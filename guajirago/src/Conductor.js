@@ -1,10 +1,56 @@
 import React, { useState, useEffect } from 'react';
+import { GoogleMap, LoadScript, Marker } from '@react-google-maps/api';
 import Calificacion from './Calificacion';
 
-function Conductor({ tipo, onCancelar }) {
-  const [segundos, setSegundos] = useState(10);
-  const [pantalla, setPantalla] = useState('conductor');
+const GOOGLE_MAPS_KEY = 'AIzaSyDCo-KBq_QWq18FbKy3otxItajq8cKvtXY';
 
+// Centro de Riohacha, La Guajira
+const centroRiohacha = { lat: 11.5444, lng: -72.9072 };
+
+const estiloMapa = {
+  width: '100%',
+  height: '280px',
+};
+
+function Conductor({ tipo, onCancelar }) {
+  const [segundos, setSegundos] = useState(60);
+  const [pantalla, setPantalla] = useState('conductor');
+  const [ubicacionConductor, setUbicacionConductor] = useState({
+    lat: 11.5444,
+    lng: -72.9072,
+  });
+  const [ubicacionPasajero, setUbicacionPasajero] = useState(null);
+
+  // Obtener ubicación real del pasajero
+  useEffect(() => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          setUbicacionPasajero({
+            lat: pos.coords.latitude,
+            lng: pos.coords.longitude,
+          });
+        },
+        () => {
+          // Si no hay permiso, usar centro de Riohacha
+          setUbicacionPasajero(centroRiohacha);
+        }
+      );
+    }
+  }, []);
+
+  // Simular movimiento del conductor hacia el pasajero
+  useEffect(() => {
+    const intervalo = setInterval(() => {
+      setUbicacionConductor(prev => ({
+        lat: prev.lat + 0.0001,
+        lng: prev.lng + 0.0001,
+      }));
+    }, 2000);
+    return () => clearInterval(intervalo);
+  }, []);
+
+  // Contador regresivo
   useEffect(() => {
     const timer = setInterval(() => {
       setSegundos(s => {
@@ -33,44 +79,36 @@ function Conductor({ tipo, onCancelar }) {
       fontFamily: 'Arial, sans-serif',
     }}>
 
-      {/* Mapa simulado */}
-      <div style={{
-        height: '280px',
-        background: 'linear-gradient(135deg, #1a2a1a, #1a1a2a)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        position: 'relative',
-      }}>
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: '60px' }}>{tipo === 'Taxi' ? '🚗' : '🏍️'}</div>
-          <div style={{
-            width: '80px',
-            height: '3px',
-            background: 'linear-gradient(90deg, #FF7A2F, transparent)',
-            margin: '8px auto',
-            borderRadius: '2px',
-          }}/>
-          <div style={{ fontSize: '24px' }}>📍</div>
-        </div>
-
-        <div style={{
-          position: 'absolute',
-          top: '16px',
-          left: '16px',
-          background: '#141416',
-          borderRadius: '12px',
-          padding: '8px 14px',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-        }}>
-          <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#2ECC71' }}/>
-          <span style={{ color: '#FFFFFF', fontSize: '13px', fontWeight: 'bold' }}>
-            En camino · {minutos}:{segs.toString().padStart(2, '0')}
-          </span>
-        </div>
-      </div>
+      {/* Mapa real de Google */}
+      <LoadScript googleMapsApiKey={GOOGLE_MAPS_KEY}>
+        <GoogleMap
+          mapContainerStyle={estiloMapa}
+          center={ubicacionConductor}
+          zoom={15}
+          options={{
+            styles: [
+              { elementType: 'geometry', stylers: [{ color: '#1A1A1E' }] },
+              { elementType: 'labels.text.fill', stylers: [{ color: '#FFFFFF' }] },
+              { elementType: 'labels.text.stroke', stylers: [{ color: '#141416' }] },
+              { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#2A2A2E' }] },
+              { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#0A0A0F' }] },
+            ],
+          }}
+        >
+          {/* Marcador del conductor */}
+          <Marker
+            position={ubicacionConductor}
+            label={{ text: tipo === 'Taxi' ? '🚗' : '🏍️', fontSize: '24px' }}
+          />
+          {/* Marcador del pasajero */}
+          {ubicacionPasajero && (
+            <Marker
+              position={ubicacionPasajero}
+              label={{ text: '📍', fontSize: '24px' }}
+            />
+          )}
+        </GoogleMap>
+      </LoadScript>
 
       {/* Card conductor */}
       <div style={{
@@ -82,6 +120,21 @@ function Conductor({ tipo, onCancelar }) {
         position: 'relative',
         zIndex: 2,
       }}>
+        {/* Tiempo */}
+        <div style={{
+          background: '#141416',
+          borderRadius: '16px',
+          padding: '12px 16px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          marginBottom: '20px',
+        }}>
+          <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#2ECC71' }}/>
+          <span style={{ color: '#FFFFFF', fontSize: '14px', fontWeight: 'bold' }}>
+            En camino · {minutos}:{segs.toString().padStart(2, '0')}
+          </span>
+        </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '20px' }}>
           <div style={{
@@ -172,7 +225,6 @@ function Conductor({ tipo, onCancelar }) {
         }}>
           Cancelar viaje
         </button>
-
       </div>
     </div>
   );
