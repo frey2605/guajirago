@@ -1,0 +1,50 @@
+╔══════════════════════════════════════════════════╗
+║         GUAJIRAGO — GUÍA DE USO DEL LOGO         ║
+╚══════════════════════════════════════════════════╝
+
+COLORES OFICIALES
+─────────────────
+• Amarillo Arena:  #FFCF4D
+• Naranja Guajiro: #FF7A2F  ← color principal
+• Magenta Wayuu:   #D6357E
+• Negro Premium:   #141416
+• Blanco:          #FFFFFF
+
+TIPOGRAFÍA
+──────────
+• Display: Arial Black / Helvetica Neue Bold
+• Texto: Arial / Helvetica
+
+ARCHIVOS INCLUIDOS
+──────────────────
+📁 01-SVG-Vectoriales/
+   └─ Para imprimir, web, redes — calidad infinita
+   └─ Abre con Illustrator, Figma, Canva, Inkscape
+
+📁 02-Iconos-App-Dark/
+   └─ Para Play Store y App Store (fondo oscuro)
+   └─ icon-1024x1024 → Play Store y App Store
+   └─ icon-180x180   → iPhone
+   └─ icon-192x192   → Android
+
+📁 03-Iconos-App-Color/
+   └─ Variante naranja para redes sociales
+
+DÓNDE USAR CADA VERSIÓN
+────────────────────────
+✅ Logo Oscuro     → App, redes sociales, pendones oscuros
+✅ Logo Claro      → Documentos, presentaciones, tarjetas
+✅ Ícono 1024px    → Play Store + App Store (obligatorio)
+✅ Ícono 512px     → Splash screen
+✅ Ícono 192px     → Android launcher
+✅ Ícono 180px     → iPhone launcher
+✅ SVG             → Imprimir en cualquier tamaño
+
+REGLAS DE USO
+─────────────
+❌ No cambiar los colores del gradiente
+❌ No estirar o deformar el símbolo
+❌ No colocar el logo sobre fondos de color similar
+❌ No añadir sombras o efectos adicionales
+✅ Siempre mantener espacio alrededor del logo
+
