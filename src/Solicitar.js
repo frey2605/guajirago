@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { db, auth } from './firebase';
-import { collection, addDoc, doc, onSnapshot, updateDoc, getDoc } from 'firebase/firestore';
+import { collection, addDoc, doc, onSnapshot, updateDoc, getDoc, setDoc } from 'firebase/firestore';
 import Calificacion from './Calificacion';
 
 const centroRiohacha = { lat: 11.5444, lng: -72.9072 };
@@ -283,28 +283,7 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
         return;
       }
 
-      // Contraoferta de un conductor: agregar a la lista si no está ya
-      if (data.estado === 'contraoferta' && data.conductorId) {
-        const key = data.conductorId + '_' + (data.contraofertaValor || '');
-        if (!contaofertasIdsRef.current.has(key)) {
-          contaofertasIdsRef.current.add(key);
-          setContraofertas(prev => {
-            // Evitar duplicados por conductorId
-            if (prev.find(c => c.conductorId === data.conductorId && c.contraofertaValor === data.contraofertaValor)) return prev;
-            return [...prev, {
-              conductorId: data.conductorId,
-              conductorNombre: data.conductorNombre,
-              conductorPlaca: data.conductorPlaca,
-              conductorVehiculo: data.conductorVehiculo,
-              conductorTelefono: data.conductorTelefono,
-              contraoferta: data.contraoferta,
-              contraofertaValor: data.contraofertaValor,
-            }];
-          });
-        }
-        // Si hay contraofertas y estamos en 'esperando', mantenemos esa pantalla
-        return;
-      }
+      // Las contraofertas ahora se escuchan en la subcoleccion (ver listener abajo)
 
       if (data.estado === 'aceptado' && pantallaRef.current !== 'fase1' && pantallaRef.current !== 'fase2' && !celebrando) {
         setContraofertas([]);
@@ -340,7 +319,30 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
       }
     });
 
-    return () => { unsub(); clearInterval(intervaloRespaldoRef.current); };
+    // Escuchar subcoleccion de contraofertas: cada conductor tiene su propio espacio
+    const unsubContraofertas = onSnapshot(
+      collection(db, 'viajes', viajeId, 'contraofertas'),
+      (snap) => {
+        snap.docChanges().forEach((change) => {
+          const oferta = { conductorId: change.doc.id, ...change.doc.data() };
+          if (change.type === 'added' && oferta.estado === 'pendiente') {
+            const key = oferta.conductorId + '_' + (oferta.contraofertaValor || '');
+            if (!contaofertasIdsRef.current.has(key)) {
+              contaofertasIdsRef.current.add(key);
+              setContraofertas(prev => {
+                if (prev.find(c => c.conductorId === oferta.conductorId && c.contraofertaValor === oferta.contraofertaValor)) return prev;
+                return [...prev, oferta];
+              });
+            }
+          }
+          if (change.type === 'modified' && oferta.estado === 'rechazada') {
+            setContraofertas(prev => prev.filter(c => c.conductorId !== oferta.conductorId));
+          }
+        });
+      }
+    );
+
+    return () => { unsub(); unsubContraofertas(); clearInterval(intervaloRespaldoRef.current); };
   }, [viajeId, celebrando, conductorEnPunto]);
 
   const escucharConductor = useCallback((conductorId) => {
@@ -426,6 +428,12 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
     contaofertasIdsRef.current.clear();
     setCelebrando(true);
     try {
+      // Marcar la contraoferta como aceptada en su propio espacio
+      await setDoc(doc(db, 'viajes', viajeId, 'contraofertas', oferta.conductorId), {
+        ...oferta,
+        estado: 'aceptada',
+      });
+      // Actualizar el viaje principal con el conductor ganador
       await updateDoc(doc(db, 'viajes', viajeId), {
         estado: 'aceptado',
         conductorId: oferta.conductorId,
@@ -445,15 +453,14 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
   };
 
   const rechazarContraoferta = async (conductorId) => {
-    // Quitar de la lista local
     setContraofertas(prev => prev.filter(c => c.conductorId !== conductorId));
-    // Si no quedan más contraofertas, volver el viaje a esperando
-    setContraofertas(prev => {
-      if (prev.filter(c => c.conductorId !== conductorId).length === 0 && viajeId) {
-        updateDoc(doc(db, 'viajes', viajeId), { estado: 'esperando' }).catch(() => {});
-      }
-      return prev.filter(c => c.conductorId !== conductorId);
-    });
+    contaofertasIdsRef.current.delete(conductorId);
+    if (viajeId) {
+      setDoc(doc(db, 'viajes', viajeId, 'contraofertas', conductorId), {
+        conductorId,
+        estado: 'rechazada',
+      }, { merge: true }).catch(() => {});
+    }
   };
 
   if (mostrarCalificacion) return <Calificacion tipo={tipo} viajeId={viajeId} nombreCalificado={viaje?.conductorNombre} quienCalifica="pasajero" onFinalizar={onVolver} />;

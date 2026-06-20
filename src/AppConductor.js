@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { db, auth } from './firebase';
-import { collection, query, where, orderBy, limit, onSnapshot, doc, updateDoc, setDoc, getDocs } from 'firebase/firestore';
+import { collection, query, where, orderBy, limit, onSnapshot, doc, updateDoc, setDoc, getDocs, addDoc } from 'firebase/firestore';
 import { registrarTokenFCM, alertarNuevoViaje, activarAudioiOS, setDebugCallback } from './Notificaciones';
 import { signOut } from 'firebase/auth';
 import Calificacion from './Calificacion';
@@ -429,32 +429,40 @@ function AppConductor({ nombre, telefono, placa, vehiculo, onCerrarSesion }) {
   useEffect(() => {
     if (!viajeIdEscuchando) return;
     const miId = auth.currentUser?.uid;
-    const unsub = onSnapshot(doc(db, 'viajes', viajeIdEscuchando), (snap) => {
+    if (!miId) return;
+
+    // Escuchar MI contraoferta en la subcoleccion (mi propio espacio)
+    const unsubMiContra = onSnapshot(doc(db, 'viajes', viajeIdEscuchando, 'contraofertas', miId), (snap) => {
+      if (!snap.exists()) return;
+      const data = snap.data();
+      // El pasajero aceptó mi contraoferta
+      if (data.estado === 'aceptada' && !celebrando && !fase) {
+        setCelebrando(true);
+        // Leer el viaje principal para tener todos los datos del viaje
+        import('firebase/firestore').then(({ getDoc }) => {
+          getDoc(doc(db, 'viajes', viajeIdEscuchando)).then(viajeSnap => {
+            const viajeData = viajeSnap.exists() ? viajeSnap.data() : {};
+            setTimeout(() => {
+              setCelebrando(false);
+              iniciarFase1({ id: viajeIdEscuchando, ...viajeData, ...data });
+              setViajeIdEscuchando(null);
+            }, 3000);
+          });
+        });
+        return;
+      }
+      // Mi contraoferta fue rechazada -> liberar
+      if (data.estado === 'rechazada') {
+        setViajeIdEscuchando(null);
+        setTarifaCambiada(false);
+        return;
+      }
+    });
+
+    // Escuchar el viaje principal para detectar cancelacion del pasajero
+    const unsubViaje = onSnapshot(doc(db, 'viajes', viajeIdEscuchando), (snap) => {
       if (!snap.exists()) { setViajeIdEscuchando(null); return; }
       const data = snap.data();
-      // Mi contraoferta fue aceptada
-      if (data.estado === 'aceptado' && data.conductorId === miId && !celebrando && !fase) {
-        setCelebrando(true);
-        setTimeout(() => {
-          setCelebrando(false);
-          iniciarFase1({ id: viajeIdEscuchando, ...data });
-          setViajeIdEscuchando(null);
-        }, 3000);
-        return;
-      }
-      // Aceptaron a otro conductor -> liberar y seguir disponible
-      if (data.estado === 'aceptado' && data.conductorId !== miId) {
-        setViajeIdEscuchando(null);
-        setTarifaCambiada(false);
-        return;
-      }
-      // La contraoferta expiró o fue rechazada (volvió a esperando) -> liberar
-      if (data.estado === 'esperando') {
-        setViajeIdEscuchando(null);
-        setTarifaCambiada(false);
-        return;
-      }
-      // El pasajero canceló
       if (data.estado === 'cancelado' || data.estado === 'cancelado_conductor') {
         setViajeIdEscuchando(null);
         setTarifaCambiada(false);
@@ -462,7 +470,8 @@ function AppConductor({ nombre, telefono, placa, vehiculo, onCerrarSesion }) {
       }
       if (data.respuestaPasajero) recibirMensajePasajero(data.respuestaPasajero);
     });
-    return () => unsub();
+
+    return () => { unsubMiContra(); unsubViaje(); };
   }, [viajeIdEscuchando, celebrando, fase, recibirMensajePasajero]);
 
   // Respaldo iPhone: si la contraoferta no es aceptada en 15s (el cartel del pasajero dura 10s),
@@ -584,12 +593,18 @@ function AppConductor({ nombre, telefono, placa, vehiculo, onCerrarSesion }) {
       descartadosRef.current[idViaje] = tsOferta;
       setViajeIdEscuchando(idViaje);
       setActivo(true);
-      // Escribir en Firestore en segundo plano
-      updateDoc(doc(db, 'viajes', idViaje), {
-        estado: 'contraoferta', conductorId: user.uid,
-        conductorNombre: nombre || 'Conductor', conductorTelefono: telefono || '',
-        conductorPlaca: placa || '', conductorVehiculo: vehiculo || '',
-        contraoferta: `$${montoContra.toLocaleString()}`, contraofertaValor: montoContra,
+      // Guardar la contraoferta en su propio espacio dentro del viaje
+      // Asi cada conductor tiene su propia fila sin pisar a los demas
+      setDoc(doc(db, 'viajes', idViaje, 'contraofertas', user.uid), {
+        conductorId: user.uid,
+        conductorNombre: nombre || 'Conductor',
+        conductorTelefono: telefono || '',
+        conductorPlaca: placa || '',
+        conductorVehiculo: vehiculo || '',
+        contraoferta: `$${montoContra.toLocaleString()}`,
+        contraofertaValor: montoContra,
+        fecha: new Date().toISOString(),
+        estado: 'pendiente',
       }).catch(() => {});
     } else {
       const viajeAceptado = solicitud;
