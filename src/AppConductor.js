@@ -364,7 +364,7 @@ function AppConductor({ nombre, telefono, placa, vehiculo, onCerrarSesion }) {
     const user = auth.currentUser;
     if (!user) return;
     setDoc(doc(db, 'conductores', user.uid), { activo: false, nombre: nombre || '' }).catch(() => {});
-  }, [activo, fase, nombre]);
+  }, [activo, fase, nombre, datosCalificacion]);
 
   useEffect(() => {
     if (!activo) { setSolicitud(null); solicitudIdRef.current = null; return; }
