@@ -283,7 +283,26 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
         return;
       }
 
-      // Las contraofertas ahora se escuchan en la subcoleccion (ver listener abajo)
+      // Contraoferta del conductor guardada en documento principal (conductor Android)
+      if (data.estado === 'contraoferta' && data.conductorId) {
+        const key = data.conductorId + '_' + (data.contraofertaValor || '');
+        if (!contaofertasIdsRef.current.has(key)) {
+          contaofertasIdsRef.current.add(key);
+          setContraofertas(prev => {
+            if (prev.find(c => c.conductorId === data.conductorId && c.contraofertaValor === data.contraofertaValor)) return prev;
+            return [...prev, {
+              conductorId: data.conductorId,
+              conductorNombre: data.conductorNombre,
+              conductorPlaca: data.conductorPlaca,
+              conductorVehiculo: data.conductorVehiculo,
+              conductorTelefono: data.conductorTelefono,
+              contraoferta: data.contraoferta,
+              contraofertaValor: data.contraofertaValor,
+            }];
+          });
+        }
+      }
+      // Las contraofertas tambien se escuchan en la subcoleccion (ver listener abajo)
 
       // Conductor aceptó la oferta directa -> pasajero debe confirmar
       if (data.estado === 'confirmando' && pantallaRef.current !== 'confirmando' && pantallaRef.current !== 'fase1' && pantallaRef.current !== 'fase2') {
