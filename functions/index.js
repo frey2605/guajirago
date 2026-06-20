@@ -127,3 +127,65 @@ exports.notificarNuevaOferta = require("firebase-functions/v2/firestore").onDocu
     return null;
   }
 });
+
+// Limpieza automática de viajes atascados y conductores inactivos
+exports.limpiarAtascados = require("firebase-functions/v2/scheduler").onSchedule("every 1 minutes", async () => {
+  const ahora = Date.now();
+  const db = admin.firestore();
+
+  const TIEMPOS = {
+    contraoferta: 1 * 60 * 1000,   // 1 minuto
+    confirmando:  1 * 60 * 1000,   // 1 minuto
+    esperando:    5 * 60 * 1000,   // 5 minutos
+    aceptado:    15 * 60 * 1000,   // 15 minutos
+  };
+
+  try {
+    // Limpiar viajes atascados
+    const viajesSnap = await db.collection("viajes")
+      .where("estado", "in", ["contraoferta", "confirmando", "esperando", "aceptado"])
+      .get();
+
+    const batch = db.batch();
+    let count = 0;
+
+    viajesSnap.forEach(doc => {
+      const data = doc.data();
+      const fechaRef = data.nuevaOferta || data.fechaSolicitud;
+      if (!fechaRef) return;
+      const edad = ahora - new Date(fechaRef).getTime();
+      const limite = TIEMPOS[data.estado];
+      if (limite && edad > limite) {
+        batch.update(doc.ref, {
+          estado: "cancelado",
+          canceladoPor: "sistema",
+          razonCancelacion: "Expirado automáticamente",
+        });
+        count++;
+        console.log("Viaje atascado cancelado:", doc.id, "estado:", data.estado, "edad:", Math.round(edad/1000), "s");
+      }
+    });
+
+    // Limpiar conductores inactivos (sin actualizar ubicación en 5 minutos)
+    const conductoresSnap = await db.collection("conductores")
+      .where("activo", "==", true)
+      .get();
+
+    conductoresSnap.forEach(doc => {
+      const data = doc.data();
+      if (!data.ubicacion?.timestamp) return;
+      const edad = ahora - new Date(data.ubicacion.timestamp).getTime();
+      if (edad > 5 * 60 * 1000) {
+        batch.update(doc.ref, { activo: false });
+        console.log("Conductor marcado inactivo:", doc.id, "sin GPS hace:", Math.round(edad/1000), "s");
+      }
+    });
+
+    await batch.commit();
+    console.log("Limpieza completada:", count, "viajes cancelados");
+    return null;
+  } catch(e) {
+    console.error("Error en limpiarAtascados:", e.message);
+    return null;
+  }
+});
