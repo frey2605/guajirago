@@ -231,6 +231,8 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
   const [contador, setContador] = useState(240);
   const [destinoCoords, setDestinoCoords] = useState(null);
   const [mostrarCalificacion, setMostrarCalificacion] = useState(false);
+  const [nuevaTarifa, setNuevaTarifa] = useState(null); // tarifa modificada mientras espera
+  const [ofertaModificada, setOfertaModificada] = useState(false);
   // Contraofertas múltiples: lista de { conductorId, conductorNombre, conductorPlaca, conductorVehiculo, contraoferta, contraofertaValor }
   const [contraofertas, setContraofertas] = useState([]);
   const contadorRef = useRef(null);
@@ -369,6 +371,33 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
   };
 
   const subirTarifa = () => setTarifa(t => t + 1000);
+
+  const subirNuevaTarifa = () => {
+    const base = nuevaTarifa !== null ? nuevaTarifa : tarifa;
+    setNuevaTarifa(base + 1000);
+    setOfertaModificada(true);
+  };
+
+  const bajarNuevaTarifa = () => {
+    const base = nuevaTarifa !== null ? nuevaTarifa : tarifa;
+    if (base <= tarifa) return; // no puede bajar de la oferta original
+    setNuevaTarifa(base - 1000);
+    setOfertaModificada(true);
+  };
+
+  const enviarNuevaOferta = async () => {
+    if (!viajeId || !nuevaTarifa || nuevaTarifa <= tarifa) return;
+    try {
+      await updateDoc(doc(db, 'viajes', viajeId), {
+        tarifa: '$' + nuevaTarifa.toLocaleString(),
+        tarifaValor: nuevaTarifa,
+        nuevaOferta: new Date().toISOString(),
+      });
+      setTarifa(nuevaTarifa);
+      setNuevaTarifa(null);
+      setOfertaModificada(false);
+    } catch(e) {}
+  };
   const bajarTarifa = () => setTarifa(t => Math.max(TARIFA_MINIMA, t - 1000));
 
   const solicitarViaje = async () => {
@@ -535,7 +564,23 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
           </div>
         )}
 
-        <div style={{ width: '60px', height: '4px', background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F)', borderRadius: '2px', marginBottom: '32px' }}/>
+        {/* Subir oferta mientras espera */}
+        <div style={{ width: '100%', background: '#1A1A1E', borderRadius: '20px', padding: '20px', marginBottom: '16px', border: '1px solid #2A2A2E' }}>
+          <p style={{ color: '#555', fontSize: '11px', margin: '0 0 12px', letterSpacing: '2px', textAlign: 'center' }}>¿QUIERES SUBIR TU OFERTA?</p>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+            <button onClick={bajarNuevaTarifa} style={{ width: '48px', height: '48px', background: (nuevaTarifa || tarifa) <= tarifa ? '#2A2A2E' : '#1A1A1E', border: `2px solid ${(nuevaTarifa || tarifa) <= tarifa ? '#2A2A2E' : '#FF7A2F'}`, borderRadius: '14px', color: (nuevaTarifa || tarifa) <= tarifa ? '#555' : '#FF7A2F', fontSize: '24px', cursor: (nuevaTarifa || tarifa) <= tarifa ? 'default' : 'pointer', fontWeight: 'bold' }}>−</button>
+            <div style={{ textAlign: 'center' }}>
+              <p style={{ color: '#FFFFFF', fontSize: '32px', fontWeight: '900', margin: '0' }}>${(nuevaTarifa || tarifa).toLocaleString()}</p>
+              <p style={{ color: '#555', fontSize: '11px', margin: '4px 0 0' }}>Oferta actual: ${tarifa.toLocaleString()}</p>
+            </div>
+            <button onClick={subirNuevaTarifa} style={{ width: '48px', height: '48px', background: '#1A1A1E', border: '2px solid #2ECC71', borderRadius: '14px', color: '#2ECC71', fontSize: '24px', cursor: 'pointer', fontWeight: 'bold' }}>+</button>
+          </div>
+          <button onClick={enviarNuevaOferta} disabled={!ofertaModificada} style={{ width: '100%', padding: '14px', background: ofertaModificada ? 'linear-gradient(135deg, #FFCF4D, #FF7A2F)' : '#2A2A2E', border: 'none', borderRadius: '14px', color: ofertaModificada ? '#141416' : '#555', fontSize: '15px', fontWeight: '900', cursor: ofertaModificada ? 'pointer' : 'default' }}>
+            {ofertaModificada ? '⬆️ Enviar nueva oferta' : 'Modifica la tarifa para enviar'}
+          </button>
+        </div>
+
+        <div style={{ width: '60px', height: '4px', background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F)', borderRadius: '2px', marginBottom: '16px' }}/>
         <button onClick={() => setMostrarCancelacion(true)} style={{ background: 'transparent', border: '1px solid #2A2A2E', borderRadius: '14px', color: '#FF4444', fontSize: '14px', padding: '14px 32px', cursor: 'pointer' }}>Cancelar viaje</button>
       </div>
     );

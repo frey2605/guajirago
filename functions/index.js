@@ -87,7 +87,6 @@ exports.notificarNuevaOferta = require("firebase-functions/v2/firestore").onDocu
 
   if (!despues || despues.estado !== "esperando") return null;
   if (antes.tarifaValor === despues.tarifaValor) return null;
-  if (!despues.conductorId) return null;
 
   console.log("notificarNuevaOferta: oferta subió de", antes.tarifaValor, "a", despues.tarifaValor);
 
