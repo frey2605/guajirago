@@ -452,13 +452,6 @@ function AppConductor({ nombre, telefono, placa, vehiculo, onCerrarSesion }) {
       if (data.estado === 'esperando') {
         setViajeIdEscuchando(null);
         setTarifaCambiada(false);
-        // Si el pasajero subió la tarifa, mostrarla inmediatamente
-        if (data.tarifaValor && data.tarifaValor > 0) {
-          setSolicitud({ id: viajeIdEscuchando, ...data });
-          solicitudIdRef.current = viajeIdEscuchando;
-          ultimaOfertaRef.current = data.nuevaOferta || data.fechaSolicitud;
-          alertarNuevoViaje();
-        }
         return;
       }
       // El pasajero canceló
@@ -476,7 +469,7 @@ function AppConductor({ nombre, telefono, placa, vehiculo, onCerrarSesion }) {
   // limpiar el indicador aunque el listener en tiempo real falle por el background de iOS.
   useEffect(() => {
     if (!viajeIdEscuchando) return;
-    const t = setTimeout(() => setViajeIdEscuchando(null), 15000);
+    const t = setTimeout(() => setViajeIdEscuchando(null), 90000);
     return () => clearTimeout(t);
   }, [viajeIdEscuchando]);
 
