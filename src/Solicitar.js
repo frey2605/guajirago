@@ -292,7 +292,9 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
         setPantalla('confirmando');
       }
 
-      if (data.estado === 'aceptado' && pantallaRef.current !== 'fase1' && pantallaRef.current !== 'fase2' && !celebrando) {
+      // Solo arrancar el viaje si el pasajero ya pasó por la pantalla de confirmacion
+      // pantallaRef.current === 'confirmando' garantiza que el pasajero tocó Confirmar
+      if (data.estado === 'aceptado' && (pantallaRef.current === 'confirmando' || pantallaRef.current === 'fase1' || pantallaRef.current === 'fase2') && pantallaRef.current !== 'fase1' && pantallaRef.current !== 'fase2' && !celebrando) {
         setContraofertas([]);
         contaofertasIdsRef.current.clear();
         setCelebrando(true);
