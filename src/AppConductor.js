@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { db, auth } from './firebase';
 import { collection, query, where, orderBy, limit, onSnapshot, doc, updateDoc, setDoc, getDocs } from 'firebase/firestore';
+import { getMessaging, getToken, onMessage } from 'firebase/messaging';
 import { signOut } from 'firebase/auth';
 import Calificacion from './Calificacion';
 
@@ -276,6 +277,22 @@ function AppConductor({ nombre, telefono, placa, vehiculo, onCerrarSesion }) {
 
   const cerrarSesion = async () => { try { await signOut(auth); } catch(e) {} if (onCerrarSesion) onCerrarSesion(); else window.location.reload(); };
 
+  const registrarTokenFCM = async (userId) => {
+    try {
+      const messaging = getMessaging();
+      const permiso = await Notification.requestPermission();
+      if (permiso !== 'granted') return;
+      const token = await getToken(messaging, {
+        vapidKey: 'BLcxcBCOZVLKO-qblckhRh0vcuAZjrXmMLZIQNxI0T6x9Viw0XxbpKoZJmNhvTb173FLjuaBIiRum8fSsZGljY0'
+      });
+      if (token && userId) {
+        await setDoc(doc(db, 'conductores', userId), { fcmToken: token }, { merge: true });
+      }
+    } catch(e) {
+      console.log('No se pudo obtener token FCM:', e);
+    }
+  };
+
   const recibirMensajePasajero = useCallback((mensaje) => {
     if (!mensaje) return;
     setRespuestaPasajero(mensaje);
@@ -289,6 +306,8 @@ function AppConductor({ nombre, telefono, placa, vehiculo, onCerrarSesion }) {
     if (!activo && !fase) return;
     const user = auth.currentUser;
     if (!user || !navigator.geolocation) return;
+    // Registrar token FCM cuando el conductor se activa
+    if (activo) registrarTokenFCM(user.uid);
 
     const guardarUbicacion = async (pos) => {
       const nueva = { lat: pos.coords.latitude, lng: pos.coords.longitude, timestamp: new Date().toISOString() };
