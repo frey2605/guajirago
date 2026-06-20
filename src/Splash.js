@@ -6,14 +6,12 @@ function Splash({ onFinish }) {
   const [pantalla, setPantalla] = useState('splash');
   const [esIphone, setEsIphone] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState(null);
-  const [yaInstalada, setYaInstalada] = useState(false);
 
   useEffect(() => {
     setTimeout(() => { setEscala(1); setOpacidad(1); }, 100);
 
     const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
     if (isStandalone) {
-      setYaInstalada(true);
       setTimeout(() => onFinish(), 2000);
       return;
     }
@@ -44,8 +42,8 @@ function Splash({ onFinish }) {
       <div style={{ backgroundColor: '#FFFFFF', minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', fontFamily: 'Arial Black, sans-serif' }}>
         <div style={{ transform: `scale(${escala})`, opacity: opacidad, transition: 'all 1s ease-in-out', textAlign: 'center' }}>
           <img src="/logo192.png" alt="GuajiraGo" style={{ width: '100px', height: '100px', borderRadius: '24px', marginBottom: '24px' }}/>
-          <h1 style={{ fontSize: '52px', color: '#0A0A0A', margin: '0', letterSpacing: '-1px' }}>Guajira</h1>
-          <h1 style={{ fontSize: '72px', background: 'linear-gradient(135deg, #4D6FE8, #1A3ED4, #0F2498)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', margin: '0', letterSpacing: '-2px' }}>GO</h1>
+          <h1 style={{ fontSize: '52px', color: '#1A3ED4', margin: '0', letterSpacing: '-1px' }}>Guajira</h1>
+          <h1 style={{ fontSize: '72px', color: '#0F2498', margin: '0', letterSpacing: '-2px' }}>GO</h1>
           <p style={{ color: '#6B7280', fontSize: '12px', letterSpacing: '4px', marginTop: '24px' }}>UNA APP · TODA LA GUAJIRA</p>
         </div>
       </div>
@@ -56,7 +54,7 @@ function Splash({ onFinish }) {
     <div style={{ backgroundColor: '#FFFFFF', minHeight: '100vh', fontFamily: 'Arial, sans-serif', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px 24px' }}>
       <img src="/logo192.png" alt="GuajiraGo" style={{ width: '100px', height: '100px', borderRadius: '24px', marginBottom: '24px', boxShadow: '0 8px 32px rgba(26, 62, 212, 0.3)' }}/>
 
-      <h1 style={{ fontSize: '32px', background: 'linear-gradient(135deg, #4D6FE8, #1A3ED4, #0F2498)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', margin: '0 0 8px', fontFamily: 'Arial Black, sans-serif' }}>GuajiraGo</h1>
+      <h1 style={{ fontSize: '32px', color: '#1A3ED4', margin: '0 0 8px', fontFamily: 'Arial Black, sans-serif' }}>GuajiraGo</h1>
 
       <p style={{ color: '#0A0A0A', fontSize: '18px', fontWeight: '900', margin: '0 0 8px', textAlign: 'center' }}>¡Instala la app gratis!</p>
       <p style={{ color: '#6B7280', fontSize: '14px', margin: '0 0 32px', textAlign: 'center' }}>Solicita taxi o mototaxi en Riohacha desde tu celular</p>
