@@ -254,7 +254,7 @@ function HistorialConductor({ onVolver }) {
 }
 
 function AppConductor({ nombre, telefono, placa, vehiculo, onCerrarSesion }) {
-  const [activo, setActivo] = useState(true);
+  const [activo, setActivo] = useState(false);
   const [solicitud, setSolicitud] = useState(null);
   const [fase, setFase] = useState(null);
   const [viajeActual, setViajeActual] = useState(null);
@@ -452,6 +452,13 @@ function AppConductor({ nombre, telefono, placa, vehiculo, onCerrarSesion }) {
       if (data.estado === 'esperando') {
         setViajeIdEscuchando(null);
         setTarifaCambiada(false);
+        // Si el pasajero subió la tarifa, mostrarla inmediatamente
+        if (data.tarifaValor && data.tarifaValor > 0) {
+          setSolicitud({ id: viajeIdEscuchando, ...data });
+          solicitudIdRef.current = viajeIdEscuchando;
+          ultimaOfertaRef.current = data.nuevaOferta || data.fechaSolicitud;
+          alertarNuevoViaje();
+        }
         return;
       }
       // El pasajero canceló
