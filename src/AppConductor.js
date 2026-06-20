@@ -360,7 +360,7 @@ function AppConductor({ nombre, telefono, placa, vehiculo, onCerrarSesion }) {
   }, [activo, fase, nombre, telefono, placa, vehiculo]);
 
   useEffect(() => {
-    if (activo || fase) return;
+    if (activo || fase || datosCalificacion) return;
     const user = auth.currentUser;
     if (!user) return;
     setDoc(doc(db, 'conductores', user.uid), { activo: false, nombre: nombre || '' }).catch(() => {});
