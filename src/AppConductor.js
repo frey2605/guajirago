@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { db, auth } from './firebase';
 import { collection, query, where, orderBy, limit, onSnapshot, doc, updateDoc, setDoc, getDocs } from 'firebase/firestore';
-import { getMessaging, getToken, onMessage } from 'firebase/messaging';
+import { registrarTokenFCM, alertarNuevoViaje, activarAudioiOS, setDebugCallback } from './Notificaciones';
 import { signOut } from 'firebase/auth';
 import Calificacion from './Calificacion';
+import Llamada from './Llamada';
 
 const centroRiohacha = { lat: 11.5444, lng: -72.9072 };
 const TARIFA_MINIMA = 8000;
@@ -272,26 +273,41 @@ function AppConductor({ nombre, telefono, placa, vehiculo, onCerrarSesion }) {
   const [contador, setContador] = useState(240);
   const [verHistorial, setVerHistorial] = useState(false);
   const [datosCalificacion, setDatosCalificacion] = useState(null);
+  const [enLlamada, setEnLlamada] = useState(false);
+  const [llamadaEntrante, setLlamadaEntrante] = useState(false);
   const contadorRef = useRef(null);
+  const [debugMsg, setDebugMsg] = React.useState('');
   const ultimoMensajeRef = useRef(null);
+  const solicitudIdRef = useRef(null);
+  const descartadosRef = useRef({}); // { [viajeId]: timestampOfertaAlDescartar }
+  const ultimaOfertaRef = useRef(null); // timestamp de la última oferta mostrada (para re-sonar si sube)
 
-  const cerrarSesion = async () => { try { await signOut(auth); } catch(e) {} if (onCerrarSesion) onCerrarSesion(); else window.location.reload(); };
-
-  const registrarTokenFCM = async (userId) => {
+  const cerrarSesion = async () => {
     try {
-      const messaging = getMessaging();
-      const permiso = await Notification.requestPermission();
-      if (permiso !== 'granted') return;
-      const token = await getToken(messaging, {
-        vapidKey: 'BLcxcBCOZVLKO-qblckhRh0vcuAZjrXmMLZIQNxI0T6x9Viw0XxbpKoZJmNhvTb173FLjuaBIiRum8fSsZGljY0'
-      });
-      if (token && userId) {
-        await setDoc(doc(db, 'conductores', userId), { fcmToken: token }, { merge: true });
+      // Cancelar viaje activo si lo hay
+      if (viajeActual) {
+        await updateDoc(doc(db, 'viajes', viajeActual.id), { estado: 'cancelado_conductor', canceladoPor: 'conductor', razonCancelacion: 'Conductor cerró sesión' });
       }
-    } catch(e) {
-      console.log('No se pudo obtener token FCM:', e);
-    }
+      // Marcar conductor como inactivo
+      const user = auth.currentUser;
+      if (user) await setDoc(doc(db, 'conductores', user.uid), { activo: false }, { merge: true });
+    } catch(e) {}
+    try { await signOut(auth); } catch(e) {}
+    if (onCerrarSesion) onCerrarSesion(); else window.location.reload();
   };
+
+
+
+  // Registrar token FCM al cargar la app
+  useEffect(() => {
+    setDebugCallback((msg) => {
+      setDebugMsg(msg);
+      setTimeout(() => setDebugMsg(''), 8000);
+    });
+    registrarTokenFCM();
+  }, []);
+
+
 
   const recibirMensajePasajero = useCallback((mensaje) => {
     if (!mensaje) return;
@@ -307,16 +323,24 @@ function AppConductor({ nombre, telefono, placa, vehiculo, onCerrarSesion }) {
     const user = auth.currentUser;
     if (!user || !navigator.geolocation) return;
     // Registrar token FCM cuando el conductor se activa
-    if (activo) registrarTokenFCM(user.uid);
+    if (activo) registrarTokenFCM();
 
     const guardarUbicacion = async (pos) => {
       const nueva = { lat: pos.coords.latitude, lng: pos.coords.longitude, timestamp: new Date().toISOString() };
       setUbicacion(nueva);
       try {
+        // Obtener token FCM fresco cada vez que se guarda ubicación
+        let tokenFCM = null;
+        try {
+          const { getMessaging, getToken } = await import('firebase/messaging');
+          const messaging = getMessaging();
+          tokenFCM = await getToken(messaging, { vapidKey: 'BLcxcBCOZVLKO-qblckhRh0vcuAZjrXmMLZIQNxI0T6x9Viw0XxbpKoZJmNhvTb173FLjuaBIiRum8fSsZGljY0' });
+        } catch(e) {}
         await setDoc(doc(db, 'conductores', user.uid), {
           nombre: nombre || 'Conductor', telefono: telefono || '',
           placa: placa || '', vehiculo: vehiculo || '',
           ubicacion: nueva, activo: true,
+          ...(tokenFCM ? { fcmToken: tokenFCM } : {}),
         });
       } catch (e) {}
     };
@@ -343,38 +367,111 @@ function AppConductor({ nombre, telefono, placa, vehiculo, onCerrarSesion }) {
   }, [activo, fase, nombre]);
 
   useEffect(() => {
-    if (!activo) { setSolicitud(null); return; }
+    if (!activo) { setSolicitud(null); solicitudIdRef.current = null; return; }
+    const VENTANA_MS = 6 * 60 * 1000; // respaldo: ocultar solicitudes colgadas de más de 6 minutos
     const q = query(collection(db, 'viajes'), where('estado', '==', 'esperando'));
     const unsub = onSnapshot(q, (snap) => {
-      if (!snap.empty) {
-        const d = snap.docs[0];
-        const datos = { id: d.id, ...d.data() };
-        setSolicitud(datos);
-        setTarifaModificada(datos.tarifaValor || TARIFA_MINIMA);
-        setTarifaCambiada(false);
-      } else { setSolicitud(null); }
+      const ahora = Date.now();
+      const tsDe = (v) => new Date(v.nuevaOferta || v.fechaSolicitud).getTime();
+      const vigentes = snap.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .filter(v => {
+          if (!v.nuevaOferta && !v.fechaSolicitud) return false;
+          const ts = tsDe(v);
+          const edad = ahora - ts;
+          if (edad < 0 || edad > VENTANA_MS) return false; // respaldo global contra colgadas
+          // Si este conductor ya descartó el viaje (rechazó o se le venció) y la oferta NO
+          // ha cambiado desde entonces, no se lo volvemos a mostrar.
+          const descartadoEn = descartadosRef.current[v.id];
+          if (descartadoEn && ts <= new Date(descartadoEn).getTime()) return false;
+          return true;
+        })
+        .sort((a, b) => tsDe(b) - tsDe(a));
+
+      if (vigentes.length === 0) {
+        setSolicitud(null);
+        solicitudIdRef.current = null;
+        return;
+      }
+      const datos = vigentes[0];
+      // Si reaparece porque la oferta cambió, quitarlo de descartados para que cuente como nuevo
+      if (descartadosRef.current[datos.id]) delete descartadosRef.current[datos.id];
+      const tsActual = datos.nuevaOferta || datos.fechaSolicitud;
+      const esNuevoViaje = solicitudIdRef.current !== datos.id;
+      const ofertaSubio = !esNuevoViaje && ultimaOfertaRef.current !== tsActual;
+      solicitudIdRef.current = datos.id;
+      ultimaOfertaRef.current = tsActual;
+      setSolicitud(datos);
+      // Siempre mostrar la oferta REAL del pasajero y limpiar cualquier contraoferta vieja.
+      // (El conductor ajusta sobre este valor; si toca +/- pasa a "Enviar contraoferta")
+      setTarifaModificada(datos.tarifaValor || TARIFA_MINIMA);
+      setTarifaCambiada(false);
+      // Suena GO GO: viaje nuevo, reaparece tras descarte, o el pasajero subió su oferta
+      if (esNuevoViaje || ofertaSubio) alertarNuevoViaje();
     });
     return () => unsub();
   }, [activo]);
 
+  // Si el conductor no acepta ni rechaza en 3 minutos, se descarta esa solicitud para él.
+  // (Reaparece solo si el pasajero cambia la oferta.) El timer se reinicia si la oferta cambia.
+  useEffect(() => {
+    if (!solicitud?.id) return;
+    const TIEMPO_DESCARTE = 3 * 60 * 1000; // 3 minutos
+    const t = setTimeout(() => {
+      descartadosRef.current[solicitud.id] = solicitud.nuevaOferta || solicitud.fechaSolicitud;
+      solicitudIdRef.current = null;
+      setSolicitud(null);
+      setTarifaCambiada(false);
+    }, TIEMPO_DESCARTE);
+    return () => clearTimeout(t);
+  }, [solicitud?.id, solicitud?.nuevaOferta]);
+
   useEffect(() => {
     if (!viajeIdEscuchando) return;
+    const miId = auth.currentUser?.uid;
     const unsub = onSnapshot(doc(db, 'viajes', viajeIdEscuchando), (snap) => {
-      if (snap.exists()) {
-        const data = snap.data();
-        if (data.estado === 'aceptado' && !celebrando && !fase) {
-          setCelebrando(true);
-          setTimeout(() => {
-            setCelebrando(false);
-            iniciarFase1({ id: viajeIdEscuchando, ...data });
-            setViajeIdEscuchando(null);
-          }, 3000);
-        }
-        if (data.respuestaPasajero) recibirMensajePasajero(data.respuestaPasajero);
+      if (!snap.exists()) { setViajeIdEscuchando(null); return; }
+      const data = snap.data();
+      // Mi contraoferta fue aceptada
+      if (data.estado === 'aceptado' && data.conductorId === miId && !celebrando && !fase) {
+        setCelebrando(true);
+        setTimeout(() => {
+          setCelebrando(false);
+          iniciarFase1({ id: viajeIdEscuchando, ...data });
+          setViajeIdEscuchando(null);
+        }, 3000);
+        return;
       }
+      // Aceptaron a otro conductor -> liberar y seguir disponible
+      if (data.estado === 'aceptado' && data.conductorId !== miId) {
+        setViajeIdEscuchando(null);
+        setTarifaCambiada(false);
+        return;
+      }
+      // La contraoferta expiró o fue rechazada (volvió a esperando) -> liberar
+      if (data.estado === 'esperando') {
+        setViajeIdEscuchando(null);
+        setTarifaCambiada(false);
+        return;
+      }
+      // El pasajero canceló
+      if (data.estado === 'cancelado' || data.estado === 'cancelado_conductor') {
+        setViajeIdEscuchando(null);
+        setTarifaCambiada(false);
+        return;
+      }
+      if (data.respuestaPasajero) recibirMensajePasajero(data.respuestaPasajero);
     });
     return () => unsub();
   }, [viajeIdEscuchando, celebrando, fase, recibirMensajePasajero]);
+
+  // Respaldo iPhone: si la contraoferta no es aceptada en 15s (el cartel del pasajero dura 10s),
+  // limpiar el indicador aunque el listener en tiempo real falle por el background de iOS.
+  useEffect(() => {
+    if (!viajeIdEscuchando) return;
+    const t = setTimeout(() => setViajeIdEscuchando(null), 15000);
+    return () => clearTimeout(t);
+  }, [viajeIdEscuchando]);
 
   useEffect(() => {
     if (!viajeActual?.id || !fase) return;
@@ -448,6 +545,7 @@ function AppConductor({ nombre, telefono, placa, vehiculo, onCerrarSesion }) {
     setFase(null); setViajeActual(null); setTiempoLlegada(null); setDistancia(null);
     setRespuestaPasajero(null); setMensajeGrande(null); ultimoMensajeRef.current = null;
     setUbicacionPasajero(null); setDestinoCoords(null); setActivo(false); setContador(240);
+    setTarifaModificada(TARIFA_MINIMA); setTarifaCambiada(false); solicitudIdRef.current = null; ultimaOfertaRef.current = null;
   };
 
   const finalizarViaje = async () => {
@@ -462,31 +560,61 @@ function AppConductor({ nombre, telefono, placa, vehiculo, onCerrarSesion }) {
     setFase(null); setViajeActual(null); setTiempoLlegada(null); setDistancia(null);
     setRespuestaPasajero(null); setMensajeGrande(null); ultimoMensajeRef.current = null;
     setUbicacionPasajero(null); setDestinoCoords(null); setActivo(false); setContador(240);
+    setTarifaModificada(TARIFA_MINIMA); setTarifaCambiada(false); solicitudIdRef.current = null; ultimaOfertaRef.current = null;
   };
 
-  const subirTarifa = () => { setTarifaModificada(t => t + 1000); setTarifaCambiada(true); };
+  const subirTarifa = () => {
+    setTarifaModificada(prev => (tarifaCambiada ? prev : (solicitud?.tarifaValor || TARIFA_MINIMA)) + 1000);
+    setTarifaCambiada(true);
+  };
+
+
 
   const aceptarOEnviar = async () => {
     if (!solicitud) return;
     const user = auth.currentUser;
     if (tarifaCambiada) {
-      await updateDoc(doc(db, 'viajes', solicitud.id), {
+      const idViaje = solicitud.id;
+      const tsOferta = solicitud.nuevaOferta || solicitud.fechaSolicitud;
+      const montoContra = tarifaModificada;
+      // Volver al menú INMEDIATAMENTE sin esperar la escritura (clave para iPhone PWA)
+      setSolicitud(null);
+      solicitudIdRef.current = null;
+      setTarifaCambiada(false);
+      descartadosRef.current[idViaje] = tsOferta;
+      setViajeIdEscuchando(idViaje);
+      setActivo(true);
+      // Escribir en Firestore en segundo plano
+      updateDoc(doc(db, 'viajes', idViaje), {
         estado: 'contraoferta', conductorId: user.uid,
         conductorNombre: nombre || 'Conductor', conductorTelefono: telefono || '',
         conductorPlaca: placa || '', conductorVehiculo: vehiculo || '',
-        contraoferta: `$${tarifaModificada.toLocaleString()}`, contraofertaValor: tarifaModificada,
-      });
-      setViajeIdEscuchando(solicitud.id); setSolicitud(null);
+        contraoferta: `$${montoContra.toLocaleString()}`, contraofertaValor: montoContra,
+      }).catch(() => {});
     } else {
+      const viajeAceptado = solicitud;
       setCelebrando(true);
-      await updateDoc(doc(db, 'viajes', solicitud.id), {
+      // Escribir en Firestore en segundo plano sin bloquear la UI
+      updateDoc(doc(db, 'viajes', viajeAceptado.id), {
         estado: 'aceptado', conductorId: user.uid,
         conductorNombre: nombre || 'Conductor', conductorTelefono: telefono || '',
         conductorPlaca: placa || '', conductorVehiculo: vehiculo || '',
-      });
-      setTimeout(() => { setCelebrando(false); iniciarFase1(solicitud); setSolicitud(null); }, 3000);
+      }).catch(() => {});
+      setTimeout(() => { setCelebrando(false); iniciarFase1(viajeAceptado); setSolicitud(null); }, 3000);
     }
   };
+
+  // Escuchar llamada entrante del pasajero
+  useEffect(() => {
+    if (!viajeActual?.id) return;
+    const unsub = onSnapshot(doc(db, 'llamadas', viajeActual.id), (s) => {
+      if (s.exists() && s.data().estado === 'llamando') setLlamadaEntrante(true);
+      if (!s.exists() || s.data().estado === 'terminada') setLlamadaEntrante(false);
+    });
+    return () => unsub();
+  }, [viajeActual]);
+
+  if (enLlamada || llamadaEntrante) return <Llamada viajeId={viajeActual?.id} miRol="conductor" nombreOtro={viajeActual?.pasajeroEmail?.split('@')[0] || 'Pasajero'} onCerrar={() => { setEnLlamada(false); setLlamadaEntrante(false); }} />;
 
   if (datosCalificacion) return <Calificacion tipo={null} viajeId={datosCalificacion.viajeId} nombreCalificado={datosCalificacion.nombrePasajero} quienCalifica="conductor" onFinalizar={() => setDatosCalificacion(null)} />;
 
@@ -502,7 +630,7 @@ function AppConductor({ nombre, telefono, placa, vehiculo, onCerrarSesion }) {
         <h2 style={{ color: '#FFFFFF', fontSize: '24px', fontWeight: '900', margin: '0 0 12px', textAlign: 'center' }}>El pasajero canceló el viaje</h2>
         <p style={{ color: '#555', fontSize: '14px', margin: '0 0 8px', textAlign: 'center' }}>Razón: <span style={{ color: '#FF7A2F' }}>{viajeActual?.razonCancelacion || 'No especificada'}</span></p>
         <p style={{ color: '#555', fontSize: '13px', margin: '0 0 32px', textAlign: 'center' }}>Puedes activarte para recibir nuevos viajes</p>
-        <button onClick={() => { setFase(null); setViajeActual(null); setUbicacionPasajero(null); setDestinoCoords(null); setActivo(false); }} style={{ width: '100%', padding: '18px', background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)', border: 'none', borderRadius: '16px', color: '#141416', fontSize: '18px', fontWeight: '900', cursor: 'pointer' }}>Volver al inicio</button>
+        <button onClick={() => { setFase(null); setViajeActual(null); setUbicacionPasajero(null); setDestinoCoords(null); setActivo(false); setTarifaModificada(TARIFA_MINIMA); setTarifaCambiada(false); solicitudIdRef.current = null; ultimaOfertaRef.current = null; }} style={{ width: '100%', padding: '18px', background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)', border: 'none', borderRadius: '16px', color: '#141416', fontSize: '18px', fontWeight: '900', cursor: 'pointer' }}>Volver al inicio</button>
       </div>
     );
   }
@@ -537,9 +665,12 @@ function AppConductor({ nombre, telefono, placa, vehiculo, onCerrarSesion }) {
             <div style={{ textAlign: 'right' }}><p style={{ color: '#555', fontSize: '10px', margin: '0' }}>TARIFA</p><p style={{ color: '#2ECC71', fontSize: '20px', fontWeight: '900', margin: '4px 0 0' }}>{viajeActual?.tarifa}</p></div>
           </div>
           {fase === 'recogiendo' && (
-            <div style={{ display: 'flex', gap: '12px' }}>
-              <button onClick={() => setMostrarCancelacion(true)} style={{ flex: 1, padding: '14px', background: 'transparent', border: '1px solid #FF4444', borderRadius: '14px', color: '#FF4444', fontSize: '14px', cursor: 'pointer' }}>Cancelar</button>
-              <button onClick={llegueAlPunto} style={{ flex: 2, padding: '16px', background: 'linear-gradient(135deg, #2ECC71, #27AE60)', border: 'none', borderRadius: '16px', color: '#FFFFFF', fontSize: '16px', fontWeight: '900', cursor: 'pointer' }}>📍 Llegué al punto</button>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <button onClick={() => setEnLlamada(true)} style={{ width: '100%', padding: '14px', background: 'linear-gradient(135deg, #2ECC71, #27AE60)', border: 'none', borderRadius: '14px', color: '#FFFFFF', fontSize: '15px', fontWeight: 'bold', cursor: 'pointer' }}>📞 Llamar al pasajero</button>
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button onClick={() => setMostrarCancelacion(true)} style={{ flex: 1, padding: '14px', background: 'transparent', border: '1px solid #FF4444', borderRadius: '14px', color: '#FF4444', fontSize: '14px', cursor: 'pointer' }}>Cancelar</button>
+                <button onClick={llegueAlPunto} style={{ flex: 2, padding: '16px', background: 'linear-gradient(135deg, #2ECC71, #27AE60)', border: 'none', borderRadius: '16px', color: '#FFFFFF', fontSize: '16px', fontWeight: '900', cursor: 'pointer' }}>📍 Llegué al punto</button>
+              </div>
             </div>
           )}
           {fase === 'en_punto' && (
@@ -587,15 +718,7 @@ function AppConductor({ nombre, telefono, placa, vehiculo, onCerrarSesion }) {
     );
   }
 
-  if (viajeIdEscuchando && !fase) {
-    return (
-      <div style={{ backgroundColor: '#141416', minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
-        <div style={{ fontSize: '60px', marginBottom: '24px' }}>⏳</div>
-        <h2 style={{ color: '#FFFFFF', fontSize: '20px', margin: '0 0 8px', textAlign: 'center' }}>Contraoferta enviada</h2>
-        <p style={{ color: '#555', fontSize: '14px', margin: '0', textAlign: 'center' }}>Esperando respuesta del pasajero...</p>
-      </div>
-    );
-  }
+  // Si hay contraoferta enviada pero no hay fase activa, mostrar menu normal
 
   return (
     <div style={{ backgroundColor: '#141416', minHeight: '100vh', fontFamily: 'Arial, sans-serif' }}>
@@ -612,14 +735,26 @@ function AppConductor({ nombre, telefono, placa, vehiculo, onCerrarSesion }) {
         <button onClick={cerrarSesion} style={{ background: '#141416', border: 'none', borderRadius: '12px', padding: '10px 16px', color: '#FF4444', fontSize: '13px', fontWeight: 'bold', cursor: 'pointer' }}>🚪 Salir</button>
       </div>
       <div style={{ padding: '24px 20px' }}>
+        {debugMsg && (
+          <div style={{ background: '#1A1A00', borderRadius: '12px', padding: '10px 14px', marginBottom: '12px', border: '1px solid #FFCF4D' }}>
+            <p style={{ color: '#FFCF4D', fontSize: '12px', margin: '0', fontFamily: 'monospace' }}>{debugMsg}</p>
+          </div>
+        )}
         {ubicacion && <div style={{ background: '#0A1F0A', borderRadius: '16px', padding: '12px 16px', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px', border: '1px solid #1A3A1A' }}><div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#2ECC71' }}/><span style={{ color: '#2ECC71', fontSize: '13px', fontWeight: 'bold' }}>GPS activo — ubicación en tiempo real</span></div>}
         <div style={{ background: '#1A1A1E', borderRadius: '20px', padding: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
           <div><p style={{ color: '#FFFFFF', fontWeight: '900', fontSize: '16px', margin: '0' }}>{activo ? 'Estoy disponible' : 'No disponible'}</p><p style={{ color: '#555', fontSize: '12px', margin: '4px 0 0' }}>{activo ? 'Puedes recibir solicitudes' : 'Actívate para recibir viajes'}</p></div>
-          <div onClick={() => setActivo(!activo)} style={{ width: '56px', height: '32px', borderRadius: '16px', background: activo ? 'linear-gradient(135deg, #FFCF4D, #FF7A2F)' : '#2A2A2E', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '0 4px', justifyContent: activo ? 'flex-end' : 'flex-start' }}>
+          <div onClick={() => { activarAudioiOS(); setActivo(!activo); }} style={{ width: '56px', height: '32px', borderRadius: '16px', background: activo ? 'linear-gradient(135deg, #FFCF4D, #FF7A2F)' : '#2A2A2E', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '0 4px', justifyContent: activo ? 'flex-end' : 'flex-start' }}>
             <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: '#FFFFFF' }}/>
           </div>
         </div>
+        {viajeIdEscuchando && !fase && (
+          <div style={{ background: 'rgba(255,207,77,0.1)', borderRadius: '16px', padding: '14px 16px', marginBottom: '12px', border: '1px solid #FFCF4D', display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <span style={{ fontSize: '20px' }}>⏳</span>
+            <p style={{ color: '#FFCF4D', fontSize: '13px', fontWeight: 'bold', margin: '0' }}>Contraoferta enviada — esperando respuesta</p>
+          </div>
+        )}
         {activo && !solicitud && <div style={{ background: '#1A1A1E', borderRadius: '20px', padding: '32px 20px', textAlign: 'center', border: '1px dashed #2A2A2E' }}><p style={{ fontSize: '40px', margin: '0 0 12px' }}>⏳</p><p style={{ color: '#555', fontSize: '14px', margin: '0' }}>Esperando solicitudes de viaje...</p></div>}
+
         {!activo && (
           <div onClick={() => setVerHistorial(true)} style={{ background: '#1A1A1E', borderRadius: '20px', padding: '20px', display: 'flex', alignItems: 'center', gap: '16px', border: '1px solid #2A2A2E', cursor: 'pointer', marginTop: '4px' }}>
             <span style={{ fontSize: '36px' }}>🕐</span>
@@ -635,13 +770,14 @@ function AppConductor({ nombre, telefono, placa, vehiculo, onCerrarSesion }) {
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px', background: '#141416', borderRadius: '16px', padding: '16px' }}>
               <div>
                 <p style={{ color: '#555', fontSize: '10px', margin: '0' }}>{tarifaCambiada ? 'TU CONTRAOFERTA' : 'OFERTA DEL PASAJERO'}</p>
-                <p style={{ color: tarifaCambiada ? '#FF7A2F' : '#2ECC71', fontWeight: '900', fontSize: '28px', margin: '4px 0 0' }}>${tarifaModificada.toLocaleString()}</p>
+                <p style={{ color: tarifaCambiada ? '#FF7A2F' : '#2ECC71', fontWeight: '900', fontSize: '28px', margin: '4px 0 0' }}>${(tarifaCambiada ? tarifaModificada : (solicitud.tarifaValor || TARIFA_MINIMA)).toLocaleString()}</p>
+                {!tarifaCambiada && solicitud?.nuevaOferta && <p style={{ color: '#FFCF4D', fontSize: '11px', margin: '4px 0 0' }}>⬆️ Pasajero actualizó su oferta</p>}
                 {tarifaCambiada && <p style={{ color: '#555', fontSize: '11px', margin: '4px 0 0' }}>Oferta original: {solicitud.tarifa}</p>}
               </div>
               <button onClick={subirTarifa} style={{ width: '56px', height: '56px', background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F)', border: 'none', borderRadius: '16px', color: '#141416', fontSize: '28px', fontWeight: '900', cursor: 'pointer' }}>+</button>
             </div>
             <div style={{ display: 'flex', gap: '12px' }}>
-              <button onClick={() => setSolicitud(null)} style={{ flex: 1, padding: '14px', background: '#141416', border: 'none', borderRadius: '14px', color: '#555', fontSize: '14px', fontWeight: 'bold', cursor: 'pointer' }}>✗ Rechazar</button>
+              <button onClick={() => { if (solicitud) { descartadosRef.current[solicitud.id] = solicitud.nuevaOferta || solicitud.fechaSolicitud; solicitudIdRef.current = null; setSolicitud(null); setTarifaCambiada(false); } }} style={{ flex: 1, padding: '14px', background: '#141416', border: 'none', borderRadius: '14px', color: '#555', fontSize: '14px', fontWeight: 'bold', cursor: 'pointer' }}>✗ Rechazar</button>
               <button onClick={aceptarOEnviar} style={{ flex: 2, padding: '14px', background: tarifaCambiada ? 'linear-gradient(135deg, #FF7A2F, #D6357E)' : 'linear-gradient(135deg, #FFCF4D, #FF7A2F)', border: 'none', borderRadius: '14px', color: '#141416', fontSize: '14px', fontWeight: 'bold', cursor: 'pointer' }}>
                 {tarifaCambiada ? '💬 Enviar contraoferta' : '✅ Aceptar viaje'}
               </button>
