@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { db, auth } from './firebase';
-import { collection, query, where, onSnapshot, doc, updateDoc, setDoc } from 'firebase/firestore';
+import { collection, query, where, orderBy, limit, onSnapshot, doc, updateDoc, setDoc, getDocs } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
+import Calificacion from './Calificacion';
 
 const centroRiohacha = { lat: 11.5444, lng: -72.9072 };
 const TARIFA_MINIMA = 8000;
@@ -12,6 +13,14 @@ const MAP_STYLES = [
   { elementType: 'labels.text.stroke', stylers: [{ color: '#141416' }] },
   { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#2A2A2E' }] },
   { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#0A0A0F' }] },
+];
+
+const RAZONES_CANCELACION_CONDUCTOR = [
+  'El pasajero no aparece',
+  'Dirección incorrecta o no la encuentro',
+  'El pasajero solicitó algo diferente',
+  'Problema con el vehículo',
+  'Otro motivo',
 ];
 
 function Celebracion() {
@@ -28,6 +37,44 @@ function Celebracion() {
   );
 }
 
+function MensajeGrande({ mensaje, onCerrar }) {
+  return (
+    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', zIndex: 9998, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
+      <div style={{ fontSize: '70px', marginBottom: '20px' }}>💬</div>
+      <p style={{ color: '#FF7A2F', fontSize: '14px', margin: '0 0 16px', letterSpacing: '2px', fontWeight: 'bold', textAlign: 'center' }}>MENSAJE DEL PASAJERO</p>
+      <div style={{ background: 'linear-gradient(135deg, #1A1A1E, #2A2A2E)', borderRadius: '24px', padding: '32px 24px', width: '100%', maxWidth: '420px', border: '2px solid #FF7A2F', textAlign: 'center' }}>
+        <p style={{ color: '#FFFFFF', fontSize: '32px', fontWeight: '900', margin: '0', lineHeight: '1.3' }}>{mensaje}</p>
+      </div>
+      <button onClick={onCerrar} style={{ marginTop: '28px', padding: '16px 40px', background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F)', border: 'none', borderRadius: '16px', color: '#141416', fontSize: '16px', fontWeight: '900', cursor: 'pointer' }}>Entendido</button>
+    </div>
+  );
+}
+
+function ModalCancelacion({ razones, onConfirmar, onCerrar }) {
+  const [razonSeleccionada, setRazonSeleccionada] = useState('');
+  return (
+    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', zIndex: 9997, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
+      <div style={{ background: '#1A1A1E', borderRadius: '24px', padding: '28px 24px', width: '100%', maxWidth: '440px', border: '1px solid #2A2A2E' }}>
+        <p style={{ color: '#FF4444', fontSize: '13px', margin: '0 0 8px', letterSpacing: '2px', fontWeight: 'bold', textAlign: 'center' }}>CANCELAR VIAJE</p>
+        <p style={{ color: '#FFFFFF', fontSize: '18px', fontWeight: '900', margin: '0 0 20px', textAlign: 'center' }}>¿Por qué cancelas?</p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '24px' }}>
+          {razones.map((razon, i) => (
+            <button key={i} onClick={() => setRazonSeleccionada(razon)} style={{ padding: '14px 16px', background: razonSeleccionada === razon ? 'rgba(255,68,68,0.15)' : '#141416', border: `1px solid ${razonSeleccionada === razon ? '#FF4444' : '#2A2A2E'}`, borderRadius: '14px', color: razonSeleccionada === razon ? '#FF4444' : '#FFFFFF', fontSize: '14px', cursor: 'pointer', textAlign: 'left', fontWeight: razonSeleccionada === razon ? 'bold' : 'normal' }}>
+              {razonSeleccionada === razon ? '● ' : '○ '}{razon}
+            </button>
+          ))}
+        </div>
+        <div style={{ display: 'flex', gap: '12px' }}>
+          <button onClick={onCerrar} style={{ flex: 1, padding: '14px', background: '#141416', border: '1px solid #2A2A2E', borderRadius: '14px', color: '#555', fontSize: '14px', fontWeight: 'bold', cursor: 'pointer' }}>Volver</button>
+          <button onClick={() => razonSeleccionada && onConfirmar(razonSeleccionada)} style={{ flex: 2, padding: '14px', background: razonSeleccionada ? '#FF4444' : '#2A2A2E', border: 'none', borderRadius: '14px', color: razonSeleccionada ? '#FFFFFF' : '#555', fontSize: '14px', fontWeight: '900', cursor: razonSeleccionada ? 'pointer' : 'default' }}>
+            Confirmar cancelación
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function MapaConductor({ ubicacionConductor, ubicacionDestino, colorRuta, tipo, onTiempo }) {
   const mapRef = useRef(null);
   const mapaRef = useRef(null);
@@ -36,7 +83,6 @@ function MapaConductor({ ubicacionConductor, ubicacionDestino, colorRuta, tipo, 
   const rutaRef = useRef(null);
   const ajustadoRef = useRef(false);
 
-  // Inicializar el mapa apenas el div esté listo (no espera al GPS)
   useEffect(() => {
     if (!window.google || !mapRef.current || mapaRef.current) return;
     mapaRef.current = new window.google.maps.Map(mapRef.current, {
@@ -51,7 +97,6 @@ function MapaConductor({ ubicacionConductor, ubicacionDestino, colorRuta, tipo, 
     });
   }, []);
 
-  // Actualizar marcador del conductor cada vez que cambia su posición
   useEffect(() => {
     if (!mapaRef.current || !window.google || !ubicacionConductor) return;
     if (marcadorConductorRef.current) {
@@ -62,12 +107,10 @@ function MapaConductor({ ubicacionConductor, ubicacionDestino, colorRuta, tipo, 
         map: mapaRef.current,
         label: { text: tipo === 'Taxi' ? '🚗' : '🏍️', fontSize: '28px' },
       });
-      // Primera vez que tenemos ubicación: centrar el mapa en el conductor
       mapaRef.current.setCenter(ubicacionConductor);
     }
   }, [ubicacionConductor, tipo]);
 
-  // Actualizar marcador del destino
   useEffect(() => {
     if (!mapaRef.current || !window.google || !ubicacionDestino) return;
     if (marcadorDestinoRef.current) {
@@ -81,10 +124,8 @@ function MapaConductor({ ubicacionConductor, ubicacionDestino, colorRuta, tipo, 
     }
   }, [ubicacionDestino]);
 
-  // Calcular la ruta cada vez que tengamos ambos puntos (se recalcula al moverse)
   useEffect(() => {
     if (!mapaRef.current || !window.google || !ubicacionConductor || !ubicacionDestino) return;
-
     const directionsService = new window.google.maps.DirectionsService();
     directionsService.route({
       origin: ubicacionConductor,
@@ -101,7 +142,6 @@ function MapaConductor({ ubicacionConductor, ubicacionDestino, colorRuta, tipo, 
         });
         const leg = result.routes[0].legs[0];
         if (onTiempo) onTiempo(leg.duration.text, leg.distance.text);
-        // Ajustar el zoom para ver toda la ruta solo la primera vez
         if (!ajustadoRef.current) {
           ajustadoRef.current = true;
           const bounds = new window.google.maps.LatLngBounds();
@@ -116,7 +156,102 @@ function MapaConductor({ ubicacionConductor, ubicacionDestino, colorRuta, tipo, 
   return <div ref={mapRef} style={{ width: '100%', height: '100vh' }} />;
 }
 
-function AppConductor({ nombre, telefono, placa, vehiculo }) {
+
+function HistorialConductor({ onVolver }) {
+  const [viajes, setViajes] = React.useState([]);
+  const [cargando, setCargando] = React.useState(true);
+  const [totalHoy, setTotalHoy] = React.useState(0);
+
+  React.useEffect(() => {
+    const cargar = async () => {
+      try {
+        const user = auth.currentUser;
+        if (!user) return;
+        // Consulta simple sin indice compuesto
+        const q = query(
+          collection(db, 'viajes'),
+          where('conductorId', '==', user.uid),
+          limit(50)
+        );
+        const snap = await getDocs(q);
+        const lista = snap.docs
+          .map(d => ({ id: d.id, ...d.data() }))
+          .filter(v => v.estado === 'finalizado' || v.estado === 'cancelado')
+          .sort((a, b) => new Date(b.fechaSolicitud) - new Date(a.fechaSolicitud));
+        setViajes(lista);
+        // Sumar ganancias de hoy
+        const hoy = new Date().toDateString();
+        const gananciaHoy = lista
+          .filter(v => v.estado === 'finalizado' && new Date(v.fechaSolicitud).toDateString() === hoy)
+          .reduce((acc, v) => acc + (v.tarifaValor || 0), 0);
+        setTotalHoy(gananciaHoy);
+      } catch (e) { console.error(e); }
+      setCargando(false);
+    };
+    cargar();
+  }, []);
+
+  return (
+    <div style={{ backgroundColor: '#141416', minHeight: '100vh', fontFamily: 'Arial, sans-serif' }}>
+      <div style={{ background: 'linear-gradient(135deg, #1A1A1E, #2A2A2E)', padding: '24px 20px', display: 'flex', alignItems: 'center', gap: '16px' }}>
+        <button onClick={onVolver} style={{ background: 'none', border: 'none', color: '#FF7A2F', fontSize: '24px', cursor: 'pointer' }}>←</button>
+        <h2 style={{ color: '#FFFFFF', margin: '0', fontSize: '20px', fontWeight: '900' }}>Mis viajes</h2>
+      </div>
+      {totalHoy > 0 && (
+        <div style={{ margin: '16px 20px 0', background: 'linear-gradient(135deg, #0A1F0A, #1A2A1A)', borderRadius: '16px', padding: '16px 20px', border: '1px solid #1A3A1A', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <p style={{ color: '#555', fontSize: '11px', margin: '0', letterSpacing: '2px' }}>GANANCIAS DE HOY</p>
+            <p style={{ color: '#2ECC71', fontSize: '28px', fontWeight: '900', margin: '4px 0 0' }}>${totalHoy.toLocaleString()}</p>
+          </div>
+          <span style={{ fontSize: '36px' }}>💰</span>
+        </div>
+      )}
+      <div style={{ padding: '16px 20px' }}>
+        {cargando && <p style={{ color: '#555', textAlign: 'center', marginTop: '40px' }}>Cargando...</p>}
+        {!cargando && viajes.length === 0 && (
+          <div style={{ textAlign: 'center', marginTop: '60px' }}>
+            <p style={{ fontSize: '60px', margin: '0 0 16px' }}>🚗</p>
+            <p style={{ color: '#555', fontSize: '15px' }}>Aún no tienes viajes</p>
+          </div>
+        )}
+        {viajes.map((v) => {
+          const fecha = v.fechaSolicitud ? new Date(v.fechaSolicitud).toLocaleDateString('es-CO', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
+          const cancelado = v.estado === 'cancelado';
+          return (
+            <div key={v.id} style={{ background: '#1A1A1E', borderRadius: '20px', padding: '20px', marginBottom: '12px', border: `1px solid ${cancelado ? '#2A1A1A' : '#1A2A1A'}` }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <span style={{ fontSize: '28px' }}>{v.tipo === 'Taxi' ? '🚗' : '🏍️'}</span>
+                  <div>
+                    <p style={{ color: '#FFFFFF', fontWeight: '900', fontSize: '15px', margin: '0' }}>{v.tipo}</p>
+                    <p style={{ color: '#555', fontSize: '12px', margin: '3px 0 0' }}>{fecha}</p>
+                  </div>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <p style={{ color: cancelado ? '#FF4444' : '#2ECC71', fontSize: '13px', fontWeight: 'bold', margin: '0' }}>{cancelado ? 'Cancelado' : 'Completado'}</p>
+                  <p style={{ color: '#FFFFFF', fontSize: '18px', fontWeight: '900', margin: '4px 0 0' }}>{v.tarifa}</p>
+                </div>
+              </div>
+              <div style={{ background: '#141416', borderRadius: '12px', padding: '12px' }}>
+                <div style={{ display: 'flex', gap: '8px', marginBottom: '6px' }}>
+                  <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#2ECC71', marginTop: '3px', flexShrink: 0 }}/>
+                  <p style={{ color: '#FFFFFF', fontSize: '13px', margin: '0' }}>{v.origen}</p>
+                </div>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <div style={{ width: '10px', height: '10px', borderRadius: '2px', background: '#FF7A2F', marginTop: '3px', flexShrink: 0 }}/>
+                  <p style={{ color: '#FFFFFF', fontSize: '13px', margin: '0' }}>{v.destino}</p>
+                </div>
+              </div>
+              {cancelado && v.razonCancelacion && <p style={{ color: '#555', fontSize: '12px', margin: '10px 0 0' }}>Razón: {v.razonCancelacion}</p>}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function AppConductor({ nombre, telefono, placa, vehiculo, onCerrarSesion }) {
   const [activo, setActivo] = useState(false);
   const [solicitud, setSolicitud] = useState(null);
   const [fase, setFase] = useState(null);
@@ -130,11 +265,25 @@ function AppConductor({ nombre, telefono, placa, vehiculo }) {
   const [tiempoLlegada, setTiempoLlegada] = useState(null);
   const [distancia, setDistancia] = useState(null);
   const [respuestaPasajero, setRespuestaPasajero] = useState(null);
+  const [mensajeGrande, setMensajeGrande] = useState(null);
+  const [mostrarCancelacion, setMostrarCancelacion] = useState(false);
   const [destinoCoords, setDestinoCoords] = useState(null);
-  const [contador, setContador] = useState(240); // 4 minutos en segundos
+  const [contador, setContador] = useState(240);
+  const [verHistorial, setVerHistorial] = useState(false);
+  const [datosCalificacion, setDatosCalificacion] = useState(null);
   const contadorRef = useRef(null);
+  const ultimoMensajeRef = useRef(null);
 
-  const cerrarSesion = async () => { await signOut(auth); window.location.reload(); };
+  const cerrarSesion = async () => { try { await signOut(auth); } catch(e) {} if (onCerrarSesion) onCerrarSesion(); else window.location.reload(); };
+
+  const recibirMensajePasajero = useCallback((mensaje) => {
+    if (!mensaje) return;
+    setRespuestaPasajero(mensaje);
+    if (mensaje !== ultimoMensajeRef.current) {
+      ultimoMensajeRef.current = mensaje;
+      setMensajeGrande(mensaje);
+    }
+  }, []);
 
   useEffect(() => {
     if (!activo && !fase) return;
@@ -153,32 +302,15 @@ function AppConductor({ nombre, telefono, placa, vehiculo }) {
       } catch (e) {}
     };
 
-    // Primer intento rápido sin alta precisión (el iPhone responde al instante)
-    navigator.geolocation.getCurrentPosition(
-      guardarUbicacion,
-      () => {
-        // Si falla, intentar con alta precisión
-        navigator.geolocation.getCurrentPosition(guardarUbicacion, () => {}, { enableHighAccuracy: true, timeout: 20000 });
-      },
-      { enableHighAccuracy: false, timeout: 8000, maximumAge: 0 }
-    );
+    navigator.geolocation.getCurrentPosition(guardarUbicacion, () => {
+      navigator.geolocation.getCurrentPosition(guardarUbicacion, () => {}, { enableHighAccuracy: true, timeout: 20000 });
+    }, { enableHighAccuracy: false, timeout: 8000, maximumAge: 0 });
 
-    // Seguimiento continuo con alta precisión y respaldo de baja precisión
     let intervalo;
     try {
-      intervalo = navigator.geolocation.watchPosition(
-        guardarUbicacion,
-        (err) => {
-          console.error('GPS alta precisión:', err);
-          // Respaldo: seguir con baja precisión
-          intervalo = navigator.geolocation.watchPosition(
-            guardarUbicacion,
-            (e) => console.error('GPS:', e),
-            { enableHighAccuracy: false, maximumAge: 5000, timeout: 20000 }
-          );
-        },
-        { enableHighAccuracy: true, maximumAge: 3000, timeout: 15000 }
-      );
+      intervalo = navigator.geolocation.watchPosition(guardarUbicacion, (err) => {
+        intervalo = navigator.geolocation.watchPosition(guardarUbicacion, () => {}, { enableHighAccuracy: false, maximumAge: 5000, timeout: 20000 });
+      }, { enableHighAccuracy: true, maximumAge: 3000, timeout: 15000 });
     } catch (e) {}
 
     return () => { if (intervalo) navigator.geolocation.clearWatch(intervalo); };
@@ -219,19 +351,24 @@ function AppConductor({ nombre, telefono, placa, vehiculo }) {
             setViajeIdEscuchando(null);
           }, 3000);
         }
-        if (data.respuestaPasajero) setRespuestaPasajero(data.respuestaPasajero);
+        if (data.respuestaPasajero) recibirMensajePasajero(data.respuestaPasajero);
       }
     });
     return () => unsub();
-  }, [viajeIdEscuchando, celebrando, fase]);
+  }, [viajeIdEscuchando, celebrando, fase, recibirMensajePasajero]);
 
   useEffect(() => {
-    if (!viajeActual?.id || fase !== 'recogiendo') return;
+    if (!viajeActual?.id || !fase) return;
     const unsub = onSnapshot(doc(db, 'viajes', viajeActual.id), (snap) => {
       if (snap.exists()) {
         const data = snap.data();
-        if (data.respuestaPasajero) setRespuestaPasajero(data.respuestaPasajero);
-        if (data.fase === 'en_viaje') {
+        if (data.respuestaPasajero) recibirMensajePasajero(data.respuestaPasajero);
+        if (data.estado === 'cancelado' && data.canceladoPor === 'pasajero') {
+          clearInterval(contadorRef.current);
+          setFase('cancelado_pasajero');
+          setViajeActual({ ...viajeActual, razonCancelacion: data.razonCancelacion });
+        }
+        if (data.fase === 'en_viaje' && fase !== 'en_viaje') {
           setFase('en_viaje');
           setTiempoLlegada(null); setDistancia(null);
           geocodificarDestino(data.destino);
@@ -239,7 +376,7 @@ function AppConductor({ nombre, telefono, placa, vehiculo }) {
       }
     });
     return () => unsub();
-  }, [viajeActual, fase]);
+  }, [viajeActual, fase, recibirMensajePasajero]);
 
   const geocodificarDestino = (destinoTexto) => {
     if (!window.google || !destinoTexto) return;
@@ -262,23 +399,14 @@ function AppConductor({ nombre, telefono, placa, vehiculo }) {
 
   const llegueAlPunto = async () => {
     if (!viajeActual) return;
-    await updateDoc(doc(db, 'viajes', viajeActual.id), {
-      conductorEnPunto: true,
-      fase: 'en_punto',
-      tiempoEspera: new Date().toISOString(),
-    });
+    await updateDoc(doc(db, 'viajes', viajeActual.id), { conductorEnPunto: true, fase: 'en_punto', tiempoEspera: new Date().toISOString() });
     setRespuestaPasajero(null);
     setFase('en_punto');
     setContador(240);
-    // Geocodificar destino para mostrar mapa al destino
     geocodificarDestino(viajeActual.destino);
-    // Iniciar contador regresivo
     contadorRef.current = setInterval(() => {
       setContador(prev => {
-        if (prev <= 1) {
-          clearInterval(contadorRef.current);
-          return 0;
-        }
+        if (prev <= 1) { clearInterval(contadorRef.current); return 0; }
         return prev - 1;
       });
     }, 1000);
@@ -292,11 +420,29 @@ function AppConductor({ nombre, telefono, placa, vehiculo }) {
     geocodificarDestino(viajeActual.destino);
   };
 
+  const cancelarViaje = async (razon) => {
+    clearInterval(contadorRef.current);
+    if (viajeActual) {
+      await updateDoc(doc(db, 'viajes', viajeActual.id), { estado: 'cancelado_conductor', canceladoPor: 'conductor', razonCancelacion: razon });
+    }
+    setMostrarCancelacion(false);
+    setFase(null); setViajeActual(null); setTiempoLlegada(null); setDistancia(null);
+    setRespuestaPasajero(null); setMensajeGrande(null); ultimoMensajeRef.current = null;
+    setUbicacionPasajero(null); setDestinoCoords(null); setActivo(false); setContador(240);
+  };
+
   const finalizarViaje = async () => {
     clearInterval(contadorRef.current);
-    if (viajeActual) { try { await updateDoc(doc(db, 'viajes', viajeActual.id), { estado: 'finalizado', fase: 'finalizado' }); } catch (err) {} }
+    if (viajeActual) {
+      try {
+        await updateDoc(doc(db, 'viajes', viajeActual.id), { estado: 'finalizado', fase: 'finalizado' });
+        // Guardar datos para calificacion antes de resetear
+        setDatosCalificacion({ viajeId: viajeActual.id, nombrePasajero: viajeActual.pasajeroEmail?.split('@')[0] || 'Pasajero' });
+      } catch (err) {}
+    }
     setFase(null); setViajeActual(null); setTiempoLlegada(null); setDistancia(null);
-    setRespuestaPasajero(null); setUbicacionPasajero(null); setDestinoCoords(null); setActivo(false); setContador(240);
+    setRespuestaPasajero(null); setMensajeGrande(null); ultimoMensajeRef.current = null;
+    setUbicacionPasajero(null); setDestinoCoords(null); setActivo(false); setContador(240);
   };
 
   const subirTarifa = () => { setTarifaModificada(t => t + 1000); setTarifaCambiada(true); };
@@ -323,11 +469,30 @@ function AppConductor({ nombre, telefono, placa, vehiculo }) {
     }
   };
 
+  if (datosCalificacion) return <Calificacion tipo={null} viajeId={datosCalificacion.viajeId} nombreCalificado={datosCalificacion.nombrePasajero} quienCalifica="conductor" onFinalizar={() => setDatosCalificacion(null)} />;
+
+  if (verHistorial) return <HistorialConductor onVolver={() => setVerHistorial(false)} />;
+
   if (celebrando) return <Celebracion />;
+
+  // Pasajero canceló el viaje
+  if (fase === 'cancelado_pasajero') {
+    return (
+      <div style={{ backgroundColor: '#141416', minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px 24px' }}>
+        <div style={{ fontSize: '80px', marginBottom: '24px' }}>😕</div>
+        <h2 style={{ color: '#FFFFFF', fontSize: '24px', fontWeight: '900', margin: '0 0 12px', textAlign: 'center' }}>El pasajero canceló el viaje</h2>
+        <p style={{ color: '#555', fontSize: '14px', margin: '0 0 8px', textAlign: 'center' }}>Razón: <span style={{ color: '#FF7A2F' }}>{viajeActual?.razonCancelacion || 'No especificada'}</span></p>
+        <p style={{ color: '#555', fontSize: '13px', margin: '0 0 32px', textAlign: 'center' }}>Puedes activarte para recibir nuevos viajes</p>
+        <button onClick={() => { setFase(null); setViajeActual(null); setUbicacionPasajero(null); setDestinoCoords(null); setActivo(false); }} style={{ width: '100%', padding: '18px', background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)', border: 'none', borderRadius: '16px', color: '#141416', fontSize: '18px', fontWeight: '900', cursor: 'pointer' }}>Volver al inicio</button>
+      </div>
+    );
+  }
 
   if (fase === 'recogiendo' || fase === 'en_punto') {
     return (
       <div style={{ backgroundColor: '#141416', minHeight: '100vh', position: 'relative' }}>
+        {mensajeGrande && <MensajeGrande mensaje={mensajeGrande} onCerrar={() => setMensajeGrande(null)} />}
+        {mostrarCancelacion && <ModalCancelacion razones={RAZONES_CANCELACION_CONDUCTOR} onConfirmar={cancelarViaje} onCerrar={() => setMostrarCancelacion(false)} />}
         <MapaConductor
           ubicacionConductor={ubicacion}
           ubicacionDestino={fase === 'en_punto' ? destinoCoords : ubicacionPasajero}
@@ -337,17 +502,13 @@ function AppConductor({ nombre, telefono, placa, vehiculo }) {
         />
         <div style={{ position: 'absolute', top: '16px', left: '16px', right: '16px', zIndex: 10, background: 'rgba(20,20,22,0.95)', borderRadius: '16px', padding: '12px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
-            <p style={{ color: fase === 'en_punto' ? '#FF7A2F' : '#2ECC71', fontSize: '11px', margin: '0', letterSpacing: '1px', fontWeight: 'bold' }}>
-              {fase === 'en_punto' ? '🏁 RUTA AL DESTINO' : '🚗 YENDO A RECOGER'}
-            </p>
-            <p style={{ color: '#FFFFFF', fontSize: '15px', fontWeight: '900', margin: '2px 0 0' }}>
-              {fase === 'en_punto' ? viajeActual?.destino : viajeActual?.origen}
-            </p>
+            <p style={{ color: fase === 'en_punto' ? '#FF7A2F' : '#2ECC71', fontSize: '11px', margin: '0', letterSpacing: '1px', fontWeight: 'bold' }}>{fase === 'en_punto' ? '🏁 RUTA AL DESTINO' : '🚗 YENDO A RECOGER'}</p>
+            <p style={{ color: '#FFFFFF', fontSize: '15px', fontWeight: '900', margin: '2px 0 0' }}>{fase === 'en_punto' ? viajeActual?.destino : viajeActual?.origen}</p>
           </div>
           {tiempoLlegada && <div style={{ textAlign: 'right' }}><p style={{ color: '#FFCF4D', fontSize: '20px', fontWeight: '900', margin: '0' }}>⏱️ {tiempoLlegada}</p><p style={{ color: '#555', fontSize: '11px', margin: '0' }}>{distancia}</p></div>}
         </div>
         {respuestaPasajero && (
-          <div style={{ position: 'absolute', top: '90px', left: '16px', right: '16px', zIndex: 10, background: 'rgba(255, 122, 47, 0.95)', borderRadius: '12px', padding: '12px 16px' }}>
+          <div onClick={() => setMensajeGrande(respuestaPasajero)} style={{ position: 'absolute', top: '90px', left: '16px', right: '16px', zIndex: 10, background: 'rgba(255, 122, 47, 0.95)', borderRadius: '12px', padding: '12px 16px', cursor: 'pointer' }}>
             <p style={{ color: '#FFFFFF', fontSize: '14px', fontWeight: 'bold', margin: '0' }}>💬 Pasajero: "{respuestaPasajero}"</p>
           </div>
         )}
@@ -356,35 +517,30 @@ function AppConductor({ nombre, telefono, placa, vehiculo }) {
             <div><p style={{ color: '#555', fontSize: '10px', margin: '0' }}>PASAJERO</p><p style={{ color: '#FFFFFF', fontSize: '14px', fontWeight: 'bold', margin: '4px 0 0' }}>{viajeActual?.pasajeroEmail?.split('@')[0]}</p></div>
             <div style={{ textAlign: 'right' }}><p style={{ color: '#555', fontSize: '10px', margin: '0' }}>TARIFA</p><p style={{ color: '#2ECC71', fontSize: '20px', fontWeight: '900', margin: '4px 0 0' }}>{viajeActual?.tarifa}</p></div>
           </div>
-          {fase === 'recogiendo' && <button onClick={llegueAlPunto} style={{ width: '100%', padding: '16px', background: 'linear-gradient(135deg, #2ECC71, #27AE60)', border: 'none', borderRadius: '16px', color: '#FFFFFF', fontSize: '18px', fontWeight: '900', cursor: 'pointer' }}>📍 Llegué al punto</button>}
+          {fase === 'recogiendo' && (
+            <div style={{ display: 'flex', gap: '12px' }}>
+              <button onClick={() => setMostrarCancelacion(true)} style={{ flex: 1, padding: '14px', background: 'transparent', border: '1px solid #FF4444', borderRadius: '14px', color: '#FF4444', fontSize: '14px', cursor: 'pointer' }}>Cancelar</button>
+              <button onClick={llegueAlPunto} style={{ flex: 2, padding: '16px', background: 'linear-gradient(135deg, #2ECC71, #27AE60)', border: 'none', borderRadius: '16px', color: '#FFFFFF', fontSize: '16px', fontWeight: '900', cursor: 'pointer' }}>📍 Llegué al punto</button>
+            </div>
+          )}
           {fase === 'en_punto' && (
             <div>
-              {/* Contador regresivo */}
-              <div style={{
-                background: contador <= 60 ? 'rgba(255,68,68,0.15)' : 'rgba(255,207,77,0.1)',
-                borderRadius: '16px', padding: '16px', marginBottom: '16px',
-                border: `1px solid ${contador <= 60 ? '#FF4444' : '#FFCF4D'}`,
-                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-              }}>
+              <div style={{ background: contador <= 60 ? 'rgba(255,68,68,0.15)' : 'rgba(255,207,77,0.1)', borderRadius: '16px', padding: '16px', marginBottom: '16px', border: `1px solid ${contador <= 60 ? '#FF4444' : '#FFCF4D'}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
                   <p style={{ color: '#555', fontSize: '11px', margin: '0' }}>TIEMPO DE ESPERA</p>
-                  <p style={{ color: contador <= 60 ? '#FF4444' : '#FFCF4D', fontSize: '11px', margin: '4px 0 0' }}>
-                    {contador === 0 ? '⚠️ Tiempo agotado' : 'Esperando al pasajero...'}
-                  </p>
+                  <p style={{ color: contador <= 60 ? '#FF4444' : '#FFCF4D', fontSize: '11px', margin: '4px 0 0' }}>{contador === 0 ? '⚠️ Tiempo agotado' : 'Esperando al pasajero...'}</p>
                 </div>
-                <p style={{
-                  color: contador <= 60 ? '#FF4444' : '#FFCF4D',
-                  fontSize: '36px', fontWeight: '900', margin: '0', fontVariantNumeric: 'tabular-nums',
-                }}>
-                  {Math.floor(contador / 60)}:{String(contador % 60).padStart(2, '0')}
-                </p>
+                <p style={{ color: contador <= 60 ? '#FF4444' : '#FFCF4D', fontSize: '36px', fontWeight: '900', margin: '0', fontVariantNumeric: 'tabular-nums' }}>{Math.floor(contador / 60)}:{String(contador % 60).padStart(2, '0')}</p>
               </div>
               {respuestaPasajero && (
-                <div style={{ background: 'rgba(255,122,47,0.15)', borderRadius: '12px', padding: '12px 16px', marginBottom: '12px', border: '1px solid #FF7A2F' }}>
+                <div onClick={() => setMensajeGrande(respuestaPasajero)} style={{ background: 'rgba(255,122,47,0.15)', borderRadius: '12px', padding: '12px 16px', marginBottom: '12px', border: '1px solid #FF7A2F', cursor: 'pointer' }}>
                   <p style={{ color: '#FF7A2F', fontSize: '13px', fontWeight: 'bold', margin: '0' }}>💬 Pasajero: "{respuestaPasajero}"</p>
                 </div>
               )}
-              <button onClick={iniciarViaje} style={{ width: '100%', padding: '16px', background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)', border: 'none', borderRadius: '16px', color: '#141416', fontSize: '18px', fontWeight: '900', cursor: 'pointer' }}>🚀 Iniciar viaje</button>
+              <div style={{ display: 'flex', gap: '12px' }}>
+                <button onClick={() => setMostrarCancelacion(true)} style={{ flex: 1, padding: '14px', background: 'transparent', border: '1px solid #FF4444', borderRadius: '14px', color: '#FF4444', fontSize: '14px', cursor: 'pointer' }}>Cancelar</button>
+                <button onClick={iniciarViaje} style={{ flex: 2, padding: '16px', background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)', border: 'none', borderRadius: '16px', color: '#141416', fontSize: '16px', fontWeight: '900', cursor: 'pointer' }}>🚀 Iniciar viaje</button>
+              </div>
             </div>
           )}
         </div>
@@ -395,6 +551,7 @@ function AppConductor({ nombre, telefono, placa, vehiculo }) {
   if (fase === 'en_viaje' && viajeActual) {
     return (
       <div style={{ backgroundColor: '#141416', minHeight: '100vh', position: 'relative' }}>
+        {mensajeGrande && <MensajeGrande mensaje={mensajeGrande} onCerrar={() => setMensajeGrande(null)} />}
         <MapaConductor ubicacionConductor={ubicacion} ubicacionDestino={destinoCoords} colorRuta="#FF7A2F" tipo={viajeActual.tipo} onTiempo={(t, d) => { setTiempoLlegada(t); setDistancia(d); }} />
         <div style={{ position: 'absolute', top: '16px', left: '16px', right: '16px', zIndex: 10, background: 'rgba(20,20,22,0.95)', borderRadius: '16px', padding: '12px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div><p style={{ color: '#FF7A2F', fontSize: '11px', margin: '0', letterSpacing: '1px', fontWeight: 'bold' }}>🚀 VIAJE EN CURSO</p><p style={{ color: '#FFFFFF', fontSize: '15px', fontWeight: '900', margin: '2px 0 0' }}>🏁 {viajeActual.destino}</p></div>
@@ -444,6 +601,12 @@ function AppConductor({ nombre, telefono, placa, vehiculo }) {
           </div>
         </div>
         {activo && !solicitud && <div style={{ background: '#1A1A1E', borderRadius: '20px', padding: '32px 20px', textAlign: 'center', border: '1px dashed #2A2A2E' }}><p style={{ fontSize: '40px', margin: '0 0 12px' }}>⏳</p><p style={{ color: '#555', fontSize: '14px', margin: '0' }}>Esperando solicitudes de viaje...</p></div>}
+        {!activo && (
+          <div onClick={() => setVerHistorial(true)} style={{ background: '#1A1A1E', borderRadius: '20px', padding: '20px', display: 'flex', alignItems: 'center', gap: '16px', border: '1px solid #2A2A2E', cursor: 'pointer', marginTop: '4px' }}>
+            <span style={{ fontSize: '36px' }}>🕐</span>
+            <div><p style={{ color: '#FFFFFF', fontWeight: '900', fontSize: '16px', margin: '0' }}>Mis viajes</p><p style={{ color: '#555', fontSize: '12px', margin: '4px 0 0' }}>Ver historial y ganancias</p></div>
+          </div>
+        )}
         {solicitud && (
           <div style={{ background: '#1A1A1E', borderRadius: '20px', padding: '20px', border: '1px solid #FF7A2F' }}>
             <p style={{ color: '#FF7A2F', fontSize: '11px', margin: '0 0 12px', letterSpacing: '2px', fontWeight: 'bold' }}>🔔 NUEVA SOLICITUD</p>
