@@ -667,7 +667,16 @@ function AppConductor({ nombre, telefono, placa, vehiculo, onCerrarSesion }) {
 
   if (enLlamada || llamadaEntrante) return <Llamada viajeId={viajeActual?.id} miRol="conductor" nombreOtro={viajeActual?.pasajeroEmail?.split('@')[0] || 'Pasajero'} onCerrar={() => { setEnLlamada(false); setLlamadaEntrante(false); }} />;
 
-  if (datosCalificacion) return <Calificacion tipo={null} viajeId={datosCalificacion.viajeId} nombreCalificado={datosCalificacion.nombrePasajero} quienCalifica="conductor" onFinalizar={() => { setDatosCalificacion(null); setActivo(true); }} />;
+  if (datosCalificacion) return <Calificacion tipo={null} viajeId={datosCalificacion.viajeId} nombreCalificado={datosCalificacion.nombrePasajero} quienCalifica="conductor" onFinalizar={async () => {
+    const user = auth.currentUser;
+    if (user) {
+      try {
+        await setDoc(doc(db, 'conductores', user.uid), { activo: true, nombre: nombre || '', placa: placa || '', vehiculo: vehiculo || '', telefono: telefono || '' }, { merge: true });
+      } catch(e) {}
+    }
+    setDatosCalificacion(null);
+    setActivo(true);
+  }} />;
 
   if (verHistorial) return <HistorialConductor onVolver={() => setVerHistorial(false)} />;
 
