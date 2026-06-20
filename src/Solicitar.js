@@ -285,6 +285,13 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
 
       // Las contraofertas ahora se escuchan en la subcoleccion (ver listener abajo)
 
+      // Conductor aceptó la oferta directa -> pasajero debe confirmar
+      if (data.estado === 'confirmando' && pantallaRef.current !== 'confirmando' && pantallaRef.current !== 'fase1' && pantallaRef.current !== 'fase2') {
+        setContraofertas([]);
+        contaofertasIdsRef.current.clear();
+        setPantalla('confirmando');
+      }
+
       if (data.estado === 'aceptado' && pantallaRef.current !== 'fase1' && pantallaRef.current !== 'fase2' && !celebrando) {
         setContraofertas([]);
         contaofertasIdsRef.current.clear();
@@ -542,6 +549,49 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
             <div style={{ textAlign: 'right' }}><p style={{ color: '#555', fontSize: '10px', margin: '0' }}>TARIFA</p><p style={{ color: '#2ECC71', fontSize: '18px', fontWeight: '900', margin: '4px 0 0' }}>{viaje?.tarifa}</p></div>
           </div>
         </div>
+      </div>
+    );
+  }
+
+  if (pantalla === 'confirmando' && viaje) {
+    return (
+      <div style={{ backgroundColor: '#141416', minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px 24px' }}>
+        <div style={{ fontSize: '80px', marginBottom: '24px' }}>{viaje.tipo === 'Taxi' ? '🚗' : '🏍️'}</div>
+        <p style={{ color: '#2ECC71', fontSize: '13px', margin: '0 0 8px', letterSpacing: '3px', fontWeight: 'bold' }}>¡CONDUCTOR ENCONTRADO!</p>
+        <h2 style={{ color: '#FFFFFF', fontSize: '26px', fontWeight: '900', margin: '0 0 4px', textAlign: 'center' }}>{viaje.conductorNombre}</h2>
+        {viaje.conductorPlaca && <p style={{ color: '#FFCF4D', fontSize: '16px', fontWeight: '900', margin: '0 0 4px' }}>🚘 {viaje.conductorPlaca}</p>}
+        {viaje.conductorVehiculo && <p style={{ color: '#555', fontSize: '14px', margin: '0 0 24px' }}>{viaje.conductorVehiculo}</p>}
+        <div style={{ background: '#1A1A1E', borderRadius: '20px', padding: '20px', width: '100%', marginBottom: '24px', border: '1px solid #2A2A2E' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
+            <p style={{ color: '#555', fontSize: '12px', margin: '0' }}>TARIFA ACORDADA</p>
+            <p style={{ color: '#2ECC71', fontSize: '22px', fontWeight: '900', margin: '0' }}>{viaje.tarifa}</p>
+          </div>
+          <div style={{ display: 'flex', gap: '8px', marginBottom: '6px' }}>
+            <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#2ECC71', marginTop: '3px', flexShrink: 0 }}/>
+            <p style={{ color: '#FFFFFF', fontSize: '13px', margin: '0' }}>{origen}</p>
+          </div>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <div style={{ width: '10px', height: '10px', borderRadius: '2px', background: '#FF7A2F', marginTop: '3px', flexShrink: 0 }}/>
+            <p style={{ color: '#FFFFFF', fontSize: '13px', margin: '0' }}>{destino}</p>
+          </div>
+        </div>
+        <button onClick={async () => {
+          if (!viajeId) return;
+          try {
+            await updateDoc(doc(db, 'viajes', viajeId), { estado: 'aceptado' });
+          } catch(e) {}
+        }} style={{ width: '100%', padding: '18px', background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)', border: 'none', borderRadius: '16px', color: '#141416', fontSize: '20px', fontWeight: '900', cursor: 'pointer', marginBottom: '12px' }}>
+          ✅ Confirmar viaje
+        </button>
+        <button onClick={async () => {
+          if (!viajeId) return;
+          try {
+            await updateDoc(doc(db, 'viajes', viajeId), { estado: 'cancelado', canceladoPor: 'pasajero', razonCancelacion: 'Pasajero no confirmó el viaje' });
+          } catch(e) {}
+          onVolver();
+        }} style={{ background: 'transparent', border: '1px solid #2A2A2E', borderRadius: '14px', color: '#FF4444', fontSize: '14px', padding: '14px 32px', cursor: 'pointer' }}>
+          Cancelar
+        </button>
       </div>
     );
   }

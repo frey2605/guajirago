@@ -459,13 +459,24 @@ function AppConductor({ nombre, telefono, placa, vehiculo, onCerrarSesion }) {
       }
     });
 
-    // Escuchar el viaje principal para detectar cancelacion del pasajero
+    // Escuchar el viaje principal para detectar confirmacion o cancelacion del pasajero
     const unsubViaje = onSnapshot(doc(db, 'viajes', viajeIdEscuchando), (snap) => {
       if (!snap.exists()) { setViajeIdEscuchando(null); return; }
       const data = snap.data();
+      // Pasajero confirmó el viaje
+      if (data.estado === 'aceptado' && data.conductorId === miId && !celebrando && !fase) {
+        setCelebrando(true);
+        setTimeout(() => {
+          setCelebrando(false);
+          iniciarFase1({ id: viajeIdEscuchando, ...data });
+          setViajeIdEscuchando(null);
+        }, 3000);
+        return;
+      }
       if (data.estado === 'cancelado' || data.estado === 'cancelado_conductor') {
         setViajeIdEscuchando(null);
         setTarifaCambiada(false);
+        setActivo(true);
         return;
       }
       if (data.respuestaPasajero) recibirMensajePasajero(data.respuestaPasajero);
@@ -608,14 +619,16 @@ function AppConductor({ nombre, telefono, placa, vehiculo, onCerrarSesion }) {
       }).catch(() => {});
     } else {
       const viajeAceptado = solicitud;
-      setCelebrando(true);
-      // Escribir en Firestore en segundo plano sin bloquear la UI
+      setSolicitud(null);
+      solicitudIdRef.current = null;
+      // Poner estado 'confirmando': el pasajero debe confirmar antes de arrancar
+      setViajeIdEscuchando(viajeAceptado.id);
+      setActivo(false);
       updateDoc(doc(db, 'viajes', viajeAceptado.id), {
-        estado: 'aceptado', conductorId: user.uid,
+        estado: 'confirmando', conductorId: user.uid,
         conductorNombre: nombre || 'Conductor', conductorTelefono: telefono || '',
         conductorPlaca: placa || '', conductorVehiculo: vehiculo || '',
       }).catch(() => {});
-      setTimeout(() => { setCelebrando(false); iniciarFase1(viajeAceptado); setSolicitud(null); }, 3000);
     }
   };
 
@@ -628,6 +641,29 @@ function AppConductor({ nombre, telefono, placa, vehiculo, onCerrarSesion }) {
     });
     return () => unsub();
   }, [viajeActual]);
+
+  // Conductor esperando que el pasajero confirme
+  if (viajeIdEscuchando && !fase && !celebrando) {
+    return (
+      <div style={{ backgroundColor: '#141416', minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px 24px' }}>
+        <div style={{ fontSize: '80px', marginBottom: '24px' }}>⏳</div>
+        <p style={{ color: '#FFCF4D', fontSize: '13px', margin: '0 0 8px', letterSpacing: '3px', fontWeight: 'bold', textAlign: 'center' }}>ESPERANDO AL PASAJERO</p>
+        <h2 style={{ color: '#FFFFFF', fontSize: '22px', fontWeight: '900', margin: '0 0 8px', textAlign: 'center' }}>El pasajero está confirmando el viaje</h2>
+        <p style={{ color: '#555', fontSize: '14px', margin: '0 0 32px', textAlign: 'center' }}>Si no confirma en 60 segundos el viaje se cancela</p>
+        <div style={{ width: '60px', height: '4px', background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F)', borderRadius: '2px', marginBottom: '32px' }}/>
+        <button onClick={async () => {
+          try {
+            const { updateDoc, doc } = await import('firebase/firestore');
+            await updateDoc(doc(db, 'viajes', viajeIdEscuchando), { estado: 'cancelado_conductor', canceladoPor: 'conductor', razonCancelacion: 'Conductor canceló antes de confirmar' });
+          } catch(e) {}
+          setViajeIdEscuchando(null);
+          setActivo(true);
+        }} style={{ background: 'transparent', border: '1px solid #2A2A2E', borderRadius: '14px', color: '#FF4444', fontSize: '14px', padding: '14px 32px', cursor: 'pointer' }}>
+          Cancelar
+        </button>
+      </div>
+    );
+  }
 
   if (enLlamada || llamadaEntrante) return <Llamada viajeId={viajeActual?.id} miRol="conductor" nombreOtro={viajeActual?.pasajeroEmail?.split('@')[0] || 'Pasajero'} onCerrar={() => { setEnLlamada(false); setLlamadaEntrante(false); }} />;
 
@@ -762,12 +798,7 @@ function AppConductor({ nombre, telefono, placa, vehiculo, onCerrarSesion }) {
             <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: '#FFFFFF' }}/>
           </div>
         </div>
-        {viajeIdEscuchando && !fase && (
-          <div style={{ background: 'rgba(255,207,77,0.1)', borderRadius: '16px', padding: '14px 16px', marginBottom: '12px', border: '1px solid #FFCF4D', display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <span style={{ fontSize: '20px' }}>⏳</span>
-            <p style={{ color: '#FFCF4D', fontSize: '13px', fontWeight: 'bold', margin: '0' }}>Contraoferta enviada — esperando respuesta</p>
-          </div>
-        )}
+
         {activo && !solicitud && <div style={{ background: '#1A1A1E', borderRadius: '20px', padding: '32px 20px', textAlign: 'center', border: '1px dashed #2A2A2E' }}><p style={{ fontSize: '40px', margin: '0 0 12px' }}>⏳</p><p style={{ color: '#555', fontSize: '14px', margin: '0' }}>Esperando solicitudes de viaje...</p></div>}
 
         {!activo && (
