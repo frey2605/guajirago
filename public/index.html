@@ -14,6 +14,13 @@
     <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
     <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDCo-KBq_QWq18FbKy3otxItajq8cKvtXY&libraries=places"></script>
     <title>GuajiraGo</title>
+    <script>
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+          window.location.reload();
+        });
+      }
+    </script>
   </head>
   <body>
     <noscript>You need to enable JavaScript to run this app.</noscript>
