@@ -402,12 +402,13 @@ function AppConductor({ nombre, telefono, placa, vehiculo, onCerrarSesion }) {
       solicitudIdRef.current = datos.id;
       ultimaOfertaRef.current = tsActual;
       setSolicitud(datos);
-      // Siempre mostrar la oferta REAL del pasajero y limpiar cualquier contraoferta vieja.
-      // (El conductor ajusta sobre este valor; si toca +/- pasa a "Enviar contraoferta")
-      setTarifaModificada(datos.tarifaValor || TARIFA_MINIMA);
-      setTarifaCambiada(false);
-      // Suena GO GO: viaje nuevo, reaparece tras descarte, o el pasajero subió su oferta
-      if (esNuevoViaje || ofertaSubio) alertarNuevoViaje();
+      // Solo resetear tarifa si es viaje nuevo o si el pasajero subió su oferta
+      // Si solo cambió porque otro conductor contraofertó, no tocar la tarifa del conductor actual
+      if (esNuevoViaje || ofertaSubio) {
+        setTarifaModificada(datos.tarifaValor || TARIFA_MINIMA);
+        setTarifaCambiada(false);
+        alertarNuevoViaje();
+      }
     });
     return () => unsub();
   }, [activo]);
@@ -448,10 +449,8 @@ function AppConductor({ nombre, telefono, placa, vehiculo, onCerrarSesion }) {
         setTarifaCambiada(false);
         return;
       }
-      // La contraoferta expiró o fue rechazada (volvió a esperando) -> liberar y permitir volver a pujar
+      // La contraoferta expiró o fue rechazada (volvió a esperando) -> liberar
       if (data.estado === 'esperando') {
-        // Borrar de descartados para que el conductor pueda volver a ver y pujar por este viaje
-        delete descartadosRef.current[viajeIdEscuchando];
         setViajeIdEscuchando(null);
         setTarifaCambiada(false);
         return;
