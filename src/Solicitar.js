@@ -693,7 +693,7 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
         <div style={{ background: '#1A1A1E', borderRadius: '16px', padding: '20px', marginBottom: '24px' }}>
           <p style={{ color: '#555', fontSize: '11px', margin: '0 0 12px', letterSpacing: '2px' }}>TU OFERTA</p>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <button onClick={bajarTarifa} style={{ width: '48px', height: '48px', background: tarifa <= TARIFA_MINIMA ? '#2A2A2E' : '#1A1A1E', border: `2px solid ${tarifa <= TARIFA_MINIMA ? '#2A2A2E' : '#FF7A2F'}`, borderRadius: '14px', color: tarifa <= TARIFA_MINIMA ? '#555' : '#FF7A2F', fontSize: '24px', cursor: tarifa <= TARIFA_MINIMA ? 'default' : 'pointer', fontWeight: 'bold' }}>−</button>
+            <button onClick={bajarTarifa} style={{ width: '48px', height: '48px', background: tarifa <= getTarifaMinima() ? '#2A2A2E' : '#1A1A1E', border: `2px solid ${tarifa <= getTarifaMinima() ? '#2A2A2E' : '#FF7A2F'}`, borderRadius: '14px', color: tarifa <= getTarifaMinima() ? '#555' : '#FF7A2F', fontSize: '24px', cursor: tarifa <= getTarifaMinima() ? 'default' : 'pointer', fontWeight: 'bold' }}>−</button>
             <div style={{ textAlign: 'center' }}>
               <p style={{ color: '#FFFFFF', fontSize: '36px', fontWeight: '900', margin: '0' }}>${tarifa.toLocaleString()}</p>
               <p style={{ color: '#555', fontSize: '11px', margin: '4px 0 0' }}>{tarifa === getTarifaMinima() ? (getTarifaMinima() === 10000 ? '🌙 Tarifa nocturna' : 'Tarifa mínima') : 'Oferta personalizada'}</p>
