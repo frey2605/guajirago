@@ -2,9 +2,13 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { db, auth } from './firebase';
 import { collection, addDoc, doc, onSnapshot, updateDoc, getDoc } from 'firebase/firestore';
 import Calificacion from './Calificacion';
+import Llamada from './Llamada';
 
 const centroRiohacha = { lat: 11.5444, lng: -72.9072 };
-const TARIFA_MINIMA = 8000;
+const getTarifaMinima = () => {
+  const hora = new Date().getHours();
+  return (hora >= 18 || hora < 6) ? 10000 : 8000;
+};
 const BOUNDS_RIOHACHA = { north: 11.7, south: 11.3, east: -72.6, west: -73.0 };
 const DURACION_CONTRAOFERTA_MS = 10000; // 10 segundos
 
@@ -219,7 +223,7 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
   const [viajeId, setViajeId] = useState(null);
   const [viaje, setViaje] = useState(null);
   const [error, setError] = useState('');
-  const [tarifa, setTarifa] = useState(TARIFA_MINIMA);
+  const [tarifa, setTarifa] = useState(() => getTarifaMinima());
   const [ubicacionPasajero, setUbicacionPasajero] = useState(centroRiohacha);
   const [ubicacionConductor, setUbicacionConductor] = useState(null);
   const [tiempoLlegada, setTiempoLlegada] = useState(null);
@@ -235,7 +239,10 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
   const [ofertaModificada, setOfertaModificada] = useState(false);
   // Contraofertas múltiples: lista de { conductorId, conductorNombre, conductorPlaca, conductorVehiculo, contraoferta, contraofertaValor }
   const [contraofertas, setContraofertas] = useState([]);
+  const [enLlamada, setEnLlamada] = useState(false);
+  const [contadorConfirmacion, setContadorConfirmacion] = useState(60);
   const contadorRef = useRef(null);
+  const contadorConfirmacionRef = useRef(null);
   const pantallaRef = useRef(pantalla);
   const intervaloRespaldoRef = useRef(null);
   const contaofertasIdsRef = useRef(new Set()); // IDs ya vistos para no duplicar
@@ -310,9 +317,25 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
         setContraofertas([]);
         contaofertasIdsRef.current.clear();
         setPantalla('confirmando');
+        setContadorConfirmacion(60);
+        clearInterval(contadorConfirmacionRef.current);
+        contadorConfirmacionRef.current = setInterval(() => {
+          setContadorConfirmacion(prev => {
+            if (prev <= 1) {
+              clearInterval(contadorConfirmacionRef.current);
+              if (viajeId) {
+                updateDoc(doc(db, 'viajes', viajeId), { estado: 'cancelado', canceladoPor: 'pasajero', razonCancelacion: 'Pasajero no confirmó a tiempo' }).catch(() => {});
+              }
+              onVolver();
+              return 0;
+            }
+            return prev - 1;
+          });
+        }, 1000);
       }
 
       if (data.estado === 'confirmado' && pantallaRef.current === 'confirmando') {
+        clearInterval(contadorConfirmacionRef.current);
         setCelebrando(true);
         setTimeout(() => {
           setCelebrando(false);
@@ -357,6 +380,15 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
 
     return () => { unsub(); clearInterval(intervaloRespaldoRef.current); };
   }, [viajeId, celebrando, conductorEnPunto]);
+
+  useEffect(() => {
+    if (!viajeId) return;
+    const unsub = onSnapshot(doc(db, 'llamadas', viajeId), (s) => {
+      if (s.exists() && s.data().estado === 'llamando') setEnLlamada(true);
+      if (!s.exists() || s.data().estado === 'terminada') setEnLlamada(false);
+    });
+    return () => unsub();
+  }, [viajeId]);
 
   const escucharConductor = useCallback((conductorId) => {
     if (!conductorId) return;
@@ -414,7 +446,7 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
       setOfertaModificada(false);
     } catch(e) {}
   };
-  const bajarTarifa = () => setTarifa(t => Math.max(TARIFA_MINIMA, t - 1000));
+  const bajarTarifa = () => setTarifa(t => Math.max(getTarifaMinima(), t - 1000));
 
   const solicitarViaje = async () => {
     if (!origen || !destino) { setError('Por favor escribe el origen y destino'); return; }
@@ -472,6 +504,7 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
     });
   };
 
+  if (enLlamada && viajeId) return <Llamada viajeId={viajeId} miRol="pasajero" nombreOtro={viaje?.conductorNombre || 'Conductor'} onCerrar={() => setEnLlamada(false)} />;
   if (mostrarCalificacion) return <Calificacion tipo={tipo} viajeId={viajeId} nombreCalificado={viaje?.conductorNombre} quienCalifica="pasajero" onFinalizar={onVolver} />;
   if (celebrando) return <Celebracion />;
 
@@ -494,8 +527,8 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
         <p style={{ color: '#2ECC71', fontSize: '13px', margin: '0 0 8px', letterSpacing: '3px', fontWeight: 'bold' }}>¡CONDUCTOR ENCONTRADO!</p>
         <h2 style={{ color: '#FFFFFF', fontSize: '26px', fontWeight: '900', margin: '0 0 4px', textAlign: 'center' }}>{viaje.conductorNombre}</h2>
         {viaje.conductorPlaca && <p style={{ color: '#FFCF4D', fontSize: '18px', fontWeight: '900', margin: '0 0 4px' }}>🚘 {viaje.conductorPlaca}</p>}
-        {viaje.conductorVehiculo && <p style={{ color: '#555', fontSize: '14px', margin: '0 0 24px' }}>{viaje.conductorVehiculo}</p>}
-        <div style={{ background: '#1A1A1E', borderRadius: '20px', padding: '20px', width: '100%', marginBottom: '24px', border: '1px solid #2A2A2E' }}>
+        {viaje.conductorVehiculo && <p style={{ color: '#555', fontSize: '14px', margin: '0 0 16px' }}>{viaje.conductorVehiculo}</p>}
+        <div style={{ background: '#1A1A1E', borderRadius: '20px', padding: '20px', width: '100%', marginBottom: '16px', border: '1px solid #2A2A2E' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
             <p style={{ color: '#555', fontSize: '12px', margin: '0' }}>TARIFA ACORDADA</p>
             <p style={{ color: '#2ECC71', fontSize: '22px', fontWeight: '900', margin: '0' }}>{viaje.tarifa}</p>
@@ -509,13 +542,19 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
             <p style={{ color: '#FFFFFF', fontSize: '13px', margin: '0' }}>{destino}</p>
           </div>
         </div>
+        <div style={{ background: contadorConfirmacion <= 15 ? 'rgba(255,68,68,0.15)' : 'rgba(255,207,77,0.1)', borderRadius: '12px', padding: '10px 16px', marginBottom: '16px', width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: `1px solid ${contadorConfirmacion <= 15 ? '#FF4444' : '#FFCF4D'}` }}>
+          <p style={{ color: '#555', fontSize: '12px', margin: '0' }}>Confirma antes de que expire</p>
+          <p style={{ color: contadorConfirmacion <= 15 ? '#FF4444' : '#FFCF4D', fontSize: '28px', fontWeight: '900', margin: '0', fontVariantNumeric: 'tabular-nums' }}>0:{String(contadorConfirmacion).padStart(2, '0')}</p>
+        </div>
         <button onClick={async () => {
+          clearInterval(contadorConfirmacionRef.current);
           if (!viajeId) return;
           try { await updateDoc(doc(db, 'viajes', viajeId), { estado: 'confirmado' }); } catch(e) {}
         }} style={{ width: '100%', padding: '18px', background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)', border: 'none', borderRadius: '16px', color: '#141416', fontSize: '20px', fontWeight: '900', cursor: 'pointer', marginBottom: '12px' }}>
           ✅ Confirmar viaje
         </button>
         <button onClick={async () => {
+          clearInterval(contadorConfirmacionRef.current);
           if (!viajeId) return;
           try { await updateDoc(doc(db, 'viajes', viajeId), { estado: 'cancelado', canceladoPor: 'pasajero', razonCancelacion: 'Pasajero no confirmó el viaje' }); } catch(e) {}
           onVolver();
@@ -566,7 +605,8 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
                 <div style={{ textAlign: 'right' }}><p style={{ color: '#555', fontSize: '10px', margin: '0' }}>TARIFA</p><p style={{ color: '#2ECC71', fontSize: '18px', fontWeight: '900', margin: '2px 0 0' }}>{viaje?.tarifa}</p></div>
               </div>
             </div>
-            <button onClick={() => setMostrarCancelacion(true)} style={{ width: '100%', marginTop: '12px', padding: '14px', background: 'transparent', border: '1px solid #2A2A2E', borderRadius: '14px', color: '#FF4444', fontSize: '14px', cursor: 'pointer' }}>Cancelar viaje</button>
+            <button onClick={() => setEnLlamada(true)} style={{ width: '100%', marginTop: '12px', padding: '14px', background: 'linear-gradient(135deg, #2ECC71, #27AE60)', border: 'none', borderRadius: '14px', color: '#FFFFFF', fontSize: '14px', fontWeight: 'bold', cursor: 'pointer' }}>📞 Llamar al conductor</button>
+            <button onClick={() => setMostrarCancelacion(true)} style={{ width: '100%', marginTop: '8px', padding: '14px', background: 'transparent', border: '1px solid #2A2A2E', borderRadius: '14px', color: '#FF4444', fontSize: '14px', cursor: 'pointer' }}>Cancelar viaje</button>
           </div>
         )}
       </div>
@@ -656,7 +696,7 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
             <button onClick={bajarTarifa} style={{ width: '48px', height: '48px', background: tarifa <= TARIFA_MINIMA ? '#2A2A2E' : '#1A1A1E', border: `2px solid ${tarifa <= TARIFA_MINIMA ? '#2A2A2E' : '#FF7A2F'}`, borderRadius: '14px', color: tarifa <= TARIFA_MINIMA ? '#555' : '#FF7A2F', fontSize: '24px', cursor: tarifa <= TARIFA_MINIMA ? 'default' : 'pointer', fontWeight: 'bold' }}>−</button>
             <div style={{ textAlign: 'center' }}>
               <p style={{ color: '#FFFFFF', fontSize: '36px', fontWeight: '900', margin: '0' }}>${tarifa.toLocaleString()}</p>
-              <p style={{ color: '#555', fontSize: '11px', margin: '4px 0 0' }}>{tarifa === TARIFA_MINIMA ? 'Tarifa mínima' : 'Oferta personalizada'}</p>
+              <p style={{ color: '#555', fontSize: '11px', margin: '4px 0 0' }}>{tarifa === getTarifaMinima() ? (getTarifaMinima() === 10000 ? '🌙 Tarifa nocturna' : 'Tarifa mínima') : 'Oferta personalizada'}</p>
             </div>
             <button onClick={subirTarifa} style={{ width: '48px', height: '48px', background: '#1A1A1E', border: '2px solid #2ECC71', borderRadius: '14px', color: '#2ECC71', fontSize: '24px', cursor: 'pointer', fontWeight: 'bold' }}>+</button>
           </div>
