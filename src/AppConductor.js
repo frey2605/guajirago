@@ -254,7 +254,7 @@ function HistorialConductor({ onVolver }) {
 }
 
 function AppConductor({ nombre, telefono, placa, vehiculo, onCerrarSesion }) {
-  const [activo, setActivo] = useState(true);
+  const [activo, setActivo] = useState(false);
   const [solicitud, setSolicitud] = useState(null);
   const [fase, setFase] = useState(null);
   const [viajeActual, setViajeActual] = useState(null);
@@ -369,7 +369,7 @@ function AppConductor({ nombre, telefono, placa, vehiculo, onCerrarSesion }) {
   useEffect(() => {
     if (!activo) { setSolicitud(null); solicitudIdRef.current = null; return; }
     const VENTANA_MS = 6 * 60 * 1000; // respaldo: ocultar solicitudes colgadas de más de 6 minutos
-    const q = query(collection(db, 'viajes'), where('estado', '==', 'esperando'));
+    const q = query(collection(db, 'viajes'), where('estado', 'in', ['esperando', 'contraoferta']));
     const unsub = onSnapshot(q, (snap) => {
       const ahora = Date.now();
       const tsDe = (v) => new Date(v.nuevaOferta || v.fechaSolicitud).getTime();
@@ -448,8 +448,10 @@ function AppConductor({ nombre, telefono, placa, vehiculo, onCerrarSesion }) {
         setTarifaCambiada(false);
         return;
       }
-      // La contraoferta expiró o fue rechazada (volvió a esperando) -> liberar
+      // La contraoferta expiró o fue rechazada (volvió a esperando) -> liberar y permitir volver a pujar
       if (data.estado === 'esperando') {
+        // Borrar de descartados para que el conductor pueda volver a ver y pujar por este viaje
+        delete descartadosRef.current[viajeIdEscuchando];
         setViajeIdEscuchando(null);
         setTarifaCambiada(false);
         return;
@@ -469,7 +471,7 @@ function AppConductor({ nombre, telefono, placa, vehiculo, onCerrarSesion }) {
   // limpiar el indicador aunque el listener en tiempo real falle por el background de iOS.
   useEffect(() => {
     if (!viajeIdEscuchando) return;
-    const t = setTimeout(() => setViajeIdEscuchando(null), 15000);
+    const t = setTimeout(() => setViajeIdEscuchando(null), 90000);
     return () => clearTimeout(t);
   }, [viajeIdEscuchando]);
 
