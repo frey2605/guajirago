@@ -1,4 +1,5 @@
 const { onDocumentCreated } = require("firebase-functions/v2/firestore");
+const { onCall } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
 
 admin.initializeApp();
@@ -126,4 +127,20 @@ exports.notificarNuevaOferta = require("firebase-functions/v2/firestore").onDocu
     console.error("Error notificarNuevaOferta:", e.message);
     return null;
   }
+});
+
+// Pasajero sube su tarifa mientras espera
+exports.subirTarifa = onCall(async (request) => {
+  const { viajeId, nuevaTarifa } = request.data;
+  if (!viajeId || !nuevaTarifa) throw new Error("Faltan datos");
+
+  await admin.firestore().collection("viajes").doc(viajeId).update({
+    tarifa: "$" + nuevaTarifa.toLocaleString(),
+    tarifaValor: nuevaTarifa,
+    nuevaOferta: new Date().toISOString(),
+    estado: "esperando",
+  });
+
+  console.log("Tarifa subida a:", nuevaTarifa, "en viaje:", viajeId);
+  return { ok: true };
 });

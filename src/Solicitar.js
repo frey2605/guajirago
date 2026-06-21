@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { db, auth } from './firebase';
 import { collection, addDoc, doc, onSnapshot, updateDoc, getDoc } from 'firebase/firestore';
-import { getFunctions, httpsCallable } from 'firebase/functions';
 import Calificacion from './Calificacion';
 
 const centroRiohacha = { lat: 11.5444, lng: -72.9072 };
@@ -213,7 +212,6 @@ function MapaPasajero({ ubicacionPasajero, ubicacionConductor, tipo, onTiempo })
 }
 
 function Solicitar({ tipo, onVolver, destinoInicial }) {
-  const fnSubirTarifa = httpsCallable(getFunctions(), 'subirTarifa');
   const [origen, setOrigen] = useState('');
   const [destino, setDestino] = useState(destinoInicial || '');
   const [pantalla, setPantalla] = useState('solicitar');
@@ -308,7 +306,22 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
         return;
       }
 
-      if (data.estado === 'aceptado' && pantallaRef.current !== 'fase1' && pantallaRef.current !== 'fase2' && !celebrando) {
+      if (data.estado === 'confirmando' && pantallaRef.current !== 'confirmando' && pantallaRef.current !== 'fase1' && pantallaRef.current !== 'fase2') {
+        setContraofertas([]);
+        contaofertasIdsRef.current.clear();
+        setPantalla('confirmando');
+      }
+
+      if (data.estado === 'confirmado' && pantallaRef.current === 'confirmando') {
+        setCelebrando(true);
+        setTimeout(() => {
+          setCelebrando(false);
+          setPantalla('fase1');
+          if (data.conductorId) escucharConductor(data.conductorId);
+        }, 3000);
+      }
+
+      if (data.estado === 'aceptado' && pantallaRef.current !== 'fase1' && pantallaRef.current !== 'fase2' && pantallaRef.current !== 'confirmando' && !celebrando) {
         setContraofertas([]);
         contaofertasIdsRef.current.clear();
         setCelebrando(true);
@@ -390,7 +403,12 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
   const enviarNuevaOferta = async () => {
     if (!viajeId || !nuevaTarifa || nuevaTarifa <= tarifa) return;
     try {
-      await fnSubirTarifa({ viajeId, nuevaTarifa });
+      await updateDoc(doc(db, 'viajes', viajeId), {
+        tarifa: '$' + nuevaTarifa.toLocaleString(),
+        tarifaValor: nuevaTarifa,
+        nuevaOferta: new Date().toISOString(),
+        estado: 'esperando',
+      });
       setTarifa(nuevaTarifa);
       setNuevaTarifa(null);
       setOfertaModificada(false);
@@ -465,6 +483,45 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
         <p style={{ color: '#555', fontSize: '14px', margin: '0 0 8px', textAlign: 'center' }}>Razón: <span style={{ color: '#FF7A2F' }}>{viaje?.razonCancelacion || 'No especificada'}</span></p>
         <p style={{ color: '#555', fontSize: '13px', margin: '0 0 32px', textAlign: 'center' }}>Puedes solicitar otro viaje</p>
         <button onClick={onVolver} style={{ width: '100%', padding: '18px', background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)', border: 'none', borderRadius: '16px', color: '#141416', fontSize: '18px', fontWeight: '900', cursor: 'pointer' }}>Volver al inicio</button>
+      </div>
+    );
+  }
+
+  if (pantalla === 'confirmando' && viaje) {
+    return (
+      <div style={{ backgroundColor: '#141416', minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px 24px' }}>
+        <div style={{ fontSize: '80px', marginBottom: '16px' }}>{viaje.tipo === 'Taxi' ? '🚗' : '🏍️'}</div>
+        <p style={{ color: '#2ECC71', fontSize: '13px', margin: '0 0 8px', letterSpacing: '3px', fontWeight: 'bold' }}>¡CONDUCTOR ENCONTRADO!</p>
+        <h2 style={{ color: '#FFFFFF', fontSize: '26px', fontWeight: '900', margin: '0 0 4px', textAlign: 'center' }}>{viaje.conductorNombre}</h2>
+        {viaje.conductorPlaca && <p style={{ color: '#FFCF4D', fontSize: '18px', fontWeight: '900', margin: '0 0 4px' }}>🚘 {viaje.conductorPlaca}</p>}
+        {viaje.conductorVehiculo && <p style={{ color: '#555', fontSize: '14px', margin: '0 0 24px' }}>{viaje.conductorVehiculo}</p>}
+        <div style={{ background: '#1A1A1E', borderRadius: '20px', padding: '20px', width: '100%', marginBottom: '24px', border: '1px solid #2A2A2E' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
+            <p style={{ color: '#555', fontSize: '12px', margin: '0' }}>TARIFA ACORDADA</p>
+            <p style={{ color: '#2ECC71', fontSize: '22px', fontWeight: '900', margin: '0' }}>{viaje.tarifa}</p>
+          </div>
+          <div style={{ display: 'flex', gap: '8px', marginBottom: '6px' }}>
+            <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#2ECC71', marginTop: '3px', flexShrink: 0 }}/>
+            <p style={{ color: '#FFFFFF', fontSize: '13px', margin: '0' }}>{origen}</p>
+          </div>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <div style={{ width: '10px', height: '10px', borderRadius: '2px', background: '#FF7A2F', marginTop: '3px', flexShrink: 0 }}/>
+            <p style={{ color: '#FFFFFF', fontSize: '13px', margin: '0' }}>{destino}</p>
+          </div>
+        </div>
+        <button onClick={async () => {
+          if (!viajeId) return;
+          try { await updateDoc(doc(db, 'viajes', viajeId), { estado: 'confirmado' }); } catch(e) {}
+        }} style={{ width: '100%', padding: '18px', background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)', border: 'none', borderRadius: '16px', color: '#141416', fontSize: '20px', fontWeight: '900', cursor: 'pointer', marginBottom: '12px' }}>
+          ✅ Confirmar viaje
+        </button>
+        <button onClick={async () => {
+          if (!viajeId) return;
+          try { await updateDoc(doc(db, 'viajes', viajeId), { estado: 'cancelado', canceladoPor: 'pasajero', razonCancelacion: 'Pasajero no confirmó el viaje' }); } catch(e) {}
+          onVolver();
+        }} style={{ background: 'transparent', border: '1px solid #2A2A2E', borderRadius: '14px', color: '#FF4444', fontSize: '14px', padding: '14px 32px', cursor: 'pointer' }}>
+          Cancelar
+        </button>
       </div>
     );
   }

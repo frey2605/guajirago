@@ -369,7 +369,7 @@ function AppConductor({ nombre, telefono, placa, vehiculo, onCerrarSesion }) {
   useEffect(() => {
     if (!activo) { setSolicitud(null); solicitudIdRef.current = null; return; }
     const VENTANA_MS = 6 * 60 * 1000; // respaldo: ocultar solicitudes colgadas de más de 6 minutos
-    const q = query(collection(db, 'viajes'), where('estado', '==', 'esperando'));
+    const q = query(collection(db, 'viajes'), where('estado', 'in', ['esperando', 'contraoferta']));
     const unsub = onSnapshot(q, (snap) => {
       const ahora = Date.now();
       const tsDe = (v) => new Date(v.nuevaOferta || v.fechaSolicitud).getTime();
@@ -402,12 +402,11 @@ function AppConductor({ nombre, telefono, placa, vehiculo, onCerrarSesion }) {
       solicitudIdRef.current = datos.id;
       ultimaOfertaRef.current = tsActual;
       setSolicitud(datos);
-      // Siempre mostrar la oferta REAL del pasajero y limpiar cualquier contraoferta vieja.
-      // (El conductor ajusta sobre este valor; si toca +/- pasa a "Enviar contraoferta")
-      setTarifaModificada(datos.tarifaValor || TARIFA_MINIMA);
-      setTarifaCambiada(false);
-      // Suena GO GO: viaje nuevo, reaparece tras descarte, o el pasajero subió su oferta
-      if (esNuevoViaje || ofertaSubio) alertarNuevoViaje();
+      if (esNuevoViaje || ofertaSubio) {
+        setTarifaModificada(datos.tarifaValor || TARIFA_MINIMA);
+        setTarifaCambiada(false);
+        alertarNuevoViaje();
+      }
     });
     return () => unsub();
   }, [activo]);
@@ -432,6 +431,16 @@ function AppConductor({ nombre, telefono, placa, vehiculo, onCerrarSesion }) {
     const unsub = onSnapshot(doc(db, 'viajes', viajeIdEscuchando), (snap) => {
       if (!snap.exists()) { setViajeIdEscuchando(null); return; }
       const data = snap.data();
+      // Mi oferta directa fue confirmada por el pasajero
+      if (data.estado === 'confirmado' && data.conductorId === miId && !celebrando && !fase) {
+        setCelebrando(true);
+        setTimeout(() => {
+          setCelebrando(false);
+          iniciarFase1({ id: viajeIdEscuchando, ...data });
+          setViajeIdEscuchando(null);
+        }, 3000);
+        return;
+      }
       // Mi contraoferta fue aceptada
       if (data.estado === 'aceptado' && data.conductorId === miId && !celebrando && !fase) {
         setCelebrando(true);
@@ -448,8 +457,15 @@ function AppConductor({ nombre, telefono, placa, vehiculo, onCerrarSesion }) {
         setTarifaCambiada(false);
         return;
       }
-      // La contraoferta expiró o fue rechazada (volvió a esperando) -> liberar
+      // La contraoferta expiró o fue rechazada (volvió a esperando) -> liberar y permitir volver a pujar
       if (data.estado === 'esperando') {
+        delete descartadosRef.current[viajeIdEscuchando];
+        setViajeIdEscuchando(null);
+        setTarifaCambiada(false);
+        return;
+      }
+      // El pasajero no confirmó -> volver a disponible
+      if (data.estado === 'cancelado' || data.estado === 'cancelado_conductor') {
         setViajeIdEscuchando(null);
         setTarifaCambiada(false);
         return;
@@ -593,14 +609,16 @@ function AppConductor({ nombre, telefono, placa, vehiculo, onCerrarSesion }) {
       }).catch(() => {});
     } else {
       const viajeAceptado = solicitud;
-      setCelebrando(true);
-      // Escribir en Firestore en segundo plano sin bloquear la UI
+      setSolicitud(null);
+      solicitudIdRef.current = null;
+      setViajeIdEscuchando(viajeAceptado.id);
+      setActivo(true);
+      // Escribir confirmando en Firestore — el pasajero debe confirmar antes de arrancar
       updateDoc(doc(db, 'viajes', viajeAceptado.id), {
-        estado: 'aceptado', conductorId: user.uid,
+        estado: 'confirmando', conductorId: user.uid,
         conductorNombre: nombre || 'Conductor', conductorTelefono: telefono || '',
         conductorPlaca: placa || '', conductorVehiculo: vehiculo || '',
       }).catch(() => {});
-      setTimeout(() => { setCelebrando(false); iniciarFase1(viajeAceptado); setSolicitud(null); }, 3000);
     }
   };
 
@@ -750,7 +768,7 @@ function AppConductor({ nombre, telefono, placa, vehiculo, onCerrarSesion }) {
         {viajeIdEscuchando && !fase && (
           <div style={{ background: 'rgba(255,207,77,0.1)', borderRadius: '16px', padding: '14px 16px', marginBottom: '12px', border: '1px solid #FFCF4D', display: 'flex', alignItems: 'center', gap: '10px' }}>
             <span style={{ fontSize: '20px' }}>⏳</span>
-            <p style={{ color: '#FFCF4D', fontSize: '13px', fontWeight: 'bold', margin: '0' }}>Contraoferta enviada — esperando respuesta</p>
+            <p style={{ color: '#FFCF4D', fontSize: '13px', fontWeight: 'bold', margin: '0' }}>Esperando confirmación del pasajero...</p>
           </div>
         )}
         {activo && !solicitud && <div style={{ background: '#1A1A1E', borderRadius: '20px', padding: '32px 20px', textAlign: 'center', border: '1px dashed #2A2A2E' }}><p style={{ fontSize: '40px', margin: '0 0 12px' }}>⏳</p><p style={{ color: '#555', fontSize: '14px', margin: '0' }}>Esperando solicitudes de viaje...</p></div>}
