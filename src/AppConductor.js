@@ -254,7 +254,7 @@ function HistorialConductor({ onVolver }) {
 }
 
 function AppConductor({ nombre, telefono, placa, vehiculo, onCerrarSesion }) {
-  const [activo, setActivo] = useState(false);
+  const [activo, setActivo] = useState(true);
   const [solicitud, setSolicitud] = useState(null);
   const [fase, setFase] = useState(null);
   const [viajeActual, setViajeActual] = useState(null);
@@ -369,7 +369,7 @@ function AppConductor({ nombre, telefono, placa, vehiculo, onCerrarSesion }) {
   useEffect(() => {
     if (!activo) { setSolicitud(null); solicitudIdRef.current = null; return; }
     const VENTANA_MS = 6 * 60 * 1000; // respaldo: ocultar solicitudes colgadas de más de 6 minutos
-    const q = query(collection(db, 'viajes'), where('estado', 'in', ['esperando', 'contraoferta']));
+    const q = query(collection(db, 'viajes'), where('estado', '==', 'esperando'));
     const unsub = onSnapshot(q, (snap) => {
       const ahora = Date.now();
       const tsDe = (v) => new Date(v.nuevaOferta || v.fechaSolicitud).getTime();
@@ -402,13 +402,12 @@ function AppConductor({ nombre, telefono, placa, vehiculo, onCerrarSesion }) {
       solicitudIdRef.current = datos.id;
       ultimaOfertaRef.current = tsActual;
       setSolicitud(datos);
-      // Solo resetear tarifa si es viaje nuevo o si el pasajero subió su oferta
-      // Si solo cambió porque otro conductor contraofertó, no tocar la tarifa del conductor actual
-      if (esNuevoViaje || ofertaSubio) {
-        setTarifaModificada(datos.tarifaValor || TARIFA_MINIMA);
-        setTarifaCambiada(false);
-        alertarNuevoViaje();
-      }
+      // Siempre mostrar la oferta REAL del pasajero y limpiar cualquier contraoferta vieja.
+      // (El conductor ajusta sobre este valor; si toca +/- pasa a "Enviar contraoferta")
+      setTarifaModificada(datos.tarifaValor || TARIFA_MINIMA);
+      setTarifaCambiada(false);
+      // Suena GO GO: viaje nuevo, reaparece tras descarte, o el pasajero subió su oferta
+      if (esNuevoViaje || ofertaSubio) alertarNuevoViaje();
     });
     return () => unsub();
   }, [activo]);
@@ -545,7 +544,7 @@ function AppConductor({ nombre, telefono, placa, vehiculo, onCerrarSesion }) {
     setMostrarCancelacion(false);
     setFase(null); setViajeActual(null); setTiempoLlegada(null); setDistancia(null);
     setRespuestaPasajero(null); setMensajeGrande(null); ultimoMensajeRef.current = null;
-    setUbicacionPasajero(null); setDestinoCoords(null); setActivo(false); setContador(240);
+    setUbicacionPasajero(null); setDestinoCoords(null); setActivo(true); setContador(240);
     setTarifaModificada(TARIFA_MINIMA); setTarifaCambiada(false); solicitudIdRef.current = null; ultimaOfertaRef.current = null;
   };
 
@@ -560,7 +559,7 @@ function AppConductor({ nombre, telefono, placa, vehiculo, onCerrarSesion }) {
     }
     setFase(null); setViajeActual(null); setTiempoLlegada(null); setDistancia(null);
     setRespuestaPasajero(null); setMensajeGrande(null); ultimoMensajeRef.current = null;
-    setUbicacionPasajero(null); setDestinoCoords(null); setActivo(false); setContador(240);
+    setUbicacionPasajero(null); setDestinoCoords(null); setActivo(true); setContador(240);
     setTarifaModificada(TARIFA_MINIMA); setTarifaCambiada(false); solicitudIdRef.current = null; ultimaOfertaRef.current = null;
   };
 
@@ -631,7 +630,7 @@ function AppConductor({ nombre, telefono, placa, vehiculo, onCerrarSesion }) {
         <h2 style={{ color: '#FFFFFF', fontSize: '24px', fontWeight: '900', margin: '0 0 12px', textAlign: 'center' }}>El pasajero canceló el viaje</h2>
         <p style={{ color: '#555', fontSize: '14px', margin: '0 0 8px', textAlign: 'center' }}>Razón: <span style={{ color: '#FF7A2F' }}>{viajeActual?.razonCancelacion || 'No especificada'}</span></p>
         <p style={{ color: '#555', fontSize: '13px', margin: '0 0 32px', textAlign: 'center' }}>Puedes activarte para recibir nuevos viajes</p>
-        <button onClick={() => { setFase(null); setViajeActual(null); setUbicacionPasajero(null); setDestinoCoords(null); setActivo(false); setTarifaModificada(TARIFA_MINIMA); setTarifaCambiada(false); solicitudIdRef.current = null; ultimaOfertaRef.current = null; }} style={{ width: '100%', padding: '18px', background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)', border: 'none', borderRadius: '16px', color: '#141416', fontSize: '18px', fontWeight: '900', cursor: 'pointer' }}>Volver al inicio</button>
+        <button onClick={() => { setFase(null); setViajeActual(null); setUbicacionPasajero(null); setDestinoCoords(null); setActivo(true); setTarifaModificada(TARIFA_MINIMA); setTarifaCambiada(false); solicitudIdRef.current = null; ultimaOfertaRef.current = null; }} style={{ width: '100%', padding: '18px', background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)', border: 'none', borderRadius: '16px', color: '#141416', fontSize: '18px', fontWeight: '900', cursor: 'pointer' }}>Volver al inicio</button>
       </div>
     );
   }
