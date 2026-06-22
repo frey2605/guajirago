@@ -10,7 +10,7 @@ const getTarifaMinima = () => {
   return (hora >= 18 || hora < 6) ? 10000 : 8000;
 };
 const BOUNDS_RIOHACHA = { north: 11.7, south: 11.3, east: -72.6, west: -73.0 };
-const DURACION_CONTRAOFERTA_MS = 10000; // 10 segundos
+const DURACION_CONTRAOFERTA_MS = 10000;
 
 const RESPUESTAS_RAPIDAS = [
   '🏃 Ya voy saliendo',
@@ -90,7 +90,6 @@ function ModalCancelacion({ razones, onConfirmar, onCerrar }) {
   );
 }
 
-// Tarjeta de contraoferta con barra de tiempo
 function TarjetaContraoferta({ oferta, onAceptar, onRechazar }) {
   const [progreso, setProgreso] = useState(100);
 
@@ -112,7 +111,6 @@ function TarjetaContraoferta({ oferta, onAceptar, onRechazar }) {
 
   return (
     <div style={{ background: '#1A1A1E', borderRadius: '20px', padding: '16px', marginBottom: '10px', border: '1px solid #FF7A2F' }}>
-      {/* Barra de tiempo */}
       <div style={{ height: '4px', background: '#2A2A2E', borderRadius: '2px', marginBottom: '14px', overflow: 'hidden' }}>
         <div style={{ height: '100%', width: `${progreso}%`, background: colorBarra, borderRadius: '2px', transition: 'width 0.05s linear, background 0.3s' }} />
       </div>
@@ -235,17 +233,18 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
   const [contador, setContador] = useState(240);
   const [destinoCoords, setDestinoCoords] = useState(null);
   const [mostrarCalificacion, setMostrarCalificacion] = useState(false);
-  const [nuevaTarifa, setNuevaTarifa] = useState(null); // tarifa modificada mientras espera
+  const [nuevaTarifa, setNuevaTarifa] = useState(null);
   const [ofertaModificada, setOfertaModificada] = useState(false);
-  // Contraofertas múltiples: lista de { conductorId, conductorNombre, conductorPlaca, conductorVehiculo, contraoferta, contraofertaValor }
   const [contraofertas, setContraofertas] = useState([]);
   const [enLlamada, setEnLlamada] = useState(false);
   const [contadorConfirmacion, setContadorConfirmacion] = useState(60);
+  // FIX: ref para saber si ya iniciamos el viaje y no repetir
+  const viajeIniciadoRef = useRef(false);
   const contadorRef = useRef(null);
   const contadorConfirmacionRef = useRef(null);
   const pantallaRef = useRef(pantalla);
   const intervaloRespaldoRef = useRef(null);
-  const contaofertasIdsRef = useRef(new Set()); // IDs ya vistos para no duplicar
+  const contaofertasIdsRef = useRef(new Set());
 
   useEffect(() => { pantallaRef.current = pantalla; }, [pantalla]);
 
@@ -290,13 +289,11 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
         return;
       }
 
-      // Contraoferta de un conductor: agregar a la lista si no está ya
       if (data.estado === 'contraoferta' && data.conductorId) {
         const key = data.conductorId + '_' + (data.contraofertaValor || '');
         if (!contaofertasIdsRef.current.has(key)) {
           contaofertasIdsRef.current.add(key);
           setContraofertas(prev => {
-            // Evitar duplicados por conductorId
             if (prev.find(c => c.conductorId === data.conductorId && c.contraofertaValor === data.contraofertaValor)) return prev;
             return [...prev, {
               conductorId: data.conductorId,
@@ -309,7 +306,6 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
             }];
           });
         }
-        // Si hay contraofertas y estamos en 'esperando', mantenemos esa pantalla
         return;
       }
 
@@ -334,7 +330,9 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
         }, 1000);
       }
 
-      if (data.estado === 'confirmado' && pantallaRef.current === 'confirmando') {
+      // FIX: escuchar confirmado desde Firestore también (para cuando el conductor confirma desde su lado)
+      if (data.estado === 'confirmado' && !viajeIniciadoRef.current && pantallaRef.current !== 'fase1' && pantallaRef.current !== 'fase2') {
+        viajeIniciadoRef.current = true;
         clearInterval(contadorConfirmacionRef.current);
         setCelebrando(true);
         setTimeout(() => {
@@ -344,7 +342,8 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
         }, 3000);
       }
 
-      if (data.estado === 'aceptado' && pantallaRef.current !== 'fase1' && pantallaRef.current !== 'fase2' && pantallaRef.current !== 'confirmando' && !celebrando) {
+      if (data.estado === 'aceptado' && !viajeIniciadoRef.current && pantallaRef.current !== 'fase1' && pantallaRef.current !== 'fase2') {
+        viajeIniciadoRef.current = true;
         setContraofertas([]);
         contaofertasIdsRef.current.clear();
         setCelebrando(true);
@@ -371,15 +370,10 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
       }
 
       if (data.estado === 'finalizado' && pantallaRef.current === 'fase2') setMostrarCalificacion(true);
-
-      if (data.estado === 'esperando') {
-        // El viaje volvió a esperando (contraoferta rechazada o expirada), limpiar contraofertas de ese conductor
-        // No limpiamos toda la lista porque pueden haber otras contraofertas válidas aún
-      }
     });
 
     return () => { unsub(); clearInterval(intervaloRespaldoRef.current); };
-  }, [viajeId, celebrando, conductorEnPunto]);
+  }, [viajeId, conductorEnPunto]);
 
   useEffect(() => {
     if (!viajeId) return;
@@ -427,7 +421,7 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
 
   const bajarNuevaTarifa = () => {
     const base = nuevaTarifa !== null ? nuevaTarifa : tarifa;
-    if (base <= tarifa) return; // no puede bajar de la oferta original
+    if (base <= tarifa) return;
     setNuevaTarifa(base - 1000);
     setOfertaModificada(true);
   };
@@ -446,6 +440,7 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
       setOfertaModificada(false);
     } catch(e) {}
   };
+
   const bajarTarifa = () => setTarifa(t => Math.max(getTarifaMinima(), t - 1000));
 
   const solicitarViaje = async () => {
@@ -461,6 +456,7 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
         fechaSolicitud: new Date().toISOString(),
       });
       setViajeId(docRef.id);
+      viajeIniciadoRef.current = false;
       setContraofertas([]);
       contaofertasIdsRef.current.clear();
       setPantalla('esperando');
@@ -487,15 +483,29 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
   };
 
   const rechazarContraoferta = async (conductorId) => {
-    // Quitar de la lista local
     setContraofertas(prev => prev.filter(c => c.conductorId !== conductorId));
-    // Si no quedan más contraofertas, volver el viaje a esperando
     setContraofertas(prev => {
       if (prev.filter(c => c.conductorId !== conductorId).length === 0 && viajeId) {
         updateDoc(doc(db, 'viajes', viajeId), { estado: 'esperando' }).catch(() => {});
       }
       return prev.filter(c => c.conductorId !== conductorId);
     });
+  };
+
+  // FIX: confirmar viaje — arranca inmediatamente sin esperar Firestore de vuelta
+  const confirmarViaje = async () => {
+    clearInterval(contadorConfirmacionRef.current);
+    if (!viajeId || viajeIniciadoRef.current) return;
+    viajeIniciadoRef.current = true;
+    // Celebrar inmediatamente
+    setCelebrando(true);
+    // Escribir en Firestore en paralelo
+    updateDoc(doc(db, 'viajes', viajeId), { estado: 'confirmado' }).catch(() => {});
+    setTimeout(() => {
+      setCelebrando(false);
+      setPantalla('fase1');
+      if (viaje?.conductorId) escucharConductor(viaje.conductorId);
+    }, 3000);
   };
 
   if (enLlamada && viajeId) return <Llamada viajeId={viajeId} miRol="pasajero" nombreOtro={viaje?.conductorNombre || 'Conductor'} onCerrar={() => setEnLlamada(false)} />;
@@ -540,11 +550,7 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
           <p style={{ color: '#555', fontSize: '12px', margin: '0' }}>Confirma antes de que expire</p>
           <p style={{ color: contadorConfirmacion <= 15 ? '#FF4444' : '#FFCF4D', fontSize: '28px', fontWeight: '900', margin: '0', fontVariantNumeric: 'tabular-nums' }}>0:{String(contadorConfirmacion).padStart(2, '0')}</p>
         </div>
-        <button onClick={async () => {
-          clearInterval(contadorConfirmacionRef.current);
-          if (!viajeId) return;
-          try { await updateDoc(doc(db, 'viajes', viajeId), { estado: 'confirmado' }); } catch(e) {}
-        }} style={{ width: '100%', padding: '18px', background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)', border: 'none', borderRadius: '16px', color: '#141416', fontSize: '20px', fontWeight: '900', cursor: 'pointer', marginBottom: '12px' }}>
+        <button onClick={confirmarViaje} style={{ width: '100%', padding: '18px', background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)', border: 'none', borderRadius: '16px', color: '#141416', fontSize: '20px', fontWeight: '900', cursor: 'pointer', marginBottom: '12px' }}>
           ✅ Confirmar viaje
         </button>
         <button onClick={async () => {
@@ -638,7 +644,6 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
         <p style={{ color: '#555', fontSize: '14px', margin: '0 0 4px', textAlign: 'center' }}>{origen} → {destino}</p>
         <p style={{ color: '#2ECC71', fontSize: '20px', fontWeight: '900', margin: '0 0 24px', textAlign: 'center' }}>Tu oferta: ${tarifa.toLocaleString()}</p>
 
-        {/* Contraofertas múltiples */}
         {contraofertas.length > 0 && (
           <div style={{ width: '100%', marginBottom: '16px' }}>
             <p style={{ color: '#555', fontSize: '11px', letterSpacing: '2px', margin: '0 0 10px', textAlign: 'center' }}>PROPUESTAS DE CONDUCTORES</p>
@@ -653,7 +658,6 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
           </div>
         )}
 
-        {/* Subir oferta mientras espera */}
         <div style={{ width: '100%', background: '#1A1A1E', borderRadius: '20px', padding: '20px', marginBottom: '16px', border: '1px solid #2A2A2E' }}>
           <p style={{ color: '#555', fontSize: '11px', margin: '0 0 12px', letterSpacing: '2px', textAlign: 'center' }}>¿QUIERES SUBIR TU OFERTA?</p>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
