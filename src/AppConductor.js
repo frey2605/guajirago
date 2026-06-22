@@ -279,6 +279,14 @@ function AppConductor({ nombre, telefono, placa, vehiculo, onCerrarSesion }) {
   const solicitudIdRef = useRef(null);
   const descartadosRef = useRef({});
   const ultimaOfertaRef = useRef(null);
+  // Post-it 1: siempre tiene el valor actual de celebrando
+  const celebrandoRef = useRef(false);
+  // Post-it 2: siempre tiene el valor actual de fase
+  const faseRef = useRef(null);
+
+  // Mantener los post-it actualizados
+  useEffect(() => { celebrandoRef.current = celebrando; }, [celebrando]);
+  useEffect(() => { faseRef.current = fase; }, [fase]);
 
   const cerrarSesion = async () => {
     try {
@@ -415,20 +423,27 @@ function AppConductor({ nombre, telefono, placa, vehiculo, onCerrarSesion }) {
     const unsub = onSnapshot(doc(db, 'viajes', viajeIdEscuchando), (snap) => {
       if (!snap.exists()) { setViajeIdEscuchando(null); return; }
       const data = snap.data();
-      if (data.estado === 'confirmado' && data.conductorId === miId && !celebrando && !fase) {
+      // Usar los post-it en vez de los valores congelados
+      if (data.estado === 'confirmado' && data.conductorId === miId && !celebrandoRef.current && !faseRef.current) {
         setCelebrando(true);
+        celebrandoRef.current = true;
+        const idCopy = viajeIdEscuchando;
         setTimeout(() => {
           setCelebrando(false);
-          iniciarFase1({ id: viajeIdEscuchando, ...data });
+          celebrandoRef.current = false;
+          iniciarFase1({ id: idCopy, ...data });
           setViajeIdEscuchando(null);
         }, 3000);
         return;
       }
-      if (data.estado === 'aceptado' && data.conductorId === miId && !celebrando && !fase) {
+      if (data.estado === 'aceptado' && data.conductorId === miId && !celebrandoRef.current && !faseRef.current) {
         setCelebrando(true);
+        celebrandoRef.current = true;
+        const idCopy = viajeIdEscuchando;
         setTimeout(() => {
           setCelebrando(false);
-          iniciarFase1({ id: viajeIdEscuchando, ...data });
+          celebrandoRef.current = false;
+          iniciarFase1({ id: idCopy, ...data });
           setViajeIdEscuchando(null);
         }, 3000);
         return;
@@ -452,7 +467,7 @@ function AppConductor({ nombre, telefono, placa, vehiculo, onCerrarSesion }) {
       if (data.respuestaPasajero) recibirMensajePasajero(data.respuestaPasajero);
     });
     return () => unsub();
-  }, [viajeIdEscuchando, celebrando, fase, recibirMensajePasajero]);
+  }, [viajeIdEscuchando, recibirMensajePasajero]);
 
   useEffect(() => {
     if (!viajeIdEscuchando) return;
@@ -494,6 +509,7 @@ function AppConductor({ nombre, telefono, placa, vehiculo, onCerrarSesion }) {
   const iniciarFase1 = (viaje) => {
     setViajeActual(viaje);
     setFase('recogiendo');
+    faseRef.current = 'recogiendo'; // actualizar el post-it
     // El botón de disponible solo se desactiva manualmente — nunca automáticamente
     if (viaje.pasajeroLat && viaje.pasajeroLng) {
       setUbicacionPasajero({ lat: viaje.pasajeroLat, lng: viaje.pasajeroLng });
@@ -529,7 +545,8 @@ function AppConductor({ nombre, telefono, placa, vehiculo, onCerrarSesion }) {
       await updateDoc(doc(db, 'viajes', viajeActual.id), { estado: 'cancelado_conductor', canceladoPor: 'conductor', razonCancelacion: razon });
     }
     setMostrarCancelacion(false);
-    setFase(null); setViajeActual(null); setTiempoLlegada(null); setDistancia(null);
+    setFase(null); faseRef.current = null;
+    setViajeActual(null); setTiempoLlegada(null); setDistancia(null);
     setRespuestaPasajero(null); setMensajeGrande(null); ultimoMensajeRef.current = null;
     setUbicacionPasajero(null); setDestinoCoords(null); setActivo(true); setContador(240);
     setTarifaModificada(TARIFA_MINIMA); setTarifaCambiada(false); solicitudIdRef.current = null; ultimaOfertaRef.current = null;
@@ -543,7 +560,8 @@ function AppConductor({ nombre, telefono, placa, vehiculo, onCerrarSesion }) {
         setDatosCalificacion({ viajeId: viajeActual.id, nombrePasajero: viajeActual.pasajeroEmail?.split('@')[0] || 'Pasajero' });
       } catch (err) {}
     }
-    setFase(null); setViajeActual(null); setTiempoLlegada(null); setDistancia(null);
+    setFase(null); faseRef.current = null;
+    setViajeActual(null); setTiempoLlegada(null); setDistancia(null);
     setRespuestaPasajero(null); setMensajeGrande(null); ultimoMensajeRef.current = null;
     setUbicacionPasajero(null); setDestinoCoords(null); setActivo(true); setContador(240);
     setTarifaModificada(TARIFA_MINIMA); setTarifaCambiada(false); solicitudIdRef.current = null; ultimaOfertaRef.current = null;
@@ -622,7 +640,7 @@ function AppConductor({ nombre, telefono, placa, vehiculo, onCerrarSesion }) {
         <h2 style={{ color: '#FFFFFF', fontSize: '24px', fontWeight: '900', margin: '0 0 12px', textAlign: 'center' }}>El pasajero canceló el viaje</h2>
         <p style={{ color: '#555', fontSize: '14px', margin: '0 0 8px', textAlign: 'center' }}>Razón: <span style={{ color: '#FF7A2F' }}>{viajeActual?.razonCancelacion || 'No especificada'}</span></p>
         <p style={{ color: '#555', fontSize: '13px', margin: '0 0 32px', textAlign: 'center' }}>Puedes activarte para recibir nuevos viajes</p>
-        <button onClick={() => { setFase(null); setViajeActual(null); setUbicacionPasajero(null); setDestinoCoords(null); setActivo(true); setTarifaModificada(TARIFA_MINIMA); setTarifaCambiada(false); solicitudIdRef.current = null; ultimaOfertaRef.current = null; }} style={{ width: '100%', padding: '18px', background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)', border: 'none', borderRadius: '16px', color: '#141416', fontSize: '18px', fontWeight: '900', cursor: 'pointer' }}>Volver al inicio</button>
+        <button onClick={() => { setFase(null); faseRef.current = null; setViajeActual(null); setUbicacionPasajero(null); setDestinoCoords(null); setActivo(true); setTarifaModificada(TARIFA_MINIMA); setTarifaCambiada(false); solicitudIdRef.current = null; ultimaOfertaRef.current = null; }} style={{ width: '100%', padding: '18px', background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)', border: 'none', borderRadius: '16px', color: '#141416', fontSize: '18px', fontWeight: '900', cursor: 'pointer' }}>Volver al inicio</button>
       </div>
     );
   }
