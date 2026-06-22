@@ -472,10 +472,9 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
     if (!viajeId) return;
     setContraofertas([]);
     contaofertasIdsRef.current.clear();
-    setCelebrando(true);
     try {
       await updateDoc(doc(db, 'viajes', viajeId), {
-        estado: 'aceptado',
+        estado: 'confirmando',
         conductorId: oferta.conductorId,
         conductorNombre: oferta.conductorNombre,
         conductorPlaca: oferta.conductorPlaca,
@@ -485,11 +484,6 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
         tarifaValor: oferta.contraofertaValor,
       });
     } catch (e) {}
-    setTimeout(() => {
-      setCelebrando(false);
-      setPantalla('fase1');
-      escucharConductor(oferta.conductorId);
-    }, 3000);
   };
 
   const rechazarContraoferta = async (conductorId) => {

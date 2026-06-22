@@ -169,7 +169,6 @@ function HistorialConductor({ onVolver }) {
       try {
         const user = auth.currentUser;
         if (!user) return;
-        // Consulta simple sin indice compuesto
         const q = query(
           collection(db, 'viajes'),
           where('conductorId', '==', user.uid),
@@ -181,7 +180,6 @@ function HistorialConductor({ onVolver }) {
           .filter(v => v.estado === 'finalizado' || v.estado === 'cancelado')
           .sort((a, b) => new Date(b.fechaSolicitud) - new Date(a.fechaSolicitud));
         setViajes(lista);
-        // Sumar ganancias de hoy
         const hoy = new Date().toDateString();
         const gananciaHoy = lista
           .filter(v => v.estado === 'finalizado' && new Date(v.fechaSolicitud).toDateString() === hoy)
@@ -279,16 +277,14 @@ function AppConductor({ nombre, telefono, placa, vehiculo, onCerrarSesion }) {
   const [debugMsg, setDebugMsg] = React.useState('');
   const ultimoMensajeRef = useRef(null);
   const solicitudIdRef = useRef(null);
-  const descartadosRef = useRef({}); // { [viajeId]: timestampOfertaAlDescartar }
-  const ultimaOfertaRef = useRef(null); // timestamp de la última oferta mostrada (para re-sonar si sube)
+  const descartadosRef = useRef({});
+  const ultimaOfertaRef = useRef(null);
 
   const cerrarSesion = async () => {
     try {
-      // Cancelar viaje activo si lo hay
       if (viajeActual) {
         await updateDoc(doc(db, 'viajes', viajeActual.id), { estado: 'cancelado_conductor', canceladoPor: 'conductor', razonCancelacion: 'Conductor cerró sesión' });
       }
-      // Marcar conductor como inactivo
       const user = auth.currentUser;
       if (user) await setDoc(doc(db, 'conductores', user.uid), { activo: false }, { merge: true });
     } catch(e) {}
@@ -296,9 +292,6 @@ function AppConductor({ nombre, telefono, placa, vehiculo, onCerrarSesion }) {
     if (onCerrarSesion) onCerrarSesion(); else window.location.reload();
   };
 
-
-
-  // Registrar token FCM al cargar la app
   useEffect(() => {
     setDebugCallback((msg) => {
       setDebugMsg(msg);
@@ -306,8 +299,6 @@ function AppConductor({ nombre, telefono, placa, vehiculo, onCerrarSesion }) {
     });
     registrarTokenFCM();
   }, []);
-
-
 
   const recibirMensajePasajero = useCallback((mensaje) => {
     if (!mensaje) return;
@@ -322,14 +313,12 @@ function AppConductor({ nombre, telefono, placa, vehiculo, onCerrarSesion }) {
     if (!activo && !fase) return;
     const user = auth.currentUser;
     if (!user || !navigator.geolocation) return;
-    // Registrar token FCM cuando el conductor se activa
     if (activo) registrarTokenFCM();
 
     const guardarUbicacion = async (pos) => {
       const nueva = { lat: pos.coords.latitude, lng: pos.coords.longitude, timestamp: new Date().toISOString() };
       setUbicacion(nueva);
       try {
-        // Obtener token FCM fresco cada vez que se guarda ubicación
         let tokenFCM = null;
         try {
           const { getMessaging, getToken } = await import('firebase/messaging');
@@ -368,8 +357,8 @@ function AppConductor({ nombre, telefono, placa, vehiculo, onCerrarSesion }) {
 
   useEffect(() => {
     if (!activo) { setSolicitud(null); solicitudIdRef.current = null; return; }
-    const VENTANA_MS = 6 * 60 * 1000; // respaldo: ocultar solicitudes colgadas de más de 6 minutos
-    const q = query(collection(db, 'viajes'), where('estado', 'in', ['esperando', 'contraoferta']));
+    const VENTANA_MS = 6 * 60 * 1000;
+    const q = query(collection(db, 'viajes'), where('estado', 'in', ['esperando', 'contraoferta', 'confirmando']));
     const unsub = onSnapshot(q, (snap) => {
       const ahora = Date.now();
       const tsDe = (v) => new Date(v.nuevaOferta || v.fechaSolicitud).getTime();
@@ -379,9 +368,7 @@ function AppConductor({ nombre, telefono, placa, vehiculo, onCerrarSesion }) {
           if (!v.nuevaOferta && !v.fechaSolicitud) return false;
           const ts = tsDe(v);
           const edad = ahora - ts;
-          if (edad < 0 || edad > VENTANA_MS) return false; // respaldo global contra colgadas
-          // Si este conductor ya descartó el viaje (rechazó o se le venció) y la oferta NO
-          // ha cambiado desde entonces, no se lo volvemos a mostrar.
+          if (edad < 0 || edad > VENTANA_MS) return false;
           const descartadoEn = descartadosRef.current[v.id];
           if (descartadoEn && ts <= new Date(descartadoEn).getTime()) return false;
           return true;
@@ -394,7 +381,6 @@ function AppConductor({ nombre, telefono, placa, vehiculo, onCerrarSesion }) {
         return;
       }
       const datos = vigentes[0];
-      // Si reaparece porque la oferta cambió, quitarlo de descartados para que cuente como nuevo
       if (descartadosRef.current[datos.id]) delete descartadosRef.current[datos.id];
       const tsActual = datos.nuevaOferta || datos.fechaSolicitud;
       const esNuevoViaje = solicitudIdRef.current !== datos.id;
@@ -411,11 +397,9 @@ function AppConductor({ nombre, telefono, placa, vehiculo, onCerrarSesion }) {
     return () => unsub();
   }, [activo]);
 
-  // Si el conductor no acepta ni rechaza en 3 minutos, se descarta esa solicitud para él.
-  // (Reaparece solo si el pasajero cambia la oferta.) El timer se reinicia si la oferta cambia.
   useEffect(() => {
     if (!solicitud?.id) return;
-    const TIEMPO_DESCARTE = 3 * 60 * 1000; // 3 minutos
+    const TIEMPO_DESCARTE = 3 * 60 * 1000;
     const t = setTimeout(() => {
       descartadosRef.current[solicitud.id] = solicitud.nuevaOferta || solicitud.fechaSolicitud;
       solicitudIdRef.current = null;
@@ -431,7 +415,6 @@ function AppConductor({ nombre, telefono, placa, vehiculo, onCerrarSesion }) {
     const unsub = onSnapshot(doc(db, 'viajes', viajeIdEscuchando), (snap) => {
       if (!snap.exists()) { setViajeIdEscuchando(null); return; }
       const data = snap.data();
-      // Mi oferta directa fue confirmada por el pasajero
       if (data.estado === 'confirmado' && data.conductorId === miId && !celebrando && !fase) {
         setCelebrando(true);
         setTimeout(() => {
@@ -441,7 +424,6 @@ function AppConductor({ nombre, telefono, placa, vehiculo, onCerrarSesion }) {
         }, 3000);
         return;
       }
-      // Mi contraoferta fue aceptada
       if (data.estado === 'aceptado' && data.conductorId === miId && !celebrando && !fase) {
         setCelebrando(true);
         setTimeout(() => {
@@ -451,26 +433,17 @@ function AppConductor({ nombre, telefono, placa, vehiculo, onCerrarSesion }) {
         }, 3000);
         return;
       }
-      // Aceptaron a otro conductor -> liberar y seguir disponible
       if (data.estado === 'aceptado' && data.conductorId !== miId) {
         setViajeIdEscuchando(null);
         setTarifaCambiada(false);
         return;
       }
-      // La contraoferta expiró o fue rechazada (volvió a esperando) -> liberar y permitir volver a pujar
       if (data.estado === 'esperando') {
         delete descartadosRef.current[viajeIdEscuchando];
         setViajeIdEscuchando(null);
         setTarifaCambiada(false);
         return;
       }
-      // El pasajero no confirmó -> volver a disponible
-      if (data.estado === 'cancelado' || data.estado === 'cancelado_conductor') {
-        setViajeIdEscuchando(null);
-        setTarifaCambiada(false);
-        return;
-      }
-      // El pasajero canceló
       if (data.estado === 'cancelado' || data.estado === 'cancelado_conductor') {
         setViajeIdEscuchando(null);
         setTarifaCambiada(false);
@@ -481,8 +454,6 @@ function AppConductor({ nombre, telefono, placa, vehiculo, onCerrarSesion }) {
     return () => unsub();
   }, [viajeIdEscuchando, celebrando, fase, recibirMensajePasajero]);
 
-  // Respaldo iPhone: si la contraoferta no es aceptada en 15s (el cartel del pasajero dura 10s),
-  // limpiar el indicador aunque el listener en tiempo real falle por el background de iOS.
   useEffect(() => {
     if (!viajeIdEscuchando) return;
     const t = setTimeout(() => setViajeIdEscuchando(null), 90000);
@@ -523,7 +494,7 @@ function AppConductor({ nombre, telefono, placa, vehiculo, onCerrarSesion }) {
   const iniciarFase1 = (viaje) => {
     setViajeActual(viaje);
     setFase('recogiendo');
-    setActivo(false);
+    // El botón de disponible solo se desactiva manualmente — nunca automáticamente
     if (viaje.pasajeroLat && viaje.pasajeroLng) {
       setUbicacionPasajero({ lat: viaje.pasajeroLat, lng: viaje.pasajeroLng });
     }
@@ -569,7 +540,6 @@ function AppConductor({ nombre, telefono, placa, vehiculo, onCerrarSesion }) {
     if (viajeActual) {
       try {
         await updateDoc(doc(db, 'viajes', viajeActual.id), { estado: 'finalizado', fase: 'finalizado' });
-        // Guardar datos para calificacion antes de resetear
         setDatosCalificacion({ viajeId: viajeActual.id, nombrePasajero: viajeActual.pasajeroEmail?.split('@')[0] || 'Pasajero' });
       } catch (err) {}
     }
@@ -584,7 +554,16 @@ function AppConductor({ nombre, telefono, placa, vehiculo, onCerrarSesion }) {
     setTarifaCambiada(true);
   };
 
-
+  // No puede bajar de la oferta original del pasajero
+  const bajarTarifa = () => {
+    const minimo = solicitud?.tarifaValor || TARIFA_MINIMA;
+    setTarifaModificada(prev => {
+      const actual = tarifaCambiada ? prev : minimo;
+      if (actual <= minimo) return actual;
+      return actual - 1000;
+    });
+    setTarifaCambiada(true);
+  };
 
   const aceptarOEnviar = async () => {
     if (!solicitud) return;
@@ -593,14 +572,12 @@ function AppConductor({ nombre, telefono, placa, vehiculo, onCerrarSesion }) {
       const idViaje = solicitud.id;
       const tsOferta = solicitud.nuevaOferta || solicitud.fechaSolicitud;
       const montoContra = tarifaModificada;
-      // Volver al menú INMEDIATAMENTE sin esperar la escritura (clave para iPhone PWA)
       setSolicitud(null);
       solicitudIdRef.current = null;
       setTarifaCambiada(false);
       descartadosRef.current[idViaje] = tsOferta;
       setViajeIdEscuchando(idViaje);
       setActivo(true);
-      // Escribir en Firestore en segundo plano
       updateDoc(doc(db, 'viajes', idViaje), {
         estado: 'contraoferta', conductorId: user.uid,
         conductorNombre: nombre || 'Conductor', conductorTelefono: telefono || '',
@@ -613,7 +590,6 @@ function AppConductor({ nombre, telefono, placa, vehiculo, onCerrarSesion }) {
       solicitudIdRef.current = null;
       setViajeIdEscuchando(viajeAceptado.id);
       setActivo(true);
-      // Escribir confirmando en Firestore — el pasajero debe confirmar antes de arrancar
       updateDoc(doc(db, 'viajes', viajeAceptado.id), {
         estado: 'confirmando', conductorId: user.uid,
         conductorNombre: nombre || 'Conductor', conductorTelefono: telefono || '',
@@ -622,7 +598,6 @@ function AppConductor({ nombre, telefono, placa, vehiculo, onCerrarSesion }) {
     }
   };
 
-  // Escuchar llamada entrante del pasajero
   useEffect(() => {
     if (!viajeActual?.id) return;
     const unsub = onSnapshot(doc(db, 'llamadas', viajeActual.id), (s) => {
@@ -640,7 +615,6 @@ function AppConductor({ nombre, telefono, placa, vehiculo, onCerrarSesion }) {
 
   if (celebrando) return <Celebracion />;
 
-  // Pasajero canceló el viaje
   if (fase === 'cancelado_pasajero') {
     return (
       <div style={{ backgroundColor: '#141416', minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px 24px' }}>
@@ -736,8 +710,6 @@ function AppConductor({ nombre, telefono, placa, vehiculo, onCerrarSesion }) {
     );
   }
 
-  // Si hay contraoferta enviada pero no hay fase activa, mostrar menu normal
-
   return (
     <div style={{ backgroundColor: '#141416', minHeight: '100vh', fontFamily: 'Arial, sans-serif' }}>
       <div style={{ background: 'linear-gradient(135deg, #1A1A1E, #2A2A2E)', padding: '24px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -792,7 +764,10 @@ function AppConductor({ nombre, telefono, placa, vehiculo, onCerrarSesion }) {
                 {!tarifaCambiada && solicitud?.nuevaOferta && <p style={{ color: '#FFCF4D', fontSize: '11px', margin: '4px 0 0' }}>⬆️ Pasajero actualizó su oferta</p>}
                 {tarifaCambiada && <p style={{ color: '#555', fontSize: '11px', margin: '4px 0 0' }}>Oferta original: {solicitud.tarifa}</p>}
               </div>
-              <button onClick={subirTarifa} style={{ width: '56px', height: '56px', background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F)', border: 'none', borderRadius: '16px', color: '#141416', fontSize: '28px', fontWeight: '900', cursor: 'pointer' }}>+</button>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button onClick={bajarTarifa} style={{ width: '56px', height: '56px', background: tarifaModificada <= (solicitud?.tarifaValor || TARIFA_MINIMA) ? '#2A2A2E' : '#1A1A1E', border: `2px solid ${tarifaModificada <= (solicitud?.tarifaValor || TARIFA_MINIMA) ? '#2A2A2E' : '#FF7A2F'}`, borderRadius: '16px', color: tarifaModificada <= (solicitud?.tarifaValor || TARIFA_MINIMA) ? '#555' : '#FF7A2F', fontSize: '28px', fontWeight: '900', cursor: tarifaModificada <= (solicitud?.tarifaValor || TARIFA_MINIMA) ? 'default' : 'pointer' }}>−</button>
+                <button onClick={subirTarifa} style={{ width: '56px', height: '56px', background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F)', border: 'none', borderRadius: '16px', color: '#141416', fontSize: '28px', fontWeight: '900', cursor: 'pointer' }}>+</button>
+              </div>
             </div>
             <div style={{ display: 'flex', gap: '12px' }}>
               <button onClick={() => { if (solicitud) { descartadosRef.current[solicitud.id] = solicitud.nuevaOferta || solicitud.fechaSolicitud; solicitudIdRef.current = null; setSolicitud(null); setTarifaCambiada(false); } }} style={{ flex: 1, padding: '14px', background: '#141416', border: 'none', borderRadius: '14px', color: '#555', fontSize: '14px', fontWeight: 'bold', cursor: 'pointer' }}>✗ Rechazar</button>
