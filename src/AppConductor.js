@@ -380,6 +380,24 @@ function AppConductor({ nombre, telefono, placa, vehiculo, onCerrarSesion }) {
     setViajesEscuchando([]);
   }, []);
 
+  const limpiarViajesOtrosConductor = useCallback(async (miId, idViajeGanador) => {
+    try {
+      const snap = await getDocs(query(collection(db, 'viajes'), where('conductorId', '==', miId)));
+      snap.docs.forEach(d => {
+        if (d.id !== idViajeGanador && (d.data().estado === 'confirmando' || d.data().estado === 'en_negociacion' || d.data().estado === 'esperando')) {
+          updateDoc(doc(db, 'viajes', d.id), {
+            estado: 'esperando',
+            conductorId: null,
+            conductorNombre: null,
+            conductorPlaca: null,
+            conductorVehiculo: null,
+            conductorTelefono: null,
+          }).catch(() => {});
+        }
+      });
+    } catch(e) {}
+  }, []);
+
   const agregarViajeEscuchando = useCallback((idViaje) => {
     if (unsubsViajesRef.current[idViaje]) return;
     const miId = auth.currentUser?.uid;
@@ -401,8 +419,13 @@ function AppConductor({ nombre, telefono, placa, vehiculo, onCerrarSesion }) {
       if ((data.estado === 'confirmado' || data.estado === 'aceptado') && data.conductorId === miId && !celebrandoRef.current && !faseRef.current) {
         const dataCopy = { id: idViaje, ...data };
         limpiarVigilantesMenos(idViaje);
+        limpiarViajesOtrosConductor(miId, idViaje);
         setCelebrando(true);
         celebrandoRef.current = true;
+        // CAMBIO: marcar ocupado:true inmediatamente al celebrar, no 3 segundos después
+        if (miId) {
+          setDoc(doc(db, 'conductores', miId), { ocupado: true }, { merge: true }).catch(() => {});
+        }
         setTimeout(() => {
           setCelebrando(false);
           celebrandoRef.current = false;
@@ -432,7 +455,7 @@ function AppConductor({ nombre, telefono, placa, vehiculo, onCerrarSesion }) {
     setTimeout(() => {
       if (unsubsViajesRef.current[idViaje]) cerrarEsteVigilante();
     }, 180000);
-  }, [limpiarVigilantesMenos]);
+  }, [limpiarVigilantesMenos, limpiarViajesOtrosConductor]);
 
   const cerrarSesion = async () => {
     try {
@@ -575,17 +598,12 @@ function AppConductor({ nombre, telefono, placa, vehiculo, onCerrarSesion }) {
     });
   };
 
-  // CAMBIO: marcar conductor ocupado:true cuando arranca el viaje
   const iniciarFase1 = (viaje) => {
     setViajeActual(viaje);
     setFase('recogiendo');
     faseRef.current = 'recogiendo';
     if (viaje.pasajeroLat && viaje.pasajeroLng) {
       setUbicacionPasajero({ lat: viaje.pasajeroLat, lng: viaje.pasajeroLng });
-    }
-    const user = auth.currentUser;
-    if (user) {
-      setDoc(doc(db, 'conductores', user.uid), { ocupado: true }, { merge: true }).catch(() => {});
     }
   };
 
@@ -612,7 +630,6 @@ function AppConductor({ nombre, telefono, placa, vehiculo, onCerrarSesion }) {
     geocodificarDestino(viajeActual.destino);
   };
 
-  // CAMBIO: marcar conductor ocupado:false al cancelar
   const cancelarViaje = async (razon) => {
     clearInterval(contadorRef.current);
     if (viajeActual) {
@@ -627,7 +644,6 @@ function AppConductor({ nombre, telefono, placa, vehiculo, onCerrarSesion }) {
     setUbicacionPasajero(null); setDestinoCoords(null); setActivo(true); setContador(240);
   };
 
-  // CAMBIO: marcar conductor ocupado:false al finalizar
   const finalizarViaje = async () => {
     clearInterval(contadorRef.current);
     if (viajeActual) {
