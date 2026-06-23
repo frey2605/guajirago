@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { db, auth } from './firebase';
-import { collection, query, where, orderBy, limit, onSnapshot, doc, updateDoc, setDoc, getDocs } from 'firebase/firestore';
+import { collection, query, where, limit, onSnapshot, doc, updateDoc, setDoc, getDocs, arrayUnion } from 'firebase/firestore';
 import { registrarTokenFCM, alertarNuevoViaje, activarAudioiOS, setDebugCallback } from './Notificaciones';
 import { signOut } from 'firebase/auth';
 import Calificacion from './Calificacion';
@@ -274,22 +274,31 @@ function TarjetaSolicitud({ solicitud, nombre, telefono, placa, vehiculo, descar
     const user = auth.currentUser;
     if (tarifaCambiada) {
       const idViaje = solicitud.id;
-      const tsOferta = solicitud.nuevaOferta || solicitud.fechaSolicitud;
       const montoContra = tarifaModificada;
-      descartadosRef.current[idViaje] = tsOferta;
+      descartadosRef.current[idViaje] = solicitud.nuevaOferta || solicitud.fechaSolicitud;
       agregarViajeEscuchando(idViaje);
       updateDoc(doc(db, 'viajes', idViaje), {
-        estado: 'contraoferta', conductorId: user.uid,
-        conductorNombre: nombre || 'Conductor', conductorTelefono: telefono || '',
-        conductorPlaca: placa || '', conductorVehiculo: vehiculo || '',
-        contraoferta: `$${montoContra.toLocaleString()}`, contraofertaValor: montoContra,
+        estado: 'en_negociacion',
+        ofertas: arrayUnion({
+          conductorId: user.uid,
+          conductorNombre: nombre || 'Conductor',
+          conductorTelefono: telefono || '',
+          conductorPlaca: placa || '',
+          conductorVehiculo: vehiculo || '',
+          monto: montoContra,
+          montoTexto: `$${montoContra.toLocaleString()}`,
+          timestamp: new Date().toISOString(),
+        }),
       }).catch(() => {});
     } else {
       agregarViajeEscuchando(solicitud.id);
       updateDoc(doc(db, 'viajes', solicitud.id), {
-        estado: 'confirmando', conductorId: user.uid,
-        conductorNombre: nombre || 'Conductor', conductorTelefono: telefono || '',
-        conductorPlaca: placa || '', conductorVehiculo: vehiculo || '',
+        estado: 'confirmando',
+        conductorId: user.uid,
+        conductorNombre: nombre || 'Conductor',
+        conductorTelefono: telefono || '',
+        conductorPlaca: placa || '',
+        conductorVehiculo: vehiculo || '',
       }).catch(() => {});
     }
     onRechazar(solicitud.id);
@@ -349,14 +358,23 @@ function AppConductor({ nombre, telefono, placa, vehiculo, onCerrarSesion }) {
   const descartadosRef = useRef({});
   const celebrandoRef = useRef(false);
   const faseRef = useRef(null);
-  // FIX: usar un ref de refs para guardar los unsub ANTES de usarlos en el callback
   const unsubsViajesRef = useRef({});
   const solicitudesIdsRef = useRef(new Set());
 
   useEffect(() => { celebrandoRef.current = celebrando; }, [celebrando]);
   useEffect(() => { faseRef.current = fase; }, [fase]);
 
-  const limpiarVigilantesPendientes = useCallback(() => {
+  const limpiarVigilantesMenos = useCallback((idViajeMantener) => {
+    Object.entries(unsubsViajesRef.current).forEach(([id, cerrar]) => {
+      if (id !== idViajeMantener) {
+        try { cerrar(); } catch(e) {}
+        delete unsubsViajesRef.current[id];
+      }
+    });
+    setViajesEscuchando(prev => prev.filter(id => id === idViajeMantener));
+  }, []);
+
+  const limpiarTodosVigilantes = useCallback(() => {
     Object.values(unsubsViajesRef.current).forEach(fn => { try { fn(); } catch(e) {} });
     unsubsViajesRef.current = {};
     setViajesEscuchando([]);
@@ -365,9 +383,6 @@ function AppConductor({ nombre, telefono, placa, vehiculo, onCerrarSesion }) {
   const agregarViajeEscuchando = useCallback((idViaje) => {
     if (unsubsViajesRef.current[idViaje]) return;
     const miId = auth.currentUser?.uid;
-
-    // FIX: guardar el unsub en un objeto local primero, luego copiarlo al ref
-    // así el callback siempre tiene acceso al unsub correcto
     const unsubHolder = { fn: null };
 
     const cerrarEsteVigilante = () => {
@@ -380,39 +395,33 @@ function AppConductor({ nombre, telefono, placa, vehiculo, onCerrarSesion }) {
     };
 
     const unsub = onSnapshot(doc(db, 'viajes', idViaje), (snap) => {
-      if (!snap.exists()) {
-        cerrarEsteVigilante();
-        return;
-      }
+      if (!snap.exists()) { cerrarEsteVigilante(); return; }
       const data = snap.data();
 
-      // Pasajero confirmó — conductor arranca
       if ((data.estado === 'confirmado' || data.estado === 'aceptado') && data.conductorId === miId && !celebrandoRef.current && !faseRef.current) {
-        limpiarVigilantesPendientes();
+        const dataCopy = { id: idViaje, ...data };
+        limpiarVigilantesMenos(idViaje);
         setCelebrando(true);
         celebrandoRef.current = true;
-        const dataCopy = { id: idViaje, ...data };
         setTimeout(() => {
           setCelebrando(false);
           celebrandoRef.current = false;
           iniciarFase1(dataCopy);
+          cerrarEsteVigilante();
         }, 3000);
         return;
       }
 
-      // Otro conductor ganó este viaje
       if ((data.estado === 'confirmado' || data.estado === 'aceptado') && data.conductorId !== miId) {
         cerrarEsteVigilante();
         return;
       }
 
-      // Viaje cancelado o volvió a esperando
       if (data.estado === 'cancelado' || data.estado === 'cancelado_conductor') {
         cerrarEsteVigilante();
         return;
       }
 
-      // confirmando y esperando: mantener vigilante vivo, no cerrar
       if (data.respuestaPasajero) recibirMensajePasajero(data.respuestaPasajero);
     });
 
@@ -420,11 +429,10 @@ function AppConductor({ nombre, telefono, placa, vehiculo, onCerrarSesion }) {
     unsubsViajesRef.current[idViaje] = cerrarEsteVigilante;
     setViajesEscuchando(prev => prev.includes(idViaje) ? prev : [...prev, idViaje]);
 
-    // Timeout de 3 minutos (más largo que el contador de confirmación de 60s)
     setTimeout(() => {
       if (unsubsViajesRef.current[idViaje]) cerrarEsteVigilante();
     }, 180000);
-  }, [limpiarVigilantesPendientes]);
+  }, [limpiarVigilantesMenos]);
 
   const cerrarSesion = async () => {
     try {
@@ -432,7 +440,7 @@ function AppConductor({ nombre, telefono, placa, vehiculo, onCerrarSesion }) {
         await updateDoc(doc(db, 'viajes', viajeActual.id), { estado: 'cancelado_conductor', canceladoPor: 'conductor', razonCancelacion: 'Conductor cerró sesión' });
       }
       const user = auth.currentUser;
-      if (user) await setDoc(doc(db, 'conductores', user.uid), { activo: false }, { merge: true });
+      if (user) await setDoc(doc(db, 'conductores', user.uid), { activo: false, ocupado: false }, { merge: true });
     } catch(e) {}
     try { await signOut(auth); } catch(e) {}
     if (onCerrarSesion) onCerrarSesion(); else window.location.reload();
@@ -504,7 +512,7 @@ function AppConductor({ nombre, telefono, placa, vehiculo, onCerrarSesion }) {
   useEffect(() => {
     if (!activo) { setSolicitudes([]); solicitudesIdsRef.current.clear(); return; }
     const VENTANA_MS = 6 * 60 * 1000;
-    const q = query(collection(db, 'viajes'), where('estado', 'in', ['esperando', 'contraoferta', 'confirmando']));
+    const q = query(collection(db, 'viajes'), where('estado', 'in', ['esperando', 'en_negociacion', 'confirmando']));
     const unsub = onSnapshot(q, (snap) => {
       const ahora = Date.now();
       const tsDe = (v) => new Date(v.nuevaOferta || v.fechaSolicitud).getTime();
@@ -567,12 +575,17 @@ function AppConductor({ nombre, telefono, placa, vehiculo, onCerrarSesion }) {
     });
   };
 
+  // CAMBIO: marcar conductor ocupado:true cuando arranca el viaje
   const iniciarFase1 = (viaje) => {
     setViajeActual(viaje);
     setFase('recogiendo');
     faseRef.current = 'recogiendo';
     if (viaje.pasajeroLat && viaje.pasajeroLng) {
       setUbicacionPasajero({ lat: viaje.pasajeroLat, lng: viaje.pasajeroLng });
+    }
+    const user = auth.currentUser;
+    if (user) {
+      setDoc(doc(db, 'conductores', user.uid), { ocupado: true }, { merge: true }).catch(() => {});
     }
   };
 
@@ -599,11 +612,14 @@ function AppConductor({ nombre, telefono, placa, vehiculo, onCerrarSesion }) {
     geocodificarDestino(viajeActual.destino);
   };
 
+  // CAMBIO: marcar conductor ocupado:false al cancelar
   const cancelarViaje = async (razon) => {
     clearInterval(contadorRef.current);
     if (viajeActual) {
       await updateDoc(doc(db, 'viajes', viajeActual.id), { estado: 'cancelado_conductor', canceladoPor: 'conductor', razonCancelacion: razon });
     }
+    const user = auth.currentUser;
+    if (user) setDoc(doc(db, 'conductores', user.uid), { ocupado: false }, { merge: true }).catch(() => {});
     setMostrarCancelacion(false);
     setFase(null); faseRef.current = null;
     setViajeActual(null); setTiempoLlegada(null); setDistancia(null);
@@ -611,6 +627,7 @@ function AppConductor({ nombre, telefono, placa, vehiculo, onCerrarSesion }) {
     setUbicacionPasajero(null); setDestinoCoords(null); setActivo(true); setContador(240);
   };
 
+  // CAMBIO: marcar conductor ocupado:false al finalizar
   const finalizarViaje = async () => {
     clearInterval(contadorRef.current);
     if (viajeActual) {
@@ -619,6 +636,8 @@ function AppConductor({ nombre, telefono, placa, vehiculo, onCerrarSesion }) {
         setDatosCalificacion({ viajeId: viajeActual.id, nombrePasajero: viajeActual.pasajeroEmail?.split('@')[0] || 'Pasajero' });
       } catch (err) {}
     }
+    const user = auth.currentUser;
+    if (user) setDoc(doc(db, 'conductores', user.uid), { ocupado: false }, { merge: true }).catch(() => {});
     setFase(null); faseRef.current = null;
     setViajeActual(null); setTiempoLlegada(null); setDistancia(null);
     setRespuestaPasajero(null); setMensajeGrande(null); ultimoMensajeRef.current = null;
@@ -646,7 +665,11 @@ function AppConductor({ nombre, telefono, placa, vehiculo, onCerrarSesion }) {
         <h2 style={{ color: '#FFFFFF', fontSize: '24px', fontWeight: '900', margin: '0 0 12px', textAlign: 'center' }}>El pasajero canceló el viaje</h2>
         <p style={{ color: '#555', fontSize: '14px', margin: '0 0 8px', textAlign: 'center' }}>Razón: <span style={{ color: '#FF7A2F' }}>{viajeActual?.razonCancelacion || 'No especificada'}</span></p>
         <p style={{ color: '#555', fontSize: '13px', margin: '0 0 32px', textAlign: 'center' }}>Puedes activarte para recibir nuevos viajes</p>
-        <button onClick={() => { setFase(null); faseRef.current = null; setViajeActual(null); setUbicacionPasajero(null); setDestinoCoords(null); setActivo(true); }} style={{ width: '100%', padding: '18px', background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)', border: 'none', borderRadius: '16px', color: '#141416', fontSize: '18px', fontWeight: '900', cursor: 'pointer' }}>Volver al inicio</button>
+        <button onClick={() => {
+          const user = auth.currentUser;
+          if (user) setDoc(doc(db, 'conductores', user.uid), { ocupado: false }, { merge: true }).catch(() => {});
+          setFase(null); faseRef.current = null; setViajeActual(null); setUbicacionPasajero(null); setDestinoCoords(null); setActivo(true);
+        }} style={{ width: '100%', padding: '18px', background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)', border: 'none', borderRadius: '16px', color: '#141416', fontSize: '18px', fontWeight: '900', cursor: 'pointer' }}>Volver al inicio</button>
       </div>
     );
   }
@@ -765,7 +788,7 @@ function AppConductor({ nombre, telefono, placa, vehiculo, onCerrarSesion }) {
           <div style={{ background: 'rgba(255,207,77,0.1)', borderRadius: '16px', padding: '14px 16px', marginBottom: '12px', border: '1px solid #FFCF4D', display: 'flex', alignItems: 'center', gap: '10px' }}>
             <span style={{ fontSize: '20px' }}>⏳</span>
             <p style={{ color: '#FFCF4D', fontSize: '13px', fontWeight: 'bold', margin: '0' }}>
-              Esperando confirmación{viajesEscuchando.length > 1 ? ` (${viajesEscuchando.length} pasajeros)` : ''}...
+              Ofertas enviadas{viajesEscuchando.length > 1 ? ` (${viajesEscuchando.length} pasajeros)` : ''}...
             </p>
           </div>
         )}

@@ -119,7 +119,7 @@ function TarjetaContraoferta({ oferta, onAceptar, onRechazar }) {
           <p style={{ color: '#FFFFFF', fontWeight: '900', fontSize: '15px', margin: '0' }}>{oferta.conductorNombre}</p>
           {oferta.conductorPlaca && <p style={{ color: '#FFCF4D', fontSize: '12px', margin: '3px 0 0' }}>🚘 {oferta.conductorPlaca} · {oferta.conductorVehiculo}</p>}
         </div>
-        <p style={{ color: '#FF7A2F', fontSize: '28px', fontWeight: '900', margin: '0' }}>{oferta.contraoferta}</p>
+        <p style={{ color: '#FF7A2F', fontSize: '28px', fontWeight: '900', margin: '0' }}>{oferta.montoTexto}</p>
       </div>
       <div style={{ display: 'flex', gap: '10px' }}>
         <button onClick={onRechazar} style={{ flex: 1, padding: '12px', background: '#141416', border: '1px solid #2A2A2E', borderRadius: '12px', color: '#FF4444', fontSize: '14px', fontWeight: 'bold', cursor: 'pointer' }}>❌ No</button>
@@ -238,7 +238,6 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
   const [contraofertas, setContraofertas] = useState([]);
   const [enLlamada, setEnLlamada] = useState(false);
   const [contadorConfirmacion, setContadorConfirmacion] = useState(60);
-  // FIX: ref para saber si ya iniciamos el viaje y no repetir
   const viajeIniciadoRef = useRef(false);
   const contadorRef = useRef(null);
   const contadorConfirmacionRef = useRef(null);
@@ -289,21 +288,16 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
         return;
       }
 
-      if (data.estado === 'contraoferta' && data.conductorId) {
-        const key = data.conductorId + '_' + (data.contraofertaValor || '');
-        if (!contaofertasIdsRef.current.has(key)) {
-          contaofertasIdsRef.current.add(key);
+      if (data.estado === 'en_negociacion' && Array.isArray(data.ofertas) && data.ofertas.length > 0) {
+        const ofertasNuevas = [...data.ofertas]
+          .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+          .slice(0, 3)
+          .filter(o => !contaofertasIdsRef.current.has(o.conductorId));
+        if (ofertasNuevas.length > 0) {
+          ofertasNuevas.forEach(o => contaofertasIdsRef.current.add(o.conductorId));
           setContraofertas(prev => {
-            if (prev.find(c => c.conductorId === data.conductorId && c.contraofertaValor === data.contraofertaValor)) return prev;
-            return [...prev, {
-              conductorId: data.conductorId,
-              conductorNombre: data.conductorNombre,
-              conductorPlaca: data.conductorPlaca,
-              conductorVehiculo: data.conductorVehiculo,
-              conductorTelefono: data.conductorTelefono,
-              contraoferta: data.contraoferta,
-              contraofertaValor: data.contraofertaValor,
-            }];
+            const todas = [...prev, ...ofertasNuevas];
+            return todas.slice(-3);
           });
         }
         return;
@@ -330,7 +324,6 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
         }, 1000);
       }
 
-      // FIX: escuchar confirmado desde Firestore también (para cuando el conductor confirma desde su lado)
       if (data.estado === 'confirmado' && !viajeIniciadoRef.current && pantallaRef.current !== 'fase1' && pantallaRef.current !== 'fase2') {
         viajeIniciadoRef.current = true;
         clearInterval(contadorConfirmacionRef.current);
@@ -454,6 +447,7 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
         tipo, origen, destino, estado: 'esperando',
         tarifa: `$${tarifa.toLocaleString()}`, tarifaValor: tarifa,
         fechaSolicitud: new Date().toISOString(),
+        ofertas: [],
       });
       setViajeId(docRef.id);
       viajeIniciadoRef.current = false;
@@ -476,30 +470,33 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
         conductorPlaca: oferta.conductorPlaca,
         conductorVehiculo: oferta.conductorVehiculo,
         conductorTelefono: oferta.conductorTelefono,
-        tarifa: oferta.contraoferta,
-        tarifaValor: oferta.contraofertaValor,
+        tarifa: oferta.montoTexto,
+        tarifaValor: oferta.monto,
       });
     } catch (e) {}
   };
 
-  const rechazarContraoferta = async (conductorId) => {
+  const rechazarContraoferta = (conductorId) => {
     setContraofertas(prev => prev.filter(c => c.conductorId !== conductorId));
-    setContraofertas(prev => {
-      if (prev.filter(c => c.conductorId !== conductorId).length === 0 && viajeId) {
-        updateDoc(doc(db, 'viajes', viajeId), { estado: 'esperando' }).catch(() => {});
-      }
-      return prev.filter(c => c.conductorId !== conductorId);
-    });
   };
 
-  // FIX: confirmar viaje — arranca inmediatamente sin esperar Firestore de vuelta
   const confirmarViaje = async () => {
     clearInterval(contadorConfirmacionRef.current);
     if (!viajeId || viajeIniciadoRef.current) return;
+
+    try {
+      const conductorId = viaje?.conductorId;
+      if (conductorId) {
+        const snapConductor = await getDoc(doc(db, 'conductores', conductorId));
+        if (snapConductor.exists() && snapConductor.data().ocupado === true) {
+          setPantalla('conductor_ocupado');
+          return;
+        }
+      }
+    } catch (e) {}
+
     viajeIniciadoRef.current = true;
-    // Celebrar inmediatamente
     setCelebrando(true);
-    // Escribir en Firestore en paralelo
     updateDoc(doc(db, 'viajes', viajeId), { estado: 'confirmado' }).catch(() => {});
     setTimeout(() => {
       setCelebrando(false);
@@ -508,9 +505,46 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
     }, 3000);
   };
 
+  // ÚNICO CAMBIO: seguir buscando reenvía la solicitud con la última tarifa
+  const seguirBuscando = async () => {
+    if (!viajeId) return;
+    viajeIniciadoRef.current = false;
+    setContraofertas([]);
+    contaofertasIdsRef.current.clear();
+    try {
+      await updateDoc(doc(db, 'viajes', viajeId), {
+        estado: 'esperando',
+        conductorId: null,
+        conductorNombre: null,
+        conductorPlaca: null,
+        conductorVehiculo: null,
+        conductorTelefono: null,
+        ofertas: [],
+        tarifa: `$${tarifa.toLocaleString()}`,
+        tarifaValor: tarifa,
+        nuevaOferta: new Date().toISOString(),
+      });
+    } catch (e) {}
+    setPantalla('esperando');
+  };
+
   if (enLlamada && viajeId) return <Llamada viajeId={viajeId} miRol="pasajero" nombreOtro={viaje?.conductorNombre || 'Conductor'} onCerrar={() => setEnLlamada(false)} />;
   if (mostrarCalificacion) return <Calificacion tipo={tipo} viajeId={viajeId} nombreCalificado={viaje?.conductorNombre} quienCalifica="pasajero" onFinalizar={onVolver} />;
   if (celebrando) return <Celebracion />;
+
+  if (pantalla === 'conductor_ocupado') {
+    return (
+      <div style={{ backgroundColor: '#141416', minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px 24px' }}>
+        <div style={{ fontSize: '100px', marginBottom: '24px' }}>😬</div>
+        <h2 style={{ color: '#FFFFFF', fontSize: '26px', fontWeight: '900', margin: '0 0 32px', textAlign: 'center', lineHeight: '1.3' }}>
+          Upp, el conductor<br/>ya está ocupado
+        </h2>
+        <button onClick={seguirBuscando} style={{ width: '100%', padding: '18px', background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)', border: 'none', borderRadius: '16px', color: '#141416', fontSize: '18px', fontWeight: '900', cursor: 'pointer' }}>
+          SEGUIR BUSCANDO
+        </button>
+      </div>
+    );
+  }
 
   if (pantalla === 'cancelado_conductor') {
     return (
@@ -638,7 +672,6 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
     return (
       <div style={{ backgroundColor: '#141416', minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
         {mostrarCancelacion && <ModalCancelacion razones={RAZONES_CANCELACION_PASAJERO} onConfirmar={cancelarViaje} onCerrar={() => setMostrarCancelacion(false)} />}
-
         <div style={{ fontSize: '80px', marginBottom: '24px' }}>{tipo === 'Taxi' ? '🚗' : '🏍️'}</div>
         <h2 style={{ color: '#FFFFFF', fontSize: '22px', margin: '0 0 8px', textAlign: 'center' }}>Buscando conductor...</h2>
         <p style={{ color: '#555', fontSize: '14px', margin: '0 0 4px', textAlign: 'center' }}>{origen} → {destino}</p>
