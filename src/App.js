@@ -238,13 +238,7 @@ function App() {
   const handleSeleccionarRol = async (rol) => {
     setTipoUsuario(rol);
     if (rol === 'pasajero') {
-      try {
-        const user = auth.currentUser;
-        if (user) {
-          await setDoc(doc(db, 'usuarios', user.uid), { tipo: 'pasajero' }, { merge: true });
-          guardarLocal({ tipo: 'pasajero', nombre: nombreUsuario, celular: telefonoUsuario, placa: placaUsuario, vehiculo: vehiculoUsuario });
-        }
-      } catch (e) {}
+      guardarLocal({ tipo: 'pasajero', nombre: nombreUsuario, celular: telefonoUsuario, placa: placaUsuario, vehiculo: vehiculoUsuario });
       setScreen('home');
     } else {
       if (placaUsuario && vehiculoUsuario) {
