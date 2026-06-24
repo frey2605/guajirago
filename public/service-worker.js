@@ -1,4 +1,4 @@
-const CACHE_NAME = 'guajirago-v1';
+const CACHE_NAME = 'guajirago-v3';
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();

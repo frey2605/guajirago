@@ -36,8 +36,6 @@ function ModalFavorito({ onGuardar, onCerrar }) {
     <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', zIndex: 999, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
       <div style={{ background: '#1A1A1E', borderRadius: '24px 24px 0 0', padding: '28px 24px', width: '100%', maxWidth: '480px' }}>
         <p style={{ color: '#FFFFFF', fontSize: '18px', fontWeight: '900', margin: '0 0 20px', textAlign: 'center' }}>Agregar lugar favorito</p>
-
-        {/* Selección de icono */}
         <p style={{ color: '#555', fontSize: '12px', margin: '0 0 10px', letterSpacing: '1px' }}>ÍCONO</p>
         <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', flexWrap: 'wrap' }}>
           {ICONOS_FAVORITOS.map(i => (
@@ -46,15 +44,10 @@ function ModalFavorito({ onGuardar, onCerrar }) {
             </div>
           ))}
         </div>
-
-        {/* Nombre */}
         <p style={{ color: '#555', fontSize: '12px', margin: '0 0 8px', letterSpacing: '1px' }}>NOMBRE (ej: Casa, Trabajo, Mamá)</p>
         <input value={nombre} onChange={e => setNombre(e.target.value)} placeholder="¿Cómo lo llamas?" style={{ width: '100%', padding: '14px 16px', background: '#141416', border: '1px solid #2A2A2E', borderRadius: '14px', color: '#FFFFFF', fontSize: '16px', outline: 'none', marginBottom: '12px', boxSizing: 'border-box' }} />
-
-        {/* Dirección con autocompletado */}
         <p style={{ color: '#555', fontSize: '12px', margin: '0 0 8px', letterSpacing: '1px' }}>DIRECCIÓN</p>
         <input ref={inputDireccionRef} value={direccion} onChange={e => setDireccion(e.target.value)} placeholder="Escribe la dirección o lugar" style={{ width: '100%', padding: '14px 16px', background: '#141416', border: '1px solid #2A2A2E', borderRadius: '14px', color: '#FFFFFF', fontSize: '16px', outline: 'none', marginBottom: '20px', boxSizing: 'border-box' }} />
-
         <div style={{ display: 'flex', gap: '12px' }}>
           <button onClick={onCerrar} style={{ flex: 1, padding: '14px', background: '#141416', border: '1px solid #2A2A2E', borderRadius: '14px', color: '#555', fontSize: '14px', cursor: 'pointer' }}>Cancelar</button>
           <button onClick={() => nombre && direccion && onGuardar({ nombre, direccion, icono })} style={{ flex: 2, padding: '14px', background: nombre && direccion ? 'linear-gradient(135deg, #FFCF4D, #FF7A2F)' : '#2A2A2E', border: 'none', borderRadius: '14px', color: nombre && direccion ? '#141416' : '#555', fontSize: '14px', fontWeight: '900', cursor: nombre && direccion ? 'pointer' : 'default' }}>Guardar</button>
@@ -152,7 +145,7 @@ function guardarReciente(destino) {
   } catch(e) {}
 }
 
-function Home({ nombre, onCerrarSesion }) {
+function Home({ nombre, onCerrarSesion, onVolver }) {
   const [pantalla, setPantalla] = useState('home');
   const [tipoSeleccionado, setTipoSeleccionado] = useState('');
   const [destinoPredefinido, setDestinoPredefinido] = useState('');
@@ -195,7 +188,6 @@ function Home({ nombre, onCerrarSesion }) {
     <div style={{ backgroundColor: '#141416', minHeight: '100vh', fontFamily: 'Arial, sans-serif' }}>
       {mostrarModalFavorito && <ModalFavorito onGuardar={agregarFavorito} onCerrar={() => setMostrarModalFavorito(false)} />}
 
-      {/* Header */}
       <div style={{ background: 'linear-gradient(135deg, #1A1A1E, #2A2A2E)', padding: '24px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
           <p style={{ color: '#555', fontSize: '12px', margin: '0', letterSpacing: '2px' }}>UBICACIÓN</p>
@@ -203,12 +195,13 @@ function Home({ nombre, onCerrarSesion }) {
           <h2 style={{ color: '#FFFFFF', fontSize: '22px', margin: '12px 0 0', fontWeight: '900' }}>Hola, {nombre || 'pasajero'} 👋</h2>
           <p style={{ color: '#555', fontSize: '14px', margin: '4px 0 0' }}>¿A dónde vamos hoy?</p>
         </div>
-        <button onClick={cerrarSesion} style={{ background: '#141416', border: 'none', borderRadius: '12px', padding: '10px 16px', color: '#FF4444', fontSize: '13px', fontWeight: 'bold', cursor: 'pointer' }}>🚪 Salir</button>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'flex-end' }}>
+          <button onClick={cerrarSesion} style={{ background: '#141416', border: 'none', borderRadius: '12px', padding: '10px 16px', color: '#FF4444', fontSize: '13px', fontWeight: 'bold', cursor: 'pointer' }}>🚪 Salir</button>
+          <button onClick={onVolver} style={{ background: '#141416', border: '1px solid #FF7A2F', borderRadius: '12px', padding: '10px 16px', color: '#FF7A2F', fontSize: '13px', fontWeight: 'bold', cursor: 'pointer' }}>← Volver</button>
+        </div>
       </div>
 
       <div style={{ padding: '20px' }}>
-
-        {/* Servicios - primero y llamativos */}
         <p style={{ color: '#555', fontSize: '11px', letterSpacing: '3px', margin: '0 0 12px' }}>¿QUÉ NECESITAS?</p>
         <div style={{ display: 'flex', gap: '12px', marginBottom: '28px' }}>
           <div onClick={() => irASolicitar('Taxi')} style={{ flex: 1, background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F)', borderRadius: '20px', padding: '20px 16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px', cursor: 'pointer', boxShadow: '0 4px 20px rgba(255,122,47,0.3)' }}>
@@ -223,7 +216,6 @@ function Home({ nombre, onCerrarSesion }) {
           </div>
         </div>
 
-        {/* Lugares favoritos */}
         <p style={{ color: '#555', fontSize: '11px', letterSpacing: '3px', margin: '0 0 12px' }}>LUGARES FAVORITOS</p>
         <div style={{ background: '#1A1A1E', borderRadius: '20px', marginBottom: '24px', overflow: 'hidden', border: '1px solid #2A2A2E' }}>
           {favoritos.map((f, i) => (
@@ -244,7 +236,6 @@ function Home({ nombre, onCerrarSesion }) {
           </div>
         </div>
 
-        {/* Recientes */}
         {recientes.length > 0 && (
           <>
             <p style={{ color: '#555', fontSize: '11px', letterSpacing: '3px', margin: '0 0 12px' }}>RECIENTES</p>
@@ -260,7 +251,6 @@ function Home({ nombre, onCerrarSesion }) {
           </>
         )}
 
-        {/* Mis viajes */}
         <div onClick={() => setPantalla('historial')} style={{ background: '#1A1A1E', borderRadius: '20px', padding: '20px', display: 'flex', alignItems: 'center', gap: '16px', border: '1px solid #2A2A2E', cursor: 'pointer' }}>
           <span style={{ fontSize: '36px' }}>🕐</span>
           <div>
