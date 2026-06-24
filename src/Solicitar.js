@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { db, auth } from './firebase';
-import { collection, addDoc, doc, onSnapshot, updateDoc, getDoc } from 'firebase/firestore';
+import { collection, addDoc, doc, onSnapshot, updateDoc, getDoc, runTransaction } from 'firebase/firestore';
 import Calificacion from './Calificacion';
 import Llamada from './Llamada';
 
@@ -303,6 +303,16 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
         return;
       }
 
+      // Si el viaje vuelve a esperando estando en confirmando, volver a buscar
+      if (data.estado === 'esperando' && pantallaRef.current === 'confirmando') {
+        clearInterval(contadorConfirmacionRef.current);
+        viajeIniciadoRef.current = false;
+        setContraofertas([]);
+        contaofertasIdsRef.current.clear();
+        setPantalla('esperando');
+        return;
+      }
+
       if (data.estado === 'confirmando' && pantallaRef.current !== 'confirmando' && pantallaRef.current !== 'fase1' && pantallaRef.current !== 'fase2') {
         setContraofertas([]);
         contaofertasIdsRef.current.clear();
@@ -480,32 +490,61 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
     setContraofertas(prev => prev.filter(c => c.conductorId !== conductorId));
   };
 
+  // CAMBIO: usar runTransaction para garantizar que solo un pasajero pueda confirmar
   const confirmarViaje = async () => {
     clearInterval(contadorConfirmacionRef.current);
     if (!viajeId || viajeIniciadoRef.current) return;
 
     try {
       const conductorId = viaje?.conductorId;
-      if (conductorId) {
-        const snapConductor = await getDoc(doc(db, 'conductores', conductorId));
-        if (snapConductor.exists() && snapConductor.data().ocupado === true) {
-          setPantalla('conductor_ocupado');
-          return;
-        }
-      }
-    } catch (e) {}
+      const viajeRef = doc(db, 'viajes', viajeId);
+      const conductorRef = conductorId ? doc(db, 'conductores', conductorId) : null;
 
-    viajeIniciadoRef.current = true;
-    setCelebrando(true);
-    updateDoc(doc(db, 'viajes', viajeId), { estado: 'confirmado' }).catch(() => {});
-    setTimeout(() => {
-      setCelebrando(false);
-      setPantalla('fase1');
-      if (viaje?.conductorId) escucharConductor(viaje.conductorId);
-    }, 3000);
+      await runTransaction(db, async (transaction) => {
+        // Leer el viaje dentro de la transacción
+        const viajeSnap = await transaction.get(viajeRef);
+        if (!viajeSnap.exists()) throw new Error('viaje_no_existe');
+
+        const viajeData = viajeSnap.data();
+
+        // Si el viaje ya no está en confirmando, otro pasajero se adelantó
+        if (viajeData.estado !== 'confirmando') throw new Error('ya_confirmado');
+
+        // Verificar si el conductor está ocupado
+        if (conductorRef) {
+          const conductorSnap = await transaction.get(conductorRef);
+          if (conductorSnap.exists() && conductorSnap.data().ocupado === true) {
+            throw new Error('conductor_ocupado');
+          }
+        }
+
+        // Todo OK — marcar el viaje como confirmado y el conductor como ocupado
+        transaction.update(viajeRef, { estado: 'confirmado' });
+        if (conductorRef) {
+          transaction.update(conductorRef, { ocupado: true });
+        }
+      });
+
+      // La transacción fue exitosa — este pasajero ganó
+      viajeIniciadoRef.current = true;
+      setCelebrando(true);
+      setTimeout(() => {
+        setCelebrando(false);
+        setPantalla('fase1');
+        if (viaje?.conductorId) escucharConductor(viaje.conductorId);
+      }, 3000);
+
+    } catch (e) {
+      if (e.message === 'conductor_ocupado') {
+        setPantalla('conductor_ocupado');
+      } else if (e.message === 'ya_confirmado') {
+        // Otro pasajero se adelantó — mostrar conductor ocupado
+        setPantalla('conductor_ocupado');
+      }
+      // Si es otro error de red, no hacer nada — el contador sigue corriendo
+    }
   };
 
-  // ÚNICO CAMBIO: seguir buscando reenvía la solicitud con la última tarifa
   const seguirBuscando = async () => {
     if (!viajeId) return;
     viajeIniciadoRef.current = false;
