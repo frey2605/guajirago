@@ -5,7 +5,7 @@ import { registrarTokenFCM, alertarNuevoViaje, activarAudioiOS, setDebugCallback
 import { signOut } from 'firebase/auth';
 import Calificacion from './Calificacion';
 import Llamada from './Llamada';
-
+import Creditos from './Creditos';
 const centroRiohacha = { lat: 11.5444, lng: -72.9072 };
 const TARIFA_MINIMA = 8000;
 
@@ -349,6 +349,7 @@ function AppConductor({ nombre, telefono, placa, vehiculo, onCerrarSesion, onVol
   const [destinoCoords, setDestinoCoords] = useState(null);
   const [contador, setContador] = useState(240);
   const [verHistorial, setVerHistorial] = useState(false);
+  const [verCreditos, setVerCreditos] = useState(false);
   const [datosCalificacion, setDatosCalificacion] = useState(null);
   const [enLlamada, setEnLlamada] = useState(false);
   const [llamadaEntrante, setLlamadaEntrante] = useState(false);
@@ -672,6 +673,7 @@ function AppConductor({ nombre, telefono, placa, vehiculo, onCerrarSesion, onVol
   if (enLlamada || llamadaEntrante) return <Llamada viajeId={viajeActual?.id} miRol="conductor" nombreOtro={viajeActual?.pasajeroEmail?.split('@')[0] || 'Pasajero'} onCerrar={() => { setEnLlamada(false); setLlamadaEntrante(false); }} />;
   if (datosCalificacion) return <Calificacion tipo={null} viajeId={datosCalificacion.viajeId} nombreCalificado={datosCalificacion.nombrePasajero} quienCalifica="conductor" onFinalizar={() => setDatosCalificacion(null)} />;
   if (verHistorial) return <HistorialConductor onVolver={() => setVerHistorial(false)} />;
+  if (verCreditos) return <Creditos onVolver={() => setVerCreditos(false)} />;
   if (celebrando) return <Celebracion />;
 
   if (fase === 'cancelado_pasajero') {
@@ -802,6 +804,14 @@ function AppConductor({ nombre, telefono, placa, vehiculo, onCerrarSesion, onVol
           <div onClick={() => { activarAudioiOS(); setActivo(!activo); }} style={{ width: '56px', height: '32px', borderRadius: '16px', background: activo ? 'linear-gradient(135deg, #FFCF4D, #FF7A2F)' : '#2A2A2E', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '0 4px', justifyContent: activo ? 'flex-end' : 'flex-start' }}>
             <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: '#FFFFFF' }}/>
           </div>
+        </div>
+        <div onClick={() => setVerCreditos(true)} style={{ background: 'linear-gradient(135deg, #1A1A1E, #2A2A2E)', borderRadius: '20px', padding: '20px', display: 'flex', alignItems: 'center', gap: '16px', border: '1px solid #FF7A2F', cursor: 'pointer', marginBottom: '16px' }}>
+          <span style={{ fontSize: '32px' }}>💰</span>
+          <div style={{ flex: 1 }}>
+            <p style={{ color: '#FFFFFF', fontWeight: '900', fontSize: '16px', margin: '0' }}>Mis créditos</p>
+            <p style={{ color: '#FFCF4D', fontSize: '13px', margin: '4px 0 0', fontWeight: 'bold' }}>Ver saldo y recargar</p>
+          </div>
+          <span style={{ color: '#FF7A2F', fontSize: '20px' }}>›</span>
         </div>
         {viajesEscuchando.length > 0 && !fase && (
           <div style={{ background: 'rgba(255,207,77,0.1)', borderRadius: '16px', padding: '14px 16px', marginBottom: '12px', border: '1px solid #FFCF4D', display: 'flex', alignItems: 'center', gap: '10px' }}>

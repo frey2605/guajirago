@@ -23,24 +23,24 @@ function PantallaModulos({ onSeleccionar, onVolver }) {
     <div style={{ backgroundColor: '#141416', minHeight: '100vh', fontFamily: 'Arial, sans-serif', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px 24px' }}>
       <h1 style={{ fontSize: '42px', color: '#FFFFFF', margin: '0', fontFamily: 'Arial Black, sans-serif', letterSpacing: '-1px', textAlign: 'center' }}>Guajira</h1>
       <h1 style={{ fontSize: '56px', background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', margin: '0 0 16px', fontFamily: 'Arial Black, sans-serif', letterSpacing: '-2px' }}>GO</h1>
-      <p style={{ color: '#555', fontSize: '14px', letterSpacing: '3px', marginBottom: '32px', textAlign: 'center' }}>¿QUÉ QUIERES HACER?</p>
+      <p style={{ color: '#AAAAAA', fontSize: '14px', letterSpacing: '3px', marginBottom: '32px', textAlign: 'center' }}>¿QUÉ QUIERES HACER?</p>
       <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '12px' }}>
         <div onClick={() => onSeleccionar('transporte')} style={{ background: '#1A1A1E', borderRadius: '20px', padding: '24px', display: 'flex', alignItems: 'center', gap: '16px', cursor: 'pointer', border: '1px solid #FF7A2F' }}>
           <span style={{ fontSize: '40px' }}>🚗</span>
           <div>
             <p style={{ color: '#FFFFFF', fontWeight: '900', fontSize: '18px', margin: '0' }}>Transporte y movilidad</p>
-            <p style={{ color: '#555', fontSize: '13px', margin: '4px 0 0' }}>Taxi y mototaxi en Riohacha</p>
+            <p style={{ color: '#AAAAAA', fontSize: '13px', margin: '4px 0 0' }}>Taxi y mototaxi en Riohacha</p>
           </div>
         </div>
         <div style={{ background: '#1A1A1E', borderRadius: '20px', padding: '24px', display: 'flex', alignItems: 'center', gap: '16px', border: '1px solid #2A2A2E', opacity: 0.4 }}>
           <span style={{ fontSize: '40px' }}>🛒</span>
           <div>
             <p style={{ color: '#FFFFFF', fontWeight: '900', fontSize: '18px', margin: '0' }}>Más módulos</p>
-            <p style={{ color: '#555', fontSize: '13px', margin: '4px 0 0' }}>Próximamente</p>
+            <p style={{ color: '#AAAAAA', fontSize: '13px', margin: '4px 0 0' }}>Próximamente</p>
           </div>
         </div>
       </div>
-      <button onClick={onVolver} style={{ background: 'none', border: 'none', color: '#555', fontSize: '13px', cursor: 'pointer', marginTop: '24px' }}>Volver</button>
+      <button onClick={onVolver} style={{ background: 'none', border: 'none', color: '#AAAAAA', fontSize: '13px', cursor: 'pointer', marginTop: '24px' }}>Volver</button>
     </div>
   );
 }
@@ -48,26 +48,26 @@ function PantallaModulos({ onSeleccionar, onVolver }) {
 function PantallaRol({ nombre, onSeleccionar, onVolver }) {
   return (
     <div style={{ backgroundColor: '#141416', minHeight: '100vh', fontFamily: 'Arial, sans-serif', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px 24px' }}>
-      <p style={{ color: '#555', fontSize: '14px', letterSpacing: '3px', marginBottom: '8px', textAlign: 'center' }}>BIENVENIDO</p>
+      <p style={{ color: '#AAAAAA', fontSize: '14px', letterSpacing: '3px', marginBottom: '8px', textAlign: 'center' }}>BIENVENIDO</p>
       <h2 style={{ color: '#FFFFFF', fontSize: '26px', fontWeight: '900', margin: '0 0 32px', textAlign: 'center' }}>{nombre || 'Usuario'}</h2>
-      <p style={{ color: '#555', fontSize: '14px', letterSpacing: '2px', marginBottom: '24px', textAlign: 'center' }}>¿CÓMO VAS A USAR GUAJIRAGO?</p>
+      <p style={{ color: '#AAAAAA', fontSize: '14px', letterSpacing: '2px', marginBottom: '24px', textAlign: 'center' }}>¿CÓMO VAS A USAR GUAJIRAGO?</p>
       <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '12px' }}>
         <div onClick={() => onSeleccionar('pasajero')} style={{ background: '#1A1A1E', borderRadius: '20px', padding: '24px', display: 'flex', alignItems: 'center', gap: '16px', cursor: 'pointer', border: '1px solid #2A2A2E' }}>
           <span style={{ fontSize: '40px' }}>🙋</span>
           <div>
             <p style={{ color: '#FFFFFF', fontWeight: '900', fontSize: '18px', margin: '0' }}>Soy pasajero</p>
-            <p style={{ color: '#555', fontSize: '13px', margin: '4px 0 0' }}>Quiero solicitar taxi o mototaxi</p>
+            <p style={{ color: '#AAAAAA', fontSize: '13px', margin: '4px 0 0' }}>Quiero solicitar taxi o mototaxi</p>
           </div>
         </div>
         <div onClick={() => onSeleccionar('conductor')} style={{ background: '#1A1A1E', borderRadius: '20px', padding: '24px', display: 'flex', alignItems: 'center', gap: '16px', cursor: 'pointer', border: '1px solid #2A2A2E' }}>
           <span style={{ fontSize: '40px' }}>🚗</span>
           <div>
             <p style={{ color: '#FFFFFF', fontWeight: '900', fontSize: '18px', margin: '0' }}>Soy conductor</p>
-            <p style={{ color: '#555', fontSize: '13px', margin: '4px 0 0' }}>Quiero recibir y hacer viajes</p>
+            <p style={{ color: '#AAAAAA', fontSize: '13px', margin: '4px 0 0' }}>Quiero recibir y hacer viajes</p>
           </div>
         </div>
       </div>
-      <button onClick={onVolver} style={{ background: 'none', border: 'none', color: '#555', fontSize: '13px', cursor: 'pointer', marginTop: '24px' }}>Volver</button>
+      <button onClick={onVolver} style={{ background: 'none', border: 'none', color: '#AAAAAA', fontSize: '13px', cursor: 'pointer', marginTop: '24px' }}>Volver</button>
     </div>
   );
 }
@@ -125,7 +125,7 @@ function PantallaDatosConductor({ nombre, celular, onGuardar, onVolver }) {
       <div style={{ textAlign: 'center', marginBottom: '32px' }}>
         <span style={{ fontSize: '48px' }}>🚗</span>
         <h2 style={{ color: '#FFFFFF', fontSize: '22px', fontWeight: '900', margin: '12px 0 4px' }}>Datos del conductor</h2>
-        <p style={{ color: '#555', fontSize: '13px', margin: '0' }}>Completa tu perfil de conductor</p>
+        <p style={{ color: '#AAAAAA', fontSize: '13px', margin: '0' }}>Completa tu perfil de conductor</p>
       </div>
       <div style={estiloCampo}>
         <span style={{ fontSize: '20px' }}>📞</span>
@@ -154,7 +154,7 @@ function PantallaDatosConductor({ nombre, celular, onGuardar, onVolver }) {
 
       <label style={{ ...estiloCampo, cursor: 'pointer' }}>
         <span style={{ fontSize: '20px' }}>📸</span>
-        <span style={{ color: fotoConductor ? '#2ECC71' : '#555', fontSize: '15px', flex: 1 }}>
+        <span style={{ color: fotoConductor ? '#2ECC71' : '#AAAAAA', fontSize: '15px', flex: 1 }}>
           {fotoConductor ? '✓ Foto del conductor lista' : 'Subir foto del conductor'}
         </span>
         <input type="file" accept="image/*" capture="user" onChange={e => setFotoConductor(e.target.files[0])} style={{ display: 'none' }} />
@@ -162,17 +162,17 @@ function PantallaDatosConductor({ nombre, celular, onGuardar, onVolver }) {
 
       <label style={{ ...estiloCampo, cursor: 'pointer', marginBottom: '20px' }}>
         <span style={{ fontSize: '20px' }}>🪪</span>
-        <span style={{ color: fotoCedula ? '#2ECC71' : '#555', fontSize: '15px', flex: 1 }}>
+        <span style={{ color: fotoCedula ? '#2ECC71' : '#AAAAAA', fontSize: '15px', flex: 1 }}>
           {fotoCedula ? '✓ Foto de la cédula lista' : 'Subir foto de la cédula'}
         </span>
         <input type="file" accept="image/*" onChange={e => setFotoCedula(e.target.files[0])} style={{ display: 'none' }} />
       </label>
 
       {error && <p style={{ color: '#FF4444', fontSize: '13px', textAlign: 'center', marginBottom: '12px' }}>{error}</p>}
-      <button onClick={guardar} disabled={cargando} style={{ width: '100%', padding: '18px', background: cargando ? '#2A2A2E' : 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)', border: 'none', borderRadius: '16px', color: cargando ? '#555' : '#141416', fontSize: '18px', fontWeight: '900', cursor: 'pointer', marginBottom: '12px' }}>
+      <button onClick={guardar} disabled={cargando} style={{ width: '100%', padding: '18px', background: cargando ? '#2A2A2E' : 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)', border: 'none', borderRadius: '16px', color: cargando ? '#AAAAAA' : '#141416', fontSize: '18px', fontWeight: '900', cursor: 'pointer', marginBottom: '12px' }}>
         {cargando ? 'Guardando...' : 'Entrar a GuajiraGo'}
       </button>
-      <button onClick={onVolver} style={{ background: 'none', border: 'none', color: '#555', fontSize: '13px', cursor: 'pointer' }}>Volver</button>
+      <button onClick={onVolver} style={{ background: 'none', border: 'none', color: '#AAAAAA', fontSize: '13px', cursor: 'pointer' }}>Volver</button>
     </div>
   );
 }

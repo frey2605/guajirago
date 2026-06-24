@@ -133,7 +133,7 @@ function Login({ onEntrar }) {
           <button onClick={recuperarContrasena} style={{ width: '100%', padding: '16px', background: '#FFFFFF', border: 'none', borderRadius: '16px', color: '#141416', fontSize: '15px', fontWeight: '900', cursor: 'pointer', marginBottom: '12px' }}>
             ¿Olvidaste tu contraseña?
           </button>
-          <button onClick={() => { setError(''); setMensajeRecuperar(''); setPantalla('inicio'); }} style={{ width: '100%', padding: '14px', background: 'none', border: 'none', color: '#555', fontSize: '13px', cursor: 'pointer' }}>Volver</button>
+          <button onClick={() => { setError(''); setMensajeRecuperar(''); setPantalla('inicio'); }} style={{ width: '100%', padding: '14px', background: 'none', border: 'none', color: '#FFFFFF', fontSize: '15px', fontWeight: 'bold', cursor: 'pointer' }}>Volver</button>
         </div>
       </div>
     );
