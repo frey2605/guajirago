@@ -242,12 +242,16 @@ function App() {
         const user = auth.currentUser;
         if (user) {
           await setDoc(doc(db, 'usuarios', user.uid), { tipo: 'pasajero' }, { merge: true });
-          guardarLocal({ tipo: 'pasajero', nombre: nombreUsuario, celular: telefonoUsuario, placa: '', vehiculo: '' });
+          guardarLocal({ tipo: 'pasajero', nombre: nombreUsuario, celular: telefonoUsuario, placa: placaUsuario, vehiculo: vehiculoUsuario });
         }
       } catch (e) {}
       setScreen('home');
     } else {
-      setScreen('datos_conductor');
+      if (placaUsuario && vehiculoUsuario) {
+        setScreen('home');
+      } else {
+        setScreen('datos_conductor');
+      }
     }
   };
 
@@ -279,6 +283,7 @@ function App() {
           placa={placaUsuario}
           vehiculo={vehiculoUsuario}
           onCerrarSesion={handleCerrarSesion}
+          onVolver={() => setScreen('rol')}
         />
       );
     }

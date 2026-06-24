@@ -332,7 +332,7 @@ function TarjetaSolicitud({ solicitud, nombre, telefono, placa, vehiculo, descar
   );
 }
 
-function AppConductor({ nombre, telefono, placa, vehiculo, onCerrarSesion }) {
+function AppConductor({ nombre, telefono, placa, vehiculo, onCerrarSesion, onVolver }) {
   const [activo, setActivo] = useState(true);
   const [solicitudes, setSolicitudes] = useState([]);
   const [fase, setFase] = useState(null);
@@ -778,14 +778,17 @@ function AppConductor({ nombre, telefono, placa, vehiculo, onCerrarSesion }) {
       <div style={{ background: 'linear-gradient(135deg, #1A1A1E, #2A2A2E)', padding: '24px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
           <p style={{ color: '#555', fontSize: '11px', margin: '0', letterSpacing: '2px' }}>CONDUCTOR</p>
-          <h2 style={{ color: '#FFFFFF', fontSize: '20px', margin: '4px 0 8px', fontWeight: '900' }}>{nombre || 'Conductor'}</h2>
+          <h2 style={{ color: '#FFFFFF', fontSize: '20px', margin: '4px 0 8px', fontWeight: '900' }}>Hola, {nombre || 'Conductor'} 👋</h2>
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
             {placa && <div style={{ background: '#141416', borderRadius: '8px', padding: '6px 12px', display: 'flex', alignItems: 'center', gap: '6px' }}><span>🚘</span><span style={{ color: '#FFCF4D', fontSize: '13px', fontWeight: 'bold' }}>{placa}</span></div>}
             {vehiculo && <div style={{ background: '#141416', borderRadius: '8px', padding: '6px 12px', display: 'flex', alignItems: 'center', gap: '6px' }}><span>🏷️</span><span style={{ color: '#FFFFFF', fontSize: '13px' }}>{vehiculo}</span></div>}
             {telefono && <div style={{ background: '#141416', borderRadius: '8px', padding: '6px 12px', display: 'flex', alignItems: 'center', gap: '6px' }}><span>📞</span><span style={{ color: '#FFFFFF', fontSize: '13px' }}>{telefono}</span></div>}
           </div>
         </div>
-        <button onClick={cerrarSesion} style={{ background: '#141416', border: 'none', borderRadius: '12px', padding: '10px 16px', color: '#FF4444', fontSize: '13px', fontWeight: 'bold', cursor: 'pointer' }}>🚪 Salir</button>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'flex-end' }}>
+          <button onClick={cerrarSesion} style={{ background: '#141416', border: 'none', borderRadius: '12px', padding: '10px 16px', color: '#FF4444', fontSize: '13px', fontWeight: 'bold', cursor: 'pointer' }}>🚪 Salir</button>
+          <button onClick={onVolver} style={{ background: '#141416', border: '1px solid #FF7A2F', borderRadius: '12px', padding: '10px 16px', color: '#FF7A2F', fontSize: '13px', fontWeight: 'bold', cursor: 'pointer' }}>← Volver</button>
+        </div>
       </div>
       <div style={{ padding: '24px 20px' }}>
         {debugMsg && (
