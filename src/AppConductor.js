@@ -7,7 +7,14 @@ import Calificacion from './Calificacion';
 import Llamada from './Llamada';
 import Creditos from './Creditos';
 const centroRiohacha = { lat: 11.5444, lng: -72.9072 };
-const TARIFA_MINIMA = 8000;
+const TARIFA_DIA = 8000;
+const TARIFA_NOCHE = 10000;
+function calcularTarifaMinima() {
+  const hora = new Date().getHours();
+  // Noche: de 6 pm (18) a 6 am (6) → tarifa más alta
+  return (hora >= 18 || hora < 6) ? TARIFA_NOCHE : TARIFA_DIA;
+}
+const TARIFA_MINIMA = calcularTarifaMinima();
 const COMISION_POR_VIAJE = 800;
 const MAP_STYLES = [
   { elementType: 'geometry', stylers: [{ color: '#1A1A1E' }] },
