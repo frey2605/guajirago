@@ -8,7 +8,7 @@ import Llamada from './Llamada';
 import Creditos from './Creditos';
 const centroRiohacha = { lat: 11.5444, lng: -72.9072 };
 const TARIFA_MINIMA = 8000;
-
+const COMISION_POR_VIAJE = 800;
 const MAP_STYLES = [
   { elementType: 'geometry', stylers: [{ color: '#1A1A1E' }] },
   { elementType: 'labels.text.fill', stylers: [{ color: '#FFFFFF' }] },
@@ -427,6 +427,15 @@ function AppConductor({ nombre, telefono, placa, vehiculo, onCerrarSesion, onVol
         // CAMBIO: marcar ocupado:true inmediatamente al celebrar, no 3 segundos después
         if (miId) {
           setDoc(doc(db, 'conductores', miId), { ocupado: true }, { merge: true }).catch(() => {});
+          (async () => {
+            try {
+              const snapU = await getDoc(doc(db, 'usuarios', miId));
+              const saldoU = snapU.exists() ? (snapU.data().creditos || 0) : 0;
+              const nuevoU = saldoU - COMISION_POR_VIAJE;
+              await setDoc(doc(db, 'usuarios', miId), { creditos: nuevoU }, { merge: true });
+              setSaldoCreditos(nuevoU);
+            } catch (e) {}
+          })();
         }
         setTimeout(() => {
           setCelebrando(false);
