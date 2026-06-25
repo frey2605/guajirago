@@ -246,7 +246,7 @@ function HistorialConductor({ onVolver }) {
   );
 }
 
-function TarjetaSolicitud({ solicitud, nombre, telefono, placa, vehiculo, descartadosRef, agregarViajeEscuchando, onRechazar }) {
+function TarjetaSolicitud({ solicitud, nombre, telefono, placa, vehiculo, saldoCreditos, descartadosRef, agregarViajeEscuchando, onRechazar }) {
   const [tarifaModificada, setTarifaModificada] = useState(solicitud.tarifaValor || TARIFA_MINIMA);
   const [tarifaCambiada, setTarifaCambiada] = useState(false);
 
@@ -271,6 +271,10 @@ function TarjetaSolicitud({ solicitud, nombre, telefono, placa, vehiculo, descar
   };
 
   const aceptarOEnviar = async () => {
+    if (saldoCreditos !== null && saldoCreditos < COMISION_POR_VIAJE) {
+      alert('No tienes saldo suficiente para tomar viajes. Recarga tus créditos.');
+      return;
+    }
     const user = auth.currentUser;
     if (tarifaCambiada) {
       const idViaje = solicitud.id;
@@ -360,6 +364,7 @@ function AppConductor({ nombre, telefono, placa, vehiculo, onCerrarSesion, onVol
   const descartadosRef = useRef({});
   const celebrandoRef = useRef(false);
   const faseRef = useRef(null);
+  const comisionDevueltaRef = useRef(false);
   const unsubsViajesRef = useRef({});
   const solicitudesIdsRef = useRef(new Set());
 
@@ -835,7 +840,7 @@ const cargarSaldo = useCallback(async (uid) => {
         {ubicacion && <div style={{ background: '#0A1F0A', borderRadius: '16px', padding: '12px 16px', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px', border: '1px solid #1A3A1A' }}><div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#2ECC71' }}/><span style={{ color: '#2ECC71', fontSize: '13px', fontWeight: 'bold' }}>GPS activo — ubicación en tiempo real</span></div>}
         <div style={{ background: '#1A1A1E', borderRadius: '20px', padding: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
           <div><p style={{ color: '#FFFFFF', fontWeight: '900', fontSize: '16px', margin: '0' }}>{activo ? 'Estoy disponible' : 'No disponible'}</p><p style={{ color: '#AAAAAA', fontSize: '12px', margin: '4px 0 0' }}>{activo ? 'Puedes recibir solicitudes' : 'Actívate para recibir viajes'}</p></div>
-          <div onClick={() => { activarAudioiOS(); setActivo(!activo); }} style={{ width: '56px', height: '32px', borderRadius: '16px', background: activo ? 'linear-gradient(135deg, #FFCF4D, #FF7A2F)' : '#2A2A2E', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '0 4px', justifyContent: activo ? 'flex-end' : 'flex-start' }}>
+          <div onClick={() => { if (!activo && saldoCreditos !== null && saldoCreditos < COMISION_POR_VIAJE) { alert('No tienes saldo suficiente para recibir viajes. Recarga tus créditos.'); return; } activarAudioiOS(); setActivo(!activo); }} style={{ width: '56px', height: '32px', borderRadius: '16px', background: activo ? 'linear-gradient(135deg, #FFCF4D, #FF7A2F)' : '#2A2A2E', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '0 4px', justifyContent: activo ? 'flex-end' : 'flex-start' }}>
             <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: '#FFFFFF' }}/>
           </div>
         </div>
@@ -873,6 +878,7 @@ const cargarSaldo = useCallback(async (uid) => {
                 telefono={telefono}
                 placa={placa}
                 vehiculo={vehiculo}
+                saldoCreditos={saldoCreditos}
                 descartadosRef={descartadosRef}
                 agregarViajeEscuchando={agregarViajeEscuchando}
                 onRechazar={rechazarSolicitud}
