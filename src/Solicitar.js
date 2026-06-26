@@ -432,8 +432,15 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
 
     try {
       const user = auth.currentUser;
+      // Traer el nombre del pasajero guardado en su registro
+      let nombrePasajero = '';
+      try {
+        const snapU = await getDoc(doc(db, 'usuarios', user.uid));
+        if (snapU.exists()) nombrePasajero = snapU.data().nombre || '';
+      } catch (e) {}
       const docRef = await addDoc(collection(db, 'viajes'), {
         pasajeroId: user.uid, pasajeroEmail: user.email,
+        pasajeroNombre: nombrePasajero,
         pasajeroLat: coordsRecogida.lat, pasajeroLng: coordsRecogida.lng,
         tipo, origen, destino, estado: 'esperando',
         tarifa: `$${tarifa.toLocaleString()}`, tarifaValor: tarifa,
