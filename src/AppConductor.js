@@ -290,17 +290,14 @@ function TarjetaSolicitud({ solicitud, nombre, telefono, placa, vehiculo, saldoC
       descartadosRef.current[idViaje] = solicitud.nuevaOferta || solicitud.fechaSolicitud;
       agregarViajeEscuchando(idViaje);
       updateDoc(doc(db, 'viajes', idViaje), {
-        estado: 'en_negociacion',
-        ofertas: arrayUnion({
-          conductorId: user.uid,
-          conductorNombre: nombre || 'Conductor',
-          conductorTelefono: telefono || '',
-          conductorPlaca: placa || '',
-          conductorVehiculo: vehiculo || '',
-          monto: montoContra,
-          montoTexto: `$${montoContra.toLocaleString()}`,
-          timestamp: new Date().toISOString(),
-        }),
+        estado: 'contraoferta',
+        conductorId: user.uid,
+        conductorNombre: nombre || 'Conductor',
+        conductorTelefono: telefono || '',
+        conductorPlaca: placa || '',
+        conductorVehiculo: vehiculo || '',
+        contraoferta: `$${montoContra.toLocaleString()}`,
+        contraofertaValor: montoContra,
       }).catch(() => {});
     } else {
       agregarViajeEscuchando(solicitud.id);

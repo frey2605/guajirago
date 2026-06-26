@@ -13,7 +13,7 @@ function calcularTarifaMinima() {
 }
 const TARIFA_MINIMA = calcularTarifaMinima();
 const BOUNDS_RIOHACHA = { north: 11.7, south: 11.3, east: -72.6, west: -73.0 };
-const DURACION_CONTRAOFERTA_MS = 10000; // 10 segundos
+const DURACION_CONTRAOFERTA_MS = 20000; // 20 segundos
 
 const RESPUESTAS_RAPIDAS = [
   '🏃 Ya voy saliendo',
