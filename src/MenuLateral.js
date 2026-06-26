@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { auth } from './firebase';
 import { signOut } from 'firebase/auth';
 
-function MenuLateral({ nombre, onIrCreditos, onIrViajes, onCerrarSesion }) {
+function MenuLateral({ nombre, foto, onIrCreditos, onIrViajes, onCerrarSesion }) {
   const [abierto, setAbierto] = useState(false);
 
   const cerrar = () => setAbierto(false);
@@ -44,7 +44,9 @@ function MenuLateral({ nombre, onIrCreditos, onIrViajes, onCerrarSesion }) {
           <div onClick={(e) => e.stopPropagation()} style={{ position: 'absolute', top: 0, left: 0, bottom: 0, width: '82%', maxWidth: '320px', background: '#1A1A1E', display: 'flex', flexDirection: 'column', boxShadow: '2px 0 20px rgba(0,0,0,0.5)' }}>
 
             <div style={{ background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)', padding: '28px 20px 24px' }}>
-              <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: 'rgba(255,255,255,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '28px', marginBottom: '12px' }}>👤</div>
+              <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: 'rgba(255,255,255,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '28px', marginBottom: '12px', overflow: 'hidden' }}>
+                {foto ? <img src={foto} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : '👤'}
+              </div>
               <p style={{ color: '#141416', fontSize: '18px', fontWeight: '900', margin: '0' }}>{nombre || 'Usuario'}</p>
               <p style={{ color: 'rgba(20,20,22,0.7)', fontSize: '13px', margin: '4px 0 0', fontWeight: 'bold' }}>GuajiraGo</p>
             </div>

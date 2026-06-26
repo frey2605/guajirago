@@ -360,6 +360,7 @@ function AppConductor({ nombre, telefono, placa, vehiculo, tipoVehiculo, onCerra
   const [verHistorial, setVerHistorial] = useState(false);
   const [verCreditos, setVerCreditos] = useState(false);
   const [saldoCreditos, setSaldoCreditos] = useState(null);
+  const [fotoConductor, setFotoConductor] = useState(null);
   const [datosCalificacion, setDatosCalificacion] = useState(null);
   const [enLlamada, setEnLlamada] = useState(false);
   const [llamadaEntrante, setLlamadaEntrante] = useState(false);
@@ -509,7 +510,12 @@ const cargarSaldo = useCallback(async (uid) => {
       const id = uid || auth.currentUser?.uid;
       if (!id) { setSaldoCreditos(0); return; }
       const snap = await getDoc(doc(db, 'usuarios', id));
-      setSaldoCreditos(snap.exists() ? (snap.data().creditos || 0) : 0);
+      if (snap.exists()) {
+        setSaldoCreditos(snap.data().creditos || 0);
+        setFotoConductor(snap.data().fotoConductor || null);
+      } else {
+        setSaldoCreditos(0);
+      }
     } catch (e) { setSaldoCreditos(0); }
   }, []);
   useEffect(() => {
@@ -821,7 +827,7 @@ const cargarSaldo = useCallback(async (uid) => {
   return (
     <div style={{ backgroundColor: '#141416', minHeight: '100vh', fontFamily: 'Arial, sans-serif' }}>
       <div style={{ background: 'linear-gradient(135deg, #1A1A1E, #2A2A2E)', padding: '24px 20px', position: 'relative' }}>
-        <MenuLateral nombre={nombre} onIrCreditos={() => setVerCreditos(true)} onIrViajes={() => setVerHistorial(true)} onCerrarSesion={cerrarSesion} />
+        <MenuLateral nombre={nombre} foto={fotoConductor} onIrCreditos={() => setVerCreditos(true)} onIrViajes={() => setVerHistorial(true)} onCerrarSesion={cerrarSesion} />
         <div onClick={onVolver} style={{ position: 'absolute', top: '18px', left: '120px', display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(255,255,255,0.12)', borderRadius: '12px', color: '#FFFFFF', fontSize: '14px', fontWeight: '500', padding: '8px 16px', cursor: 'pointer', zIndex: 5 }}><span style={{ fontSize: '20px', fontWeight: '900', lineHeight: '1' }}>‹</span> Volver</div>
         <div style={{ marginTop: '48px' }}>
           <p style={{ color: '#AAAAAA', fontSize: '11px', margin: '0', letterSpacing: '2px' }}>CONDUCTOR</p>
