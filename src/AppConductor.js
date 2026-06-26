@@ -469,6 +469,13 @@ function AppConductor({ nombre, telefono, placa, vehiculo, onCerrarSesion, onVol
         return;
       }
 
+      // El pasajero subió su oferta: soltar este viaje para que reaparezca en la lista de solicitudes
+      if (data.estado === 'esperando' && data.nuevaOferta) {
+        delete descartadosRef.current[idViaje];
+        cerrarEsteVigilante();
+        return;
+      }
+
       if (data.respuestaPasajero) recibirMensajePasajero(data.respuestaPasajero);
     });
 

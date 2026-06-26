@@ -329,6 +329,12 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
         return;
       }
 
+      // El conductor aceptó el viaje directo: el pasajero confirma pasándolo a 'aceptado'
+      if (data.estado === 'confirmando' && data.conductorId && pantallaRef.current === 'esperando' && !celebrando) {
+        updateDoc(doc(db, 'viajes', viajeId), { estado: 'aceptado' }).catch(() => {});
+        return;
+      }
+
       if (data.estado === 'aceptado' && pantallaRef.current !== 'fase1' && pantallaRef.current !== 'fase2' && !celebrando) {
         setContraofertas([]);
         contaofertasIdsRef.current.clear();

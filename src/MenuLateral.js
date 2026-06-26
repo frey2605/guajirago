@@ -52,6 +52,8 @@ function MenuLateral({ nombre, onIrCreditos, onIrViajes, onCerrarSesion }) {
             <div style={{ flex: 1, padding: '16px 12px', overflowY: 'auto' }}>
               {opcion('🕐', 'Mis viajes', () => { if (onIrViajes) onIrViajes(); else proximamente(); })}
               {opcion('💰', 'Mis créditos', () => { if (onIrCreditos) onIrCreditos(); else proximamente(); })}
+              {opcion('📊', 'Ganancias', proximamente)}
+              {opcion('🛡️', 'Seguridad', proximamente)}
               {opcion('📢', 'Compartir GuajiraGo', compartir)}
               {opcion('⚙️', 'Configuración', proximamente)}
               {opcion('❓', 'Ayuda y soporte', proximamente)}
