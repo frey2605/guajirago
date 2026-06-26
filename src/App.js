@@ -8,7 +8,26 @@ import { auth, db, storage } from './firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-
+const MARCAS_VEHICULO = [
+  'Chevrolet', 'Renault', 'Kia', 'Nissan', 'Hyundai', 'Toyota',
+  'Mazda', 'Ford', 'Volkswagen', 'Suzuki',
+  'Bajaj', 'Yamaha', 'AKT', 'Honda', 'Hero', 'TVS', 'Auteco',
+  'Otra',
+];
+const COLORES_VEHICULO = [
+  { nombre: 'Blanco', hex: '#FFFFFF' },
+  { nombre: 'Negro', hex: '#1A1A1A' },
+  { nombre: 'Gris', hex: '#9E9E9E' },
+  { nombre: 'Plateado', hex: '#C0C0C0' },
+  { nombre: 'Rojo', hex: '#E53935' },
+  { nombre: 'Azul', hex: '#1E88E5' },
+  { nombre: 'Verde', hex: '#43A047' },
+  { nombre: 'Amarillo', hex: '#FDD835' },
+  { nombre: 'Naranja', hex: '#FB8C00' },
+  { nombre: 'Vinotinto', hex: '#7B1E2B' },
+  { nombre: 'Beige', hex: '#D7CCA3' },
+  { nombre: 'Dorado', hex: '#C9A227' },
+];
 const STORAGE_KEY = 'guajirago_usuario';
 
 function guardarLocal(datos) {
@@ -47,10 +66,11 @@ function PantallaModulos({ nombre, onSeleccionar, onVolver, onCerrarSesion }) {
   );
 }
 
-function PantallaRol({ nombre, onSeleccionar, onVolver }) {
+function PantallaRol({ nombre, onSeleccionar, onVolver, onCerrarSesion }) {
   return (
     <div style={{ backgroundColor: '#141416', minHeight: '100vh', fontFamily: 'Arial, sans-serif', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px 24px', position: 'relative' }}>
-      <div onClick={onVolver} style={{ position: 'absolute', top: '18px', left: '20px', display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(255,255,255,0.12)', borderRadius: '12px', color: '#FFFFFF', fontSize: '14px', fontWeight: '500', padding: '8px 16px', cursor: 'pointer', zIndex: 5 }}><span style={{ fontSize: '20px', fontWeight: '900', lineHeight: '1' }}>‹</span> Volver</div>
+      <MenuLateral nombre={nombre} onCerrarSesion={onCerrarSesion} />
+      <div onClick={onVolver} style={{ position: 'absolute', top: '18px', left: '120px', display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(255,255,255,0.12)', borderRadius: '12px', color: '#FFFFFF', fontSize: '14px', fontWeight: '500', padding: '8px 16px', cursor: 'pointer', zIndex: 5 }}><span style={{ fontSize: '20px', fontWeight: '900', lineHeight: '1' }}>‹</span> Volver</div>
       <p style={{ color: '#AAAAAA', fontSize: '14px', letterSpacing: '3px', marginBottom: '8px', textAlign: 'center' }}>BIENVENIDO</p>
       <h2 style={{ color: '#FFFFFF', fontSize: '26px', fontWeight: '900', margin: '0 0 32px', textAlign: 'center' }}>{nombre || 'Usuario'}</h2>
       <p style={{ color: '#AAAAAA', fontSize: '14px', letterSpacing: '2px', marginBottom: '24px', textAlign: 'center' }}>¿CÓMO VAS A USAR GUAJIRAGO?</p>
@@ -74,11 +94,15 @@ function PantallaRol({ nombre, onSeleccionar, onVolver }) {
   );
 }
 
-function PantallaDatosConductor({ nombre, celular, onGuardar, onVolver }) {
+function PantallaDatosConductor({ nombre, celular, onGuardar, onVolver, onCerrarSesion }) {
+  const [tipoVehiculo, setTipoVehiculo] = React.useState('');
   const [placa, setPlaca] = React.useState('');
-  const [marca, setMarca] = React.useState('');
+  const [marca: marcaFinal, setMarca] = React.useState('');
+  const [listaMarcaAbierta, setListaMarcaAbierta] = React.useState(false);
+  const [marcaOtra, setMarcaOtra] = React.useState('');
   const [modelo, setModelo] = React.useState('');
   const [color, setColor] = React.useState('');
+  const [listaColorAbierta, setListaColorAbierta] = React.useState(false);
   const [documento, setDocumento] = React.useState('');
   const [telefono, setTelefono] = React.useState(celular || '');
   const [fotoConductor, setFotoConductor] = React.useState(null);
@@ -93,7 +117,8 @@ function PantallaDatosConductor({ nombre, celular, onGuardar, onVolver }) {
   };
 
   const guardar = async () => {
-    if (!placa || !marca || !modelo || !color || !documento || !telefono) { setError('Por favor completa todos los campos'); return; }
+    if (!tipoVehiculo || !placa || !marca || !modelo || !color || !documento || !telefono) { setError('Por favor completa todos los campos'); return; }
+    if (marca === 'Otra' && !marcaOtra.trim()) { setError('Escribe la marca del vehículo'); return; }
     if (!fotoConductor || !fotoCedula) { setError('Debes subir la foto del conductor y la foto de la cédula'); return; }
     setCargando(true); setError('');
     try {
@@ -101,11 +126,13 @@ function PantallaDatosConductor({ nombre, celular, onGuardar, onVolver }) {
       if (!user) { setError('Error de sesión. Vuelve a iniciar sesión'); setCargando(false); return; }
       const urlFotoConductor = await subirFoto(fotoConductor, 'conductor', user.uid);
       const urlFotoCedula = await subirFoto(fotoCedula, 'cedula', user.uid);
-      const vehiculo = `${marca} ${modelo}`;
+      const marcaFinal = marca === 'Otra' ? marcaOtra.trim() : marca;
+      const vehiculo = `${marcaFinal} ${modelo}`;
       await setDoc(doc(db, 'usuarios', user.uid), {
         tipo: 'conductor',
+        tipoVehiculo,
         placa: placa.toUpperCase(),
-        marca,
+        marca: marcaFinal,
         modelo,
         color,
         documento,
@@ -123,11 +150,21 @@ function PantallaDatosConductor({ nombre, celular, onGuardar, onVolver }) {
   const estiloInput = { background: 'none', border: 'none', outline: 'none', color: '#FFFFFF', fontSize: '16px', width: '100%' };
 
   return (
-    <div style={{ backgroundColor: '#141416', minHeight: '100vh', fontFamily: 'Arial, sans-serif', display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '32px 24px' }}>
+    <div style={{ backgroundColor: '#141416', minHeight: '100vh', fontFamily: 'Arial, sans-serif', display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '32px 24px', position: 'relative' }}>
+      <MenuLateral nombre={nombre} onCerrarSesion={onCerrarSesion} />
+      <div onClick={onVolver} style={{ position: 'absolute', top: '18px', left: '120px', display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(255,255,255,0.12)', borderRadius: '12px', color: '#FFFFFF', fontSize: '14px', fontWeight: '500', padding: '8px 16px', cursor: 'pointer', zIndex: 5 }}><span style={{ fontSize: '20px', fontWeight: '900', lineHeight: '1' }}>‹</span> Volver</div>
       <div style={{ textAlign: 'center', marginBottom: '32px' }}>
         <span style={{ fontSize: '48px' }}>🚗</span>
         <h2 style={{ color: '#FFFFFF', fontSize: '22px', fontWeight: '900', margin: '12px 0 4px' }}>Datos del conductor</h2>
         <p style={{ color: '#AAAAAA', fontSize: '13px', margin: '0' }}>Completa tu perfil de conductor</p>
+      </div>
+      <div style={estiloCampo}>
+        <span style={{ fontSize: '20px' }}>🚖</span>
+        <select value={tipoVehiculo} onChange={e => setTipoVehiculo(e.target.value)} style={{ ...estiloInput, cursor: 'pointer' }}>
+          <option value="" style={{ background: '#1A1A1E' }}>Tipo de vehículo</option>
+          <option value="Taxi" style={{ background: '#1A1A1E' }}>🚗 Taxi</option>
+          <option value="Mototaxi" style={{ background: '#1A1A1E' }}>🏍️ Mototaxi</option>
+        </select>
       </div>
       <div style={estiloCampo}>
         <span style={{ fontSize: '20px' }}>📞</span>
@@ -137,18 +174,60 @@ function PantallaDatosConductor({ nombre, celular, onGuardar, onVolver }) {
         <span style={{ fontSize: '20px' }}>🚘</span>
         <input value={placa} onChange={e => setPlaca(e.target.value.toUpperCase())} placeholder="Placa del vehículo (ej: GUA 123)" style={estiloInput} />
       </div>
-      <div style={estiloCampo}>
+      <div onClick={() => setListaMarcaAbierta(true)} style={{ ...estiloCampo, cursor: 'pointer' }}>
         <span style={{ fontSize: '20px' }}>🏭</span>
-        <input value={marca} onChange={e => setMarca(e.target.value)} placeholder="Marca (ej: Chevrolet)" style={estiloInput} />
+        <span style={{ color: marca ? '#FFFFFF' : '#AAAAAA', fontSize: '16px', flex: 1 }}>{marca || 'Marca del vehículo'}</span>
+        <span style={{ color: '#AAAAAA', fontSize: '14px' }}>▼</span>
       </div>
+      {marca === 'Otra' && (
+        <div style={estiloCampo}>
+          <span style={{ fontSize: '20px' }}>✏️</span>
+          <input value={marcaOtra} onChange={e => setMarcaOtra(e.target.value)} placeholder="Escribe la marca" style={estiloInput} />
+        </div>
+      )}
+
+      {listaMarcaAbierta && (
+        <div onClick={() => setListaMarcaAbierta(false)} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ background: '#1A1A1E', borderRadius: '20px', padding: '20px', width: '100%', maxWidth: '380px', maxHeight: '70vh', overflowY: 'auto' }}>
+            <p style={{ color: '#FFFFFF', fontSize: '16px', fontWeight: '900', margin: '0 0 16px', textAlign: 'center' }}>Escoge la marca</p>
+            {MARCAS_VEHICULO.map(m => (
+              <div key={m} onClick={() => { setMarca(m); if (m !== 'Otra') setMarcaOtra(''); setListaMarcaAbierta(false); }} style={{ display: 'flex', alignItems: 'center', padding: '14px', borderRadius: '12px', cursor: 'pointer', background: marca === m ? '#2A2A2E' : 'transparent', marginBottom: '4px' }}>
+                <span style={{ color: '#FFFFFF', fontSize: '16px' }}>{m}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
       <div style={estiloCampo}>
         <span style={{ fontSize: '20px' }}>📅</span>
         <input value={modelo} onChange={e => setModelo(e.target.value)} placeholder="Modelo (ej: 2020)" style={estiloInput} />
       </div>
-      <div style={estiloCampo}>
+      <div onClick={() => setListaColorAbierta(true)} style={{ ...estiloCampo, cursor: 'pointer' }}>
         <span style={{ fontSize: '20px' }}>🎨</span>
-        <input value={color} onChange={e => setColor(e.target.value)} placeholder="Color del vehículo" style={estiloInput} />
+        {color ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1 }}>
+            <span style={{ width: '20px', height: '20px', borderRadius: '50%', background: COLORES_VEHICULO.find(c => c.nombre === color)?.hex || '#888', border: '1px solid #555', flexShrink: 0 }} />
+            <span style={{ color: '#FFFFFF', fontSize: '16px' }}>{color}</span>
+          </div>
+        ) : (
+          <span style={{ color: '#AAAAAA', fontSize: '16px', flex: 1 }}>Color del vehículo</span>
+        )}
+        <span style={{ color: '#AAAAAA', fontSize: '14px' }}>▼</span>
       </div>
+
+      {listaColorAbierta && (
+        <div onClick={() => setListaColorAbierta(false)} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ background: '#1A1A1E', borderRadius: '20px', padding: '20px', width: '100%', maxWidth: '380px', maxHeight: '70vh', overflowY: 'auto' }}>
+            <p style={{ color: '#FFFFFF', fontSize: '16px', fontWeight: '900', margin: '0 0 16px', textAlign: 'center' }}>Escoge el color</p>
+            {COLORES_VEHICULO.map(c => (
+              <div key={c.nombre} onClick={() => { setColor(c.nombre); setListaColorAbierta(false); }} style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '14px', borderRadius: '12px', cursor: 'pointer', background: color === c.nombre ? '#2A2A2E' : 'transparent', marginBottom: '4px' }}>
+                <span style={{ width: '26px', height: '26px', borderRadius: '50%', background: c.hex, border: '1px solid #555', flexShrink: 0 }} />
+                <span style={{ color: '#FFFFFF', fontSize: '16px' }}>{c.nombre}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
       <div style={estiloCampo}>
         <span style={{ fontSize: '20px' }}>🪪</span>
         <input value={documento} onChange={e => setDocumento(e.target.value)} placeholder="Documento de identidad" type="tel" style={estiloInput} />
@@ -159,7 +238,7 @@ function PantallaDatosConductor({ nombre, celular, onGuardar, onVolver }) {
         <span style={{ color: fotoConductor ? '#2ECC71' : '#AAAAAA', fontSize: '15px', flex: 1 }}>
           {fotoConductor ? '✓ Foto del conductor lista' : 'Subir foto del conductor'}
         </span>
-        <input type="file" accept="image/*" capture="user" onChange={e => setFotoConductor(e.target.files[0])} style={{ display: 'none' }} />
+        <input type="file" accept="image/*" onChange={e => setFotoConductor(e.target.files[0])} style={{ display: 'none' }} />
       </label>
 
       <label style={{ ...estiloCampo, cursor: 'pointer', marginBottom: '20px' }}>
@@ -174,8 +253,7 @@ function PantallaDatosConductor({ nombre, celular, onGuardar, onVolver }) {
       <button onClick={guardar} disabled={cargando} style={{ width: '100%', padding: '18px', background: cargando ? '#2A2A2E' : 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)', border: 'none', borderRadius: '16px', color: cargando ? '#AAAAAA' : '#141416', fontSize: '18px', fontWeight: '900', cursor: 'pointer', marginBottom: '12px' }}>
         {cargando ? 'Guardando...' : 'Entrar a GuajiraGo'}
       </button>
-      <button onClick={onVolver} style={{ background: 'none', border: 'none', color: '#AAAAAA', fontSize: '13px', cursor: 'pointer' }}>Volver</button>
-    </div>
+      </div>
   );
 }
 
@@ -267,8 +345,8 @@ function App() {
   if (screen === 'splash') return <Splash onFinish={() => {}} />;
   if (screen === 'login') return <Login onEntrar={handleEntrar} />;
   if (screen === 'modulos') return <PantallaModulos nombre={nombreUsuario} onSeleccionar={handleSeleccionarModulo} onVolver={() => setScreen('login')} onCerrarSesion={handleCerrarSesion} />;
-  if (screen === 'rol') return <PantallaRol nombre={nombreUsuario} onSeleccionar={handleSeleccionarRol} onVolver={() => setScreen('modulos')} />;
-  if (screen === 'datos_conductor') return <PantallaDatosConductor nombre={nombreUsuario} celular={telefonoUsuario} onGuardar={handleDatosConductor} onVolver={() => setScreen('rol')} />;
+  if (screen === 'rol') return <PantallaRol nombre={nombreUsuario} onSeleccionar={handleSeleccionarRol} onVolver={() => setScreen('modulos')} onCerrarSesion={handleCerrarSesion} />;
+  if (screen === 'datos_conductor') return <PantallaDatosConductor nombre={nombreUsuario} celular={telefonoUsuario} onGuardar={handleDatosConductor} onVolver={() => setScreen('rol')} onCerrarSesion={handleCerrarSesion} />;
 
   if (screen === 'home') {
     if (tipoUsuario === 'conductor') {

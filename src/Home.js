@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import Solicitar from './Solicitar';
+import MenuLateral from './MenuLateral';
 import { auth, db } from './firebase';
 import { signOut } from 'firebase/auth';
 import { collection, query, where, limit, getDocs } from 'firebase/firestore';
@@ -189,7 +190,8 @@ function Home({ nombre, onCerrarSesion, onVolver }) {
       {mostrarModalFavorito && <ModalFavorito onGuardar={agregarFavorito} onCerrar={() => setMostrarModalFavorito(false)} />}
 
       <div style={{ background: 'linear-gradient(135deg, #1A1A1E, #2A2A2E)', padding: '24px 20px', position: 'relative' }}>
-        <div onClick={onVolver} style={{ position: 'absolute', top: '18px', left: '20px', display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(255,255,255,0.12)', borderRadius: '12px', color: '#FFFFFF', fontSize: '14px', fontWeight: '500', padding: '8px 16px', cursor: 'pointer', zIndex: 5 }}><span style={{ fontSize: '20px', fontWeight: '900', lineHeight: '1' }}>‹</span> Volver</div>
+        <MenuLateral nombre={nombre} onCerrarSesion={onCerrarSesion} />
+        <div onClick={onVolver} style={{ position: 'absolute', top: '18px', left: '120px', display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(255,255,255,0.12)', borderRadius: '12px', color: '#FFFFFF', fontSize: '14px', fontWeight: '500', padding: '8px 16px', cursor: 'pointer', zIndex: 5 }}><span style={{ fontSize: '20px', fontWeight: '900', lineHeight: '1' }}>‹</span> Volver</div>
         <div style={{ marginTop: '48px' }}>
           <p style={{ color: '#AAAAAA', fontSize: '12px', margin: '0', letterSpacing: '2px' }}>UBICACIÓN</p>
           <p style={{ color: '#FFFFFF', fontSize: '16px', margin: '4px 0 0', fontWeight: 'bold' }}>📍 Riohacha, La Guajira</p>
