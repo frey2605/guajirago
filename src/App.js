@@ -99,7 +99,7 @@ function PantallaRol({ nombre, onSeleccionar, onVolver, onCerrarSesion }) {
 function PantallaDatosConductor({ nombre, celular, onGuardar, onVolver, onCerrarSesion }) {
   const [tipoVehiculo, setTipoVehiculo] = React.useState('');
   const [placa, setPlaca] = React.useState('');
-  const [marca: marcaFinal, setMarca] = React.useState('');
+  const [marca, setMarca] = React.useState('');
   const [listaMarcaAbierta, setListaMarcaAbierta] = React.useState(false);
   const [marcaOtra, setMarcaOtra] = React.useState('');
   const [modelo, setModelo] = React.useState('');
@@ -110,6 +110,7 @@ function PantallaDatosConductor({ nombre, celular, onGuardar, onVolver, onCerrar
   const [fotoConductor, setFotoConductor] = React.useState(null);
   const [fotoCedula, setFotoCedula] = React.useState(null);
   const [error, setError] = React.useState('');
+  const [campoError, setCampoError] = React.useState('');
   const [cargando, setCargando] = React.useState(false);
 
   const subirFoto = async (archivo, carpeta, uid) => {
@@ -119,9 +120,17 @@ function PantallaDatosConductor({ nombre, celular, onGuardar, onVolver, onCerrar
   };
 
   const guardar = async () => {
-    if (!tipoVehiculo || !placa || !marca || !modelo || !color || !documento || !telefono) { setError('Por favor completa todos los campos'); return; }
-    if (marca === 'Otra' && !marcaOtra.trim()) { setError('Escribe la marca del vehículo'); return; }
-    if (!fotoConductor || !fotoCedula) { setError('Debes subir la foto del conductor y la foto de la cédula'); return; }
+    if (!tipoVehiculo) { setError('Falta escoger el tipo de vehículo'); setCampoError('tipoVehiculo'); return; }
+    if (!telefono) { setError('Falta el número de teléfono'); setCampoError('telefono'); return; }
+    if (!placa) { setError('Falta la placa del vehículo'); setCampoError('placa'); return; }
+    if (!marca) { setError('Falta escoger la marca'); setCampoError('marca'); return; }
+    if (marca === 'Otra' && !marcaOtra.trim()) { setError('Escribe la marca del vehículo'); setCampoError('marcaOtra'); return; }
+    if (!modelo) { setError('Falta el modelo'); setCampoError('modelo'); return; }
+    if (!color) { setError('Falta escoger el color'); setCampoError('color'); return; }
+    if (!documento) { setError('Falta el documento de identidad'); setCampoError('documento'); return; }
+    if (!fotoConductor) { setError('Falta subir la foto del conductor'); setCampoError('fotoConductor'); return; }
+    if (!fotoCedula) { setError('Falta subir la foto de la cédula'); setCampoError('fotoCedula'); return; }
+    setCampoError('');
     setCargando(true); setError('');
     try {
       const user = auth.currentUser;
@@ -148,11 +157,24 @@ function PantallaDatosConductor({ nombre, celular, onGuardar, onVolver, onCerrar
     setCargando(false);
   };
 
-  const estiloCampo = { background: '#1A1A1E', borderRadius: '16px', padding: '16px', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '12px' };
+  const estiloCampoBase = { background: '#1A1A1E', borderRadius: '16px', padding: '16px', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '12px' };
+  const estiloCampo = estiloCampoBase;
+  const campoRojo = (campo) => campoError === campo ? { ...estiloCampoBase, border: '2px solid #FF4444' } : estiloCampoBase;
   const estiloInput = { background: 'none', border: 'none', outline: 'none', color: '#FFFFFF', fontSize: '16px', width: '100%' };
 
   return (
     <div style={{ backgroundColor: '#141416', minHeight: '100vh', fontFamily: 'Arial, sans-serif', display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '32px 24px', position: 'relative' }}>
+      {error && campoError && (
+        <div onClick={() => setError('')} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ background: '#1A1A1E', borderRadius: '24px', padding: '32px 24px', width: '100%', maxWidth: '380px', border: '2px solid #FF4444', textAlign: 'center', position: 'relative' }}>
+            <span onClick={() => setError('')} style={{ position: 'absolute', top: '16px', right: '20px', color: '#AAAAAA', fontSize: '26px', cursor: 'pointer', lineHeight: '1' }}>✕</span>
+            <div style={{ fontSize: '54px', marginBottom: '12px' }}>⚠️</div>
+            <h2 style={{ color: '#FFFFFF', fontSize: '20px', fontWeight: '900', margin: '0 0 10px' }}>Falta un dato</h2>
+            <p style={{ color: '#FFFFFF', fontSize: '17px', margin: '0 0 24px', lineHeight: '1.5', fontWeight: 'bold' }}>{error}</p>
+            <button onClick={() => setError('')} style={{ width: '100%', padding: '16px', background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F)', border: 'none', borderRadius: '14px', color: '#141416', fontSize: '16px', fontWeight: '900', cursor: 'pointer' }}>Entendido</button>
+          </div>
+        </div>
+      )}
       <MenuLateral nombre={nombre} onCerrarSesion={onCerrarSesion} />
       <div onClick={onVolver} style={{ position: 'absolute', top: '18px', left: '120px', display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(255,255,255,0.12)', borderRadius: '12px', color: '#FFFFFF', fontSize: '14px', fontWeight: '500', padding: '8px 16px', cursor: 'pointer', zIndex: 5 }}><span style={{ fontSize: '20px', fontWeight: '900', lineHeight: '1' }}>‹</span> Volver</div>
       <div style={{ textAlign: 'center', marginBottom: '32px' }}>
@@ -168,21 +190,21 @@ function PantallaDatosConductor({ nombre, celular, onGuardar, onVolver, onCerrar
           <option value="Mototaxi" style={{ background: '#1A1A1E' }}>🏍️ Mototaxi</option>
         </select>
       </div>
-      <div style={estiloCampo}>
+      <div style={campoRojo('telefono')}>
         <span style={{ fontSize: '20px' }}>📞</span>
         <input value={telefono} onChange={e => setTelefono(e.target.value)} placeholder="Número de teléfono" type="tel" style={estiloInput} />
       </div>
-      <div style={estiloCampo}>
+      <div style={campoRojo('placa')}>
         <span style={{ fontSize: '20px' }}>🚘</span>
         <input value={placa} onChange={e => setPlaca(e.target.value.toUpperCase())} placeholder="Placa del vehículo (ej: GUA 123)" style={estiloInput} />
       </div>
-      <div onClick={() => setListaMarcaAbierta(true)} style={{ ...estiloCampo, cursor: 'pointer' }}>
+      <div onClick={() => setListaMarcaAbierta(true)} style={{ ...campoRojo('marca'), cursor: 'pointer' }}>
         <span style={{ fontSize: '20px' }}>🏭</span>
         <span style={{ color: marca ? '#FFFFFF' : '#AAAAAA', fontSize: '16px', flex: 1 }}>{marca || 'Marca del vehículo'}</span>
         <span style={{ color: '#AAAAAA', fontSize: '14px' }}>▼</span>
       </div>
       {marca === 'Otra' && (
-        <div style={estiloCampo}>
+        <div style={campoRojo('marcaOtra')}>
           <span style={{ fontSize: '20px' }}>✏️</span>
           <input value={marcaOtra} onChange={e => setMarcaOtra(e.target.value)} placeholder="Escribe la marca" style={estiloInput} />
         </div>
@@ -200,11 +222,11 @@ function PantallaDatosConductor({ nombre, celular, onGuardar, onVolver, onCerrar
           </div>
         </div>
       )}
-      <div style={estiloCampo}>
+      <div style={campoRojo('modelo')}>
         <span style={{ fontSize: '20px' }}>📅</span>
         <input value={modelo} onChange={e => setModelo(e.target.value)} placeholder="Modelo (ej: 2020)" style={estiloInput} />
       </div>
-      <div onClick={() => setListaColorAbierta(true)} style={{ ...estiloCampo, cursor: 'pointer' }}>
+      <div onClick={() => setListaColorAbierta(true)} style={{ ...campoRojo('color'), cursor: 'pointer' }}>
         <span style={{ fontSize: '20px' }}>🎨</span>
         {color ? (
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1 }}>
@@ -230,12 +252,12 @@ function PantallaDatosConductor({ nombre, celular, onGuardar, onVolver, onCerrar
           </div>
         </div>
       )}
-      <div style={estiloCampo}>
+      <div style={campoRojo('documento')}>
         <span style={{ fontSize: '20px' }}>🪪</span>
         <input value={documento} onChange={e => setDocumento(e.target.value)} placeholder="Documento de identidad" type="tel" style={estiloInput} />
       </div>
 
-      <label style={{ ...estiloCampo, cursor: 'pointer' }}>
+      <label style={{ ...campoRojo('fotoConductor'), cursor: 'pointer' }}>
         <span style={{ fontSize: '20px' }}>📸</span>
         <span style={{ color: fotoConductor ? '#2ECC71' : '#AAAAAA', fontSize: '15px', flex: 1 }}>
           {fotoConductor ? '✓ Foto del conductor lista' : 'Subir foto del conductor'}
@@ -243,7 +265,7 @@ function PantallaDatosConductor({ nombre, celular, onGuardar, onVolver, onCerrar
         <input type="file" accept="image/*" onChange={e => setFotoConductor(e.target.files[0])} style={{ display: 'none' }} />
       </label>
 
-      <label style={{ ...estiloCampo, cursor: 'pointer', marginBottom: '20px' }}>
+      <label style={{ ...campoRojo('fotoCedula'), cursor: 'pointer', marginBottom: '20px' }}>
         <span style={{ fontSize: '20px' }}>🪪</span>
         <span style={{ color: fotoCedula ? '#2ECC71' : '#AAAAAA', fontSize: '15px', flex: 1 }}>
           {fotoCedula ? '✓ Foto de la cédula lista' : 'Subir foto de la cédula'}

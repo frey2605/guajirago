@@ -6,6 +6,7 @@ import { signOut } from 'firebase/auth';
 import Calificacion from './Calificacion';
 import Llamada from './Llamada';
 import Creditos from './Creditos';
+import MenuLateral from './MenuLateral';
 const centroRiohacha = { lat: 11.5444, lng: -72.9072 };
 const TARIFA_DIA = 8000;
 const TARIFA_NOCHE = 10000;
@@ -813,8 +814,10 @@ const cargarSaldo = useCallback(async (uid) => {
 
   return (
     <div style={{ backgroundColor: '#141416', minHeight: '100vh', fontFamily: 'Arial, sans-serif' }}>
-      <div style={{ background: 'linear-gradient(135deg, #1A1A1E, #2A2A2E)', padding: '24px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-        <div>
+      <div style={{ background: 'linear-gradient(135deg, #1A1A1E, #2A2A2E)', padding: '24px 20px', position: 'relative' }}>
+        <MenuLateral nombre={nombre} onIrCreditos={() => setVerCreditos(true)} onIrViajes={() => setVerHistorial(true)} onCerrarSesion={cerrarSesion} />
+        <div onClick={onVolver} style={{ position: 'absolute', top: '18px', left: '120px', display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(255,255,255,0.12)', borderRadius: '12px', color: '#FFFFFF', fontSize: '14px', fontWeight: '500', padding: '8px 16px', cursor: 'pointer', zIndex: 5 }}><span style={{ fontSize: '20px', fontWeight: '900', lineHeight: '1' }}>‹</span> Volver</div>
+        <div style={{ marginTop: '48px' }}>
           <p style={{ color: '#AAAAAA', fontSize: '11px', margin: '0', letterSpacing: '2px' }}>CONDUCTOR</p>
           <h2 style={{ color: '#FFFFFF', fontSize: '20px', margin: '4px 0 8px', fontWeight: '900' }}>Hola, {nombre || 'Conductor'} 👋</h2>
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
@@ -822,10 +825,6 @@ const cargarSaldo = useCallback(async (uid) => {
             {vehiculo && <div style={{ background: '#141416', borderRadius: '8px', padding: '6px 12px', display: 'flex', alignItems: 'center', gap: '6px' }}><span>🏷️</span><span style={{ color: '#FFFFFF', fontSize: '13px' }}>{vehiculo}</span></div>}
             {telefono && <div style={{ background: '#141416', borderRadius: '8px', padding: '6px 12px', display: 'flex', alignItems: 'center', gap: '6px' }}><span>📞</span><span style={{ color: '#FFFFFF', fontSize: '13px' }}>{telefono}</span></div>}
           </div>
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'flex-end' }}>
-          <button onClick={cerrarSesion} style={{ background: '#141416', border: 'none', borderRadius: '12px', padding: '10px 16px', color: '#FF4444', fontSize: '13px', fontWeight: 'bold', cursor: 'pointer' }}>🚪 Salir</button>
-          <button onClick={onVolver} style={{ background: '#141416', border: '1px solid #FF7A2F', borderRadius: '12px', padding: '10px 16px', color: '#FF7A2F', fontSize: '13px', fontWeight: 'bold', cursor: 'pointer' }}>← Volver</button>
         </div>
       </div>
       <div style={{ padding: '24px 20px' }}>
