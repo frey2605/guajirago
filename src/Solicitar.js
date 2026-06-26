@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { db, auth } from './firebase';
-import { collection, addDoc, doc, onSnapshot, updateDoc, getDoc } from 'firebase/firestore';
+import { collection, addDoc, doc, onSnapshot, updateDoc, getDoc, runTransaction } from 'firebase/firestore';
 import Calificacion from './Calificacion';
 import { alertarNuevoViaje, precargarAudio, activarAudioiOS } from './Notificaciones';
 
@@ -243,6 +243,7 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
   const [contador, setContador] = useState(240);
   const [buscandoAgotado, setBuscandoAgotado] = useState(false);
   const [confirmacionPendiente, setConfirmacionPendiente] = useState(null);
+  const [conductorYaTomado, setConductorYaTomado] = useState(false);
   const [tiempoBusqueda, setTiempoBusqueda] = useState(240);
   const contadorBusquedaRef = useRef(null);
   const radioRef = useRef(null);
@@ -578,15 +579,31 @@ const confirmarViaje = async () => {
     if (!viajeId || !confirmacionPendiente) return;
     const datos = confirmacionPendiente;
     setConfirmacionPendiente(null);
-    setCelebrando(true);
+
     try {
-      await updateDoc(doc(db, 'viajes', viajeId), { estado: 'aceptado' });
-    } catch (e) {}
-    setTimeout(() => {
-      setCelebrando(false);
-      setPantalla('fase1');
-      if (datos.conductorId) escucharConductor(datos.conductorId);
-    }, 3000);
+      // Transacción: solo se queda con el conductor si todavía está libre (la "última silla")
+      await runTransaction(db, async (transaccion) => {
+        const refConductor = doc(db, 'conductores', datos.conductorId);
+        const snapConductor = await transaccion.get(refConductor);
+        if (snapConductor.exists() && snapConductor.data().ocupado === true) {
+          throw new Error('CONDUCTOR_OCUPADO');
+        }
+        // Marcar al conductor como ocupado y aceptar el viaje, todo junto
+        transaccion.set(refConductor, { ocupado: true }, { merge: true });
+        transaccion.update(doc(db, 'viajes', viajeId), { estado: 'aceptado' });
+      });
+
+      // Éxito: el conductor era nuestro, celebramos
+      setCelebrando(true);
+      setTimeout(() => {
+        setCelebrando(false);
+        setPantalla('fase1');
+        if (datos.conductorId) escucharConductor(datos.conductorId);
+      }, 3000);
+    } catch (e) {
+      // El conductor ya fue tomado por otro pasajero
+      setConductorYaTomado(true);
+    }
   };
 
   const rechazarConfirmacion = async () => {
@@ -642,6 +659,19 @@ const confirmarViaje = async () => {
 
   if (mostrarCalificacion) return <Calificacion tipo={tipo} viajeId={viajeId} nombreCalificado={viaje?.conductorNombre} quienCalifica="pasajero" onFinalizar={onVolver} />;
   if (celebrando) return <Celebracion />;
+
+  if (conductorYaTomado) {
+    return (
+      <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.92)', zIndex: 9998, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
+        <div style={{ fontSize: '70px', marginBottom: '16px' }}>😕</div>
+        <div style={{ background: '#1A1A1E', borderRadius: '24px', padding: '32px 24px', width: '100%', maxWidth: '420px', border: '2px solid #FF7A2F', textAlign: 'center' }}>
+          <h2 style={{ color: '#FFFFFF', fontSize: '22px', fontWeight: '900', margin: '0 0 12px' }}>UPP, ESTE CONDUCTOR YA NO ESTÁ DISPONIBLE 🙈</h2>
+          <p style={{ color: '#AAAAAA', fontSize: '14px', margin: '0', lineHeight: '1.5' }}>Otro pasajero lo tomó primero. No te preocupes, seguimos buscando otro conductor para ti.</p>
+        </div>
+        <button onClick={() => { setConductorYaTomado(false); seguirBuscando(); }} style={{ marginTop: '28px', width: '100%', maxWidth: '420px', padding: '18px', background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)', border: 'none', borderRadius: '16px', color: '#141416', fontSize: '17px', fontWeight: '900', cursor: 'pointer' }}>🔄 Seguir buscando</button>
+      </div>
+    );
+  }
 
   if (confirmacionPendiente) {
     return (
