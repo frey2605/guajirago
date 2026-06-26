@@ -9,24 +9,26 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 const MARCAS_VEHICULO = [
-  'Chevrolet', 'Renault', 'Kia', 'Nissan', 'Hyundai', 'Toyota',
-  'Mazda', 'Ford', 'Volkswagen', 'Suzuki',
-  'Bajaj', 'Yamaha', 'AKT', 'Honda', 'Hero', 'TVS', 'Auteco',
+  'AKT', 'Auteco', 'Bajaj', 'BMW', 'BYD', 'Chery', 'Chevrolet',
+  'Citroen', 'Ford', 'Foton', 'Hero', 'Honda', 'Hyundai', 'JAC',
+  'JMC', 'Kia', 'Mazda', 'Mercedes Benz', 'Mitsubishi', 'Nissan',
+  'Peugeot', 'Renault', 'Subaru', 'Suzuki', 'Toyota', 'TVS',
+  'Volkswagen', 'Yamaha',
   'Otra',
 ];
 const COLORES_VEHICULO = [
+  { nombre: 'Amarillo', hex: '#FDD835' },
+  { nombre: 'Azul', hex: '#1E88E5' },
+  { nombre: 'Beige', hex: '#D7CCA3' },
   { nombre: 'Blanco', hex: '#FFFFFF' },
-  { nombre: 'Negro', hex: '#1A1A1A' },
+  { nombre: 'Dorado', hex: '#C9A227' },
   { nombre: 'Gris', hex: '#9E9E9E' },
+  { nombre: 'Naranja', hex: '#FB8C00' },
+  { nombre: 'Negro', hex: '#1A1A1A' },
   { nombre: 'Plateado', hex: '#C0C0C0' },
   { nombre: 'Rojo', hex: '#E53935' },
-  { nombre: 'Azul', hex: '#1E88E5' },
   { nombre: 'Verde', hex: '#43A047' },
-  { nombre: 'Amarillo', hex: '#FDD835' },
-  { nombre: 'Naranja', hex: '#FB8C00' },
   { nombre: 'Vinotinto', hex: '#7B1E2B' },
-  { nombre: 'Beige', hex: '#D7CCA3' },
-  { nombre: 'Dorado', hex: '#C9A227' },
 ];
 const STORAGE_KEY = 'guajirago_usuario';
 
