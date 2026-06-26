@@ -19,8 +19,10 @@ function cargarLocal() {
 }
 
 function PantallaModulos({ onSeleccionar, onVolver }) {
+  const [menuAbierto, setMenuAbierto] = React.useState(false);
   return (
-    <div style={{ backgroundColor: '#141416', minHeight: '100vh', fontFamily: 'Arial, sans-serif', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px 24px' }}>
+    <div style={{ backgroundColor: '#141416', minHeight: '100vh', fontFamily: 'Arial, sans-serif', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px 24px', position: 'relative' }}>
+      <div onClick={() => setMenuAbierto(true)} style={{ position: 'absolute', top: '20px', left: '20px', fontSize: '28px', color: '#FFFFFF', cursor: 'pointer', zIndex: 5 }}>☰</div>
       <h1 style={{ fontSize: '42px', color: '#FFFFFF', margin: '0', fontFamily: 'Arial Black, sans-serif', letterSpacing: '-1px', textAlign: 'center' }}>Guajira</h1>
       <h1 style={{ fontSize: '56px', background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', margin: '0 0 16px', fontFamily: 'Arial Black, sans-serif', letterSpacing: '-2px' }}>GO</h1>
       <p style={{ color: '#AAAAAA', fontSize: '14px', letterSpacing: '3px', marginBottom: '32px', textAlign: 'center' }}>¿QUÉ QUIERES HACER?</p>
@@ -41,6 +43,18 @@ function PantallaModulos({ onSeleccionar, onVolver }) {
         </div>
       </div>
       <button onClick={onVolver} style={{ background: 'none', border: 'none', color: '#AAAAAA', fontSize: '13px', cursor: 'pointer', marginTop: '24px' }}>Volver</button>
+
+      {menuAbierto && (
+        <div onClick={() => setMenuAbierto(false)} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)', zIndex: 50 }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ position: 'absolute', top: 0, left: 0, bottom: 0, width: '80%', maxWidth: '320px', background: '#1A1A1E', padding: '24px 20px', boxShadow: '2px 0 20px rgba(0,0,0,0.5)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+              <h2 style={{ color: '#FFFFFF', fontSize: '20px', fontWeight: '900', margin: '0' }}>Menú</h2>
+              <span onClick={() => setMenuAbierto(false)} style={{ color: '#FFFFFF', fontSize: '24px', cursor: 'pointer' }}>✕</span>
+            </div>
+            <p style={{ color: '#AAAAAA', fontSize: '14px', margin: '0' }}>Aquí irán las opciones...</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
