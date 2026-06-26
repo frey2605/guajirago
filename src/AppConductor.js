@@ -17,6 +17,16 @@ function calcularTarifaMinima() {
 }
 const TARIFA_MINIMA = calcularTarifaMinima();
 const COMISION_POR_VIAJE = 800;
+// Calcula la distancia en kilómetros entre dos puntos del mapa (fórmula Haversine)
+function calcularDistanciaKm(lat1, lng1, lat2, lng2) {
+  const R = 6371; // radio de la Tierra en km
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLng / 2) * Math.sin(dLng / 2);
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
 const MAP_STYLES = [
   { elementType: 'geometry', stylers: [{ color: '#1A1A1E' }] },
   { elementType: 'labels.text.fill', stylers: [{ color: '#FFFFFF' }] },
@@ -357,6 +367,8 @@ function AppConductor({ nombre, telefono, placa, vehiculo, tipoVehiculo, onCerra
   const [mostrarCancelacion, setMostrarCancelacion] = useState(false);
   const [destinoCoords, setDestinoCoords] = useState(null);
   const [contador, setContador] = useState(240);
+  const [buscandoAgotado, setBuscandoAgotado] = useState(false);
+  const radioRef = useRef(null);
   const [verHistorial, setVerHistorial] = useState(false);
   const [verCreditos, setVerCreditos] = useState(false);
   const [saldoCreditos, setSaldoCreditos] = useState(null);
@@ -373,6 +385,7 @@ function AppConductor({ nombre, telefono, placa, vehiculo, tipoVehiculo, onCerra
   const comisionDevueltaRef = useRef(false);
   const unsubsViajesRef = useRef({});
   const solicitudesIdsRef = useRef(new Set());
+  const ubicacionRef = useRef(null);
 
   useEffect(() => { celebrandoRef.current = celebrando; }, [celebrando]);
   useEffect(() => { faseRef.current = fase; }, [fase]);
@@ -543,6 +556,7 @@ const cargarSaldo = useCallback(async (uid) => {
     const guardarUbicacion = async (pos) => {
       const nueva = { lat: pos.coords.latitude, lng: pos.coords.longitude, timestamp: new Date().toISOString() };
       setUbicacion(nueva);
+      ubicacionRef.current = { lat: pos.coords.latitude, lng: pos.coords.longitude };
       try {
         let tokenFCM = null;
         try {
@@ -582,7 +596,7 @@ const cargarSaldo = useCallback(async (uid) => {
 
   useEffect(() => {
     if (!activo) { setSolicitudes([]); solicitudesIdsRef.current.clear(); return; }
-    const VENTANA_MS = 6 * 60 * 1000;
+    const VENTANA_MS = 2 * 60 * 1000;
     const q = query(collection(db, 'viajes'), where('estado', 'in', ['esperando', 'en_negociacion', 'confirmando']));
     const unsub = onSnapshot(q, (snap) => {
       const ahora = Date.now();
@@ -593,6 +607,12 @@ const cargarSaldo = useCallback(async (uid) => {
           if (!v.nuevaOferta && !v.fechaSolicitud) return false;
           // Filtro por tipo: el conductor solo ve solicitudes de su tipo de vehículo
           if (tipoVehiculo && v.tipo && v.tipo !== tipoVehiculo) return false;
+          // Filtro por distancia: solo mostrar si el pasajero está dentro del radio de búsqueda actual
+          if (ubicacionRef.current && v.pasajeroLat && v.pasajeroLng) {
+            const radio = v.radioBusqueda || 7;
+            const dist = calcularDistanciaKm(ubicacionRef.current.lat, ubicacionRef.current.lng, v.pasajeroLat, v.pasajeroLng);
+            if (dist > radio) return false;
+          }
           const ts = tsDe(v);
           const edad = ahora - ts;
           if (edad < 0 || edad > VENTANA_MS) return false;
@@ -608,7 +628,18 @@ const cargarSaldo = useCallback(async (uid) => {
       solicitudesIdsRef.current = new Set(vigentes.map(v => v.id));
       setSolicitudes(vigentes);
     });
-    return () => unsub();
+
+    // Refresco automático: quita solicitudes vencidas aunque nadie toque nada
+    const intervaloLimpieza = setInterval(() => {
+      const ahora = Date.now();
+      const tsDe = (v) => new Date(v.nuevaOferta || v.fechaSolicitud).getTime();
+      setSolicitudes(prev => prev.filter(v => {
+        const edad = ahora - tsDe(v);
+        return edad >= 0 && edad <= VENTANA_MS;
+      }));
+    }, 10000);
+
+    return () => { unsub(); clearInterval(intervaloLimpieza); };
   }, [activo, tipoVehiculo]);
 
   const rechazarSolicitud = useCallback((idViaje) => {

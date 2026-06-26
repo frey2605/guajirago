@@ -240,6 +240,10 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
   const [mostrarLlego, setMostrarLlego] = useState(false);
   const [mostrarCancelacion, setMostrarCancelacion] = useState(false);
   const [contador, setContador] = useState(240);
+  const [buscandoAgotado, setBuscandoAgotado] = useState(false);
+  const [tiempoBusqueda, setTiempoBusqueda] = useState(240);
+  const contadorBusquedaRef = useRef(null);
+  const radioRef = useRef(null);
   const [destinoCoords, setDestinoCoords] = useState(null);
   const [mostrarCalificacion, setMostrarCalificacion] = useState(false);
   const [nuevaTarifa, setNuevaTarifa] = useState(null); // tarifa modificada mientras espera
@@ -338,6 +342,8 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
       }
 
       if (data.estado === 'aceptado' && pantallaRef.current !== 'fase1' && pantallaRef.current !== 'fase2' && !celebrando) {
+        if (radioRef.current) { clearTimeout(radioRef.current.ampliar); clearTimeout(radioRef.current.agotar); }
+        clearInterval(contadorBusquedaRef.current);
         setContraofertas([]);
         contaofertasIdsRef.current.clear();
         setCelebrando(true);
@@ -396,6 +402,8 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
 
   const cancelarViaje = async (razon) => {
     clearInterval(contadorRef.current);
+    if (radioRef.current) { clearTimeout(radioRef.current.ampliar); clearTimeout(radioRef.current.agotar); }
+    clearInterval(contadorBusquedaRef.current);
     if (viajeId) await updateDoc(doc(db, 'viajes', viajeId), { estado: 'cancelado', canceladoPor: 'pasajero', razonCancelacion: razon });
     setMostrarCancelacion(false);
     onVolver();
@@ -452,6 +460,25 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
       setOfertaModificada(false);
     } catch(e) {}
   };
+  const seguirBuscando = () => {
+    if (!viajeId) return;
+    setBuscandoAgotado(false);
+    setTiempoBusqueda(120);
+    updateDoc(doc(db, 'viajes', viajeId), { radioBusqueda: 3, nuevaOferta: new Date().toISOString() }).catch(() => {});
+    if (radioRef.current) { clearTimeout(radioRef.current.ampliar); clearTimeout(radioRef.current.agotar); }
+    radioRef.current = {
+      ampliar: setTimeout(() => {
+        updateDoc(doc(db, 'viajes', viajeId), { radioBusqueda: 7 }).catch(() => {});
+      }, 60000),
+      agotar: setTimeout(() => {
+        setBuscandoAgotado(true);
+      }, 120000),
+    };
+    clearInterval(contadorBusquedaRef.current);
+    contadorBusquedaRef.current = setInterval(() => {
+      setTiempoBusqueda(prev => { if (prev <= 1) { clearInterval(contadorBusquedaRef.current); return 0; } return prev - 1; });
+    }, 1000);
+  };
   const subirTarifa = () => setTarifa(t => t + 1000);
   const bajarTarifa = () => setTarifa(t => Math.max(TARIFA_MINIMA, t - 1000));
 
@@ -492,11 +519,29 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
         tipo, origen, destino, estado: 'esperando',
         tarifa: `$${tarifa.toLocaleString()}`, tarifaValor: tarifa,
         fechaSolicitud: new Date().toISOString(),
+        radioBusqueda: 3,
       });
       setViajeId(docRef.id);
       setContraofertas([]);
       contaofertasIdsRef.current.clear();
+      setBuscandoAgotado(false);
+      setTiempoBusqueda(120);
       setPantalla('esperando');
+
+      // Temporizadores de radio: al 1 min amplía a 7km, a los 2 min marca agotado
+      radioRef.current = {
+        ampliar: setTimeout(() => {
+          updateDoc(doc(db, 'viajes', docRef.id), { radioBusqueda: 7 }).catch(() => {});
+        }, 60000),
+        agotar: setTimeout(() => {
+          setBuscandoAgotado(true);
+        }, 120000),
+      };
+      // Contador visible (cuenta regresiva de 4:00 a 0:00)
+      clearInterval(contadorBusquedaRef.current);
+      contadorBusquedaRef.current = setInterval(() => {
+        setTiempoBusqueda(prev => { if (prev <= 1) { clearInterval(contadorBusquedaRef.current); return 0; } return prev - 1; });
+      }, 1000);
     } catch (err) { setError('Error al solicitar viaje. Intenta de nuevo.'); }
     setCargando(false);
   };
@@ -626,10 +671,24 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
       <div style={{ backgroundColor: '#141416', minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
         {mostrarCancelacion && <ModalCancelacion razones={RAZONES_CANCELACION_PASAJERO} onConfirmar={cancelarViaje} onCerrar={() => setMostrarCancelacion(false)} />}
 
-        <div style={{ fontSize: '80px', marginBottom: '24px' }}>{tipo === 'Taxi' ? '🚗' : '🏍️'}</div>
-        <h2 style={{ color: '#FFFFFF', fontSize: '22px', margin: '0 0 8px', textAlign: 'center' }}>Buscando conductor...</h2>
+        <div style={{ fontSize: '80px', marginBottom: '24px' }}>{buscandoAgotado ? '😕' : (tipo === 'Taxi' ? '🚗' : '🏍️')}</div>
+        <h2 style={{ color: '#FFFFFF', fontSize: '22px', margin: '0 0 8px', textAlign: 'center' }}>{buscandoAgotado ? 'No encontramos conductor' : 'Buscando conductor...'}</h2>
         <p style={{ color: '#555', fontSize: '14px', margin: '0 0 4px', textAlign: 'center' }}>{origen} → {destino}</p>
-        <p style={{ color: '#2ECC71', fontSize: '20px', fontWeight: '900', margin: '0 0 24px', textAlign: 'center' }}>Tu oferta: ${tarifa.toLocaleString()}</p>
+        {!buscandoAgotado && <p style={{ color: '#2ECC71', fontSize: '20px', fontWeight: '900', margin: '0 0 16px', textAlign: 'center' }}>Tu oferta: ${tarifa.toLocaleString()}</p>}
+        {!buscandoAgotado && (
+          <div style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px' }}>
+            <div style={{ flex: 1, height: '8px', background: '#2A2A2E', borderRadius: '4px', overflow: 'hidden' }}>
+              <div style={{ height: '100%', width: `${(tiempoBusqueda / 120) * 100}%`, background: tiempoBusqueda > 60 ? '#2ECC71' : tiempoBusqueda > 30 ? '#FFCF4D' : '#FF4444', borderRadius: '4px', transition: 'width 1s linear, background 0.5s' }} />
+            </div>
+            <span style={{ color: tiempoBusqueda > 60 ? '#2ECC71' : tiempoBusqueda > 30 ? '#FFCF4D' : '#FF4444', fontSize: '15px', fontWeight: '900', fontVariantNumeric: 'tabular-nums', minWidth: '42px', textAlign: 'right' }}>{Math.floor(tiempoBusqueda / 60)}:{String(tiempoBusqueda % 60).padStart(2, '0')}</span>
+          </div>
+        )}
+        {buscandoAgotado && (
+          <div style={{ width: '100%', marginBottom: '24px' }}>
+            <p style={{ color: '#AAAAAA', fontSize: '14px', margin: '0 0 16px', textAlign: 'center', lineHeight: '1.5' }}>No hay conductores disponibles cerca en este momento. Puedes seguir buscando o subir tu oferta.</p>
+            <button onClick={seguirBuscando} style={{ width: '100%', padding: '18px', background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)', border: 'none', borderRadius: '16px', color: '#141416', fontSize: '17px', fontWeight: '900', cursor: 'pointer' }}>🔄 Seguir buscando</button>
+          </div>
+        )}
 
         {/* Contraofertas múltiples */}
         {contraofertas.length > 0 && (
