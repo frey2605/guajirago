@@ -36,7 +36,7 @@ function ModalFavorito({ onGuardar, onCerrar }) {
     <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', zIndex: 999, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
       <div style={{ background: '#1A1A1E', borderRadius: '24px 24px 0 0', padding: '28px 24px', width: '100%', maxWidth: '480px' }}>
         <p style={{ color: '#FFFFFF', fontSize: '18px', fontWeight: '900', margin: '0 0 20px', textAlign: 'center' }}>Agregar lugar favorito</p>
-        <p style={{ color: '#555', fontSize: '12px', margin: '0 0 10px', letterSpacing: '1px' }}>ÍCONO</p>
+        <p style={{ color: '#AAAAAA', fontSize: '12px', margin: '0 0 10px', letterSpacing: '1px' }}>ÍCONO</p>
         <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', flexWrap: 'wrap' }}>
           {ICONOS_FAVORITOS.map(i => (
             <div key={i} onClick={() => setIcono(i)} style={{ width: '44px', height: '44px', borderRadius: '12px', background: icono === i ? 'linear-gradient(135deg, #FFCF4D, #FF7A2F)' : '#141416', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '22px', cursor: 'pointer', border: icono === i ? 'none' : '1px solid #2A2A2E' }}>
@@ -44,13 +44,13 @@ function ModalFavorito({ onGuardar, onCerrar }) {
             </div>
           ))}
         </div>
-        <p style={{ color: '#555', fontSize: '12px', margin: '0 0 8px', letterSpacing: '1px' }}>NOMBRE (ej: Casa, Trabajo, Mamá)</p>
+        <p style={{ color: '#AAAAAA', fontSize: '12px', margin: '0 0 8px', letterSpacing: '1px' }}>NOMBRE (ej: Casa, Trabajo, Mamá)</p>
         <input value={nombre} onChange={e => setNombre(e.target.value)} placeholder="¿Cómo lo llamas?" style={{ width: '100%', padding: '14px 16px', background: '#141416', border: '1px solid #2A2A2E', borderRadius: '14px', color: '#FFFFFF', fontSize: '16px', outline: 'none', marginBottom: '12px', boxSizing: 'border-box' }} />
-        <p style={{ color: '#555', fontSize: '12px', margin: '0 0 8px', letterSpacing: '1px' }}>DIRECCIÓN</p>
+        <p style={{ color: '#AAAAAA', fontSize: '12px', margin: '0 0 8px', letterSpacing: '1px' }}>DIRECCIÓN</p>
         <input ref={inputDireccionRef} value={direccion} onChange={e => setDireccion(e.target.value)} placeholder="Escribe la dirección o lugar" style={{ width: '100%', padding: '14px 16px', background: '#141416', border: '1px solid #2A2A2E', borderRadius: '14px', color: '#FFFFFF', fontSize: '16px', outline: 'none', marginBottom: '20px', boxSizing: 'border-box' }} />
         <div style={{ display: 'flex', gap: '12px' }}>
-          <button onClick={onCerrar} style={{ flex: 1, padding: '14px', background: '#141416', border: '1px solid #2A2A2E', borderRadius: '14px', color: '#555', fontSize: '14px', cursor: 'pointer' }}>Cancelar</button>
-          <button onClick={() => nombre && direccion && onGuardar({ nombre, direccion, icono })} style={{ flex: 2, padding: '14px', background: nombre && direccion ? 'linear-gradient(135deg, #FFCF4D, #FF7A2F)' : '#2A2A2E', border: 'none', borderRadius: '14px', color: nombre && direccion ? '#141416' : '#555', fontSize: '14px', fontWeight: '900', cursor: nombre && direccion ? 'pointer' : 'default' }}>Guardar</button>
+          <button onClick={onCerrar} style={{ flex: 1, padding: '14px', background: '#141416', border: '1px solid #2A2A2E', borderRadius: '14px', color: '#AAAAAA', fontSize: '14px', cursor: 'pointer' }}>Cancelar</button>
+          <button onClick={() => nombre && direccion && onGuardar({ nombre, direccion, icono })} style={{ flex: 2, padding: '14px', background: nombre && direccion ? 'linear-gradient(135deg, #FFCF4D, #FF7A2F)' : '#2A2A2E', border: 'none', borderRadius: '14px', color: nombre && direccion ? '#141416' : '#AAAAAA', fontSize: '14px', fontWeight: '900', cursor: nombre && direccion ? 'pointer' : 'default' }}>Guardar</button>
         </div>
       </div>
     </div>
@@ -86,11 +86,11 @@ function Historial({ onVolver }) {
         <h2 style={{ color: '#FFFFFF', margin: '0', fontSize: '20px', fontWeight: '900' }}>Mis viajes</h2>
       </div>
       <div style={{ padding: '20px' }}>
-        {cargando && <p style={{ color: '#555', textAlign: 'center', marginTop: '40px' }}>Cargando...</p>}
+        {cargando && <p style={{ color: '#AAAAAA', textAlign: 'center', marginTop: '40px' }}>Cargando...</p>}
         {!cargando && viajes.length === 0 && (
           <div style={{ textAlign: 'center', marginTop: '60px' }}>
             <p style={{ fontSize: '60px', margin: '0 0 16px' }}>🚗</p>
-            <p style={{ color: '#555', fontSize: '15px' }}>Aún no tienes viajes</p>
+            <p style={{ color: '#AAAAAA', fontSize: '15px' }}>Aún no tienes viajes</p>
           </div>
         )}
         {viajes.map((v) => {
@@ -103,7 +103,7 @@ function Historial({ onVolver }) {
                   <span style={{ fontSize: '28px' }}>{v.tipo === 'Taxi' ? '🚗' : '🏍️'}</span>
                   <div>
                     <p style={{ color: '#FFFFFF', fontWeight: '900', fontSize: '15px', margin: '0' }}>{v.tipo}</p>
-                    <p style={{ color: '#555', fontSize: '12px', margin: '3px 0 0' }}>{fecha}</p>
+                    <p style={{ color: '#AAAAAA', fontSize: '12px', margin: '3px 0 0' }}>{fecha}</p>
                   </div>
                 </div>
                 <div style={{ textAlign: 'right' }}>
@@ -121,8 +121,8 @@ function Historial({ onVolver }) {
                   <p style={{ color: '#FFFFFF', fontSize: '13px', margin: '0' }}>{v.destino}</p>
                 </div>
               </div>
-              {v.conductorNombre && <p style={{ color: '#555', fontSize: '12px', margin: '10px 0 0' }}>Conductor: <span style={{ color: '#FFCF4D' }}>{v.conductorNombre}</span></p>}
-              {cancelado && v.razonCancelacion && <p style={{ color: '#555', fontSize: '12px', margin: '4px 0 0' }}>Razón: {v.razonCancelacion}</p>}
+              {v.conductorNombre && <p style={{ color: '#AAAAAA', fontSize: '12px', margin: '10px 0 0' }}>Conductor: <span style={{ color: '#FFCF4D' }}>{v.conductorNombre}</span></p>}
+              {cancelado && v.razonCancelacion && <p style={{ color: '#AAAAAA', fontSize: '12px', margin: '4px 0 0' }}>Razón: {v.razonCancelacion}</p>}
             </div>
           );
         })}
@@ -188,21 +188,17 @@ function Home({ nombre, onCerrarSesion, onVolver }) {
     <div style={{ backgroundColor: '#141416', minHeight: '100vh', fontFamily: 'Arial, sans-serif' }}>
       {mostrarModalFavorito && <ModalFavorito onGuardar={agregarFavorito} onCerrar={() => setMostrarModalFavorito(false)} />}
 
-      <div style={{ background: 'linear-gradient(135deg, #1A1A1E, #2A2A2E)', padding: '24px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-        <div>
-          <p style={{ color: '#555', fontSize: '12px', margin: '0', letterSpacing: '2px' }}>UBICACIÓN</p>
+      <div style={{ background: 'linear-gradient(135deg, #1A1A1E, #2A2A2E)', padding: '24px 20px', position: 'relative' }}>
+        <div onClick={onVolver} style={{ position: 'absolute', top: '18px', left: '20px', display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(255,255,255,0.12)', borderRadius: '12px', color: '#FFFFFF', fontSize: '14px', fontWeight: '500', padding: '8px 16px', cursor: 'pointer', zIndex: 5 }}><span style={{ fontSize: '20px', fontWeight: '900', lineHeight: '1' }}>‹</span> Volver</div>
+        <div style={{ marginTop: '48px' }}>
+          <p style={{ color: '#AAAAAA', fontSize: '12px', margin: '0', letterSpacing: '2px' }}>UBICACIÓN</p>
           <p style={{ color: '#FFFFFF', fontSize: '16px', margin: '4px 0 0', fontWeight: 'bold' }}>📍 Riohacha, La Guajira</p>
           <h2 style={{ color: '#FFFFFF', fontSize: '22px', margin: '12px 0 0', fontWeight: '900' }}>Hola, {nombre || 'pasajero'} 👋</h2>
-          <p style={{ color: '#555', fontSize: '14px', margin: '4px 0 0' }}>¿A dónde vamos hoy?</p>
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'flex-end' }}>
-          <button onClick={cerrarSesion} style={{ background: '#141416', border: 'none', borderRadius: '12px', padding: '10px 16px', color: '#FF4444', fontSize: '13px', fontWeight: 'bold', cursor: 'pointer' }}>🚪 Salir</button>
-          <button onClick={onVolver} style={{ background: '#141416', border: '1px solid #FF7A2F', borderRadius: '12px', padding: '10px 16px', color: '#FF7A2F', fontSize: '13px', fontWeight: 'bold', cursor: 'pointer' }}>← Volver</button>
         </div>
       </div>
 
       <div style={{ padding: '20px' }}>
-        <p style={{ color: '#555', fontSize: '11px', letterSpacing: '3px', margin: '0 0 12px' }}>¿QUÉ NECESITAS?</p>
+        <p style={{ color: '#AAAAAA', fontSize: '11px', letterSpacing: '3px', margin: '0 0 12px' }}>¿QUÉ NECESITAS?</p>
         <div style={{ display: 'flex', gap: '12px', marginBottom: '28px' }}>
           <div onClick={() => irASolicitar('Taxi')} style={{ flex: 1, background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F)', borderRadius: '20px', padding: '20px 16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px', cursor: 'pointer', boxShadow: '0 4px 20px rgba(255,122,47,0.3)' }}>
             <span style={{ fontSize: '44px' }}>🚗</span>
@@ -216,48 +212,11 @@ function Home({ nombre, onCerrarSesion, onVolver }) {
           </div>
         </div>
 
-        <p style={{ color: '#555', fontSize: '11px', letterSpacing: '3px', margin: '0 0 12px' }}>LUGARES FAVORITOS</p>
-        <div style={{ background: '#1A1A1E', borderRadius: '20px', marginBottom: '24px', overflow: 'hidden', border: '1px solid #2A2A2E' }}>
-          {favoritos.map((f, i) => (
-            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '16px', borderBottom: '1px solid #2A2A2E' }}>
-              <div onClick={() => irASolicitar('Taxi', f.direccion)} style={{ display: 'flex', alignItems: 'center', gap: '14px', flex: 1, cursor: 'pointer' }}>
-                <span style={{ fontSize: '26px' }}>{f.icono}</span>
-                <div>
-                  <p style={{ color: '#FFFFFF', fontSize: '16px', fontWeight: '900', margin: '0' }}>{f.nombre}</p>
-                  <p style={{ color: '#555', fontSize: '12px', margin: '2px 0 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '220px' }}>{f.direccion}</p>
-                </div>
-              </div>
-              <button onClick={() => eliminarFavorito(i)} style={{ background: 'none', border: 'none', color: '#555', fontSize: '20px', cursor: 'pointer', padding: '4px 8px' }}>✕</button>
-            </div>
-          ))}
-          <div onClick={() => setMostrarModalFavorito(true)} style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '16px', cursor: 'pointer' }}>
-            <span style={{ fontSize: '26px', color: '#FF7A2F' }}>＋</span>
-            <p style={{ color: '#FF7A2F', fontSize: '16px', fontWeight: '900', margin: '0' }}>Agregar lugar</p>
-          </div>
-        </div>
+        
 
-        {recientes.length > 0 && (
-          <>
-            <p style={{ color: '#555', fontSize: '11px', letterSpacing: '3px', margin: '0 0 12px' }}>RECIENTES</p>
-            <div style={{ background: '#1A1A1E', borderRadius: '20px', marginBottom: '24px', overflow: 'hidden', border: '1px solid #2A2A2E' }}>
-              {recientes.map((r, i) => (
-                <div key={i} onClick={() => irASolicitar('Taxi', r)} style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '14px 16px', borderBottom: i < recientes.length - 1 ? '1px solid #2A2A2E' : 'none', cursor: 'pointer' }}>
-                  <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: '#141416', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', flexShrink: 0 }}>🕐</div>
-                  <p style={{ color: '#FFFFFF', fontSize: '14px', margin: '0', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r}</p>
-                  <span style={{ color: '#555', fontSize: '20px' }}>›</span>
-                </div>
-              ))}
-            </div>
-          </>
-        )}
+        
 
-        <div onClick={() => setPantalla('historial')} style={{ background: '#1A1A1E', borderRadius: '20px', padding: '20px', display: 'flex', alignItems: 'center', gap: '16px', border: '1px solid #2A2A2E', cursor: 'pointer' }}>
-          <span style={{ fontSize: '36px' }}>🕐</span>
-          <div>
-            <p style={{ color: '#FFFFFF', fontWeight: '900', fontSize: '16px', margin: '0' }}>Mis viajes</p>
-            <p style={{ color: '#555', fontSize: '12px', margin: '4px 0 0' }}>Ver historial de viajes</p>
-          </div>
-        </div>
+        
       </div>
     </div>
   );
