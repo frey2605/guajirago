@@ -221,6 +221,8 @@ function MapaPasajero({ ubicacionPasajero, ubicacionConductor, tipo, onTiempo })
 function Solicitar({ tipo, onVolver, destinoInicial }) {
   const [origen, setOrigen] = useState('');
   const [destino, setDestino] = useState(destinoInicial || '');
+  const [favoritos, setFavoritos] = useState([]);
+  const [avisoLimite, setAvisoLimite] = useState(false);
   const [pantalla, setPantalla] = useState('solicitar');
   const [cargando, setCargando] = useState(false);
   const [viajeId, setViajeId] = useState(null);
@@ -248,6 +250,20 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
   const contaofertasIdsRef = useRef(new Set()); // IDs ya vistos para no duplicar
 
   useEffect(() => { pantallaRef.current = pantalla; }, [pantalla]);
+
+  useEffect(() => {
+    const cargarFavoritos = async () => {
+      try {
+        const user = auth.currentUser;
+        if (!user) return;
+        const snap = await getDoc(doc(db, 'usuarios', user.uid));
+        if (snap.exists() && Array.isArray(snap.data().favoritos)) {
+          setFavoritos(snap.data().favoritos);
+        }
+      } catch (e) {}
+    };
+    cargarFavoritos();
+  }, []);
 
   useEffect(() => {
     if (!navigator.geolocation) return;
@@ -377,7 +393,29 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
     onVolver();
   };
 
-  const subirTarifa = () => setTarifa(t => t + 1000);
+  const guardarFavorito = async () => {
+    if (!destino) return;
+    const user = auth.currentUser;
+    if (!user) return;
+    if (favoritos.length >= 3) { setAvisoLimite(true); return; }
+    if (favoritos.find(f => f.direccion === destino)) { setError('Ese lugar ya está guardado'); return; }
+    const nuevo = { nombre: destino.length > 18 ? destino.slice(0, 18) + '…' : destino, direccion: destino, icono: '⭐' };
+    const nuevos = [...favoritos, nuevo];
+    try {
+      await updateDoc(doc(db, 'usuarios', user.uid), { favoritos: nuevos });
+      setFavoritos(nuevos);
+    } catch (e) { setError('No se pudo guardar el lugar'); }
+  };
+
+  const borrarFavorito = async (i) => {
+    const user = auth.currentUser;
+    if (!user) return;
+    const nuevos = favoritos.filter((_, idx) => idx !== i);
+    try {
+      await updateDoc(doc(db, 'usuarios', user.uid), { favoritos: nuevos });
+      setFavoritos(nuevos);
+    } catch (e) {}
+  };
 
   const subirNuevaTarifa = () => {
     const base = nuevaTarifa !== null ? nuevaTarifa : tarifa;
@@ -406,6 +444,7 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
       setOfertaModificada(false);
     } catch(e) {}
   };
+  const subirTarifa = () => setTarifa(t => t + 1000);
   const bajarTarifa = () => setTarifa(t => Math.max(TARIFA_MINIMA, t - 1000));
 
   const solicitarViaje = async () => {
@@ -623,6 +662,17 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
 
   return (
     <div style={{ backgroundColor: '#141416', minHeight: '100vh', fontFamily: 'Arial, sans-serif' }}>
+      {avisoLimite && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
+          <div style={{ background: '#1A1A1E', borderRadius: '24px', padding: '32px 24px', width: '100%', maxWidth: '380px', border: '1px solid #FF7A2F', textAlign: 'center', position: 'relative' }}>
+            <span onClick={() => setAvisoLimite(false)} style={{ position: 'absolute', top: '16px', right: '20px', color: '#AAAAAA', fontSize: '26px', cursor: 'pointer', lineHeight: '1' }}>✕</span>
+            <div style={{ fontSize: '54px', marginBottom: '12px' }}>📍</div>
+            <h2 style={{ color: '#FFFFFF', fontSize: '20px', fontWeight: '900', margin: '0 0 10px' }}>Llegaste al límite</h2>
+            <p style={{ color: '#AAAAAA', fontSize: '14px', margin: '0 0 24px', lineHeight: '1.5' }}>Solo puedes guardar 3 lugares. Borra uno para poder agregar otro.</p>
+            <button onClick={() => setAvisoLimite(false)} style={{ width: '100%', padding: '16px', background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F)', border: 'none', borderRadius: '14px', color: '#141416', fontSize: '16px', fontWeight: '900', cursor: 'pointer' }}>Entendido</button>
+          </div>
+        </div>
+      )}
       <div style={{ background: 'linear-gradient(135deg, #1A1A1E, #2A2A2E)', padding: '24px 20px', display: 'flex', alignItems: 'center', gap: '16px' }}>
         <div onClick={onVolver} style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(255,255,255,0.12)', borderRadius: '12px', color: '#FFFFFF', fontSize: '14px', fontWeight: '500', padding: '8px 16px', cursor: 'pointer' }}><span style={{ fontSize: '22px', fontWeight: '900', lineHeight: '1', position: 'relative', top: '-1px' }}>‹</span> Volver</div>
         <h2 style={{ color: '#FFFFFF', margin: '0', fontSize: '20px' }}>Solicitar {tipo}</h2>
@@ -630,6 +680,31 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
       <div style={{ padding: '24px 20px' }}>
         <AutocompleteInput value={origen} onChange={setOrigen} placeholder="¿Dónde estás? (Riohacha)" icon="origen" />
         <AutocompleteInput value={destino} onChange={setDestino} placeholder="¿A dónde vas? (Riohacha)" icon="destino" />
+
+        {destino && !favoritos.find(f => f.direccion === destino) && (
+          <div onClick={guardarFavorito} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F)', borderRadius: '16px', padding: '16px', marginBottom: '16px', cursor: 'pointer', boxShadow: '0 4px 16px rgba(255,122,47,0.4)' }}>
+            <span style={{ fontSize: '22px' }}>⭐</span>
+            <span style={{ color: '#141416', fontSize: '16px', fontWeight: '900' }}>Guardar este lugar</span>
+          </div>
+        )}
+
+        {favoritos.length > 0 && (
+          <div style={{ marginBottom: '20px' }}>
+            <p style={{ color: '#AAAAAA', fontSize: '11px', letterSpacing: '2px', margin: '0 0 10px' }}>MIS LUGARES</p>
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              {favoritos.map((f, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#1A1A1E', border: '1px solid #2A2A2E', borderRadius: '14px', padding: '10px 14px' }}>
+                  <div onClick={() => setDestino(f.direccion)} style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                    <span style={{ fontSize: '18px' }}>{f.icono}</span>
+                    <span style={{ color: '#FFFFFF', fontSize: '14px', fontWeight: 'bold' }}>{f.nombre}</span>
+                  </div>
+                  <span onClick={() => borrarFavorito(i)} style={{ color: '#FF4444', fontSize: '18px', cursor: 'pointer', fontWeight: 'bold', paddingLeft: '4px' }}>✕</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div style={{ background: '#1A1A1E', borderRadius: '16px', padding: '20px', marginBottom: '24px' }}>
           <p style={{ color: '#555', fontSize: '11px', margin: '0 0 12px', letterSpacing: '2px' }}>TU OFERTA</p>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
