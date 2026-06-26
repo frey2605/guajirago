@@ -242,6 +242,7 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
   const [mostrarCancelacion, setMostrarCancelacion] = useState(false);
   const [contador, setContador] = useState(240);
   const [buscandoAgotado, setBuscandoAgotado] = useState(false);
+  const [confirmacionPendiente, setConfirmacionPendiente] = useState(null);
   const [tiempoBusqueda, setTiempoBusqueda] = useState(240);
   const contadorBusquedaRef = useRef(null);
   const radioRef = useRef(null);
@@ -299,6 +300,19 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
           setPantalla('cancelado_conductor');
         }
         if (data.conductorEnPunto && pantallaRef.current === 'fase1') setViaje(data);
+        // Respaldo: detectar si un conductor aceptó (para Safari que tarda en el listener)
+        if (data.estado === 'confirmando' && data.conductorId && pantallaRef.current === 'esperando' && !celebrando) {
+          if (radioRef.current) { clearTimeout(radioRef.current.ampliar); clearTimeout(radioRef.current.agotar); }
+          clearInterval(contadorBusquedaRef.current);
+          setConfirmacionPendiente(prev => prev || {
+            conductorId: data.conductorId,
+            conductorNombre: data.conductorNombre,
+            conductorPlaca: data.conductorPlaca,
+            conductorVehiculo: data.conductorVehiculo,
+            conductorTelefono: data.conductorTelefono,
+            tarifa: data.tarifa,
+          });
+        }
       } catch (e) {}
     }, 5000);
 
@@ -337,9 +351,19 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
         return;
       }
 
-      // El conductor aceptó el viaje directo: el pasajero confirma pasándolo a 'aceptado'
+      // El conductor aceptó el viaje directo: mostrar confirmación al pasajero (no aceptar automático)
       if (data.estado === 'confirmando' && data.conductorId && pantallaRef.current === 'esperando' && !celebrando) {
-        updateDoc(doc(db, 'viajes', viajeId), { estado: 'aceptado' }).catch(() => {});
+        if (radioRef.current) { clearTimeout(radioRef.current.ampliar); clearTimeout(radioRef.current.agotar); }
+        clearInterval(contadorBusquedaRef.current);
+        alertarNuevoViaje();
+        setConfirmacionPendiente({
+          conductorId: data.conductorId,
+          conductorNombre: data.conductorNombre,
+          conductorPlaca: data.conductorPlaca,
+          conductorVehiculo: data.conductorVehiculo,
+          conductorTelefono: data.conductorTelefono,
+          tarifa: data.tarifa,
+        });
         return;
       }
 
@@ -550,7 +574,36 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
     } catch (err) { setError('Error al solicitar viaje. Intenta de nuevo.'); }
     setCargando(false);
   };
+const confirmarViaje = async () => {
+    if (!viajeId || !confirmacionPendiente) return;
+    const datos = confirmacionPendiente;
+    setConfirmacionPendiente(null);
+    setCelebrando(true);
+    try {
+      await updateDoc(doc(db, 'viajes', viajeId), { estado: 'aceptado' });
+    } catch (e) {}
+    setTimeout(() => {
+      setCelebrando(false);
+      setPantalla('fase1');
+      if (datos.conductorId) escucharConductor(datos.conductorId);
+    }, 3000);
+  };
 
+  const rechazarConfirmacion = async () => {
+    setConfirmacionPendiente(null);
+    if (viajeId) {
+      // Devolver el viaje a 'esperando' y liberar al conductor
+      updateDoc(doc(db, 'viajes', viajeId), {
+        estado: 'esperando',
+        conductorId: null,
+        conductorNombre: null,
+        conductorPlaca: null,
+        conductorVehiculo: null,
+        conductorTelefono: null,
+        nuevaOferta: new Date().toISOString(),
+      }).catch(() => {});
+    }
+  };
   const aceptarContraoferta = async (oferta) => {
     if (!viajeId) return;
     setContraofertas([]);
@@ -589,6 +642,27 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
 
   if (mostrarCalificacion) return <Calificacion tipo={tipo} viajeId={viajeId} nombreCalificado={viaje?.conductorNombre} quienCalifica="pasajero" onFinalizar={onVolver} />;
   if (celebrando) return <Celebracion />;
+
+  if (confirmacionPendiente) {
+    return (
+      <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.92)', zIndex: 9998, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
+        <div style={{ fontSize: '80px', marginBottom: '16px', animation: 'pulso 1s infinite alternate' }}>🚗</div>
+        <div style={{ background: 'linear-gradient(135deg, #1A1A1E, #2A2A2E)', borderRadius: '28px', padding: '32px 24px', width: '100%', maxWidth: '440px', border: '3px solid #2ECC71', textAlign: 'center' }}>
+          <p style={{ color: '#2ECC71', fontSize: '13px', margin: '0 0 12px', letterSpacing: '2px', fontWeight: 'bold' }}>¡UN CONDUCTOR ACEPTÓ!</p>
+          <h2 style={{ color: '#FFFFFF', fontSize: '24px', fontWeight: '900', margin: '0 0 12px' }}>{confirmacionPendiente.conductorNombre || 'Conductor'}</h2>
+          {confirmacionPendiente.conductorPlaca && <p style={{ color: '#FFCF4D', fontSize: '18px', fontWeight: '900', margin: '0 0 4px' }}>🚘 {confirmacionPendiente.conductorPlaca}</p>}
+          {confirmacionPendiente.conductorVehiculo && <p style={{ color: '#AAAAAA', fontSize: '14px', margin: '0 0 12px' }}>{confirmacionPendiente.conductorVehiculo}</p>}
+          <p style={{ color: '#2ECC71', fontSize: '32px', fontWeight: '900', margin: '8px 0 0' }}>{confirmacionPendiente.tarifa}</p>
+        </div>
+        <p style={{ color: '#FFFFFF', fontSize: '16px', margin: '24px 0 16px', textAlign: 'center', fontWeight: 'bold' }}>¿Confirmas este viaje?</p>
+        <div style={{ display: 'flex', gap: '12px', width: '100%', maxWidth: '440px' }}>
+          <button onClick={rechazarConfirmacion} style={{ flex: 1, padding: '16px', background: '#141416', border: '1px solid #FF4444', borderRadius: '16px', color: '#FF4444', fontSize: '16px', fontWeight: 'bold', cursor: 'pointer' }}>❌ No</button>
+          <button onClick={confirmarViaje} style={{ flex: 2, padding: '16px', background: 'linear-gradient(135deg, #2ECC71, #27AE60)', border: 'none', borderRadius: '16px', color: '#FFFFFF', fontSize: '17px', fontWeight: '900', cursor: 'pointer' }}>✅ Sí, confirmar</button>
+        </div>
+        <style>{`@keyframes pulso { from { transform: scale(1); } to { transform: scale(1.12); } }`}</style>
+      </div>
+    );
+  }
 
   if (pantalla === 'cancelado_conductor') {
     return (
