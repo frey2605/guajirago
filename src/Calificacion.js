@@ -37,7 +37,7 @@ function Calificacion({ tipo, viajeId, nombreCalificado, quienCalifica, onFinali
       <h2 style={{ color: '#FFFFFF', fontSize: '24px', margin: '0 0 8px', textAlign: 'center' }}>
         {quienCalifica === 'pasajero' ? '¡Llegaste a tu destino!' : '¡Viaje completado!'}
       </h2>
-      <p style={{ color: '#555', fontSize: '14px', margin: '0 0 32px', textAlign: 'center' }}>
+      <p style={{ color: '#AAAAAA', fontSize: '14px', margin: '0 0 32px', textAlign: 'center' }}>
         ¿Cómo fue tu experiencia con <span style={{ color: '#FFCF4D', fontWeight: 'bold' }}>{nombreCalificado || 'el usuario'}</span>?
       </p>
       <div style={{ display: 'flex', gap: '12px', marginBottom: '32px' }}>
@@ -48,10 +48,10 @@ function Calificacion({ tipo, viajeId, nombreCalificado, quienCalifica, onFinali
       <textarea value={comentario} onChange={e => setComentario(e.target.value)} placeholder="Deja un comentario (opcional)"
         style={{ width: '100%', padding: '16px', background: '#1A1A1E', border: 'none', borderRadius: '16px', color: '#FFFFFF', fontSize: '14px', height: '100px', resize: 'none', outline: 'none', marginBottom: '24px', boxSizing: 'border-box' }}
       />
-      <button onClick={enviar} style={{ width: '100%', padding: '18px', background: estrellas > 0 ? 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)' : '#2A2A2E', border: 'none', borderRadius: '16px', color: estrellas > 0 ? '#141416' : '#555', fontSize: '18px', fontWeight: '900', cursor: estrellas > 0 ? 'pointer' : 'default', transition: 'all 0.3s' }}>
+      <button onClick={enviar} style={{ width: '100%', padding: '18px', background: estrellas > 0 ? 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)' : '#2A2A2E', border: 'none', borderRadius: '16px', color: estrellas > 0 ? '#141416' : '#AAAAAA', fontSize: '18px', fontWeight: '900', cursor: estrellas > 0 ? 'pointer' : 'default', transition: 'all 0.3s' }}>
         {enviando ? 'Enviando...' : estrellas > 0 ? 'Enviar calificación' : 'Selecciona una estrella'}
       </button>
-      <button onClick={onFinalizar} style={{ background: 'none', border: 'none', color: '#555', fontSize: '13px', cursor: 'pointer', marginTop: '16px' }}>Omitir</button>
+      <button onClick={onFinalizar} style={{ background: 'none', border: 'none', color: '#AAAAAA', fontSize: '13px', cursor: 'pointer', marginTop: '16px' }}>Omitir</button>
     </div>
   );
 }

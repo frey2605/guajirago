@@ -102,7 +102,7 @@ function Creditos({ onVolver }) {
         </div>
 
         {/* Recargar con código */}
-        <p style={{ color: '#555', fontSize: '11px', letterSpacing: '3px', margin: '0 0 12px' }}>RECARGAR CON CÓDIGO</p>
+        <p style={{ color: '#AAAAAA', fontSize: '11px', letterSpacing: '3px', margin: '0 0 12px' }}>RECARGAR CON CÓDIGO</p>
         <div style={{ background: '#1A1A1E', borderRadius: '16px', padding: '16px', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '12px' }}>
           <span style={{ fontSize: '20px' }}>🎟️</span>
           <input
@@ -119,7 +119,7 @@ function Creditos({ onVolver }) {
         <button
           onClick={recargar}
           disabled={cargando}
-          style={{ width: '100%', padding: '18px', background: cargando ? '#2A2A2E' : 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)', border: 'none', borderRadius: '16px', color: cargando ? '#555' : '#141416', fontSize: '18px', fontWeight: '900', cursor: 'pointer', marginBottom: '20px' }}
+          style={{ width: '100%', padding: '18px', background: cargando ? '#2A2A2E' : 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)', border: 'none', borderRadius: '16px', color: cargando ? '#AAAAAA' : '#141416', fontSize: '18px', fontWeight: '900', cursor: 'pointer', marginBottom: '20px' }}
         >
           {cargando ? 'Recargando...' : 'Recargar créditos'}
         </button>
@@ -127,7 +127,7 @@ function Creditos({ onVolver }) {
         {/* Información */}
         <div style={{ background: '#1A1A1E', borderRadius: '16px', padding: '16px', border: '1px solid #2A2A2E' }}>
           <p style={{ color: '#FFFFFF', fontSize: '14px', fontWeight: 'bold', margin: '0 0 8px' }}>💡 ¿Cómo recargar?</p>
-          <p style={{ color: '#555', fontSize: '13px', margin: '0', lineHeight: '1.5' }}>
+          <p style={{ color: '#AAAAAA', fontSize: '13px', margin: '0', lineHeight: '1.5' }}>
             Realiza tu pago por Nequi o Daviplata, recibe tu código de recarga y escríbelo aquí para sumar tus créditos.
           </p>
         </div>

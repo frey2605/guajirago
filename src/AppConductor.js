@@ -706,7 +706,7 @@ const cargarSaldo = useCallback(async (uid) => {
     return () => unsub();
   }, [viajeActual]);
 
-  if (enLlamada || llamadaEntrante) return <Llamada viajeId={viajeActual?.id} miRol="conductor" nombreOtro={viajeActual?.pasajeroEmail?.split('@')[0] || 'Pasajero'} onCerrar={() => { setEnLlamada(false); setLlamadaEntrante(false); }} />;
+  if (enLlamada || llamadaEntrante) return <Llamada viajeId={viajeActual?.id} miRol="conductor" nombreOtro={viajeActual?.pasajeroNombre || 'Pasajero'} onCerrar={() => { setEnLlamada(false); setLlamadaEntrante(false); }} />;
   if (datosCalificacion) return <Calificacion tipo={null} viajeId={datosCalificacion.viajeId} nombreCalificado={datosCalificacion.nombrePasajero} quienCalifica="conductor" onFinalizar={() => setDatosCalificacion(null)} />;
   if (verHistorial) return <HistorialConductor onVolver={() => setVerHistorial(false)} />;
   if (verCreditos) return <Creditos onVolver={() => setVerCreditos(false)} />;

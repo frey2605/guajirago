@@ -3,6 +3,7 @@ import Splash from './Splash';
 import Login from './Login';
 import Home from './Home';
 import AppConductor from './AppConductor';
+import MenuLateral from './MenuLateral';
 import { auth, db, storage } from './firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
@@ -18,11 +19,10 @@ function cargarLocal() {
   try { return JSON.parse(localStorage.getItem(STORAGE_KEY)); } catch (e) { return null; }
 }
 
-function PantallaModulos({ onSeleccionar, onVolver }) {
-  const [menuAbierto, setMenuAbierto] = React.useState(false);
+function PantallaModulos({ nombre, onSeleccionar, onVolver, onCerrarSesion }) {
   return (
     <div style={{ backgroundColor: '#141416', minHeight: '100vh', fontFamily: 'Arial, sans-serif', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px 24px', position: 'relative' }}>
-      <div onClick={() => setMenuAbierto(true)} style={{ position: 'absolute', top: '18px', left: '20px', display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(255,255,255,0.12)', borderRadius: '12px', color: '#FFFFFF', fontSize: '14px', fontWeight: '500', padding: '8px 16px', cursor: 'pointer', zIndex: 5 }}><span style={{ fontSize: '20px', lineHeight: '1' }}>☰</span> Menú</div>
+      <MenuLateral nombre={nombre} onCerrarSesion={onCerrarSesion} />
       <div onClick={onVolver} style={{ position: 'absolute', top: '18px', left: '120px', display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(255,255,255,0.12)', borderRadius: '12px', color: '#FFFFFF', fontSize: '14px', fontWeight: '500', padding: '8px 16px', cursor: 'pointer', zIndex: 5 }}><span style={{ fontSize: '20px', fontWeight: '900', lineHeight: '1' }}>‹</span> Volver</div>
       <h1 style={{ fontSize: '42px', color: '#FFFFFF', margin: '0', fontFamily: 'Arial Black, sans-serif', letterSpacing: '-1px', textAlign: 'center' }}>Guajira</h1>
       <h1 style={{ fontSize: '56px', background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', margin: '0 0 16px', fontFamily: 'Arial Black, sans-serif', letterSpacing: '-2px' }}>GO</h1>
@@ -43,18 +43,7 @@ function PantallaModulos({ onSeleccionar, onVolver }) {
           </div>
         </div>
       </div>
-      {menuAbierto && (
-        <div onClick={() => setMenuAbierto(false)} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)', zIndex: 50 }}>
-          <div onClick={(e) => e.stopPropagation()} style={{ position: 'absolute', top: 0, left: 0, bottom: 0, width: '80%', maxWidth: '320px', background: '#1A1A1E', padding: '24px 20px', boxShadow: '2px 0 20px rgba(0,0,0,0.5)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-              <h2 style={{ color: '#FFFFFF', fontSize: '20px', fontWeight: '900', margin: '0' }}>Menú</h2>
-              <span onClick={() => setMenuAbierto(false)} style={{ color: '#FFFFFF', fontSize: '24px', cursor: 'pointer' }}>✕</span>
-            </div>
-            <p style={{ color: '#AAAAAA', fontSize: '14px', margin: '0' }}>Aquí irán las opciones...</p>
-          </div>
-        </div>
-      )}
-    </div>
+      </div>
   );
 }
 
@@ -277,7 +266,7 @@ function App() {
 
   if (screen === 'splash') return <Splash onFinish={() => {}} />;
   if (screen === 'login') return <Login onEntrar={handleEntrar} />;
-  if (screen === 'modulos') return <PantallaModulos onSeleccionar={handleSeleccionarModulo} onVolver={() => setScreen('login')} />;
+  if (screen === 'modulos') return <PantallaModulos nombre={nombreUsuario} onSeleccionar={handleSeleccionarModulo} onVolver={() => setScreen('login')} onCerrarSesion={handleCerrarSesion} />;
   if (screen === 'rol') return <PantallaRol nombre={nombreUsuario} onSeleccionar={handleSeleccionarRol} onVolver={() => setScreen('modulos')} />;
   if (screen === 'datos_conductor') return <PantallaDatosConductor nombre={nombreUsuario} celular={telefonoUsuario} onGuardar={handleDatosConductor} onVolver={() => setScreen('rol')} />;
 
