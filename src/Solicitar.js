@@ -6,12 +6,13 @@ import Calificacion from './Calificacion';
 const centroRiohacha = { lat: 11.5444, lng: -72.9072 };
 const TARIFA_DIA = 8000;
 const TARIFA_NOCHE = 10000;
-function calcularTarifaMinima() {
+const TARIFA_MOTOTAXI = 3000;
+function calcularTarifaMinima(tipo) {
+  if (tipo === 'Mototaxi') return TARIFA_MOTOTAXI;
   const hora = new Date().getHours();
   // Noche: de 6 pm (18) a 6 am (6) → tarifa más alta
   return (hora >= 18 || hora < 6) ? TARIFA_NOCHE : TARIFA_DIA;
 }
-const TARIFA_MINIMA = calcularTarifaMinima();
 const BOUNDS_RIOHACHA = { north: 11.7, south: 11.3, east: -72.6, west: -73.0 };
 const DURACION_CONTRAOFERTA_MS = 20000; // 20 segundos
 
@@ -228,6 +229,7 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
   const [viajeId, setViajeId] = useState(null);
   const [viaje, setViaje] = useState(null);
   const [error, setError] = useState('');
+  const TARIFA_MINIMA = calcularTarifaMinima(tipo);
   const [tarifa, setTarifa] = useState(TARIFA_MINIMA);
   const [ubicacionPasajero, setUbicacionPasajero] = useState(centroRiohacha);
   const [ubicacionConductor, setUbicacionConductor] = useState(null);

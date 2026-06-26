@@ -152,7 +152,7 @@ function PantallaDatosConductor({ nombre, celular, onGuardar, onVolver, onCerrar
         fotoConductor: urlFotoConductor,
         fotoCedula: urlFotoCedula,
       }, { merge: true });
-      onGuardar(placa.toUpperCase(), vehiculo, telefono);
+      onGuardar(placa.toUpperCase(), vehiculo, telefono, tipoVehiculo);
     } catch (e) { setError('Error al guardar. Revisa tu conexión e intenta de nuevo'); }
     setCargando(false);
   };
@@ -288,6 +288,7 @@ function App() {
   const [telefonoUsuario, setTelefonoUsuario] = useState('');
   const [placaUsuario, setPlacaUsuario] = useState('');
   const [vehiculoUsuario, setVehiculoUsuario] = useState('');
+  const [tipoVehiculoUsuario, setTipoVehiculoUsuario] = useState('');
 
   useEffect(() => {
     const local = cargarLocal();
@@ -297,6 +298,7 @@ function App() {
       setTelefonoUsuario(local.telefono || local.celular || '');
       setPlacaUsuario(local.placa || '');
       setVehiculoUsuario(local.vehiculo || '');
+      setTipoVehiculoUsuario(local.tipoVehiculo || '');
       setTimeout(() => setScreen('modulos'), 2000);
       return;
     }
@@ -311,6 +313,7 @@ function App() {
             setTelefonoUsuario(datos.telefono || datos.celular || '');
             setPlacaUsuario(datos.placa || '');
             setVehiculoUsuario(datos.vehiculo || '');
+            setTipoVehiculoUsuario(datos.tipoVehiculo || '');
             setTipoUsuario(datos.tipo || '');
             guardarLocal(datos);
             setTimeout(() => setScreen('modulos'), 2000);
@@ -323,13 +326,22 @@ function App() {
     return () => unsub();
   }, []);
 
-  const handleEntrar = (tipo, nombre, celular, placa, vehiculo) => {
+  const handleEntrar = async (tipo, nombre, celular, placa, vehiculo) => {
     setNombreUsuario(nombre);
     setTelefonoUsuario(celular);
     setPlacaUsuario(placa);
     setVehiculoUsuario(vehiculo);
     setTipoUsuario(tipo);
-    guardarLocal({ tipo, nombre, celular, placa, vehiculo });
+    let tipoVeh = '';
+    try {
+      const user = auth.currentUser;
+      if (user) {
+        const snap = await getDoc(doc(db, 'usuarios', user.uid));
+        if (snap.exists()) tipoVeh = snap.data().tipoVehiculo || '';
+      }
+    } catch (e) {}
+    setTipoVehiculoUsuario(tipoVeh);
+    guardarLocal({ tipo, nombre, celular, placa, vehiculo, tipoVehiculo: tipoVeh });
     setScreen('modulos');
   };
 
@@ -353,11 +365,12 @@ function App() {
     }
   };
 
-  const handleDatosConductor = (placa, vehiculo, telefono) => {
+  const handleDatosConductor = (placa, vehiculo, telefono, tipoVehiculo) => {
     setPlacaUsuario(placa);
     setVehiculoUsuario(vehiculo);
     setTelefonoUsuario(telefono);
-    guardarLocal({ tipo: 'conductor', nombre: nombreUsuario, celular: telefono, placa, vehiculo });
+    setTipoVehiculoUsuario(tipoVehiculo || '');
+    guardarLocal({ tipo: 'conductor', nombre: nombreUsuario, celular: telefono, placa, vehiculo, tipoVehiculo: tipoVehiculo || '' });
     setScreen('home');
   };
 
@@ -380,6 +393,7 @@ function App() {
           telefono={telefonoUsuario}
           placa={placaUsuario}
           vehiculo={vehiculoUsuario}
+          tipoVehiculo={tipoVehiculoUsuario}
           onCerrarSesion={handleCerrarSesion}
           onVolver={() => setScreen('rol')}
         />

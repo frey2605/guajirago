@@ -341,7 +341,7 @@ function TarjetaSolicitud({ solicitud, nombre, telefono, placa, vehiculo, saldoC
   );
 }
 
-function AppConductor({ nombre, telefono, placa, vehiculo, onCerrarSesion, onVolver }) {
+function AppConductor({ nombre, telefono, placa, vehiculo, tipoVehiculo, onCerrarSesion, onVolver }) {
   const [activo, setActivo] = useState(true);
   const [solicitudes, setSolicitudes] = useState([]);
   const [fase, setFase] = useState(null);
@@ -585,6 +585,8 @@ const cargarSaldo = useCallback(async (uid) => {
         .map(d => ({ id: d.id, ...d.data() }))
         .filter(v => {
           if (!v.nuevaOferta && !v.fechaSolicitud) return false;
+          // Filtro por tipo: el conductor solo ve solicitudes de su tipo de vehículo
+          if (tipoVehiculo && v.tipo && v.tipo !== tipoVehiculo) return false;
           const ts = tsDe(v);
           const edad = ahora - ts;
           if (edad < 0 || edad > VENTANA_MS) return false;
@@ -601,7 +603,7 @@ const cargarSaldo = useCallback(async (uid) => {
       setSolicitudes(vigentes);
     });
     return () => unsub();
-  }, [activo]);
+  }, [activo, tipoVehiculo]);
 
   const rechazarSolicitud = useCallback((idViaje) => {
     descartadosRef.current[idViaje] = new Date().toISOString();
