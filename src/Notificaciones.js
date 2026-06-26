@@ -2,8 +2,17 @@ import { db } from './firebase';
 import { doc, setDoc } from 'firebase/firestore';
 import { getMessaging, getToken } from 'firebase/messaging';
 import { auth } from './firebase';
-
 const VAPID_KEY = 'BLcxcBCOZVLKO-qblckhRh0vcuAZjrXmMLZIQNxI0T6x9Viw0XxbpKoZJmNhvTb173FLjuaBIiRum8fSsZGljY0';
+// Audio precargado una sola vez, para que suene rápido aunque la conexión esté lenta
+let _audioAlerta = null;
+export const precargarAudio = () => {
+  try {
+    if (!_audioAlerta) {
+      _audioAlerta = new Audio('/gogo.mp3');
+      _audioAlerta.load();
+    }
+  } catch (e) {}
+};
 
 // Callback para mostrar el resultado en pantalla
 let _onDebug = null;
@@ -35,7 +44,9 @@ export const registrarTokenFCM = async () => {
 export const alertarNuevoViaje = () => {
   if (navigator.vibrate) navigator.vibrate([300, 100, 300, 100, 600]);
   try {
-    const audio = new Audio('/gogo.mp3');
+    if (!_audioAlerta) { _audioAlerta = new Audio('/gogo.mp3'); }
+    const audio = _audioAlerta;
+    audio.currentTime = 0;
     audio.volume = 1.0;
     audio.play().catch(() => {
       try {

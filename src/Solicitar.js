@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { db, auth } from './firebase';
 import { collection, addDoc, doc, onSnapshot, updateDoc, getDoc } from 'firebase/firestore';
 import Calificacion from './Calificacion';
+import { alertarNuevoViaje, precargarAudio, activarAudioiOS } from './Notificaciones';
 
 const centroRiohacha = { lat: 11.5444, lng: -72.9072 };
 const TARIFA_DIA = 8000;
@@ -317,6 +318,7 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
         const key = data.conductorId + '_' + (data.contraofertaValor || '');
         if (!contaofertasIdsRef.current.has(key)) {
           contaofertasIdsRef.current.add(key);
+          alertarNuevoViaje();
           setContraofertas(prev => {
             // Evitar duplicados por conductorId
             if (prev.find(c => c.conductorId === data.conductorId && c.contraofertaValor === data.contraofertaValor)) return prev;
@@ -344,6 +346,7 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
       if (data.estado === 'aceptado' && pantallaRef.current !== 'fase1' && pantallaRef.current !== 'fase2' && !celebrando) {
         if (radioRef.current) { clearTimeout(radioRef.current.ampliar); clearTimeout(radioRef.current.agotar); }
         clearInterval(contadorBusquedaRef.current);
+        alertarNuevoViaje();
         setContraofertas([]);
         contaofertasIdsRef.current.clear();
         setCelebrando(true);
@@ -484,6 +487,8 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
 
   const solicitarViaje = async () => {
     if (!origen || !destino) { setError('Por favor escribe el origen y destino'); return; }
+    activarAudioiOS();
+    precargarAudio();
     setCargando(true); setError('');
 
     // Convertir la dirección escrita del origen en coordenadas (más confiable que el GPS)

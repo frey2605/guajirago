@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { db, auth } from './firebase';
 import { collection, query, where, limit, onSnapshot, doc, updateDoc, setDoc, getDoc, getDocs, arrayUnion } from 'firebase/firestore';
-import { registrarTokenFCM, alertarNuevoViaje, activarAudioiOS, setDebugCallback } from './Notificaciones';
+import { registrarTokenFCM, alertarNuevoViaje, activarAudioiOS, precargarAudio, setDebugCallback } from './Notificaciones';
 import { signOut } from 'firebase/auth';
 import Calificacion from './Calificacion';
 import Llamada from './Llamada';
@@ -386,6 +386,7 @@ function AppConductor({ nombre, telefono, placa, vehiculo, tipoVehiculo, onCerra
   const unsubsViajesRef = useRef({});
   const solicitudesIdsRef = useRef(new Set());
   const ubicacionRef = useRef(null);
+  const [refrescoListener, setRefrescoListener] = useState(0);
 
   useEffect(() => { celebrandoRef.current = celebrando; }, [celebrando]);
   useEffect(() => { faseRef.current = fase; }, [fase]);
@@ -639,8 +640,13 @@ const cargarSaldo = useCallback(async (uid) => {
       }));
     }, 10000);
 
-    return () => { unsub(); clearInterval(intervaloLimpieza); };
-  }, [activo, tipoVehiculo]);
+    // Despertador: reconecta la búsqueda cada 10 segundos para que las solicitudes lleguen rápido
+    const intervaloRefresco = setInterval(() => {
+      setRefrescoListener(r => r + 1);
+    }, 10000);
+
+    return () => { unsub(); clearInterval(intervaloLimpieza); clearInterval(intervaloRefresco); };
+  }, [activo, tipoVehiculo, refrescoListener]);
 
   const rechazarSolicitud = useCallback((idViaje) => {
     descartadosRef.current[idViaje] = new Date().toISOString();
@@ -876,20 +882,15 @@ const cargarSaldo = useCallback(async (uid) => {
             <p style={{ color: '#FFCF4D', fontSize: '12px', margin: '0', fontFamily: 'monospace' }}>{debugMsg}</p>
           </div>
         )}
-        <div onClick={() => setVerCreditos(true)} style={{ background: 'linear-gradient(135deg, #1A1A1E, #2A2A2E)', borderRadius: '20px', padding: '20px', display: 'flex', alignItems: 'center', gap: '16px', border: '1px solid #FF7A2F', cursor: 'pointer', marginBottom: '16px' }}>
-          <span style={{ fontSize: '32px' }}>💰</span>
-          <div style={{ flex: 1 }}>
-            <p style={{ color: '#FFFFFF', fontWeight: '900', fontSize: '16px', margin: '0' }}>Mis créditos</p>
-            <p style={{ color: '#FFCF4D', fontSize: '13px', margin: '4px 0 0', fontWeight: 'bold' }}>Ver saldo y recargar</p>
-          </div>
-          <div style={{ textAlign: 'right' }}>
-            <p style={{ color: '#2ECC71', fontSize: '22px', fontWeight: '900', margin: '0' }}>{saldoCreditos === null ? '...' : `$${saldoCreditos.toLocaleString()}`}</p>
-          </div>
+        <div onClick={() => setVerCreditos(true)} style={{ background: 'linear-gradient(135deg, #1A1A1E, #2A2A2E)', borderRadius: '14px', padding: '12px 16px', display: 'flex', alignItems: 'center', gap: '12px', border: '1px solid #FF7A2F', cursor: 'pointer', marginBottom: '12px' }}>
+          <span style={{ fontSize: '24px' }}>💰</span>
+          <p style={{ color: '#FFFFFF', fontWeight: '900', fontSize: '15px', margin: '0', flex: 1 }}>Mis créditos</p>
+          <p style={{ color: '#2ECC71', fontSize: '20px', fontWeight: '900', margin: '0' }}>{saldoCreditos === null ? '...' : `$${saldoCreditos.toLocaleString()}`}</p>
         </div>
-        {ubicacion && <div style={{ background: '#0A1F0A', borderRadius: '16px', padding: '12px 16px', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px', border: '1px solid #1A3A1A' }}><div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#2ECC71' }}/><span style={{ color: '#2ECC71', fontSize: '13px', fontWeight: 'bold' }}>GPS activo — ubicación en tiempo real</span></div>}
+        
         <div style={{ background: '#1A1A1E', borderRadius: '14px', padding: '12px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
           <p style={{ color: activo ? '#FFFFFF' : '#AAAAAA', fontWeight: '900', fontSize: '15px', margin: '0' }}>{activo ? '🟢 Estoy disponible' : '⚪ No disponible'}</p>
-          <div onClick={() => { if (!activo && saldoCreditos !== null && saldoCreditos < COMISION_POR_VIAJE) { alert('No tienes saldo suficiente para recibir viajes. Recarga tus créditos.'); return; } activarAudioiOS(); setActivo(!activo); }} style={{ width: '52px', height: '30px', borderRadius: '15px', background: activo ? 'linear-gradient(135deg, #FFCF4D, #FF7A2F)' : '#2A2A2E', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '0 4px', justifyContent: activo ? 'flex-end' : 'flex-start', flexShrink: 0 }}>
+          <div onClick={() => { if (!activo && saldoCreditos !== null && saldoCreditos < COMISION_POR_VIAJE) { alert('No tienes saldo suficiente para recibir viajes. Recarga tus créditos.'); return; } activarAudioiOS(); precargarAudio(); setActivo(!activo); }} style={{ width: '52px', height: '30px', borderRadius: '15px', background: activo ? 'linear-gradient(135deg, #FFCF4D, #FF7A2F)' : '#2A2A2E', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '0 4px', justifyContent: activo ? 'flex-end' : 'flex-start', flexShrink: 0 }}>
             <div style={{ width: '22px', height: '22px', borderRadius: '50%', background: '#FFFFFF' }}/>
           </div>
         </div>
