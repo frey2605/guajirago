@@ -257,6 +257,7 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
   const pantallaRef = useRef(pantalla);
   const intervaloRespaldoRef = useRef(null);
   const contaofertasIdsRef = useRef(new Set()); // IDs ya vistos para no duplicar
+  const confirmacionMostradaRef = useRef(false);
 
   useEffect(() => { pantallaRef.current = pantalla; }, [pantalla]);
 
@@ -311,7 +312,8 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
             conductorPlaca: data.conductorPlaca,
             conductorVehiculo: data.conductorVehiculo,
             conductorTelefono: data.conductorTelefono,
-            tarifa: data.tarifa,
+              tarifa: data.tarifa,
+            };
           });
         }
       } catch (e) {}
@@ -353,7 +355,8 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
       }
 
       // El conductor aceptó el viaje directo: mostrar confirmación al pasajero (no aceptar automático)
-      if (data.estado === 'confirmando' && data.conductorId && pantallaRef.current === 'esperando' && !celebrando) {
+      if (data.estado === 'confirmando' && data.conductorId && pantallaRef.current === 'esperando' && !celebrando && !confirmacionMostradaRef.current) {
+        confirmacionMostradaRef.current = true;
         if (radioRef.current) { clearTimeout(radioRef.current.ampliar); clearTimeout(radioRef.current.agotar); }
         clearInterval(contadorBusquedaRef.current);
         alertarNuevoViaje();
