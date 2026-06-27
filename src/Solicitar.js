@@ -303,7 +303,8 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
         }
         if (data.conductorEnPunto && pantallaRef.current === 'fase1') setViaje(data);
         // Respaldo: detectar si un conductor aceptó (para Safari que tarda en el listener)
-        if (data.estado === 'confirmando' && data.conductorId && pantallaRef.current === 'esperando' && !celebrando) {
+        if (data.estado === 'confirmando' && data.conductorId && pantallaRef.current === 'esperando' && !celebrando && !confirmacionMostradaRef.current) {
+          confirmacionMostradaRef.current = true;
           if (radioRef.current) { clearTimeout(radioRef.current.ampliar); clearTimeout(radioRef.current.agotar); }
           clearInterval(contadorBusquedaRef.current);
           setConfirmacionPendiente(prev => prev || {
@@ -312,8 +313,7 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
             conductorPlaca: data.conductorPlaca,
             conductorVehiculo: data.conductorVehiculo,
             conductorTelefono: data.conductorTelefono,
-              tarifa: data.tarifa,
-            };
+            tarifa: data.tarifa,
           });
         }
       } catch (e) {}
