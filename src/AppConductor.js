@@ -366,6 +366,9 @@ function AppConductor({ nombre, telefono, placa, vehiculo, tipoVehiculo, onCerra
   const [respuestaPasajero, setRespuestaPasajero] = useState(null);
   const [mensajeGrande, setMensajeGrande] = useState(null);
   const [mostrarCancelacion, setMostrarCancelacion] = useState(false);
+  const [mostrarCodigo, setMostrarCodigo] = useState(false);
+  const [codigoIngresado, setCodigoIngresado] = useState('');
+  const [errorCodigo, setErrorCodigo] = useState('');
   const [destinoCoords, setDestinoCoords] = useState(null);
   const [contador, setContador] = useState(240);
   const [buscandoAgotado, setBuscandoAgotado] = useState(false);
@@ -719,6 +722,29 @@ const cargarSaldo = useCallback(async (uid) => {
     geocodificarDestino(viajeActual.destino);
   };
 
+  const intentarIniciar = () => {
+    if (!viajeActual) return;
+    // Si el viaje tiene código de seguridad, pedirlo. Si no (pasajero registrado antes), iniciar directo.
+    if (viajeActual.codigoSeguridad) {
+      setCodigoIngresado('');
+      setErrorCodigo('');
+      setMostrarCodigo(true);
+    } else {
+      iniciarViaje();
+    }
+  };
+
+  const verificarCodigo = () => {
+    if (codigoIngresado.trim() === String(viajeActual.codigoSeguridad).trim()) {
+      setMostrarCodigo(false);
+      setCodigoIngresado('');
+      setErrorCodigo('');
+      iniciarViaje();
+    } else {
+      setErrorCodigo('Código incorrecto. Verifícalo con el pasajero');
+    }
+  };
+
   const cancelarViaje = async (razon) => {
     clearInterval(contadorRef.current);
     if (viajeActual) {
@@ -787,6 +813,28 @@ const cargarSaldo = useCallback(async (uid) => {
       <div style={{ backgroundColor: '#141416', minHeight: '100vh', position: 'relative' }}>
         {mensajeGrande && <MensajeGrande mensaje={mensajeGrande} onCerrar={() => setMensajeGrande(null)} />}
         {mostrarCancelacion && <ModalCancelacion razones={RAZONES_CANCELACION_CONDUCTOR} onConfirmar={cancelarViaje} onCerrar={() => setMostrarCancelacion(false)} />}
+        {mostrarCodigo && (
+          <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.9)', zIndex: 9998, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
+            <div style={{ background: 'linear-gradient(135deg, #1A1A1E, #2A2A2E)', borderRadius: '28px', padding: '32px 24px', width: '100%', maxWidth: '420px', border: '3px solid #FFCF4D', textAlign: 'center' }}>
+              <div style={{ fontSize: '60px', marginBottom: '12px' }}>🔐</div>
+              <h2 style={{ color: '#FFFFFF', fontSize: '22px', fontWeight: '900', margin: '0 0 8px' }}>Código de seguridad</h2>
+              <p style={{ color: '#AAAAAA', fontSize: '14px', margin: '0 0 20px', lineHeight: '1.5' }}>Pídele al pasajero su código de 4 dígitos para iniciar el viaje</p>
+              <input
+                value={codigoIngresado}
+                onChange={e => { setCodigoIngresado(e.target.value.replace(/[^0-9]/g, '').slice(0, 4)); setErrorCodigo(''); }}
+                type="tel"
+                inputMode="numeric"
+                placeholder="••••"
+                style={{ width: '100%', background: '#141416', border: `2px solid ${errorCodigo ? '#FF4444' : '#2A2A2E'}`, borderRadius: '16px', padding: '18px', color: '#FFFFFF', fontSize: '32px', fontWeight: '900', textAlign: 'center', letterSpacing: '12px', outline: 'none', boxSizing: 'border-box', marginBottom: '12px' }}
+              />
+              {errorCodigo && <p style={{ color: '#FF4444', fontSize: '13px', margin: '0 0 12px', fontWeight: 'bold' }}>{errorCodigo}</p>}
+              <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>
+                <button onClick={() => { setMostrarCodigo(false); setCodigoIngresado(''); setErrorCodigo(''); }} style={{ flex: 1, padding: '16px', background: '#141416', border: '1px solid #2A2A2E', borderRadius: '16px', color: '#AAAAAA', fontSize: '15px', fontWeight: 'bold', cursor: 'pointer' }}>Cancelar</button>
+                <button onClick={verificarCodigo} disabled={codigoIngresado.length < 4} style={{ flex: 2, padding: '16px', background: codigoIngresado.length < 4 ? '#2A2A2E' : 'linear-gradient(135deg, #2ECC71, #27AE60)', border: 'none', borderRadius: '16px', color: codigoIngresado.length < 4 ? '#555' : '#FFFFFF', fontSize: '16px', fontWeight: '900', cursor: codigoIngresado.length < 4 ? 'default' : 'pointer' }}>✅ Verificar</button>
+              </div>
+            </div>
+          </div>
+        )}
         <MapaConductor
           ubicacionConductor={ubicacion}
           ubicacionDestino={fase === 'en_punto' ? destinoCoords : ubicacionPasajero}
@@ -836,7 +884,7 @@ const cargarSaldo = useCallback(async (uid) => {
               )}
               <div style={{ display: 'flex', gap: '12px' }}>
                 <button onClick={() => setMostrarCancelacion(true)} style={{ flex: 1, padding: '14px', background: 'transparent', border: '1px solid #FF4444', borderRadius: '14px', color: '#FF4444', fontSize: '14px', cursor: 'pointer' }}>Cancelar</button>
-                <button onClick={iniciarViaje} style={{ flex: 2, padding: '16px', background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)', border: 'none', borderRadius: '16px', color: '#141416', fontSize: '16px', fontWeight: '900', cursor: 'pointer' }}>🚀 Iniciar viaje</button>
+                <button onClick={intentarIniciar} style={{ flex: 2, padding: '16px', background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)', border: 'none', borderRadius: '16px', color: '#141416', fontSize: '16px', fontWeight: '900', cursor: 'pointer' }}>🚀 Iniciar viaje</button>
               </div>
             </div>
           )}
