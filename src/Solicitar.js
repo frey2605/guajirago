@@ -102,11 +102,8 @@ function TarjetaContraoferta({ oferta, onAceptar, onRechazar }) {
   const [fotoConductor, setFotoConductor] = useState(null);
 
   useEffect(() => {
-    if (!oferta.conductorId) return;
-    getDoc(doc(db, 'usuarios', oferta.conductorId)).then(snap => {
-      if (snap.exists()) setFotoConductor(snap.data().fotoConductor || snap.data().foto || null);
-    }).catch(() => {});
-  }, [oferta.conductorId]);
+    setFotoConductor(oferta.conductorFoto || null);
+  }, [oferta.conductorFoto]);
 
   useEffect(() => {
     const inicio = Date.now();
@@ -362,6 +359,7 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
               conductorPlaca: data.conductorPlaca,
               conductorVehiculo: data.conductorVehiculo,
               conductorTelefono: data.conductorTelefono,
+              conductorFoto: data.conductorFoto || null,
               contraoferta: data.contraoferta,
               contraofertaValor: data.contraofertaValor,
             }];
@@ -443,21 +441,11 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
     });
   }, []);
 
-  const cargarDatosConductor = useCallback(async (conductorId) => {
-    if (!conductorId) return;
-    try {
-      const snap = await getDoc(doc(db, 'usuarios', conductorId));
-      if (snap.exists()) {
-        const d = snap.data();
-        setDatosConductor({ foto: d.fotoConductor || d.foto || null, color: d.color || '' });
-      }
-    } catch (e) {}
-  }, []);
-
   useEffect(() => {
-    const cid = confirmacionPendiente?.conductorId || viaje?.conductorId;
-    if (cid) cargarDatosConductor(cid);
-  }, [confirmacionPendiente, viaje?.conductorId, cargarDatosConductor]);
+    if (viaje?.conductorFoto || viaje?.conductorColor) {
+      setDatosConductor({ foto: viaje.conductorFoto || null, color: viaje.conductorColor || '' });
+    }
+  }, [viaje?.conductorFoto, viaje?.conductorColor]);
 
   const geocodificarDestino = (destinoTexto) => {
     if (!window.google || !destinoTexto) return;

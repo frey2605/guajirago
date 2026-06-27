@@ -265,7 +265,7 @@ function HistorialConductor({ onVolver }) {
   );
 }
 
-function TarjetaSolicitud({ solicitud, nombre, telefono, placa, vehiculo, saldoCreditos, descartadosRef, agregarViajeEscuchando, onRechazar }) {
+function TarjetaSolicitud({ solicitud, nombre, telefono, placa, vehiculo, fotoConductor, colorConductor, saldoCreditos, descartadosRef, agregarViajeEscuchando, onRechazar }) {
   const [tarifaModificada, setTarifaModificada] = useState(solicitud.tarifaValor || TARIFA_MINIMA);
   const [tarifaCambiada, setTarifaCambiada] = useState(false);
 
@@ -307,6 +307,8 @@ function TarjetaSolicitud({ solicitud, nombre, telefono, placa, vehiculo, saldoC
         conductorTelefono: telefono || '',
         conductorPlaca: placa || '',
         conductorVehiculo: vehiculo || '',
+        conductorFoto: fotoConductor || null,
+        conductorColor: colorConductor || '',
         contraoferta: `$${montoContra.toLocaleString()}`,
         contraofertaValor: montoContra,
       }).catch(() => {});
@@ -319,6 +321,8 @@ function TarjetaSolicitud({ solicitud, nombre, telefono, placa, vehiculo, saldoC
         conductorTelefono: telefono || '',
         conductorPlaca: placa || '',
         conductorVehiculo: vehiculo || '',
+        conductorFoto: fotoConductor || null,
+        conductorColor: colorConductor || '',
       }).catch(() => {});
     }
     onRechazar(solicitud.id);
@@ -378,6 +382,7 @@ function AppConductor({ nombre, telefono, placa, vehiculo, tipoVehiculo, onCerra
   const [verPerfil, setVerPerfil] = useState(false);
   const [saldoCreditos, setSaldoCreditos] = useState(null);
   const [fotoConductor, setFotoConductor] = useState(null);
+  const [colorConductor, setColorConductor] = useState('');
   const [datosCalificacion, setDatosCalificacion] = useState(null);
   const [enLlamada, setEnLlamada] = useState(false);
   const [llamadaEntrante, setLlamadaEntrante] = useState(false);
@@ -532,6 +537,7 @@ const cargarSaldo = useCallback(async (uid) => {
       if (snap.exists()) {
         setSaldoCreditos(snap.data().creditos || 0);
         setFotoConductor(snap.data().fotoConductor || null);
+        setColorConductor(snap.data().color || '');
       } else {
         setSaldoCreditos(0);
       }
@@ -980,6 +986,8 @@ const cargarSaldo = useCallback(async (uid) => {
                 telefono={telefono}
                 placa={placa}
                 vehiculo={vehiculo}
+                fotoConductor={fotoConductor}
+                colorConductor={colorConductor}
                 saldoCreditos={saldoCreditos}
                 descartadosRef={descartadosRef}
                 agregarViajeEscuchando={agregarViajeEscuchando}
