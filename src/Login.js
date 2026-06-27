@@ -9,6 +9,9 @@ function Login({ onEntrar }) {
   const [email, setEmail] = useState('');
   const [emailConfirm, setEmailConfirm] = useState('');
   const [celular, setCelular] = useState('');
+  const [diaNac, setDiaNac] = useState('');
+  const [mesNac, setMesNac] = useState('');
+  const [anioNac, setAnioNac] = useState('');
   const [password, setPassword] = useState('');
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const [error, setError] = useState('');
@@ -18,7 +21,7 @@ function Login({ onEntrar }) {
   const [verPasswordConfirm, setVerPasswordConfirm] = useState(false);
 
   const registrarse = async () => {
-    if (!nombre || !email || !emailConfirm || !celular || !password || !passwordConfirm) { setError('Por favor completa todos los campos'); return; }
+    if (!nombre || !email || !emailConfirm || !celular || !diaNac || !mesNac || !anioNac || !password || !passwordConfirm) { setError('Por favor completa todos los campos'); return; }
     if (email.trim().toLowerCase() !== emailConfirm.trim().toLowerCase()) { setError('Los correos no coinciden'); return; }
     if (password !== passwordConfirm) { setError('Las contraseñas no coinciden'); return; }
     if (password.length < 6) { setError('La contraseña debe tener mínimo 6 caracteres'); return; }
@@ -26,7 +29,8 @@ function Login({ onEntrar }) {
     try {
       const resultado = await createUserWithEmailAndPassword(auth, email.trim().toLowerCase(), password);
       try { await sendEmailVerification(resultado.user); } catch (e) {}
-      await setDoc(doc(db, 'usuarios', resultado.user.uid), { nombre, email: email.trim().toLowerCase(), celular, tipo: '', placa: '', vehiculo: '', fechaRegistro: new Date().toISOString() });
+      const fechaNacimiento = `${String(diaNac).padStart(2, '0')}/${String(mesNac).padStart(2, '0')}/${anioNac}`;
+      await setDoc(doc(db, 'usuarios', resultado.user.uid), { nombre, email: email.trim().toLowerCase(), celular, fechaNacimiento, tipo: '', placa: '', vehiculo: '', fechaRegistro: new Date().toISOString() });
       onEntrar('', nombre, celular, '', '');
     } catch (err) {
       if (err.code === 'auth/email-already-in-use') setError('Este correo ya está registrado');
@@ -81,6 +85,17 @@ function Login({ onEntrar }) {
   if (pantalla === 'registro') {
     return (
       <div style={{ backgroundColor: '#141416', minHeight: '100vh', fontFamily: 'Arial, sans-serif', display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '32px 24px' }}>
+        {error && (
+          <div onClick={() => setError('')} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
+            <div onClick={(e) => e.stopPropagation()} style={{ background: '#1A1A1E', borderRadius: '24px', padding: '32px 24px', width: '100%', maxWidth: '380px', border: '2px solid #FF4444', textAlign: 'center', position: 'relative' }}>
+              <span onClick={() => setError('')} style={{ position: 'absolute', top: '16px', right: '20px', color: '#AAAAAA', fontSize: '26px', cursor: 'pointer', lineHeight: '1' }}>✕</span>
+              <div style={{ fontSize: '54px', marginBottom: '12px' }}>⚠️</div>
+              <h2 style={{ color: '#FFFFFF', fontSize: '20px', fontWeight: '900', margin: '0 0 10px' }}>Atención</h2>
+              <p style={{ color: '#FFFFFF', fontSize: '17px', margin: '0 0 24px', lineHeight: '1.5', fontWeight: 'bold' }}>{error}</p>
+              <button onClick={() => setError('')} style={{ width: '100%', padding: '16px', background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F)', border: 'none', borderRadius: '14px', color: '#141416', fontSize: '16px', fontWeight: '900', cursor: 'pointer' }}>Entendido</button>
+            </div>
+          </div>
+        )}
         <div style={{ textAlign: 'center', marginBottom: '32px' }}>
           <h1 style={{ fontSize: '28px', color: '#FFFFFF', margin: '0', fontFamily: 'Arial Black, sans-serif' }}>Crear cuenta</h1>
           <p style={{ color: '#555', fontSize: '13px', margin: '8px 0 0' }}>Ingresa tus datos para registrarte</p>
@@ -101,6 +116,26 @@ function Login({ onEntrar }) {
           <span style={{ color: '#FFFFFF', fontSize: '16px', fontWeight: '900', whiteSpace: 'nowrap' }}>+57</span>
           <input value={celular} onChange={e => setCelular(e.target.value)} placeholder="3001234567" type="tel" style={{ background: 'none', border: 'none', outline: 'none', color: '#FFFFFF', fontSize: '16px', width: '100%' }} />
         </div>
+        <div style={{ background: '#1A1A1E', borderRadius: '16px', padding: '16px', marginBottom: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
+            <span style={{ fontSize: '20px' }}>🎂</span>
+            <span style={{ color: '#AAAAAA', fontSize: '14px' }}>Fecha de nacimiento</span>
+          </div>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <select value={diaNac} onChange={e => setDiaNac(e.target.value)} style={{ flex: 1, background: '#141416', border: '1px solid #2A2A2E', borderRadius: '12px', padding: '12px', color: '#FFFFFF', fontSize: '15px', outline: 'none', cursor: 'pointer' }}>
+              <option value="">Día</option>
+              {Array.from({ length: 31 }, (_, i) => i + 1).map(d => <option key={d} value={d} style={{ background: '#1A1A1E' }}>{d}</option>)}
+            </select>
+            <select value={mesNac} onChange={e => setMesNac(e.target.value)} style={{ flex: 1, background: '#141416', border: '1px solid #2A2A2E', borderRadius: '12px', padding: '12px', color: '#FFFFFF', fontSize: '15px', outline: 'none', cursor: 'pointer' }}>
+              <option value="">Mes</option>
+              {Array.from({ length: 12 }, (_, i) => i + 1).map(m => <option key={m} value={m} style={{ background: '#1A1A1E' }}>{m}</option>)}
+            </select>
+            <select value={anioNac} onChange={e => setAnioNac(e.target.value)} style={{ flex: 1.3, background: '#141416', border: '1px solid #2A2A2E', borderRadius: '12px', padding: '12px', color: '#FFFFFF', fontSize: '15px', outline: 'none', cursor: 'pointer' }}>
+              <option value="">Año</option>
+              {Array.from({ length: 90 }, (_, i) => new Date().getFullYear() - 15 - i).map(a => <option key={a} value={a} style={{ background: '#1A1A1E' }}>{a}</option>)}
+            </select>
+          </div>
+        </div>
         <div style={{ background: '#1A1A1E', borderRadius: '16px', padding: '16px', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '12px' }}>
           <span style={{ fontSize: '20px' }}>🔒</span>
           <input value={password} onChange={e => setPassword(e.target.value)} placeholder="Contraseña (mínimo 6 caracteres)" type={verPassword ? 'text' : 'password'} style={{ background: 'none', border: 'none', outline: 'none', color: '#FFFFFF', fontSize: '16px', width: '100%' }} />
@@ -111,7 +146,6 @@ function Login({ onEntrar }) {
           <input value={passwordConfirm} onChange={e => setPasswordConfirm(e.target.value)} onPaste={e => e.preventDefault()} placeholder="Confirmar contraseña" type={verPasswordConfirm ? 'text' : 'password'} style={{ background: 'none', border: 'none', outline: 'none', color: '#FFFFFF', fontSize: '16px', width: '100%' }} />
           <span onClick={() => setVerPasswordConfirm(!verPasswordConfirm)} style={{ fontSize: '20px', cursor: 'pointer' }}>{verPasswordConfirm ? '🙈' : '👁️'}</span>
         </div>
-        {error && <p style={{ color: '#FF4444', fontSize: '13px', textAlign: 'center', marginBottom: '12px' }}>{error}</p>}
         <button onClick={registrarse} style={{ width: '100%', padding: '18px', background: cargando ? '#2A2A2E' : 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)', border: 'none', borderRadius: '16px', color: cargando ? '#555' : '#141416', fontSize: '18px', fontWeight: '900', cursor: 'pointer' }}>
           {cargando ? 'Creando cuenta...' : 'Crear cuenta'}
         </button>
