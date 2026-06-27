@@ -674,7 +674,7 @@ const confirmarViaje = async () => {
   if (mostrarCalificacion) return <Calificacion tipo={tipo} viajeId={viajeId} nombreCalificado={viaje?.conductorNombre} quienCalifica="pasajero" onFinalizar={onVolver} />;
   if (celebrando) return <Celebracion />;
   if (llamandoConductor) return <Llamada viajeId={viajeId} miRol="pasajero" nombreOtro={viaje?.conductorNombre || 'Conductor'} onCerrar={() => setLlamandoConductor(false)} />;
-  if (llamadaEntrante) return <Llamada viajeId={viajeId} miRol="pasajero" nombreOtro={viaje?.conductorNombre || 'Conductor'} onCerrar={() => setLlamadaEntrante(false)} />;
+  if (llamadaEntrante) return <Llamada viajeId={viajeId} miRol="entrante" nombreOtro={viaje?.conductorNombre || 'Conductor'} onCerrar={() => setLlamadaEntrante(false)} />;
 
   if (conductorYaTomado) {
     return (

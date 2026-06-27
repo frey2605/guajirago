@@ -11,7 +11,7 @@ const ICE_SERVERS = {
 };
 
 function Llamada({ viajeId, miRol, nombreOtro, onCerrar }) {
-  const [estado, setEstado] = useState('conectando');
+  const [estado, setEstado] = useState(miRol === 'entrante' ? 'entrante' : 'llamando');
   const [duracion, setDuracion] = useState(0);
   const [silenciado, setSilenciado] = useState(false);
   const [altavoz, setAltavoz] = useState(false);
@@ -197,7 +197,85 @@ function Llamada({ viajeId, miRol, nombreOtro, onCerrar }) {
       }
     });
   };
+const contestar = async () => {
+    try {
+      setEstado('conectando');
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+      streamRef.current = stream;
+      const pc = new RTCPeerConnection(ICE_SERVERS);
+      pcRef.current = pc;
+      stream.getTracks().forEach(track => pc.addTrack(track, stream));
 
+      const candidatos = [];
+      const campoMio = miRol === 'entrante' && pcRef.current ? 'candidatosPasajero' : 'candidatosConductor';
+
+      pc.onicecandidate = async (e) => {
+        if (e.candidate) {
+          candidatos.push(e.candidate.toJSON());
+          try { await updateDoc(llamadaDocRef, { [campoMio]: candidatos }); } catch(err) {}
+        }
+      };
+
+      pc.ontrack = (event) => {
+        detenerTono();
+        if (!audioRemotoRef.current) audioRemotoRef.current = new Audio();
+        audioRemotoRef.current.srcObject = event.streams[0];
+        audioRemotoRef.current.play().catch(e => console.log(e));
+        setEstado('activa');
+        clearInterval(intervaloRef.current);
+        intervaloRef.current = setInterval(() => setDuracion(d => d + 1), 1000);
+      };
+
+      pc.oniceconnectionstatechange = () => {
+        if (pc.iceConnectionState === 'disconnected' || pc.iceConnectionState === 'failed') setEstado('terminada');
+      };
+
+      // Avisar que contestó y escuchar la oferta del que llamó
+      await updateDoc(llamadaDocRef, { estado: 'contestada' });
+
+      unsubRef.current = onSnapshot(llamadaDocRef, async (snap) => {
+        if (!snap.exists()) return;
+        const data = snap.data();
+
+        // Si el que llamó mandó una oferta, responder
+        const oferta = data.oferta;
+        if (oferta && !pc.currentRemoteDescription) {
+          try {
+            await pc.setRemoteDescription(new RTCSessionDescription(oferta));
+            const respuesta = await pc.createAnswer();
+            await pc.setLocalDescription(respuesta);
+            await updateDoc(llamadaDocRef, {
+              respuesta: { type: respuesta.type, sdp: respuesta.sdp },
+              estado: 'activa',
+            });
+          } catch(e) { console.error(e); }
+        }
+
+        // Candidatos del que llamó
+        const candidatosOtro = data.candidatosPasajero || data.candidatosConductor || [];
+        if (pc.currentRemoteDescription) {
+          for (const c of candidatosOtro) {
+            try { await pc.addIceCandidate(new RTCIceCandidate(c)); } catch(e) {}
+          }
+        }
+
+        if (data.estado === 'terminada') {
+          limpiar();
+          setEstado('terminada');
+          setTimeout(onCerrar, 1500);
+        }
+      });
+    } catch(e) {
+      console.error(e);
+      setEstado('error');
+    }
+  };
+
+  const rechazar = async () => {
+    try { await updateDoc(llamadaDocRef, { estado: 'terminada' }); } catch(e) {}
+    limpiar();
+    onCerrar();
+  };
   const colgar = async () => {
     try { await updateDoc(llamadaDocRef, { estado: 'terminada' }); } catch(e) {}
     limpiar();
@@ -227,7 +305,7 @@ function Llamada({ viajeId, miRol, nombreOtro, onCerrar }) {
   const formatDuracion = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 
   const colorEstado = estado === 'activa' ? '#2ECC71' : estado === 'terminada' || estado === 'error' ? '#FF4444' : '#FFCF4D';
-  const textoEstado = estado === 'conectando' ? 'Conectando...' : estado === 'activa' ? 'En llamada' : estado === 'terminada' ? 'Llamada terminada' : 'Error de conexión';
+  const textoEstado = estado === 'llamando' ? 'Llamando...' : estado === 'entrante' ? 'Llamada entrante' : estado === 'conectando' ? 'Conectando...' : estado === 'activa' ? 'En llamada' : estado === 'terminada' ? 'Llamada terminada' : 'Error de conexión';
 
   return (
     <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: '#141416', zIndex: 9999, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px 24px' }}>
@@ -246,8 +324,22 @@ function Llamada({ viajeId, miRol, nombreOtro, onCerrar }) {
       )}
       {estado !== 'activa' && <div style={{ height: '74px' }} />}
 
-      {/* Controles */}
-      {(estado === 'conectando' || estado === 'activa') && (
+      {/* Llamada entrante: botones Contestar/Rechazar */}
+      {estado === 'entrante' && (
+        <div style={{ display: 'flex', gap: '32px', alignItems: 'center', marginBottom: '48px' }}>
+          <div onClick={rechazar} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
+            <div style={{ width: '80px', height: '80px', borderRadius: '50%', background: 'linear-gradient(135deg, #FF4444, #CC0000)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '32px', boxShadow: '0 6px 24px rgba(255,68,68,0.5)' }}>📵</div>
+            <p style={{ color: '#FFFFFF', fontSize: '13px', margin: '0', fontWeight: 'bold' }}>Rechazar</p>
+          </div>
+          <div onClick={contestar} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
+            <div style={{ width: '80px', height: '80px', borderRadius: '50%', background: 'linear-gradient(135deg, #2ECC71, #27AE60)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '32px', boxShadow: '0 6px 24px rgba(46,204,113,0.5)' }}>📞</div>
+            <p style={{ color: '#FFFFFF', fontSize: '13px', margin: '0', fontWeight: 'bold' }}>Contestar</p>
+          </div>
+        </div>
+      )}
+
+      {/* Controles durante la llamada */}
+      {(estado === 'llamando' || estado === 'conectando' || estado === 'activa') && (
         <div style={{ display: 'flex', gap: '24px', alignItems: 'center', marginBottom: '48px' }}>
 
           {/* Silenciar */}
