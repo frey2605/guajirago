@@ -552,13 +552,22 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
       const user = auth.currentUser;
       // Traer el nombre del pasajero guardado en su registro
       let nombrePasajero = '';
+      let codigoSeguridad = '';
       try {
         const snapU = await getDoc(doc(db, 'usuarios', user.uid));
-        if (snapU.exists()) nombrePasajero = snapU.data().nombre || '';
+        if (snapU.exists()) {
+          nombrePasajero = snapU.data().nombre || '';
+          const fechaNac = snapU.data().fechaNacimiento || '';
+          const partes = fechaNac.split('/');
+          if (partes.length >= 2 && partes[0] && partes[1]) {
+            codigoSeguridad = partes[0].padStart(2, '0') + partes[1].padStart(2, '0');
+          }
+        }
       } catch (e) {}
       const docRef = await addDoc(collection(db, 'viajes'), {
         pasajeroId: user.uid, pasajeroEmail: user.email,
         pasajeroNombre: nombrePasajero,
+        codigoSeguridad: codigoSeguridad,
         pasajeroLat: coordsRecogida.lat, pasajeroLng: coordsRecogida.lng,
         tipo, origen, destino, estado: 'esperando',
         tarifa: `$${tarifa.toLocaleString()}`, tarifaValor: tarifa,
@@ -738,6 +747,13 @@ const confirmarViaje = async () => {
         {conductorEnPunto && (
           <div style={{ position: 'absolute', top: '90px', left: '16px', right: '16px', zIndex: 10, background: 'rgba(20,20,22,0.97)', borderRadius: '20px', padding: '20px', border: '2px solid #2ECC71' }}>
             <p style={{ color: '#2ECC71', fontSize: '16px', fontWeight: '900', margin: '0 0 4px', textAlign: 'center' }}>📍 ¡Tu conductor llegó!</p>
+            {viaje?.codigoSeguridad && (
+              <div style={{ background: 'linear-gradient(135deg, #1A1A1E, #2A2A2E)', borderRadius: '16px', padding: '16px', marginBottom: '12px', border: '2px solid #FFCF4D', textAlign: 'center' }}>
+                <p style={{ color: '#FFCF4D', fontSize: '11px', margin: '0 0 6px', letterSpacing: '2px', fontWeight: 'bold' }}>🔐 CÓDIGO DE SEGURIDAD</p>
+                <p style={{ color: '#FFFFFF', fontSize: '40px', fontWeight: '900', margin: '0', letterSpacing: '8px' }}>{viaje.codigoSeguridad}</p>
+                <p style={{ color: '#AAAAAA', fontSize: '12px', margin: '6px 0 0' }}>Dáselo al conductor al subir</p>
+              </div>
+            )}
             <div style={{ background: contador <= 60 ? 'rgba(255,68,68,0.15)' : 'rgba(255,207,77,0.1)', borderRadius: '12px', padding: '10px 16px', marginBottom: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: `1px solid ${contador <= 60 ? '#FF4444' : '#FFCF4D'}` }}>
               <p style={{ color: '#555', fontSize: '12px', margin: '0' }}>{contador === 0 ? '⚠️ Tiempo agotado' : 'Sal pronto o el conductor puede cancelar'}</p>
               <p style={{ color: contador <= 60 ? '#FF4444' : '#FFCF4D', fontSize: '28px', fontWeight: '900', margin: '0', fontVariantNumeric: 'tabular-nums' }}>{Math.floor(contador / 60)}:{String(contador % 60).padStart(2, '0')}</p>
@@ -763,6 +779,13 @@ const confirmarViaje = async () => {
                 <div style={{ textAlign: 'right' }}><p style={{ color: '#555', fontSize: '10px', margin: '0' }}>TARIFA</p><p style={{ color: '#2ECC71', fontSize: '18px', fontWeight: '900', margin: '2px 0 0' }}>{viaje?.tarifa}</p></div>
               </div>
             </div>
+            {viaje?.codigoSeguridad && (
+              <div style={{ background: 'linear-gradient(135deg, #1A1A1E, #2A2A2E)', borderRadius: '16px', padding: '16px', marginTop: '12px', border: '2px solid #FFCF4D', textAlign: 'center' }}>
+                <p style={{ color: '#FFCF4D', fontSize: '11px', margin: '0 0 6px', letterSpacing: '2px', fontWeight: 'bold' }}>🔐 CÓDIGO DE SEGURIDAD</p>
+                <p style={{ color: '#FFFFFF', fontSize: '40px', fontWeight: '900', margin: '0', letterSpacing: '8px' }}>{viaje.codigoSeguridad}</p>
+                <p style={{ color: '#AAAAAA', fontSize: '12px', margin: '6px 0 0' }}>Dáselo al conductor cuando subas</p>
+              </div>
+            )}
             <button onClick={() => setLlamandoConductor(true)} style={{ width: '100%', marginTop: '12px', padding: '14px', background: 'linear-gradient(135deg, #2ECC71, #27AE60)', border: 'none', borderRadius: '14px', color: '#FFFFFF', fontSize: '14px', fontWeight: 'bold', cursor: 'pointer' }}>📞 Llamar al conductor</button>
             <button onClick={() => setMostrarCancelacion(true)} style={{ width: '100%', marginTop: '8px', padding: '14px', background: 'transparent', border: '1px solid #2A2A2E', borderRadius: '14px', color: '#FF4444', fontSize: '14px', cursor: 'pointer' }}>Cancelar viaje</button>
           </div>
