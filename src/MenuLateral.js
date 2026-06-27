@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { auth } from './firebase';
 import { signOut } from 'firebase/auth';
 
-function MenuLateral({ nombre, foto, onIrCreditos, onIrViajes, onCerrarSesion }) {
+function MenuLateral({ nombre, foto, onIrPerfil, onIrCreditos, onIrViajes, onCerrarSesion }) {
   const [abierto, setAbierto] = useState(false);
 
   const cerrar = () => setAbierto(false);
@@ -52,6 +52,7 @@ function MenuLateral({ nombre, foto, onIrCreditos, onIrViajes, onCerrarSesion })
             </div>
 
             <div style={{ flex: 1, padding: '16px 12px', overflowY: 'auto' }}>
+              {opcion('👤', 'Mi perfil', () => { if (onIrPerfil) onIrPerfil(); else proximamente(); })}
               {opcion('🕐', 'Mis viajes', () => { if (onIrViajes) onIrViajes(); else proximamente(); })}
               {opcion('💰', 'Mis créditos', () => { if (onIrCreditos) onIrCreditos(); else proximamente(); })}
               {opcion('📊', 'Ganancias', proximamente)}
