@@ -21,6 +21,30 @@ function Llamada({ viajeId, miRol, nombreOtro, onCerrar }) {
   const intervaloRef = useRef(null);
   const unsubRef = useRef(null);
   const llamadaDocRef = doc(db, 'llamadas', viajeId);
+  const tonoRef = useRef(null);
+
+  const iniciarTono = () => {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const tocar = () => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.frequency.value = 440;
+        gain.gain.setValueAtTime(0.3, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 1.0);
+        osc.start(ctx.currentTime);
+        osc.stop(ctx.currentTime + 1.0);
+      };
+      tocar();
+      tonoRef.current = setInterval(tocar, 3000);
+    } catch(e) {}
+  };
+
+  const detenerTono = () => {
+    if (tonoRef.current) { clearInterval(tonoRef.current); tonoRef.current = null; }
+  };
 
   useEffect(() => {
     iniciar();
@@ -28,6 +52,7 @@ function Llamada({ viajeId, miRol, nombreOtro, onCerrar }) {
   }, []);
 
   const limpiar = () => {
+    detenerTono();
     clearInterval(intervaloRef.current);
     if (unsubRef.current) unsubRef.current();
     if (streamRef.current) streamRef.current.getTracks().forEach(t => t.stop());
@@ -46,6 +71,7 @@ function Llamada({ viajeId, miRol, nombreOtro, onCerrar }) {
       stream.getTracks().forEach(track => pc.addTrack(track, stream));
 
       pc.ontrack = (event) => {
+        detenerTono();
         if (!audioRemotoRef.current) {
           audioRemotoRef.current = new Audio();
         }
@@ -139,6 +165,8 @@ function Llamada({ viajeId, miRol, nombreOtro, onCerrar }) {
       candidatosConductor: [],
       inicio: new Date().toISOString(),
     });
+
+    iniciarTono();
 
     unsubRef.current = onSnapshot(llamadaDocRef, async (snap) => {
       if (!snap.exists()) return;
