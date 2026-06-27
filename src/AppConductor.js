@@ -7,6 +7,7 @@ import Calificacion from './Calificacion';
 import Llamada from './Llamada';
 import Creditos from './Creditos';
 import MiPerfil from './MiPerfil';
+import Ganancias from './Ganancias';
 import MenuLateral from './MenuLateral';
 const centroRiohacha = { lat: 11.5444, lng: -72.9072 };
 const TARIFA_DIA = 8000;
@@ -380,6 +381,7 @@ function AppConductor({ nombre, telefono, placa, vehiculo, tipoVehiculo, onCerra
   const [verHistorial, setVerHistorial] = useState(false);
   const [verCreditos, setVerCreditos] = useState(false);
   const [verPerfil, setVerPerfil] = useState(false);
+  const [verGanancias, setVerGanancias] = useState(false);
   const [saldoCreditos, setSaldoCreditos] = useState(null);
   const [fotoConductor, setFotoConductor] = useState(null);
   const [colorConductor, setColorConductor] = useState('');
@@ -796,6 +798,7 @@ const cargarSaldo = useCallback(async (uid) => {
   if (verHistorial) return <HistorialConductor onVolver={() => setVerHistorial(false)} />;
   if (verCreditos) return <Creditos onVolver={() => setVerCreditos(false)} />;
   if (verPerfil) return <MiPerfil onVolver={() => setVerPerfil(false)} />;
+  if (verGanancias) return <Ganancias onVolver={() => setVerGanancias(false)} />;
   if (celebrando) return <Celebracion />;
 
   if (fase === 'cancelado_pasajero') {
@@ -922,7 +925,7 @@ const cargarSaldo = useCallback(async (uid) => {
   return (
     <div style={{ backgroundColor: '#141416', minHeight: '100vh', fontFamily: 'Arial, sans-serif' }}>
       <div style={{ background: 'linear-gradient(135deg, #1A1A1E, #2A2A2E)', padding: '24px 20px', position: 'relative' }}>
-        <MenuLateral nombre={nombre} foto={fotoConductor} onIrPerfil={() => setVerPerfil(true)} onIrCreditos={() => setVerCreditos(true)} onIrViajes={() => setVerHistorial(true)} onCerrarSesion={cerrarSesion} />
+        <MenuLateral nombre={nombre} foto={fotoConductor} onIrPerfil={() => setVerPerfil(true)} onIrCreditos={() => setVerCreditos(true)} onIrViajes={() => setVerHistorial(true)} onIrGanancias={() => setVerGanancias(true)} onCerrarSesion={cerrarSesion} />
         <div onClick={onVolver} style={{ position: 'absolute', top: '18px', left: '120px', display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(255,255,255,0.12)', borderRadius: '12px', color: '#FFFFFF', fontSize: '14px', fontWeight: '500', padding: '8px 16px', cursor: 'pointer', zIndex: 5 }}><span style={{ fontSize: '20px', fontWeight: '900', lineHeight: '1' }}>‹</span> Volver</div>
         <div style={{ marginTop: '48px' }}>
           <p style={{ color: '#AAAAAA', fontSize: '11px', margin: '0', letterSpacing: '2px' }}>CONDUCTOR</p>

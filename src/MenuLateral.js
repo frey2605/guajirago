@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { auth } from './firebase';
 import { signOut } from 'firebase/auth';
 
-function MenuLateral({ nombre, foto, onIrPerfil, onIrCreditos, onIrViajes, onCerrarSesion }) {
+function MenuLateral({ nombre, foto, onIrPerfil, onIrCreditos, onIrViajes, onIrGanancias, onCerrarSesion }) {
   const [abierto, setAbierto] = useState(false);
 
   const cerrar = () => setAbierto(false);
@@ -55,7 +55,7 @@ function MenuLateral({ nombre, foto, onIrPerfil, onIrCreditos, onIrViajes, onCer
               {opcion('👤', 'Mi perfil', () => { if (onIrPerfil) onIrPerfil(); else proximamente(); })}
               {opcion('🕐', 'Mis viajes', () => { if (onIrViajes) onIrViajes(); else proximamente(); })}
               {opcion('💰', 'Mis créditos', () => { if (onIrCreditos) onIrCreditos(); else proximamente(); })}
-              {opcion('📊', 'Ganancias', proximamente)}
+              {opcion('📊', 'Ganancias', () => { if (onIrGanancias) onIrGanancias(); else proximamente(); })}
               {opcion('🛡️', 'Seguridad', proximamente)}
               {opcion('📢', 'Compartir GuajiraGo', compartir)}
               {opcion('⚙️', 'Configuración', proximamente)}
