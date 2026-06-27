@@ -4,6 +4,7 @@ import Login from './Login';
 import Home from './Home';
 import AppConductor from './AppConductor';
 import MenuLateral from './MenuLateral';
+import MiPerfil from './MiPerfil';
 import { auth, db, storage } from './firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
@@ -40,10 +41,10 @@ function cargarLocal() {
   try { return JSON.parse(localStorage.getItem(STORAGE_KEY)); } catch (e) { return null; }
 }
 
-function PantallaModulos({ nombre, onSeleccionar, onVolver, onCerrarSesion }) {
+function PantallaModulos({ nombre, onSeleccionar, onVolver, onCerrarSesion, onIrPerfil }) {
   return (
     <div style={{ backgroundColor: '#141416', minHeight: '100vh', fontFamily: 'Arial, sans-serif', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px 24px', position: 'relative' }}>
-      <MenuLateral nombre={nombre} onCerrarSesion={onCerrarSesion} />
+      <MenuLateral nombre={nombre} onIrPerfil={onIrPerfil} onCerrarSesion={onCerrarSesion} />
       <div onClick={onVolver} style={{ position: 'absolute', top: '18px', left: '120px', display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(255,255,255,0.12)', borderRadius: '12px', color: '#FFFFFF', fontSize: '14px', fontWeight: '500', padding: '8px 16px', cursor: 'pointer', zIndex: 5 }}><span style={{ fontSize: '20px', fontWeight: '900', lineHeight: '1' }}>‹</span> Volver</div>
       <h1 style={{ fontSize: '42px', color: '#FFFFFF', margin: '0', fontFamily: 'Arial Black, sans-serif', letterSpacing: '-1px', textAlign: 'center' }}>Guajira</h1>
       <h1 style={{ fontSize: '56px', background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', margin: '0 0 16px', fontFamily: 'Arial Black, sans-serif', letterSpacing: '-2px' }}>GO</h1>
@@ -68,10 +69,10 @@ function PantallaModulos({ nombre, onSeleccionar, onVolver, onCerrarSesion }) {
   );
 }
 
-function PantallaRol({ nombre, onSeleccionar, onVolver, onCerrarSesion }) {
+function PantallaRol({ nombre, onSeleccionar, onVolver, onCerrarSesion, onIrPerfil }) {
   return (
     <div style={{ backgroundColor: '#141416', minHeight: '100vh', fontFamily: 'Arial, sans-serif', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px 24px', position: 'relative' }}>
-      <MenuLateral nombre={nombre} onCerrarSesion={onCerrarSesion} />
+      <MenuLateral nombre={nombre} onIrPerfil={onIrPerfil} onCerrarSesion={onCerrarSesion} />
       <div onClick={onVolver} style={{ position: 'absolute', top: '18px', left: '120px', display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(255,255,255,0.12)', borderRadius: '12px', color: '#FFFFFF', fontSize: '14px', fontWeight: '500', padding: '8px 16px', cursor: 'pointer', zIndex: 5 }}><span style={{ fontSize: '20px', fontWeight: '900', lineHeight: '1' }}>‹</span> Volver</div>
       <p style={{ color: '#AAAAAA', fontSize: '14px', letterSpacing: '3px', marginBottom: '8px', textAlign: 'center' }}>BIENVENIDO</p>
       <h2 style={{ color: '#FFFFFF', fontSize: '26px', fontWeight: '900', margin: '0 0 32px', textAlign: 'center' }}>{nombre || 'Usuario'}</h2>
@@ -96,7 +97,7 @@ function PantallaRol({ nombre, onSeleccionar, onVolver, onCerrarSesion }) {
   );
 }
 
-function PantallaDatosConductor({ nombre, celular, onGuardar, onVolver, onCerrarSesion }) {
+function PantallaDatosConductor({ nombre, celular, onGuardar, onVolver, onCerrarSesion, onIrPerfil }) {
   const [tipoVehiculo, setTipoVehiculo] = React.useState('');
   const [placa, setPlaca] = React.useState('');
   const [marca, setMarca] = React.useState('');
@@ -175,7 +176,7 @@ function PantallaDatosConductor({ nombre, celular, onGuardar, onVolver, onCerrar
           </div>
         </div>
       )}
-      <MenuLateral nombre={nombre} onCerrarSesion={onCerrarSesion} />
+      <MenuLateral nombre={nombre} onIrPerfil={onIrPerfil} onCerrarSesion={onCerrarSesion} />
       <div onClick={onVolver} style={{ position: 'absolute', top: '18px', left: '120px', display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(255,255,255,0.12)', borderRadius: '12px', color: '#FFFFFF', fontSize: '14px', fontWeight: '500', padding: '8px 16px', cursor: 'pointer', zIndex: 5 }}><span style={{ fontSize: '20px', fontWeight: '900', lineHeight: '1' }}>‹</span> Volver</div>
       <div style={{ textAlign: 'center', marginBottom: '32px' }}>
         <span style={{ fontSize: '48px' }}>🚗</span>
@@ -289,6 +290,7 @@ function App() {
   const [placaUsuario, setPlacaUsuario] = useState('');
   const [vehiculoUsuario, setVehiculoUsuario] = useState('');
   const [tipoVehiculoUsuario, setTipoVehiculoUsuario] = useState('');
+  const [verPerfil, setVerPerfil] = useState(false);
 
   useEffect(() => {
     const local = cargarLocal();
@@ -379,11 +381,12 @@ function App() {
     setScreen('login');
   };
 
+  if (verPerfil) return <MiPerfil onVolver={() => setVerPerfil(false)} />;
   if (screen === 'splash') return <Splash onFinish={() => {}} />;
   if (screen === 'login') return <Login onEntrar={handleEntrar} />;
-  if (screen === 'modulos') return <PantallaModulos nombre={nombreUsuario} onSeleccionar={handleSeleccionarModulo} onVolver={() => setScreen('login')} onCerrarSesion={handleCerrarSesion} />;
-  if (screen === 'rol') return <PantallaRol nombre={nombreUsuario} onSeleccionar={handleSeleccionarRol} onVolver={() => setScreen('modulos')} onCerrarSesion={handleCerrarSesion} />;
-  if (screen === 'datos_conductor') return <PantallaDatosConductor nombre={nombreUsuario} celular={telefonoUsuario} onGuardar={handleDatosConductor} onVolver={() => setScreen('rol')} onCerrarSesion={handleCerrarSesion} />;
+  if (screen === 'modulos') return <PantallaModulos nombre={nombreUsuario} onSeleccionar={handleSeleccionarModulo} onVolver={() => setScreen('login')} onCerrarSesion={handleCerrarSesion} onIrPerfil={() => setVerPerfil(true)} />;
+  if (screen === 'rol') return <PantallaRol nombre={nombreUsuario} onSeleccionar={handleSeleccionarRol} onVolver={() => setScreen('modulos')} onCerrarSesion={handleCerrarSesion} onIrPerfil={() => setVerPerfil(true)} />;
+  if (screen === 'datos_conductor') return <PantallaDatosConductor nombre={nombreUsuario} celular={telefonoUsuario} onGuardar={handleDatosConductor} onVolver={() => setScreen('rol')} onCerrarSesion={handleCerrarSesion} onIrPerfil={() => setVerPerfil(true)} />;
 
   if (screen === 'home') {
     if (tipoUsuario === 'conductor') {
