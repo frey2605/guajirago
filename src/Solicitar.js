@@ -99,6 +99,14 @@ function ModalCancelacion({ razones, onConfirmar, onCerrar }) {
 // Tarjeta de contraoferta con barra de tiempo
 function TarjetaContraoferta({ oferta, onAceptar, onRechazar }) {
   const [progreso, setProgreso] = useState(100);
+  const [fotoConductor, setFotoConductor] = useState(null);
+
+  useEffect(() => {
+    if (!oferta.conductorId) return;
+    getDoc(doc(db, 'usuarios', oferta.conductorId)).then(snap => {
+      if (snap.exists()) setFotoConductor(snap.data().fotoConductor || snap.data().foto || null);
+    }).catch(() => {});
+  }, [oferta.conductorId]);
 
   useEffect(() => {
     const inicio = Date.now();
@@ -123,9 +131,14 @@ function TarjetaContraoferta({ oferta, onAceptar, onRechazar }) {
         <div style={{ height: '100%', width: `${progreso}%`, background: colorBarra, borderRadius: '2px', transition: 'width 0.05s linear, background 0.3s' }} />
       </div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-        <div>
-          <p style={{ color: '#FFFFFF', fontWeight: '900', fontSize: '15px', margin: '0' }}>{oferta.conductorNombre}</p>
-          {oferta.conductorPlaca && <p style={{ color: '#FFCF4D', fontSize: '12px', margin: '3px 0 0' }}>🚘 {oferta.conductorPlaca} · {oferta.conductorVehiculo}</p>}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: '#141416', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '22px', overflow: 'hidden', border: '2px solid #FF7A2F', flexShrink: 0 }}>
+            {fotoConductor ? <img src={fotoConductor} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : '👤'}
+          </div>
+          <div>
+            <p style={{ color: '#FFFFFF', fontWeight: '900', fontSize: '15px', margin: '0' }}>{oferta.conductorNombre}</p>
+            {oferta.conductorPlaca && <p style={{ color: '#FFCF4D', fontSize: '12px', margin: '3px 0 0' }}>🚘 {oferta.conductorPlaca} · {oferta.conductorVehiculo}</p>}
+          </div>
         </div>
         <p style={{ color: '#FF7A2F', fontSize: '28px', fontWeight: '900', margin: '0' }}>{oferta.contraoferta}</p>
       </div>
@@ -244,6 +257,7 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
   const [contador, setContador] = useState(240);
   const [buscandoAgotado, setBuscandoAgotado] = useState(false);
   const [confirmacionPendiente, setConfirmacionPendiente] = useState(null);
+  const [datosConductor, setDatosConductor] = useState(null);
   const [conductorYaTomado, setConductorYaTomado] = useState(false);
   const [llamandoConductor, setLlamandoConductor] = useState(false);
   const [llamadaEntrante, setLlamadaEntrante] = useState(false);
@@ -428,6 +442,22 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
       if (snap.exists() && snap.data().ubicacion) setUbicacionConductor({ lat: snap.data().ubicacion.lat, lng: snap.data().ubicacion.lng });
     });
   }, []);
+
+  const cargarDatosConductor = useCallback(async (conductorId) => {
+    if (!conductorId) return;
+    try {
+      const snap = await getDoc(doc(db, 'usuarios', conductorId));
+      if (snap.exists()) {
+        const d = snap.data();
+        setDatosConductor({ foto: d.fotoConductor || d.foto || null, color: d.color || '' });
+      }
+    } catch (e) {}
+  }, []);
+
+  useEffect(() => {
+    const cid = confirmacionPendiente?.conductorId || viaje?.conductorId;
+    if (cid) cargarDatosConductor(cid);
+  }, [confirmacionPendiente, viaje?.conductorId, cargarDatosConductor]);
 
   const geocodificarDestino = (destinoTexto) => {
     if (!window.google || !destinoTexto) return;
@@ -704,9 +734,12 @@ const confirmarViaje = async () => {
         <div style={{ fontSize: '80px', marginBottom: '16px', animation: 'pulso 1s infinite alternate' }}>🚗</div>
         <div style={{ background: 'linear-gradient(135deg, #1A1A1E, #2A2A2E)', borderRadius: '28px', padding: '32px 24px', width: '100%', maxWidth: '440px', border: '3px solid #2ECC71', textAlign: 'center' }}>
           <p style={{ color: '#2ECC71', fontSize: '13px', margin: '0 0 12px', letterSpacing: '2px', fontWeight: 'bold' }}>¡UN CONDUCTOR ACEPTÓ!</p>
+          <div style={{ width: '90px', height: '90px', borderRadius: '50%', background: '#141416', margin: '0 auto 12px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '40px', overflow: 'hidden', border: '3px solid #2ECC71' }}>
+            {datosConductor?.foto ? <img src={datosConductor.foto} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : '👤'}
+          </div>
           <h2 style={{ color: '#FFFFFF', fontSize: '24px', fontWeight: '900', margin: '0 0 12px' }}>{confirmacionPendiente.conductorNombre || 'Conductor'}</h2>
           {confirmacionPendiente.conductorPlaca && <p style={{ color: '#FFCF4D', fontSize: '18px', fontWeight: '900', margin: '0 0 4px' }}>🚘 {confirmacionPendiente.conductorPlaca}</p>}
-          {confirmacionPendiente.conductorVehiculo && <p style={{ color: '#AAAAAA', fontSize: '14px', margin: '0 0 12px' }}>{confirmacionPendiente.conductorVehiculo}</p>}
+          {confirmacionPendiente.conductorVehiculo && <p style={{ color: '#AAAAAA', fontSize: '14px', margin: '0 0 12px' }}>{confirmacionPendiente.conductorVehiculo}{datosConductor?.color ? ` · ${datosConductor.color}` : ''}</p>}
           <p style={{ color: '#2ECC71', fontSize: '32px', fontWeight: '900', margin: '8px 0 0' }}>{confirmacionPendiente.tarifa}</p>
         </div>
         <p style={{ color: '#FFFFFF', fontSize: '16px', margin: '24px 0 16px', textAlign: 'center', fontWeight: 'bold' }}>¿Confirmas este viaje?</p>
@@ -770,10 +803,15 @@ const confirmarViaje = async () => {
         {!conductorEnPunto && (
           <div style={{ position: 'absolute', bottom: '0', left: '0', right: '0', zIndex: 10, background: 'rgba(20,20,22,0.97)', borderRadius: '24px 24px 0 0', padding: '20px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-              <div>
-                <p style={{ color: '#555', fontSize: '10px', margin: '0' }}>CONDUCTOR</p>
-                <p style={{ color: '#FFFFFF', fontSize: '14px', fontWeight: 'bold', margin: '4px 0 0' }}>{viaje?.conductorNombre}</p>
-                {viaje?.conductorPlaca && <p style={{ color: '#FFCF4D', fontSize: '12px', margin: '2px 0 0' }}>🚘 {viaje.conductorPlaca} · {viaje.conductorVehiculo}</p>}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: '#141416', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px', overflow: 'hidden', border: '2px solid #2ECC71', flexShrink: 0 }}>
+                  {datosConductor?.foto ? <img src={datosConductor.foto} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : '👤'}
+                </div>
+                <div>
+                  <p style={{ color: '#555', fontSize: '10px', margin: '0' }}>CONDUCTOR</p>
+                  <p style={{ color: '#FFFFFF', fontSize: '14px', fontWeight: 'bold', margin: '4px 0 0' }}>{viaje?.conductorNombre}</p>
+                  {viaje?.conductorPlaca && <p style={{ color: '#FFCF4D', fontSize: '12px', margin: '2px 0 0' }}>🚘 {viaje.conductorPlaca} · {viaje.conductorVehiculo}{datosConductor?.color ? ` · ${datosConductor.color}` : ''}</p>}
+                </div>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '8px' }}>
                 <div style={{ textAlign: 'right' }}><p style={{ color: '#555', fontSize: '10px', margin: '0' }}>TARIFA</p><p style={{ color: '#2ECC71', fontSize: '18px', fontWeight: '900', margin: '2px 0 0' }}>{viaje?.tarifa}</p></div>
@@ -807,7 +845,16 @@ const confirmarViaje = async () => {
         </div>
         <div style={{ position: 'absolute', bottom: '0', left: '0', right: '0', zIndex: 10, background: 'rgba(20,20,22,0.97)', borderRadius: '24px 24px 0 0', padding: '20px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-            <div><p style={{ color: '#555', fontSize: '10px', margin: '0' }}>CONDUCTOR</p><p style={{ color: '#FFFFFF', fontSize: '14px', fontWeight: 'bold', margin: '4px 0 0' }}>{viaje?.conductorNombre}</p></div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: '#141416', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '22px', overflow: 'hidden', border: '2px solid #FF7A2F', flexShrink: 0 }}>
+                {datosConductor?.foto ? <img src={datosConductor.foto} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : '👤'}
+              </div>
+              <div>
+                <p style={{ color: '#555', fontSize: '10px', margin: '0' }}>CONDUCTOR</p>
+                <p style={{ color: '#FFFFFF', fontSize: '14px', fontWeight: 'bold', margin: '4px 0 0' }}>{viaje?.conductorNombre}</p>
+                {viaje?.conductorPlaca && <p style={{ color: '#FFCF4D', fontSize: '11px', margin: '2px 0 0' }}>🚘 {viaje.conductorPlaca} · {viaje.conductorVehiculo}{datosConductor?.color ? ` · ${datosConductor.color}` : ''}</p>}
+              </div>
+            </div>
             <div style={{ textAlign: 'right' }}><p style={{ color: '#555', fontSize: '10px', margin: '0' }}>TARIFA</p><p style={{ color: '#2ECC71', fontSize: '18px', fontWeight: '900', margin: '4px 0 0' }}>{viaje?.tarifa}</p></div>
           </div>
         </div>
