@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { db, auth } from './firebase';
 import { collection, addDoc, doc, onSnapshot, updateDoc, getDoc, runTransaction } from 'firebase/firestore';
 import Calificacion from './Calificacion';
+import Llamada from './Llamada';
 import { alertarNuevoViaje, precargarAudio, activarAudioiOS } from './Notificaciones';
 
 const centroRiohacha = { lat: 11.5444, lng: -72.9072 };
@@ -244,6 +245,7 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
   const [buscandoAgotado, setBuscandoAgotado] = useState(false);
   const [confirmacionPendiente, setConfirmacionPendiente] = useState(null);
   const [conductorYaTomado, setConductorYaTomado] = useState(false);
+  const [llamandoConductor, setLlamandoConductor] = useState(false);
   const [tiempoBusqueda, setTiempoBusqueda] = useState(240);
   const contadorBusquedaRef = useRef(null);
   const radioRef = useRef(null);
@@ -662,6 +664,7 @@ const confirmarViaje = async () => {
 
   if (mostrarCalificacion) return <Calificacion tipo={tipo} viajeId={viajeId} nombreCalificado={viaje?.conductorNombre} quienCalifica="pasajero" onFinalizar={onVolver} />;
   if (celebrando) return <Celebracion />;
+  if (llamandoConductor) return <Llamada viajeId={viajeId} miRol="pasajero" nombreOtro={viaje?.conductorNombre || 'Conductor'} onCerrar={() => setLlamandoConductor(false)} />;
 
   if (conductorYaTomado) {
     return (
@@ -750,7 +753,8 @@ const confirmarViaje = async () => {
                 <div style={{ textAlign: 'right' }}><p style={{ color: '#555', fontSize: '10px', margin: '0' }}>TARIFA</p><p style={{ color: '#2ECC71', fontSize: '18px', fontWeight: '900', margin: '2px 0 0' }}>{viaje?.tarifa}</p></div>
               </div>
             </div>
-            <button onClick={() => setMostrarCancelacion(true)} style={{ width: '100%', marginTop: '12px', padding: '14px', background: 'transparent', border: '1px solid #2A2A2E', borderRadius: '14px', color: '#FF4444', fontSize: '14px', cursor: 'pointer' }}>Cancelar viaje</button>
+            <button onClick={() => setLlamandoConductor(true)} style={{ width: '100%', marginTop: '12px', padding: '14px', background: 'linear-gradient(135deg, #2ECC71, #27AE60)', border: 'none', borderRadius: '14px', color: '#FFFFFF', fontSize: '14px', fontWeight: 'bold', cursor: 'pointer' }}>📞 Llamar al conductor</button>
+            <button onClick={() => setMostrarCancelacion(true)} style={{ width: '100%', marginTop: '8px', padding: '14px', background: 'transparent', border: '1px solid #2A2A2E', borderRadius: '14px', color: '#FF4444', fontSize: '14px', cursor: 'pointer' }}>Cancelar viaje</button>
           </div>
         )}
       </div>

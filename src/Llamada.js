@@ -215,27 +215,27 @@ function Llamada({ viajeId, miRol, nombreOtro, onCerrar }) {
         <div style={{ display: 'flex', gap: '24px', alignItems: 'center', marginBottom: '48px' }}>
 
           {/* Silenciar */}
-          <div onClick={toggleSilencio} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-            <div style={{ width: '60px', height: '60px', borderRadius: '50%', background: silenciado ? '#FF4444' : '#1A1A1E', border: '2px solid #2A2A2E', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px' }}>
+          <div onClick={toggleSilencio} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
+            <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: silenciado ? '#FF4444' : 'rgba(255,255,255,0.1)', border: `2px solid ${silenciado ? '#FF4444' : 'rgba(255,255,255,0.2)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '26px', boxShadow: silenciado ? '0 4px 16px rgba(255,68,68,0.4)' : 'none' }}>
               {silenciado ? '🔇' : '🎤'}
             </div>
-            <p style={{ color: '#555', fontSize: '11px', margin: '0' }}>{silenciado ? 'Activar mic' : 'Silenciar'}</p>
+            <p style={{ color: '#FFFFFF', fontSize: '12px', margin: '0', fontWeight: 'bold' }}>{silenciado ? 'Activar mic' : 'Silenciar'}</p>
           </div>
 
           {/* Colgar */}
-          <div onClick={colgar} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-            <div style={{ width: '80px', height: '80px', borderRadius: '50%', background: '#FF4444', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '32px', boxShadow: '0 4px 20px rgba(255,68,68,0.4)' }}>
+          <div onClick={colgar} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
+            <div style={{ width: '84px', height: '84px', borderRadius: '50%', background: 'linear-gradient(135deg, #FF4444, #CC0000)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '34px', boxShadow: '0 6px 24px rgba(255,68,68,0.5)' }}>
               📵
             </div>
-            <p style={{ color: '#555', fontSize: '11px', margin: '0' }}>Colgar</p>
+            <p style={{ color: '#FFFFFF', fontSize: '12px', margin: '0', fontWeight: 'bold' }}>Colgar</p>
           </div>
 
           {/* Altavoz */}
-          <div onClick={toggleAltavoz} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-            <div style={{ width: '60px', height: '60px', borderRadius: '50%', background: altavoz ? '#2ECC71' : '#1A1A1E', border: '2px solid #2A2A2E', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px' }}>
+          <div onClick={toggleAltavoz} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
+            <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: altavoz ? '#2ECC71' : 'rgba(255,255,255,0.1)', border: `2px solid ${altavoz ? '#2ECC71' : 'rgba(255,255,255,0.2)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '26px', boxShadow: altavoz ? '0 4px 16px rgba(46,204,113,0.4)' : 'none' }}>
               {altavoz ? '🔊' : '🔈'}
             </div>
-            <p style={{ color: '#555', fontSize: '11px', margin: '0' }}>{altavoz ? 'Altavoz on' : 'Altavoz'}</p>
+            <p style={{ color: '#FFFFFF', fontSize: '12px', margin: '0', fontWeight: 'bold' }}>{altavoz ? 'Altavoz on' : 'Altavoz'}</p>
           </div>
 
         </div>

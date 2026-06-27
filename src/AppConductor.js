@@ -624,7 +624,7 @@ const cargarSaldo = useCallback(async (uid) => {
         .sort((a, b) => tsDe(b) - tsDe(a))
         .slice(0, 5);
 
-      const nuevas = vigentes.filter(v => !solicitudesIdsRef.current.has(v.id));
+      const nuevas = vigentes.filter(v => !solicitudesIdsRef.current.has(v.id) && !v.nuevaOferta);
       if (nuevas.length > 0) alertarNuevoViaje();
       solicitudesIdsRef.current = new Set(vigentes.map(v => v.id));
       setSolicitudes(vigentes);
