@@ -132,6 +132,14 @@ function Llamada({ viajeId, miRol, nombreOtro, onCerrar }) {
       }
     };
 
+    // Crear documento para que el pasajero detecte la llamada entrante
+    await setDoc(llamadaDocRef, {
+      estado: 'llamando',
+      candidatosPasajero: [],
+      candidatosConductor: [],
+      inicio: new Date().toISOString(),
+    });
+
     unsubRef.current = onSnapshot(llamadaDocRef, async (snap) => {
       if (!snap.exists()) return;
       const data = snap.data();

@@ -246,6 +246,7 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
   const [confirmacionPendiente, setConfirmacionPendiente] = useState(null);
   const [conductorYaTomado, setConductorYaTomado] = useState(false);
   const [llamandoConductor, setLlamandoConductor] = useState(false);
+  const [llamadaEntrante, setLlamadaEntrante] = useState(false);
   const [tiempoBusqueda, setTiempoBusqueda] = useState(240);
   const contadorBusquedaRef = useRef(null);
   const radioRef = useRef(null);
@@ -412,6 +413,14 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
 
     return () => { unsub(); clearInterval(intervaloRespaldoRef.current); };
   }, [viajeId, celebrando, conductorEnPunto]);
+  useEffect(() => {
+    if (!viajeId) return;
+    const unsub = onSnapshot(doc(db, 'llamadas', viajeId), (s) => {
+      if (s.exists() && s.data().estado === 'llamando') setLlamadaEntrante(true);
+      if (!s.exists() || s.data().estado === 'terminada') setLlamadaEntrante(false);
+    });
+    return () => unsub();
+  }, [viajeId]);
 
   const escucharConductor = useCallback((conductorId) => {
     if (!conductorId) return;
@@ -665,6 +674,7 @@ const confirmarViaje = async () => {
   if (mostrarCalificacion) return <Calificacion tipo={tipo} viajeId={viajeId} nombreCalificado={viaje?.conductorNombre} quienCalifica="pasajero" onFinalizar={onVolver} />;
   if (celebrando) return <Celebracion />;
   if (llamandoConductor) return <Llamada viajeId={viajeId} miRol="pasajero" nombreOtro={viaje?.conductorNombre || 'Conductor'} onCerrar={() => setLlamandoConductor(false)} />;
+  if (llamadaEntrante) return <Llamada viajeId={viajeId} miRol="pasajero" nombreOtro={viaje?.conductorNombre || 'Conductor'} onCerrar={() => setLlamadaEntrante(false)} />;
 
   if (conductorYaTomado) {
     return (
