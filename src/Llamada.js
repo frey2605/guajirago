@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { db } from './firebase';
-import { doc, setDoc, onSnapshot, updateDoc, deleteDoc } from 'firebase/firestore';
+import { doc, setDoc, getDoc, onSnapshot, updateDoc } from 'firebase/firestore';
 
 const ICE_SERVERS = {
   iceServers: [
@@ -20,8 +20,14 @@ function Llamada({ viajeId, miRol, nombreOtro, onCerrar }) {
   const audioRemotoRef = useRef(null);
   const intervaloRef = useRef(null);
   const unsubRef = useRef(null);
-  const llamadaDocRef = doc(db, 'llamadas', viajeId);
   const tonoRef = useRef(null);
+  const candidatosLocalesRef = useRef([]);
+  const llamadaDocRef = doc(db, 'llamadas', viajeId);
+
+  // El que llama es el "oferente"; el que recibe es el "respondedor"
+  const soyOferente = miRol === 'conductor' || miRol === 'pasajero';
+  const miCampoCandidatos = soyOferente ? 'candidatosOferente' : 'candidatosRespondedor';
+  const campoCandidatosOtro = soyOferente ? 'candidatosRespondedor' : 'candidatosOferente';
 
   const iniciarTono = () => {
     try {
@@ -32,14 +38,14 @@ function Llamada({ viajeId, miRol, nombreOtro, onCerrar }) {
         osc.connect(gain);
         gain.connect(ctx.destination);
         osc.frequency.value = 440;
-        gain.gain.setValueAtTime(0.3, ctx.currentTime);
+        gain.gain.setValueAtTime(0.25, ctx.currentTime);
         gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 1.0);
         osc.start(ctx.currentTime);
         osc.stop(ctx.currentTime + 1.0);
       };
       tocar();
       tonoRef.current = setInterval(tocar, 3000);
-    } catch(e) {}
+    } catch (e) {}
   };
 
   const detenerTono = () => {
@@ -47,215 +53,89 @@ function Llamada({ viajeId, miRol, nombreOtro, onCerrar }) {
   };
 
   useEffect(() => {
-    iniciar();
+    if (soyOferente) {
+      iniciarLlamada();
+    }
+    // El receptor (entrante) no hace nada hasta que toca Contestar
     return () => limpiar();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const limpiar = () => {
     detenerTono();
     clearInterval(intervaloRef.current);
-    if (unsubRef.current) unsubRef.current();
+    if (unsubRef.current) { try { unsubRef.current(); } catch (e) {} unsubRef.current = null; }
     if (streamRef.current) streamRef.current.getTracks().forEach(t => t.stop());
-    if (pcRef.current) { try { pcRef.current.close(); } catch(e) {} }
-    if (audioRemotoRef.current) { audioRemotoRef.current.srcObject = null; }
+    if (pcRef.current) { try { pcRef.current.close(); } catch (e) {} pcRef.current = null; }
+    if (audioRemotoRef.current) { try { audioRemotoRef.current.srcObject = null; } catch (e) {} }
   };
 
-  const iniciar = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-      streamRef.current = stream;
+  // Manejadores comunes de la conexión WebRTC (los usan ambos lados)
+  const configurarPeer = (pc) => {
+    pc.onicecandidate = async (e) => {
+      if (e.candidate) {
+        candidatosLocalesRef.current.push(e.candidate.toJSON());
+        try {
+          await updateDoc(llamadaDocRef, { [miCampoCandidatos]: candidatosLocalesRef.current });
+        } catch (err) {}
+      }
+    };
 
-      const pc = new RTCPeerConnection(ICE_SERVERS);
-      pcRef.current = pc;
-
-      stream.getTracks().forEach(track => pc.addTrack(track, stream));
-
-      pc.ontrack = (event) => {
-        detenerTono();
-        if (!audioRemotoRef.current) {
-          audioRemotoRef.current = new Audio();
-        }
+    pc.ontrack = (event) => {
+      detenerTono();
+      if (audioRemotoRef.current) {
         audioRemotoRef.current.srcObject = event.streams[0];
-        audioRemotoRef.current.play().catch(e => console.log(e));
-        setEstado('activa');
-        clearInterval(intervaloRef.current);
-        intervaloRef.current = setInterval(() => setDuracion(d => d + 1), 1000);
-      };
-
-      pc.oniceconnectionstatechange = () => {
-        if (pc.iceConnectionState === 'disconnected' || pc.iceConnectionState === 'failed') {
-          setEstado('terminada');
-        }
-      };
-
-      if (miRol === 'pasajero') {
-        await iniciarComoPasajero(pc, stream);
-      } else {
-        await iniciarComoConductor(pc, stream);
+        audioRemotoRef.current.play().catch(() => {});
       }
-    } catch(e) {
-      console.error('Error iniciando llamada:', e);
-      setEstado('error');
-    }
-  };
-
-  const iniciarComoPasajero = async (pc, stream) => {
-    const candidatosPasajero = [];
-
-    pc.onicecandidate = async (e) => {
-      if (e.candidate) {
-        candidatosPasajero.push(e.candidate.toJSON());
-        try {
-          await updateDoc(llamadaDocRef, { candidatosPasajero });
-        } catch(err) {}
-      }
+      setEstado('activa');
+      clearInterval(intervaloRef.current);
+      intervaloRef.current = setInterval(() => setDuracion(d => d + 1), 1000);
     };
 
-    const oferta = await pc.createOffer();
-    await pc.setLocalDescription(oferta);
-
-    await setDoc(llamadaDocRef, {
-      oferta: { type: oferta.type, sdp: oferta.sdp },
-      estado: 'llamando',
-      candidatosPasajero: [],
-      candidatosConductor: [],
-      inicio: new Date().toISOString(),
-    });
-
-    unsubRef.current = onSnapshot(llamadaDocRef, async (snap) => {
-      if (!snap.exists()) return;
-      const data = snap.data();
-
-      if (data.respuesta && !pc.currentRemoteDescription) {
-        try {
-          await pc.setRemoteDescription(new RTCSessionDescription(data.respuesta));
-        } catch(e) {}
-      }
-
-      if (data.candidatosConductor && pc.currentRemoteDescription) {
-        for (const c of data.candidatosConductor) {
-          try { await pc.addIceCandidate(new RTCIceCandidate(c)); } catch(e) {}
-        }
-      }
-
-      if (data.estado === 'terminada') {
-        limpiar();
+    pc.oniceconnectionstatechange = () => {
+      if (pc.iceConnectionState === 'disconnected' || pc.iceConnectionState === 'failed') {
         setEstado('terminada');
-        setTimeout(onCerrar, 1500);
-      }
-    });
-  };
-
-  const iniciarComoConductor = async (pc, stream) => {
-    const candidatosConductor = [];
-
-    pc.onicecandidate = async (e) => {
-      if (e.candidate) {
-        candidatosConductor.push(e.candidate.toJSON());
-        try {
-          await updateDoc(llamadaDocRef, { candidatosConductor });
-        } catch(err) {}
       }
     };
-
-    // Crear documento para que el pasajero detecte la llamada entrante
-    await setDoc(llamadaDocRef, {
-      estado: 'llamando',
-      candidatosPasajero: [],
-      candidatosConductor: [],
-      inicio: new Date().toISOString(),
-    });
-
-    iniciarTono();
-
-    unsubRef.current = onSnapshot(llamadaDocRef, async (snap) => {
-      if (!snap.exists()) return;
-      const data = snap.data();
-
-      if (data.oferta && !pc.currentRemoteDescription) {
-        try {
-          await pc.setRemoteDescription(new RTCSessionDescription(data.oferta));
-          const respuesta = await pc.createAnswer();
-          await pc.setLocalDescription(respuesta);
-          await updateDoc(llamadaDocRef, {
-            respuesta: { type: respuesta.type, sdp: respuesta.sdp },
-            estado: 'activa',
-          });
-        } catch(e) { console.error(e); }
-      }
-
-      if (data.candidatosPasajero && pc.currentRemoteDescription) {
-        for (const c of data.candidatosPasajero) {
-          try { await pc.addIceCandidate(new RTCIceCandidate(c)); } catch(e) {}
-        }
-      }
-
-      if (data.estado === 'terminada') {
-        limpiar();
-        setEstado('terminada');
-        setTimeout(onCerrar, 1500);
-      }
-    });
   };
-const contestar = async () => {
+
+  // EL QUE LLAMA: crea la oferta y espera la respuesta
+  const iniciarLlamada = async () => {
     try {
-      setEstado('conectando');
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
       streamRef.current = stream;
       const pc = new RTCPeerConnection(ICE_SERVERS);
       pcRef.current = pc;
       stream.getTracks().forEach(track => pc.addTrack(track, stream));
+      configurarPeer(pc);
 
-      const candidatos = [];
-      const campoMio = miRol === 'entrante' && pcRef.current ? 'candidatosPasajero' : 'candidatosConductor';
+      const oferta = await pc.createOffer();
+      await pc.setLocalDescription(oferta);
 
-      pc.onicecandidate = async (e) => {
-        if (e.candidate) {
-          candidatos.push(e.candidate.toJSON());
-          try { await updateDoc(llamadaDocRef, { [campoMio]: candidatos }); } catch(err) {}
-        }
-      };
+      // Crear el documento con la oferta y los candidatos ya reunidos
+      await setDoc(llamadaDocRef, {
+        estado: 'llamando',
+        oferta: { type: oferta.type, sdp: oferta.sdp },
+        candidatosOferente: candidatosLocalesRef.current,
+        candidatosRespondedor: [],
+        inicio: new Date().toISOString(),
+      });
 
-      pc.ontrack = (event) => {
-        detenerTono();
-        if (!audioRemotoRef.current) audioRemotoRef.current = new Audio();
-        audioRemotoRef.current.srcObject = event.streams[0];
-        audioRemotoRef.current.play().catch(e => console.log(e));
-        setEstado('activa');
-        clearInterval(intervaloRef.current);
-        intervaloRef.current = setInterval(() => setDuracion(d => d + 1), 1000);
-      };
-
-      pc.oniceconnectionstatechange = () => {
-        if (pc.iceConnectionState === 'disconnected' || pc.iceConnectionState === 'failed') setEstado('terminada');
-      };
-
-      // Avisar que contestó y escuchar la oferta del que llamó
-      await updateDoc(llamadaDocRef, { estado: 'contestada' });
+      iniciarTono();
 
       unsubRef.current = onSnapshot(llamadaDocRef, async (snap) => {
         if (!snap.exists()) return;
         const data = snap.data();
 
-        // Si el que llamó mandó una oferta, responder
-        const oferta = data.oferta;
-        if (oferta && !pc.currentRemoteDescription) {
+        if (data.respuesta && pcRef.current && !pcRef.current.currentRemoteDescription) {
           try {
-            await pc.setRemoteDescription(new RTCSessionDescription(oferta));
-            const respuesta = await pc.createAnswer();
-            await pc.setLocalDescription(respuesta);
-            await updateDoc(llamadaDocRef, {
-              respuesta: { type: respuesta.type, sdp: respuesta.sdp },
-              estado: 'activa',
-            });
-          } catch(e) { console.error(e); }
+            await pcRef.current.setRemoteDescription(new RTCSessionDescription(data.respuesta));
+          } catch (e) {}
         }
 
-        // Candidatos del que llamó
-        const candidatosOtro = data.candidatosPasajero || data.candidatosConductor || [];
-        if (pc.currentRemoteDescription) {
-          for (const c of candidatosOtro) {
-            try { await pc.addIceCandidate(new RTCIceCandidate(c)); } catch(e) {}
+        if (pcRef.current && pcRef.current.currentRemoteDescription && Array.isArray(data[campoCandidatosOtro])) {
+          for (const c of data[campoCandidatosOtro]) {
+            try { await pcRef.current.addIceCandidate(new RTCIceCandidate(c)); } catch (e) {}
           }
         }
 
@@ -265,19 +145,71 @@ const contestar = async () => {
           setTimeout(onCerrar, 1500);
         }
       });
-    } catch(e) {
-      console.error(e);
+    } catch (e) {
+      setEstado('error');
+    }
+  };
+
+  // EL QUE RECIBE: lee la oferta y responde (solo al tocar Contestar)
+  const contestar = async () => {
+    try {
+      setEstado('conectando');
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+      streamRef.current = stream;
+      const pc = new RTCPeerConnection(ICE_SERVERS);
+      pcRef.current = pc;
+      stream.getTracks().forEach(track => pc.addTrack(track, stream));
+      configurarPeer(pc);
+
+      const snap = await getDoc(llamadaDocRef);
+      const data = snap.exists() ? snap.data() : null;
+      if (!data || !data.oferta) { setEstado('error'); return; }
+
+      await pc.setRemoteDescription(new RTCSessionDescription(data.oferta));
+      const respuesta = await pc.createAnswer();
+      await pc.setLocalDescription(respuesta);
+
+      await updateDoc(llamadaDocRef, {
+        respuesta: { type: respuesta.type, sdp: respuesta.sdp },
+        estado: 'activa',
+      });
+
+      // Agregar los candidatos del que llamó que ya estaban guardados
+      if (Array.isArray(data.candidatosOferente)) {
+        for (const c of data.candidatosOferente) {
+          try { await pc.addIceCandidate(new RTCIceCandidate(c)); } catch (e) {}
+        }
+      }
+
+      unsubRef.current = onSnapshot(llamadaDocRef, async (snap2) => {
+        if (!snap2.exists()) return;
+        const d = snap2.data();
+
+        if (pcRef.current && pcRef.current.currentRemoteDescription && Array.isArray(d.candidatosOferente)) {
+          for (const c of d.candidatosOferente) {
+            try { await pcRef.current.addIceCandidate(new RTCIceCandidate(c)); } catch (e) {}
+          }
+        }
+
+        if (d.estado === 'terminada') {
+          limpiar();
+          setEstado('terminada');
+          setTimeout(onCerrar, 1500);
+        }
+      });
+    } catch (e) {
       setEstado('error');
     }
   };
 
   const rechazar = async () => {
-    try { await updateDoc(llamadaDocRef, { estado: 'terminada' }); } catch(e) {}
+    try { await updateDoc(llamadaDocRef, { estado: 'terminada' }); } catch (e) {}
     limpiar();
     onCerrar();
   };
+
   const colgar = async () => {
-    try { await updateDoc(llamadaDocRef, { estado: 'terminada' }); } catch(e) {}
+    try { await updateDoc(llamadaDocRef, { estado: 'terminada' }); } catch (e) {}
     limpiar();
     setEstado('terminada');
     setTimeout(onCerrar, 1000);
@@ -291,15 +223,7 @@ const contestar = async () => {
   };
 
   const toggleAltavoz = () => {
-    if (audioRemotoRef.current) {
-      // En móvil, cambiar el sink de audio si está disponible
-      if (audioRemotoRef.current.setSinkId) {
-        if (!altavoz) {
-          audioRemotoRef.current.setSinkId('').catch(() => {});
-        }
-      }
-      setAltavoz(!altavoz);
-    }
+    setAltavoz(!altavoz);
   };
 
   const formatDuracion = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
@@ -309,6 +233,8 @@ const contestar = async () => {
 
   return (
     <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: '#141416', zIndex: 9999, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px 24px' }}>
+
+      <audio ref={audioRemotoRef} autoPlay playsInline style={{ display: 'none' }} />
 
       {/* Avatar animado */}
       <div style={{ width: '120px', height: '120px', borderRadius: '50%', background: `linear-gradient(135deg, #1A1A1E, #2A2A2E)`, border: `3px solid ${colorEstado}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '56px', marginBottom: '24px', boxShadow: estado === 'activa' ? `0 0 30px ${colorEstado}40` : 'none', transition: 'all 0.5s' }}>
