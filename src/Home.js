@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import Solicitar from './Solicitar';
 import MenuLateral from './MenuLateral';
 import MiPerfil from './MiPerfil';
+import Seguridad from './Seguridad';
 import { auth, db } from './firebase';
 import { signOut } from 'firebase/auth';
 import { collection, query, where, limit, getDocs } from 'firebase/firestore';
@@ -83,9 +84,9 @@ function Historial({ onVolver }) {
 
   return (
     <div style={{ backgroundColor: '#141416', minHeight: '100vh', fontFamily: 'Arial, sans-serif' }}>
-      <div style={{ background: 'linear-gradient(135deg, #1A1A1E, #2A2A2E)', padding: '24px 20px', display: 'flex', alignItems: 'center', gap: '16px' }}>
-        <button onClick={onVolver} style={{ background: 'none', border: 'none', color: '#FF7A2F', fontSize: '24px', cursor: 'pointer' }}>←</button>
-        <h2 style={{ color: '#FFFFFF', margin: '0', fontSize: '20px', fontWeight: '900' }}>Mis viajes</h2>
+      <div style={{ background: 'linear-gradient(135deg, #1A1A1E, #2A2A2E)', padding: '24px 20px', position: 'relative', display: 'flex', alignItems: 'center' }}>
+        <div onClick={onVolver} style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(255,255,255,0.12)', borderRadius: '12px', color: '#FFFFFF', fontSize: '14px', fontWeight: '500', padding: '8px 16px', cursor: 'pointer' }}><span style={{ fontSize: '20px', fontWeight: '900', lineHeight: '1', position: 'relative', top: '-1px' }}>‹</span> Volver</div>
+        <h2 style={{ color: '#FFFFFF', margin: '0 auto', fontSize: '20px', fontWeight: '900' }}>Mis viajes</h2>
       </div>
       <div style={{ padding: '20px' }}>
         {cargando && <p style={{ color: '#AAAAAA', textAlign: 'center', marginTop: '40px' }}>Cargando...</p>}
@@ -150,6 +151,7 @@ function guardarReciente(destino) {
 function Home({ nombre, onCerrarSesion, onVolver }) {
   const [pantalla, setPantalla] = useState('home');
   const [verPerfil, setVerPerfil] = useState(false);
+  const [verSeguridad, setVerSeguridad] = useState(false);
   const [tipoSeleccionado, setTipoSeleccionado] = useState('');
   const [destinoPredefinido, setDestinoPredefinido] = useState('');
   const [favoritos, setFavoritos] = useState(cargarFavoritos());
@@ -189,13 +191,16 @@ function Home({ nombre, onCerrarSesion, onVolver }) {
   if (verPerfil) {
     return <MiPerfil onVolver={() => setVerPerfil(false)} />;
   }
+  if (verSeguridad) {
+    return <Seguridad onVolver={() => setVerSeguridad(false)} />;
+  }
 
   return (
     <div style={{ backgroundColor: '#141416', minHeight: '100vh', fontFamily: 'Arial, sans-serif' }}>
       {mostrarModalFavorito && <ModalFavorito onGuardar={agregarFavorito} onCerrar={() => setMostrarModalFavorito(false)} />}
 
       <div style={{ background: 'linear-gradient(135deg, #1A1A1E, #2A2A2E)', padding: '24px 20px', position: 'relative' }}>
-        <MenuLateral nombre={nombre} onIrPerfil={() => setVerPerfil(true)} onCerrarSesion={onCerrarSesion} />
+        <MenuLateral nombre={nombre} onIrPerfil={() => setVerPerfil(true)} onIrViajes={() => setPantalla('historial')} onIrSeguridad={() => setVerSeguridad(true)} onCerrarSesion={onCerrarSesion} />
         <div onClick={onVolver} style={{ position: 'absolute', top: '18px', left: '120px', display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(255,255,255,0.12)', borderRadius: '12px', color: '#FFFFFF', fontSize: '14px', fontWeight: '500', padding: '8px 16px', cursor: 'pointer', zIndex: 5 }}><span style={{ fontSize: '20px', fontWeight: '900', lineHeight: '1' }}>‹</span> Volver</div>
         <div style={{ marginTop: '48px' }}>
           <p style={{ color: '#AAAAAA', fontSize: '12px', margin: '0', letterSpacing: '2px' }}>UBICACIÓN</p>

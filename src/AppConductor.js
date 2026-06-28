@@ -8,6 +8,7 @@ import Llamada from './Llamada';
 import Creditos from './Creditos';
 import MiPerfil from './MiPerfil';
 import Ganancias from './Ganancias';
+import Seguridad from './Seguridad';
 import MenuLateral from './MenuLateral';
 const centroRiohacha = { lat: 11.5444, lng: -72.9072 };
 const TARIFA_DIA = 8000;
@@ -208,9 +209,9 @@ function HistorialConductor({ onVolver }) {
 
   return (
     <div style={{ backgroundColor: '#141416', minHeight: '100vh', fontFamily: 'Arial, sans-serif' }}>
-      <div style={{ background: 'linear-gradient(135deg, #1A1A1E, #2A2A2E)', padding: '24px 20px', display: 'flex', alignItems: 'center', gap: '16px' }}>
-        <button onClick={onVolver} style={{ background: 'none', border: 'none', color: '#FF7A2F', fontSize: '24px', cursor: 'pointer' }}>←</button>
-        <h2 style={{ color: '#FFFFFF', margin: '0', fontSize: '20px', fontWeight: '900' }}>Mis viajes</h2>
+      <div style={{ background: 'linear-gradient(135deg, #1A1A1E, #2A2A2E)', padding: '24px 20px', position: 'relative', display: 'flex', alignItems: 'center' }}>
+        <div onClick={onVolver} style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(255,255,255,0.12)', borderRadius: '12px', color: '#FFFFFF', fontSize: '14px', fontWeight: '500', padding: '8px 16px', cursor: 'pointer' }}><span style={{ fontSize: '20px', fontWeight: '900', lineHeight: '1', position: 'relative', top: '-1px' }}>‹</span> Volver</div>
+        <h2 style={{ color: '#FFFFFF', margin: '0 auto', fontSize: '20px', fontWeight: '900' }}>Mis viajes</h2>
       </div>
       {totalHoy > 0 && (
         <div style={{ margin: '16px 20px 0', background: 'linear-gradient(135deg, #0A1F0A, #1A2A1A)', borderRadius: '16px', padding: '16px 20px', border: '1px solid #1A3A1A', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -382,6 +383,7 @@ function AppConductor({ nombre, telefono, placa, vehiculo, tipoVehiculo, onCerra
   const [verCreditos, setVerCreditos] = useState(false);
   const [verPerfil, setVerPerfil] = useState(false);
   const [verGanancias, setVerGanancias] = useState(false);
+  const [verSeguridad, setVerSeguridad] = useState(false);
   const [saldoCreditos, setSaldoCreditos] = useState(null);
   const [fotoConductor, setFotoConductor] = useState(null);
   const [colorConductor, setColorConductor] = useState('');
@@ -799,6 +801,7 @@ const cargarSaldo = useCallback(async (uid) => {
   if (verCreditos) return <Creditos onVolver={() => setVerCreditos(false)} />;
   if (verPerfil) return <MiPerfil onVolver={() => setVerPerfil(false)} />;
   if (verGanancias) return <Ganancias onVolver={() => setVerGanancias(false)} />;
+  if (verSeguridad) return <Seguridad onVolver={() => setVerSeguridad(false)} />;
   if (celebrando) return <Celebracion />;
 
   if (fase === 'cancelado_pasajero') {
@@ -925,7 +928,7 @@ const cargarSaldo = useCallback(async (uid) => {
   return (
     <div style={{ backgroundColor: '#141416', minHeight: '100vh', fontFamily: 'Arial, sans-serif' }}>
       <div style={{ background: 'linear-gradient(135deg, #1A1A1E, #2A2A2E)', padding: '24px 20px', position: 'relative' }}>
-        <MenuLateral nombre={nombre} foto={fotoConductor} onIrPerfil={() => setVerPerfil(true)} onIrCreditos={() => setVerCreditos(true)} onIrViajes={() => setVerHistorial(true)} onIrGanancias={() => setVerGanancias(true)} onCerrarSesion={cerrarSesion} />
+        <MenuLateral nombre={nombre} foto={fotoConductor} onIrPerfil={() => setVerPerfil(true)} onIrCreditos={() => setVerCreditos(true)} onIrViajes={() => setVerHistorial(true)} onIrGanancias={() => setVerGanancias(true)} onIrSeguridad={() => setVerSeguridad(true)} onCerrarSesion={cerrarSesion} />
         <div onClick={onVolver} style={{ position: 'absolute', top: '18px', left: '120px', display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(255,255,255,0.12)', borderRadius: '12px', color: '#FFFFFF', fontSize: '14px', fontWeight: '500', padding: '8px 16px', cursor: 'pointer', zIndex: 5 }}><span style={{ fontSize: '20px', fontWeight: '900', lineHeight: '1' }}>‹</span> Volver</div>
         <div style={{ marginTop: '48px' }}>
           <p style={{ color: '#AAAAAA', fontSize: '11px', margin: '0', letterSpacing: '2px' }}>CONDUCTOR</p>
