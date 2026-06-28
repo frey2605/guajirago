@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { db, auth } from './firebase';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, collection, query, where, getDocs } from 'firebase/firestore';
 
 function Seguridad({ onVolver }) {
   const [contactoNombre, setContactoNombre] = useState('');
@@ -58,17 +58,46 @@ function Seguridad({ onVolver }) {
     setGuardando(false);
   };
 
-  const compartirUbicacion = () => {
+  const compartirUbicacion = async () => {
     if (!contactoNumero.trim()) {
       setError('Primero guarda un contacto de confianza');
       return;
     }
-    let texto = '🚨 *Estoy usando GuajiraGo* y quiero que sepas mi ubicación actual.';
+    setError('');
+
+    let texto = '🚨 *Estoy usando GuajiraGo* y quiero que sepas dónde estoy.';
     if (ubicacion) {
-      texto += `\n📍 Mi ubicación: https://maps.google.com/?q=${ubicacion.lat},${ubicacion.lng}`;
+      texto += `\n\n📍 *Mi ubicación:* https://maps.google.com/?q=${ubicacion.lat},${ubicacion.lng}`;
     } else {
-      texto += '\n📍 No pude obtener mi ubicación exacta en este momento.';
+      texto += '\n\n📍 No pude obtener mi ubicación exacta en este momento.';
     }
+
+    // Buscar si el pasajero tiene un viaje en curso para añadir ruta y datos del conductor
+    try {
+      const user = auth.currentUser;
+      if (user) {
+        const q = query(collection(db, 'viajes'), where('pasajeroId', '==', user.uid));
+        const snap = await getDocs(q);
+        const viajeActivo = snap.docs
+          .map(d => ({ id: d.id, ...d.data() }))
+          .find(v => ['confirmado', 'aceptado', 'recogiendo', 'en_punto', 'en_viaje'].includes(v.estado) || ['recogiendo', 'en_punto', 'en_viaje'].includes(v.fase));
+
+        if (viajeActivo) {
+          texto += '\n\n🛣️ *MI RUTA*';
+          if (viajeActivo.origen) texto += `\n🟢 Origen: ${viajeActivo.origen}`;
+          if (viajeActivo.destino) texto += `\n🔴 Destino: ${viajeActivo.destino}`;
+
+          texto += '\n\n🚗 *DATOS DEL CONDUCTOR*';
+          if (viajeActivo.conductorNombre) texto += `\n👤 Nombre: ${viajeActivo.conductorNombre}`;
+          if (viajeActivo.conductorPlaca) texto += `\n🚘 Placa: ${viajeActivo.conductorPlaca}`;
+          if (viajeActivo.conductorColor) texto += `\n🎨 Color: ${viajeActivo.conductorColor}`;
+          if (viajeActivo.conductorVehiculo) texto += `\n🏷️ Vehículo: ${viajeActivo.conductorVehiculo}`;
+          if (viajeActivo.conductorTelefono) texto += `\n📞 Teléfono: ${viajeActivo.conductorTelefono}`;
+          if (viajeActivo.conductorFoto) texto += `\n📸 Foto: ${viajeActivo.conductorFoto}`;
+        }
+      }
+    } catch (e) {}
+
     const numero = contactoNumero.replace(/\D/g, '');
     const numeroFinal = numero.startsWith('57') ? numero : '57' + numero;
     window.open(`https://wa.me/${numeroFinal}?text=${encodeURIComponent(texto)}`, '_blank');
@@ -140,8 +169,9 @@ function Seguridad({ onVolver }) {
         <div onClick={compartirUbicacion} style={{ background: '#1A1A1E', borderRadius: '20px', padding: '20px', display: 'flex', alignItems: 'center', gap: '16px', cursor: 'pointer', border: '1px solid #25D366', marginTop: '8px' }}>
           <span style={{ fontSize: '32px' }}>📤</span>
           <div>
-            <p style={{ color: '#FFFFFF', fontWeight: '900', fontSize: '16px', margin: '0' }}>Compartir mi ubicación</p>
-            <p style={{ color: '#25D366', fontSize: '13px', margin: '4px 0 0' }}>
+            <p style={{ color: '#FFFFFF', fontWeight: '900', fontSize: '15px', margin: '0', lineHeight: '1.3' }}>Compartir ubicación, ruta e identidad del conductor</p>
+            <p style={{ color: '#AAAAAA', fontSize: '12px', margin: '6px 0 0', lineHeight: '1.4' }}>Nombre, foto, placa, color, marca y modelo</p>
+            <p style={{ color: '#25D366', fontSize: '13px', margin: '6px 0 0' }}>
               {contactoNombre ? `Enviar por WhatsApp a ${contactoNombre}` : 'Guarda un contacto primero'}
             </p>
           </div>

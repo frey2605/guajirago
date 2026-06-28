@@ -14,6 +14,8 @@ function Login({ onEntrar }) {
   const [anioNac, setAnioNac] = useState('');
   const [password, setPassword] = useState('');
   const [passwordConfirm, setPasswordConfirm] = useState('');
+  const [contactoNombre, setContactoNombre] = useState('');
+  const [contactoNumero, setContactoNumero] = useState('');
   const [error, setError] = useState('');
   const [cargando, setCargando] = useState(false);
   const [mensajeRecuperar, setMensajeRecuperar] = useState('');
@@ -22,6 +24,8 @@ function Login({ onEntrar }) {
 
   const registrarse = async () => {
     if (!nombre || !email || !emailConfirm || !celular || !diaNac || !mesNac || !anioNac || !password || !passwordConfirm) { setError('Por favor completa todos los campos'); return; }
+    if (!contactoNombre.trim()) { setError('Escribe el nombre de tu contacto de emergencia'); return; }
+    if (!contactoNumero.trim()) { setError('Escribe el número de tu contacto de emergencia'); return; }
     if (email.trim().toLowerCase() !== emailConfirm.trim().toLowerCase()) { setError('Los correos no coinciden'); return; }
     if (password !== passwordConfirm) { setError('Las contraseñas no coinciden'); return; }
     if (password.length < 6) { setError('La contraseña debe tener mínimo 6 caracteres'); return; }
@@ -30,7 +34,7 @@ function Login({ onEntrar }) {
       const resultado = await createUserWithEmailAndPassword(auth, email.trim().toLowerCase(), password);
       try { await sendEmailVerification(resultado.user); } catch (e) {}
       const fechaNacimiento = `${String(diaNac).padStart(2, '0')}/${String(mesNac).padStart(2, '0')}/${anioNac}`;
-      await setDoc(doc(db, 'usuarios', resultado.user.uid), { nombre, email: email.trim().toLowerCase(), celular, fechaNacimiento, tipo: '', placa: '', vehiculo: '', fechaRegistro: new Date().toISOString() });
+      await setDoc(doc(db, 'usuarios', resultado.user.uid), { nombre, email: email.trim().toLowerCase(), celular, fechaNacimiento, contactoConfianzaNombre: contactoNombre.trim(), contactoConfianzaNumero: contactoNumero.trim(), tipo: '', placa: '', vehiculo: '', fechaRegistro: new Date().toISOString() });
       onEntrar('', nombre, celular, '', '');
     } catch (err) {
       if (err.code === 'auth/email-already-in-use') setError('Este correo ya está registrado');
@@ -141,10 +145,19 @@ function Login({ onEntrar }) {
           <input value={password} onChange={e => setPassword(e.target.value)} placeholder="Contraseña (mínimo 6 caracteres)" type={verPassword ? 'text' : 'password'} style={{ background: 'none', border: 'none', outline: 'none', color: '#FFFFFF', fontSize: '16px', width: '100%' }} />
           <span onClick={() => setVerPassword(!verPassword)} style={{ fontSize: '20px', cursor: 'pointer' }}>{verPassword ? '🙈' : '👁️'}</span>
         </div>
-        <div style={{ background: '#1A1A1E', borderRadius: '16px', padding: '16px', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <div style={{ background: '#1A1A1E', borderRadius: '16px', padding: '16px', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '12px' }}>
           <span style={{ fontSize: '20px' }}>🔒</span>
           <input value={passwordConfirm} onChange={e => setPasswordConfirm(e.target.value)} onPaste={e => e.preventDefault()} placeholder="Confirmar contraseña" type={verPasswordConfirm ? 'text' : 'password'} style={{ background: 'none', border: 'none', outline: 'none', color: '#FFFFFF', fontSize: '16px', width: '100%' }} />
           <span onClick={() => setVerPasswordConfirm(!verPasswordConfirm)} style={{ fontSize: '20px', cursor: 'pointer' }}>{verPasswordConfirm ? '🙈' : '👁️'}</span>
+        </div>
+        <p style={{ color: '#FF7A2F', fontSize: '11px', letterSpacing: '2px', margin: '0 0 10px 4px', fontWeight: 'bold' }}>🚨 CONTACTO DE EMERGENCIA</p>
+        <div style={{ background: '#1A1A1E', borderRadius: '16px', padding: '16px', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <span style={{ fontSize: '20px' }}>👥</span>
+          <input value={contactoNombre} onChange={e => setContactoNombre(e.target.value)} placeholder="Nombre del contacto" style={{ background: 'none', border: 'none', outline: 'none', color: '#FFFFFF', fontSize: '16px', width: '100%' }} />
+        </div>
+        <div style={{ background: '#1A1A1E', borderRadius: '16px', padding: '16px', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <span style={{ color: '#FFFFFF', fontSize: '16px', fontWeight: '900', whiteSpace: 'nowrap' }}>+57</span>
+          <input value={contactoNumero} onChange={e => setContactoNumero(e.target.value)} placeholder="3001234567" type="tel" style={{ background: 'none', border: 'none', outline: 'none', color: '#FFFFFF', fontSize: '16px', width: '100%' }} />
         </div>
         <button onClick={registrarse} style={{ width: '100%', padding: '18px', background: cargando ? '#2A2A2E' : 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)', border: 'none', borderRadius: '16px', color: cargando ? '#555' : '#141416', fontSize: '18px', fontWeight: '900', cursor: 'pointer' }}>
           {cargando ? 'Creando cuenta...' : 'Crear cuenta'}

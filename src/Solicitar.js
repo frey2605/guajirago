@@ -251,9 +251,11 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
   const [conductorEnPunto, setConductorEnPunto] = useState(false);
   const [mostrarLlego, setMostrarLlego] = useState(false);
   const [mostrarCancelacion, setMostrarCancelacion] = useState(false);
+  const [mostrarEmergencia, setMostrarEmergencia] = useState(false);
   const [contador, setContador] = useState(240);
   const [buscandoAgotado, setBuscandoAgotado] = useState(false);
   const [confirmacionPendiente, setConfirmacionPendiente] = useState(null);
+  const [contactoEmergencia, setContactoEmergencia] = useState('');
   const [datosConductor, setDatosConductor] = useState(null);
   const [conductorYaTomado, setConductorYaTomado] = useState(false);
   const [llamandoConductor, setLlamandoConductor] = useState(false);
@@ -281,8 +283,9 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
         const user = auth.currentUser;
         if (!user) return;
         const snap = await getDoc(doc(db, 'usuarios', user.uid));
-        if (snap.exists() && Array.isArray(snap.data().favoritos)) {
-          setFavoritos(snap.data().favoritos);
+        if (snap.exists()) {
+          if (Array.isArray(snap.data().favoritos)) setFavoritos(snap.data().favoritos);
+          setContactoEmergencia(snap.data().contactoConfianzaNumero || '');
         }
       } catch (e) {}
     };
@@ -458,6 +461,38 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
   const enviarRespuesta = async (respuesta) => {
     if (!viajeId) return;
     await updateDoc(doc(db, 'viajes', viajeId), { respuestaPasajero: respuesta });
+  };
+  const llamarEmergencia = () => {
+    window.location.href = 'tel:123';
+  };
+
+  const compartirSeguridad = () => {
+    let texto = '🚨 *EMERGENCIA - Estoy en un viaje de GuajiraGo*';
+
+    if (ubicacionPasajero) {
+      texto += `\n\n📍 *Mi ubicación:* https://maps.google.com/?q=${ubicacionPasajero.lat},${ubicacionPasajero.lng}`;
+    }
+
+    texto += '\n\n🛣️ *MI RUTA*';
+    if (origen) texto += `\n🟢 Origen: ${origen}`;
+    if (destino) texto += `\n🔴 Destino: ${destino}`;
+
+    if (viaje) {
+      texto += '\n\n🚗 *DATOS DEL CONDUCTOR*';
+      if (viaje.conductorNombre) texto += `\n👤 Nombre: ${viaje.conductorNombre}`;
+      if (viaje.conductorPlaca) texto += `\n🚘 Placa: ${viaje.conductorPlaca}`;
+      if (datosConductor?.color) texto += `\n🎨 Color: ${datosConductor.color}`;
+      if (viaje.conductorVehiculo) texto += `\n🏷️ Vehículo: ${viaje.conductorVehiculo}`;
+      if (viaje.conductorTelefono) texto += `\n📞 Teléfono: ${viaje.conductorTelefono}`;
+      if (datosConductor?.foto) texto += `\n📸 Foto: ${datosConductor.foto}`;
+    }
+
+    const numero = contactoEmergencia.replace(/\D/g, '');
+    const numeroFinal = numero ? (numero.startsWith('57') ? numero : '57' + numero) : '';
+    const url = numeroFinal
+      ? `https://wa.me/${numeroFinal}?text=${encodeURIComponent(texto)}`
+      : `https://wa.me/?text=${encodeURIComponent(texto)}`;
+    window.location.href = url;
   };
 
   const cancelarViaje = async (razon) => {
@@ -697,7 +732,34 @@ const confirmarViaje = async () => {
       return prev.filter(c => c.conductorId !== conductorId);
     });
   };
+const PanelEmergencia = () => (
+    mostrarEmergencia ? (
+      <div onClick={() => setMostrarEmergencia(false)} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.9)', zIndex: 99999, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
+        <div onClick={(e) => e.stopPropagation()} style={{ background: '#1A1A1E', borderRadius: '28px', padding: '28px 24px', width: '100%', maxWidth: '420px', border: '3px solid #FF4444' }}>
+          <p style={{ color: '#FF4444', fontSize: '14px', margin: '0 0 4px', letterSpacing: '2px', fontWeight: 'bold', textAlign: 'center' }}>🚨 EMERGENCIA</p>
+          <p style={{ color: '#AAAAAA', fontSize: '13px', margin: '0 0 24px', textAlign: 'center', lineHeight: '1.4' }}>¿Qué necesitas hacer?</p>
 
+          <div onClick={() => { llamarEmergencia(); }} style={{ background: 'linear-gradient(135deg, #FF4444, #CC0000)', borderRadius: '18px', padding: '20px', marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '14px', cursor: 'pointer' }}>
+            <span style={{ fontSize: '34px' }}>🚨</span>
+            <div>
+              <p style={{ color: '#FFFFFF', fontWeight: '900', fontSize: '17px', margin: '0' }}>Llamar al 123</p>
+              <p style={{ color: 'rgba(255,255,255,0.8)', fontSize: '12px', margin: '3px 0 0' }}>Línea de emergencias</p>
+            </div>
+          </div>
+
+          <div onClick={() => { compartirSeguridad(); setMostrarEmergencia(false); }} style={{ background: '#141416', borderRadius: '18px', padding: '20px', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '14px', cursor: 'pointer', border: '1px solid #25D366' }}>
+            <span style={{ fontSize: '34px' }}>📤</span>
+            <div>
+              <p style={{ color: '#FFFFFF', fontWeight: '900', fontSize: '15px', margin: '0', lineHeight: '1.3' }}>Compartir ubicación, ruta e identidad del conductor</p>
+              <p style={{ color: '#25D366', fontSize: '12px', margin: '5px 0 0' }}>Enviar por WhatsApp</p>
+            </div>
+          </div>
+
+          <button onClick={() => setMostrarEmergencia(false)} style={{ width: '100%', padding: '14px', background: 'transparent', border: '1px solid #2A2A2E', borderRadius: '14px', color: '#AAAAAA', fontSize: '14px', fontWeight: 'bold', cursor: 'pointer' }}>Cerrar</button>
+        </div>
+      </div>
+    ) : null
+  );
   if (mostrarCalificacion) return <Calificacion tipo={tipo} viajeId={viajeId} nombreCalificado={viaje?.conductorNombre} quienCalifica="pasajero" onFinalizar={onVolver} />;
   if (celebrando) return <Celebracion />;
   if (llamandoConductor) return <Llamada viajeId={viajeId} miRol="pasajero" nombreOtro={viaje?.conductorNombre || 'Conductor'} onCerrar={() => setLlamandoConductor(false)} />;
@@ -757,7 +819,12 @@ const confirmarViaje = async () => {
       <div style={{ backgroundColor: '#141416', minHeight: '100vh', position: 'relative' }}>
         {mostrarCancelacion && <ModalCancelacion razones={RAZONES_CANCELACION_PASAJERO} onConfirmar={cancelarViaje} onCerrar={() => setMostrarCancelacion(false)} />}
         {mostrarLlego && <ConductorLlego nombre={viaje?.conductorNombre} placa={viaje?.conductorPlaca} onCerrar={() => setMostrarLlego(false)} />}
+        <PanelEmergencia />
         <MapaPasajero ubicacionPasajero={ubicacionPasajero} ubicacionConductor={ubicacionConductor} tipo={tipo} />
+        <div onClick={() => setMostrarEmergencia(true)} style={{ position: 'absolute', top: '86px', right: '16px', zIndex: 20, background: 'linear-gradient(135deg, #FF4444, #CC0000)', borderRadius: '14px', padding: '10px 14px', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', boxShadow: '0 4px 12px rgba(255,68,68,0.5)' }}>
+          <span style={{ fontSize: '20px' }}>🚨</span>
+          <span style={{ color: '#FFFFFF', fontSize: '14px', fontWeight: '900' }}>Emergencia</span>
+        </div>
         <div style={{ position: 'absolute', top: '16px', left: '16px', right: '16px', zIndex: 10, background: 'rgba(20,20,22,0.95)', borderRadius: '16px', padding: '12px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
             <p style={{ color: '#2ECC71', fontSize: '11px', margin: '0', letterSpacing: '1px', fontWeight: 'bold' }}>🚗 CONDUCTOR EN CAMINO</p>
@@ -823,7 +890,12 @@ const confirmarViaje = async () => {
   if (pantalla === 'fase2') {
     return (
       <div style={{ backgroundColor: '#141416', minHeight: '100vh', position: 'relative' }}>
+        <PanelEmergencia />
         <MapaPasajero ubicacionPasajero={destinoCoords || ubicacionPasajero} ubicacionConductor={ubicacionConductor} tipo={tipo} onTiempo={(t, d) => { setTiempoLlegada(t); setDistancia(d); }} />
+        <div onClick={() => setMostrarEmergencia(true)} style={{ position: 'absolute', top: '86px', right: '16px', zIndex: 20, background: 'linear-gradient(135deg, #FF4444, #CC0000)', borderRadius: '14px', padding: '10px 14px', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', boxShadow: '0 4px 12px rgba(255,68,68,0.5)' }}>
+          <span style={{ fontSize: '20px' }}>🚨</span>
+          <span style={{ color: '#FFFFFF', fontSize: '14px', fontWeight: '900' }}>Emergencia</span>
+        </div>
         <div style={{ position: 'absolute', top: '16px', left: '16px', right: '16px', zIndex: 10, background: 'rgba(20,20,22,0.95)', borderRadius: '16px', padding: '12px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
             <p style={{ color: '#FF7A2F', fontSize: '11px', margin: '0', letterSpacing: '1px', fontWeight: 'bold' }}>🚀 VIAJE EN CURSO</p>
