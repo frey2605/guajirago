@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { auth, db } from './firebase';
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, sendEmailVerification } from 'firebase/auth';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
+import TerminosCondiciones from './TerminosCondiciones';
+import PoliticaPrivacidad from './PoliticaPrivacidad';
 
 function Login({ onEntrar }) {
   const [pantalla, setPantalla] = useState('inicio');
@@ -22,6 +24,9 @@ function Login({ onEntrar }) {
   const [verPassword, setVerPassword] = useState(false);
   const [verPasswordConfirm, setVerPasswordConfirm] = useState(false);
   const [enviando, setEnviando] = useState(false);
+  const [aceptaTerminos, setAceptaTerminos] = useState(false);
+  const [verTerminos, setVerTerminos] = useState(false);
+  const [verPrivacidad, setVerPrivacidad] = useState(false);
 
   const registrarse = async () => {
     if (!nombre || !email || !emailConfirm || !celular || !diaNac || !mesNac || !anioNac || !password || !passwordConfirm) { setError('Por favor completa todos los campos'); return; }
@@ -30,6 +35,7 @@ function Login({ onEntrar }) {
     if (email.trim().toLowerCase() !== emailConfirm.trim().toLowerCase()) { setError('Los correos no coinciden'); return; }
     if (password !== passwordConfirm) { setError('Las contraseñas no coinciden'); return; }
     if (password.length < 6) { setError('La contraseña debe tener mínimo 6 caracteres'); return; }
+    if (!aceptaTerminos) { setError('Debes aceptar los Términos y condiciones para continuar'); return; }
     setEnviando(true); setError('');
     try {
       const resultado = await createUserWithEmailAndPassword(auth, email.trim().toLowerCase(), password);
@@ -74,7 +80,8 @@ function Login({ onEntrar }) {
     setCargando(false);
   };
 
-    
+  if (verTerminos) return <TerminosCondiciones onVolver={() => setVerTerminos(false)} />;
+  if (verPrivacidad) return <PoliticaPrivacidad onVolver={() => setVerPrivacidad(false)} />;
   if (pantalla === 'inicio') {
     return (
       <div style={{ backgroundColor: '#141416', minHeight: '100vh', fontFamily: 'Arial, sans-serif', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px 24px' }}>
@@ -161,6 +168,18 @@ function Login({ onEntrar }) {
           <span style={{ color: '#FFFFFF', fontSize: '16px', fontWeight: '900', whiteSpace: 'nowrap' }}>+57</span>
           <input value={contactoNumero} onChange={e => setContactoNumero(e.target.value)} placeholder="3001234567" type="tel" style={{ background: 'none', border: 'none', outline: 'none', color: '#FFFFFF', fontSize: '16px', width: '100%' }} />
         </div>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', marginBottom: '16px', padding: '14px', background: '#1A1A1E', borderRadius: '14px', border: `1px solid ${aceptaTerminos ? '#FF7A2F' : '#2A2A2E'}` }}>
+          <div onClick={() => setAceptaTerminos(!aceptaTerminos)} style={{ width: '22px', height: '22px', borderRadius: '6px', background: aceptaTerminos ? 'linear-gradient(135deg, #FFCF4D, #FF7A2F)' : '#2A2A2E', border: aceptaTerminos ? 'none' : '2px solid #555', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0, marginTop: '2px' }}>
+            {aceptaTerminos && <span style={{ color: '#141416', fontSize: '14px', fontWeight: '900' }}>✓</span>}
+          </div>
+          <p style={{ color: '#AAAAAA', fontSize: '13px', margin: '0', lineHeight: '1.5' }}>
+            He leído y acepto los{' '}
+            <span onClick={() => setVerTerminos(true)} style={{ color: '#FF7A2F', fontWeight: 'bold', cursor: 'pointer', textDecoration: 'underline' }}>Términos y condiciones</span>
+            {' '}y la{' '}
+            <span onClick={() => setVerPrivacidad(true)} style={{ color: '#FF7A2F', fontWeight: 'bold', cursor: 'pointer', textDecoration: 'underline' }}>Política de privacidad</span>
+            {' '}de GuajiraGo.
+          </p>
+        </div>
         <button onClick={registrarse} disabled={enviando} style={{ width: '100%', padding: '18px', background: enviando ? '#2A2A2E' : 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)', border: 'none', borderRadius: '16px', color: enviando ? '#555' : '#141416', fontSize: '18px', fontWeight: '900', cursor: 'pointer' }}>
           {enviando ? 'Creando cuenta...' : 'Crear cuenta'}
         </button>
@@ -199,7 +218,7 @@ function Login({ onEntrar }) {
     );
   }
 
-  return null;
+  
 }
 
 export default Login;

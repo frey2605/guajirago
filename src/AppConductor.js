@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { db, auth } from './firebase';
-import { collection, query, where, limit, onSnapshot, doc, updateDoc, setDoc, getDoc, getDocs, arrayUnion } from 'firebase/firestore';
+import { collection, query, where, limit, onSnapshot, doc, updateDoc, setDoc, getDoc, getDocs, arrayUnion, addDoc, orderBy } from 'firebase/firestore';
 import { registrarTokenFCM, alertarNuevoViaje, activarAudioiOS, precargarAudio, setDebugCallback } from './Notificaciones';
 import { signOut } from 'firebase/auth';
 import Calificacion from './Calificacion';
@@ -394,6 +394,9 @@ function AppConductor({ nombre, telefono, placa, vehiculo, tipoVehiculo, onCerra
   const [datosCalificacion, setDatosCalificacion] = useState(null);
   const [enLlamada, setEnLlamada] = useState(false);
   const [llamadaEntrante, setLlamadaEntrante] = useState(false);
+  const [mensajesChat, setMensajesChat] = useState([]);
+  const [textoChat, setTextoChat] = useState('');
+  const chatFinRef = useRef(null);
   const contadorRef = useRef(null);
   const [debugMsg, setDebugMsg] = React.useState('');
   const ultimoMensajeRef = useRef(null);
@@ -788,7 +791,29 @@ const cargarSaldo = useCallback(async (uid) => {
     setRespuestaPasajero(null); setMensajeGrande(null); ultimoMensajeRef.current = null;
     setUbicacionPasajero(null); setDestinoCoords(null); setActivo(true); setContador(240);
   };
+useEffect(() => {
+    if (!viajeActual?.id) return;
+    const q = query(collection(db, 'viajes', viajeActual.id, 'mensajes'), orderBy('fecha', 'asc'));
+    const unsub = onSnapshot(q, (snap) => {
+      setMensajesChat(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      setTimeout(() => { if (chatFinRef.current) chatFinRef.current.scrollIntoView({ behavior: 'smooth' }); }, 100);
+    });
+    return () => unsub();
+  }, [viajeActual?.id]);
 
+  const enviarMensajeConductor = async () => {
+    if (!textoChat.trim() || !viajeActual?.id) return;
+    const user = auth.currentUser;
+    try {
+      await addDoc(collection(db, 'viajes', viajeActual.id, 'mensajes'), {
+        texto: textoChat.trim(),
+        autor: 'conductor',
+        autorId: user?.uid || '',
+        fecha: new Date().toISOString(),
+      });
+      setTextoChat('');
+    } catch (e) {}
+  };
   useEffect(() => {
     if (!viajeActual?.id) return;
     const unsub = onSnapshot(doc(db, 'llamadas', viajeActual.id), (s) => {
@@ -880,6 +905,23 @@ const cargarSaldo = useCallback(async (uid) => {
           {fase === 'recogiendo' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               <button onClick={() => setEnLlamada(true)} style={{ width: '100%', padding: '14px', background: 'linear-gradient(135deg, #2ECC71, #27AE60)', border: 'none', borderRadius: '14px', color: '#FFFFFF', fontSize: '15px', fontWeight: 'bold', cursor: 'pointer' }}>📞 Llamar al pasajero</button>
+              <div style={{ background: '#141416', borderRadius: '14px', padding: '10px', border: '1px solid #2A2A2E', marginTop: '8px' }}>
+                <div style={{ maxHeight: '120px', overflowY: 'auto', marginBottom: '8px' }}>
+                  {mensajesChat.length === 0 && <p style={{ color: '#555', fontSize: '13px', textAlign: 'center', margin: '8px 0' }}>Sin mensajes aún</p>}
+                  {mensajesChat.map(m => (
+                    <div key={m.id} style={{ display: 'flex', justifyContent: m.autor === 'conductor' ? 'flex-end' : 'flex-start', marginBottom: '6px' }}>
+                      <div style={{ background: m.autor === 'conductor' ? 'linear-gradient(135deg, #FF7A2F, #D6357E)' : '#2A2A2E', borderRadius: '12px', padding: '8px 12px', maxWidth: '80%' }}>
+                        <p style={{ color: '#FFFFFF', fontSize: '13px', margin: '0', lineHeight: '1.4' }}>{m.texto}</p>
+                      </div>
+                    </div>
+                  ))}
+                  <div ref={chatFinRef} />
+                </div>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <input value={textoChat} onChange={e => setTextoChat(e.target.value)} onKeyDown={e => e.key === 'Enter' && enviarMensajeConductor()} placeholder="Escribe un mensaje..." style={{ flex: 1, background: '#1A1A1E', border: '1px solid #2A2A2E', borderRadius: '10px', padding: '10px 12px', color: '#FFFFFF', fontSize: '14px', outline: 'none' }} />
+                  <button onClick={enviarMensajeConductor} disabled={!textoChat.trim()} style={{ padding: '10px 16px', background: textoChat.trim() ? 'linear-gradient(135deg, #FF7A2F, #D6357E)' : '#2A2A2E', border: 'none', borderRadius: '10px', color: '#FFFFFF', fontSize: '18px', cursor: textoChat.trim() ? 'pointer' : 'default' }}>➤</button>
+                </div>
+              </div>
               <div style={{ display: 'flex', gap: '10px' }}>
                 <button onClick={() => setMostrarCancelacion(true)} style={{ flex: 1, padding: '14px', background: 'transparent', border: '1px solid #FF4444', borderRadius: '14px', color: '#FF4444', fontSize: '14px', cursor: 'pointer' }}>Cancelar</button>
                 <button onClick={llegueAlPunto} style={{ flex: 2, padding: '16px', background: 'linear-gradient(135deg, #2ECC71, #27AE60)', border: 'none', borderRadius: '16px', color: '#FFFFFF', fontSize: '16px', fontWeight: '900', cursor: 'pointer' }}>📍 Llegué al punto</button>

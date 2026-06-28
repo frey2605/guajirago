@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { db, auth } from './firebase';
-import { collection, addDoc, doc, onSnapshot, updateDoc, getDoc, runTransaction } from 'firebase/firestore';
+import { collection, addDoc, doc, onSnapshot, updateDoc, getDoc, runTransaction, query, orderBy } from 'firebase/firestore';
 import Calificacion from './Calificacion';
 import Llamada from './Llamada';
 import { alertarNuevoViaje, precargarAudio, activarAudioiOS } from './Notificaciones';
@@ -274,6 +274,10 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
   const intervaloRespaldoRef = useRef(null);
   const contaofertasIdsRef = useRef(new Set()); // IDs ya vistos para no duplicar
   const confirmacionMostradaRef = useRef(false);
+  const [mensajesChat, setMensajesChat] = useState([]);
+  const [textoChat, setTextoChat] = useState('');
+  const [mostrarChat, setMostrarChat] = useState(false);
+  const chatFinRef = useRef(null);
 
   useEffect(() => { pantallaRef.current = pantalla; }, [pantalla]);
 
@@ -461,6 +465,29 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
   const enviarRespuesta = async (respuesta) => {
     if (!viajeId) return;
     await updateDoc(doc(db, 'viajes', viajeId), { respuestaPasajero: respuesta });
+  };
+  useEffect(() => {
+    if (!viajeId) return;
+    const q = query(collection(db, 'viajes', viajeId, 'mensajes'), orderBy('fecha', 'asc'));
+    const unsub = onSnapshot(q, (snap) => {
+      setMensajesChat(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      setTimeout(() => { if (chatFinRef.current) chatFinRef.current.scrollIntoView({ behavior: 'smooth' }); }, 100);
+    });
+    return () => unsub();
+  }, [viajeId]);
+
+  const enviarMensajeChat = async () => {
+    if (!textoChat.trim() || !viajeId) return;
+    const user = auth.currentUser;
+    try {
+      await addDoc(collection(db, 'viajes', viajeId, 'mensajes'), {
+        texto: textoChat.trim(),
+        autor: 'pasajero',
+        autorId: user?.uid || '',
+        fecha: new Date().toISOString(),
+      });
+      setTextoChat('');
+    } catch (e) {}
   };
   const llamarEmergencia = () => {
     window.location.href = 'tel:123';
@@ -880,6 +907,26 @@ const PanelEmergencia = () => (
               </div>
             )}
             <button onClick={() => setLlamandoConductor(true)} style={{ width: '100%', marginTop: '12px', padding: '14px', background: 'linear-gradient(135deg, #2ECC71, #27AE60)', border: 'none', borderRadius: '14px', color: '#FFFFFF', fontSize: '14px', fontWeight: 'bold', cursor: 'pointer' }}>📞 Llamar al conductor</button>
+            <button onClick={() => setMostrarChat(!mostrarChat)} style={{ width: '100%', marginTop: '8px', padding: '14px', background: mostrarChat ? '#2A2A2E' : '#1A1A1E', border: '1px solid #2A2A2E', borderRadius: '14px', color: '#FFFFFF', fontSize: '14px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>💬 Chat con el conductor {mensajesChat.length > 0 ? `(${mensajesChat.length})` : ''}</button>
+            {mostrarChat && (
+              <div style={{ marginTop: '8px', background: '#141416', borderRadius: '14px', padding: '12px', border: '1px solid #2A2A2E' }}>
+                <div style={{ maxHeight: '160px', overflowY: 'auto', marginBottom: '8px' }}>
+                  {mensajesChat.length === 0 && <p style={{ color: '#555', fontSize: '13px', textAlign: 'center', margin: '8px 0' }}>Sin mensajes aún</p>}
+                  {mensajesChat.map(m => (
+                    <div key={m.id} style={{ display: 'flex', justifyContent: m.autor === 'pasajero' ? 'flex-end' : 'flex-start', marginBottom: '6px' }}>
+                      <div style={{ background: m.autor === 'pasajero' ? 'linear-gradient(135deg, #FF7A2F, #D6357E)' : '#2A2A2E', borderRadius: '12px', padding: '8px 12px', maxWidth: '80%' }}>
+                        <p style={{ color: '#FFFFFF', fontSize: '13px', margin: '0', lineHeight: '1.4' }}>{m.texto}</p>
+                      </div>
+                    </div>
+                  ))}
+                  <div ref={chatFinRef} />
+                </div>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <input value={textoChat} onChange={e => setTextoChat(e.target.value)} onKeyDown={e => e.key === 'Enter' && enviarMensajeChat()} placeholder="Escribe un mensaje..." style={{ flex: 1, background: '#1A1A1E', border: '1px solid #2A2A2E', borderRadius: '10px', padding: '10px 12px', color: '#FFFFFF', fontSize: '14px', outline: 'none' }} />
+                  <button onClick={enviarMensajeChat} disabled={!textoChat.trim()} style={{ padding: '10px 16px', background: textoChat.trim() ? 'linear-gradient(135deg, #FF7A2F, #D6357E)' : '#2A2A2E', border: 'none', borderRadius: '10px', color: '#FFFFFF', fontSize: '18px', cursor: textoChat.trim() ? 'pointer' : 'default' }}>➤</button>
+                </div>
+              </div>
+            )}
             <button onClick={() => setMostrarCancelacion(true)} style={{ width: '100%', marginTop: '8px', padding: '14px', background: 'transparent', border: '1px solid #2A2A2E', borderRadius: '14px', color: '#FF4444', fontSize: '14px', cursor: 'pointer' }}>Cancelar viaje</button>
           </div>
         )}
@@ -916,6 +963,29 @@ const PanelEmergencia = () => (
               </div>
             </div>
             <div style={{ textAlign: 'right' }}><p style={{ color: '#555', fontSize: '10px', margin: '0' }}>TARIFA</p><p style={{ color: '#2ECC71', fontSize: '18px', fontWeight: '900', margin: '4px 0 0' }}>{viaje?.tarifa}</p></div>
+          </div>
+          <p style={{ color: '#555', fontSize: '11px', letterSpacing: '2px', margin: '12px 0 8px' }}>RESPUESTAS RÁPIDAS</p>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '10px' }}>
+            {RESPUESTAS_RAPIDAS.map((resp, i) => (
+              <button key={i} onClick={() => enviarRespuesta(resp)} style={{ padding: '8px 12px', background: '#1A1A1E', border: '1px solid #2A2A2E', borderRadius: '10px', color: '#FFFFFF', fontSize: '12px', cursor: 'pointer', fontWeight: 'bold' }}>{resp}</button>
+            ))}
+          </div>
+          <div style={{ background: '#141416', borderRadius: '14px', padding: '10px', border: '1px solid #2A2A2E', marginBottom: '8px' }}>
+            <div style={{ maxHeight: '120px', overflowY: 'auto', marginBottom: '8px' }}>
+              {mensajesChat.length === 0 && <p style={{ color: '#555', fontSize: '13px', textAlign: 'center', margin: '8px 0' }}>Sin mensajes aún</p>}
+              {mensajesChat.map(m => (
+                <div key={m.id} style={{ display: 'flex', justifyContent: m.autor === 'pasajero' ? 'flex-end' : 'flex-start', marginBottom: '6px' }}>
+                  <div style={{ background: m.autor === 'pasajero' ? 'linear-gradient(135deg, #FF7A2F, #D6357E)' : '#2A2A2E', borderRadius: '12px', padding: '8px 12px', maxWidth: '80%' }}>
+                    <p style={{ color: '#FFFFFF', fontSize: '13px', margin: '0', lineHeight: '1.4' }}>{m.texto}</p>
+                  </div>
+                </div>
+              ))}
+              <div ref={chatFinRef} />
+            </div>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <input value={textoChat} onChange={e => setTextoChat(e.target.value)} onKeyDown={e => e.key === 'Enter' && enviarMensajeChat()} placeholder="Escribe un mensaje..." style={{ flex: 1, background: '#1A1A1E', border: '1px solid #2A2A2E', borderRadius: '10px', padding: '10px 12px', color: '#FFFFFF', fontSize: '14px', outline: 'none' }} />
+              <button onClick={enviarMensajeChat} disabled={!textoChat.trim()} style={{ padding: '10px 16px', background: textoChat.trim() ? 'linear-gradient(135deg, #FF7A2F, #D6357E)' : '#2A2A2E', border: 'none', borderRadius: '10px', color: '#FFFFFF', fontSize: '18px', cursor: textoChat.trim() ? 'pointer' : 'default' }}>➤</button>
+            </div>
           </div>
         </div>
       </div>
