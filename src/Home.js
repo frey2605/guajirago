@@ -5,6 +5,7 @@ import MiPerfil from './MiPerfil';
 import Seguridad from './Seguridad';
 import Creditos from './Creditos';
 import AyudaSoporte from './AyudaSoporte';
+import Configuracion from './Configuracion';
 import { auth, db } from './firebase';
 import { signOut } from 'firebase/auth';
 import { collection, query, where, limit, getDocs, doc, getDoc } from 'firebase/firestore';
@@ -156,6 +157,7 @@ function Home({ nombre, onCerrarSesion, onVolver }) {
   const [verSeguridad, setVerSeguridad] = useState(false);
   const [verCreditos, setVerCreditos] = useState(false);
   const [verAyuda, setVerAyuda] = useState(false);
+  const [verConfig, setVerConfig] = useState(false);
   const [tipoSeleccionado, setTipoSeleccionado] = useState('');
   const [destinoPredefinido, setDestinoPredefinido] = useState('');
   const [favoritos, setFavoritos] = useState(cargarFavoritos());
@@ -216,13 +218,16 @@ function Home({ nombre, onCerrarSesion, onVolver }) {
   if (verAyuda) {
     return <AyudaSoporte onVolver={() => setVerAyuda(false)} />;
   }
+  if (verConfig) {
+    return <Configuracion onVolver={() => setVerConfig(false)} onCerrarSesion={onCerrarSesion} />;
+  }
 
   return (
     <div style={{ backgroundColor: '#141416', minHeight: '100vh', fontFamily: 'Arial, sans-serif' }}>
       {mostrarModalFavorito && <ModalFavorito onGuardar={agregarFavorito} onCerrar={() => setMostrarModalFavorito(false)} />}
 
       <div style={{ background: 'linear-gradient(135deg, #1A1A1E, #2A2A2E)', padding: '24px 20px', position: 'relative' }}>
-        <MenuLateral nombre={nombre} foto={fotoUsuario} onIrPerfil={() => setVerPerfil(true)} onIrViajes={() => setPantalla('historial')} onIrCreditos={() => setVerCreditos(true)} onIrSeguridad={() => setVerSeguridad(true)} onIrAyuda={() => setVerAyuda(true)} onCerrarSesion={onCerrarSesion} />
+        <MenuLateral nombre={nombre} foto={fotoUsuario} onIrPerfil={() => setVerPerfil(true)} onIrViajes={() => setPantalla('historial')} onIrCreditos={() => setVerCreditos(true)} onIrSeguridad={() => setVerSeguridad(true)} onIrAyuda={() => setVerAyuda(true)} onIrConfig={() => setVerConfig(true)} onCerrarSesion={onCerrarSesion} />
         <div onClick={onVolver} style={{ position: 'absolute', top: '18px', left: '120px', display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(255,255,255,0.12)', borderRadius: '12px', color: '#FFFFFF', fontSize: '14px', fontWeight: '500', padding: '8px 16px', cursor: 'pointer', zIndex: 5 }}><span style={{ fontSize: '20px', fontWeight: '900', lineHeight: '1' }}>‹</span> Volver</div>
         <div style={{ marginTop: '48px' }}>
           <p style={{ color: '#AAAAAA', fontSize: '12px', margin: '0', letterSpacing: '2px' }}>UBICACIÓN</p>
