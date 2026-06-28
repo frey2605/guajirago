@@ -21,6 +21,7 @@ function Login({ onEntrar }) {
   const [mensajeRecuperar, setMensajeRecuperar] = useState('');
   const [verPassword, setVerPassword] = useState(false);
   const [verPasswordConfirm, setVerPasswordConfirm] = useState(false);
+  const [enviando, setEnviando] = useState(false);
 
   const registrarse = async () => {
     if (!nombre || !email || !emailConfirm || !celular || !diaNac || !mesNac || !anioNac || !password || !passwordConfirm) { setError('Por favor completa todos los campos'); return; }
@@ -29,7 +30,7 @@ function Login({ onEntrar }) {
     if (email.trim().toLowerCase() !== emailConfirm.trim().toLowerCase()) { setError('Los correos no coinciden'); return; }
     if (password !== passwordConfirm) { setError('Las contraseñas no coinciden'); return; }
     if (password.length < 6) { setError('La contraseña debe tener mínimo 6 caracteres'); return; }
-    setCargando(true); setError('');
+    setEnviando(true); setError('');
     try {
       const resultado = await createUserWithEmailAndPassword(auth, email.trim().toLowerCase(), password);
       try { await sendEmailVerification(resultado.user); } catch (e) {}
@@ -42,7 +43,7 @@ function Login({ onEntrar }) {
       else if (err.code === 'auth/invalid-email') setError('El correo no es válido');
       else setError('Error al registrarse. Intenta de nuevo');
     }
-    setCargando(false);
+    setEnviando(false);
   };
 
   const iniciarSesion = async () => {
@@ -73,6 +74,7 @@ function Login({ onEntrar }) {
     setCargando(false);
   };
 
+    
   if (pantalla === 'inicio') {
     return (
       <div style={{ backgroundColor: '#141416', minHeight: '100vh', fontFamily: 'Arial, sans-serif', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px 24px' }}>
@@ -159,8 +161,8 @@ function Login({ onEntrar }) {
           <span style={{ color: '#FFFFFF', fontSize: '16px', fontWeight: '900', whiteSpace: 'nowrap' }}>+57</span>
           <input value={contactoNumero} onChange={e => setContactoNumero(e.target.value)} placeholder="3001234567" type="tel" style={{ background: 'none', border: 'none', outline: 'none', color: '#FFFFFF', fontSize: '16px', width: '100%' }} />
         </div>
-        <button onClick={registrarse} style={{ width: '100%', padding: '18px', background: cargando ? '#2A2A2E' : 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)', border: 'none', borderRadius: '16px', color: cargando ? '#555' : '#141416', fontSize: '18px', fontWeight: '900', cursor: 'pointer' }}>
-          {cargando ? 'Creando cuenta...' : 'Crear cuenta'}
+        <button onClick={registrarse} disabled={enviando} style={{ width: '100%', padding: '18px', background: enviando ? '#2A2A2E' : 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)', border: 'none', borderRadius: '16px', color: enviando ? '#555' : '#141416', fontSize: '18px', fontWeight: '900', cursor: 'pointer' }}>
+          {enviando ? 'Creando cuenta...' : 'Crear cuenta'}
         </button>
         <button onClick={() => { setError(''); setPantalla('inicio'); }} style={{ background: 'none', border: 'none', color: '#555', fontSize: '13px', cursor: 'pointer', marginTop: '16px' }}>Volver</button>
       </div>
