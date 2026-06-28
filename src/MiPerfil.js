@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { auth, db, storage } from './firebase';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 function MiPerfil({ onVolver }) {
@@ -17,6 +17,8 @@ function MiPerfil({ onVolver }) {
   const [editandoNombre, setEditandoNombre] = useState(false);
   const [editandoTelefono, setEditandoTelefono] = useState(false);
   const [hayCambios, setHayCambios] = useState(false);
+  const [calificacion, setCalificacion] = useState(null);
+  const [totalCal, setTotalCal] = useState(0);
 
   useEffect(() => {
     const cargar = async () => {
@@ -31,6 +33,20 @@ function MiPerfil({ onVolver }) {
           setTelefono(d.telefono || d.celular || '');
           setFoto(d.fotoConductor || d.foto || null);
         }
+
+        // Cargar calificaciones recibidas
+        try {
+          const qCal = query(collection(db, 'calificaciones'), where('calificadoId', '==', user.uid));
+          const snapCal = await getDocs(qCal);
+          if (!snapCal.empty) {
+            const lista = snapCal.docs.map(d => d.data().estrellas || 0).filter(e => e > 0);
+            if (lista.length > 0) {
+              const promedio = lista.reduce((a, b) => a + b, 0) / lista.length;
+              setCalificacion(Math.round(promedio * 10) / 10);
+              setTotalCal(lista.length);
+            }
+          }
+        } catch (e) {}
       } catch (e) {}
       setCargando(false);
     };
@@ -134,7 +150,33 @@ function MiPerfil({ onVolver }) {
               <span style={{ color: '#AAAAAA', fontSize: '12px', fontWeight: 'bold' }}>Editar</span>
             </div>
           </div>
-
+{/* Calificaciones */}
+          {calificacion !== null && (
+            <div style={{ background: 'linear-gradient(135deg, #1A1A1E, #2A2A2E)', borderRadius: '16px', padding: '14px 16px', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '12px', border: '1px solid #FFCF4D' }}>
+              <span style={{ fontSize: '24px' }}>⭐</span>
+              <div style={{ flex: 1 }}>
+                <p style={{ color: '#555', fontSize: '10px', margin: '0', letterSpacing: '2px' }}>MI CALIFICACIÓN</p>
+                <p style={{ color: '#FFFFFF', fontSize: '16px', fontWeight: '900', margin: '2px 0 0' }}>
+                  <span style={{ color: '#FFCF4D', fontSize: '22px' }}>{calificacion}</span>
+                  <span style={{ color: '#555', fontSize: '13px', fontWeight: '400' }}> · {totalCal} {totalCal === 1 ? 'calificación' : 'calificaciones'}</span>
+                </p>
+              </div>
+              <div style={{ display: 'flex', gap: '2px' }}>
+                {[1,2,3,4,5].map(i => (
+                  <span key={i} style={{ fontSize: '16px', color: i <= Math.round(calificacion) ? '#FFCF4D' : '#2A2A2E' }}>★</span>
+                ))}
+              </div>
+            </div>
+          )}
+          {calificacion === null && (
+            <div style={{ background: '#1A1A1E', borderRadius: '16px', padding: '14px 16px', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '12px', border: '1px solid #2A2A2E' }}>
+              <span style={{ fontSize: '24px' }}>⭐</span>
+              <div>
+                <p style={{ color: '#555', fontSize: '10px', margin: '0', letterSpacing: '2px' }}>MI CALIFICACIÓN</p>
+                <p style={{ color: '#555', fontSize: '14px', margin: '2px 0 0' }}>Aún no tienes calificaciones</p>
+              </div>
+            </div>
+          )}
           {/* Datos solo lectura del conductor */}
           {esConductor && (
             <>
