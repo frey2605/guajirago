@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { auth } from './firebase';
 import { signOut } from 'firebase/auth';
 
-function MenuLateral({ nombre, foto, onIrPerfil, onIrCreditos, onIrViajes, onIrGanancias, onIrSeguridad, onCerrarSesion }) {
+function MenuLateral({ nombre, foto, onIrPerfil, onIrCreditos, onIrViajes, onIrGanancias, onIrSeguridad, onIrAyuda, onCerrarSesion }) {
   const [abierto, setAbierto] = useState(false);
 
   const cerrar = () => setAbierto(false);
@@ -27,9 +27,9 @@ function MenuLateral({ nombre, foto, onIrPerfil, onIrCreditos, onIrViajes, onIrG
   const proximamente = () => alert('Esta función estará disponible muy pronto.');
 
   const opcion = (icono, texto, accion, color) => (
-    <div onClick={() => { cerrar(); accion(); }} style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '16px', borderRadius: '14px', cursor: 'pointer', marginBottom: '6px' }}>
-      <span style={{ fontSize: '22px' }}>{icono}</span>
-      <span style={{ color: color || '#FFFFFF', fontSize: '16px', fontWeight: '500' }}>{texto}</span>
+    <div onClick={() => { cerrar(); accion(); }} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 12px', borderRadius: '12px', cursor: 'pointer', marginBottom: '2px' }}>
+      <span style={{ fontSize: '20px' }}>{icono}</span>
+      <span style={{ color: color || '#FFFFFF', fontSize: '15px', fontWeight: '500' }}>{texto}</span>
     </div>
   );
 
@@ -59,7 +59,7 @@ function MenuLateral({ nombre, foto, onIrPerfil, onIrCreditos, onIrViajes, onIrG
               {opcion('🛡️', 'Seguridad', () => { if (onIrSeguridad) onIrSeguridad(); else proximamente(); })}
               {opcion('📢', 'Compartir GuajiraGo', compartir)}
               {opcion('⚙️', 'Configuración', proximamente)}
-              {opcion('❓', 'Ayuda y soporte', proximamente)}
+              {opcion('❓', 'Ayuda y soporte', () => { if (onIrAyuda) onIrAyuda(); else proximamente(); })}
             </div>
 
             <div style={{ padding: '12px 12px 24px', borderTop: '1px solid #2A2A2E' }}>
