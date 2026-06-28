@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { db, auth } from './firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { sendPasswordResetEmail, deleteUser, signOut } from 'firebase/auth';
+import { sendPasswordResetEmail, deleteUser, signOut, reauthenticateWithCredential, EmailAuthProvider } from 'firebase/auth';
 import TerminosCondiciones from './TerminosCondiciones';
 import PoliticaPrivacidad from './PoliticaPrivacidad';
 
@@ -16,6 +16,9 @@ function Configuracion({ onVolver, onCerrarSesion }) {
   const [verPrivacidad, setVerPrivacidad] = useState(false);
   const [confirmarEliminar, setConfirmarEliminar] = useState(false);
   const [correoEnviado, setCorreoEnviado] = useState('');
+  const [contrasenaEliminar, setContrasenaEliminar] = useState('');
+  const [errorEliminar, setErrorEliminar] = useState('');
+  const [verContrasena, setVerContrasena] = useState(false);
 
   useEffect(() => {
     const cargar = async () => {
@@ -66,15 +69,21 @@ function Configuracion({ onVolver, onCerrarSesion }) {
   };
 
   const eliminarCuenta = async () => {
-    setError(''); setMensaje('');
+    setErrorEliminar('');
+    if (!contrasenaEliminar.trim()) { setErrorEliminar('Escribe tu contraseña para confirmar'); return; }
     try {
       const user = auth.currentUser;
-      if (!user) return;
+      if (!user || !user.email) return;
+      const credencial = EmailAuthProvider.credential(user.email, contrasenaEliminar);
+      await reauthenticateWithCredential(user, credencial);
       await deleteUser(user);
       if (onCerrarSesion) onCerrarSesion();
     } catch (e) {
-      setError('Por seguridad, debes volver a iniciar sesión antes de eliminar tu cuenta. Cierra sesión, vuelve a entrar e inténtalo de nuevo.');
-      setConfirmarEliminar(false);
+      if (e.code === 'auth/wrong-password' || e.code === 'auth/invalid-credential') {
+        setErrorEliminar('Contraseña incorrecta. Inténtalo de nuevo');
+      } else {
+        setErrorEliminar('Error al eliminar. Intenta más tarde');
+      }
     }
   };
 
@@ -162,13 +171,26 @@ function Configuracion({ onVolver, onCerrarSesion }) {
       </div>
 
       {confirmarEliminar && (
-        <div onClick={() => setConfirmarEliminar(false)} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
+        <div onClick={() => { setConfirmarEliminar(false); setContrasenaEliminar(''); setErrorEliminar(''); }} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
           <div onClick={(e) => e.stopPropagation()} style={{ background: '#1A1A1E', borderRadius: '24px', padding: '32px 24px', width: '100%', maxWidth: '400px', border: '2px solid #FF4444', textAlign: 'center' }}>
             <div style={{ fontSize: '54px', marginBottom: '12px' }}>⚠️</div>
             <h2 style={{ color: '#FFFFFF', fontSize: '20px', fontWeight: '900', margin: '0 0 10px' }}>¿Eliminar tu cuenta?</h2>
-            <p style={{ color: '#AAAAAA', fontSize: '14px', margin: '0 0 24px', lineHeight: '1.5' }}>Esta acción es permanente. Se borrarán todos tus datos y no podrás recuperarlos.</p>
+            <p style={{ color: '#AAAAAA', fontSize: '14px', margin: '0 0 16px', lineHeight: '1.5' }}>Esta acción es permanente. Se borrarán todos tus datos y no podrás recuperarlos. Escribe tu contraseña para confirmar.</p>
+            <div style={{ background: '#141416', borderRadius: '14px', padding: '14px 16px', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '12px', border: `1px solid ${errorEliminar ? '#FF4444' : '#2A2A2E'}` }}>
+              <span style={{ fontSize: '18px' }}>🔒</span>
+              <input
+                value={contrasenaEliminar}
+                onChange={e => { setContrasenaEliminar(e.target.value); setErrorEliminar(''); }}
+                type={verContrasena ? 'text' : 'password'}
+                placeholder="Escribe tu contraseña"
+                autoComplete="new-password"
+                style={{ background: 'none', border: 'none', outline: 'none', color: '#FFFFFF', fontSize: '16px', width: '100%' }}
+              />
+              <span onClick={() => setVerContrasena(!verContrasena)} style={{ fontSize: '18px', cursor: 'pointer' }}>{verContrasena ? '🙈' : '👁️'}</span>
+            </div>
+            {errorEliminar && <p style={{ color: '#FF4444', fontSize: '13px', margin: '0 0 12px', fontWeight: 'bold' }}>{errorEliminar}</p>}
             <div style={{ display: 'flex', gap: '12px' }}>
-              <button onClick={() => setConfirmarEliminar(false)} style={{ flex: 1, padding: '16px', background: '#141416', border: '1px solid #2A2A2E', borderRadius: '14px', color: '#FFFFFF', fontSize: '15px', fontWeight: 'bold', cursor: 'pointer' }}>Cancelar</button>
+              <button onClick={() => { setConfirmarEliminar(false); setContrasenaEliminar(''); setErrorEliminar(''); }} style={{ flex: 1, padding: '16px', background: '#141416', border: '1px solid #2A2A2E', borderRadius: '14px', color: '#FFFFFF', fontSize: '15px', fontWeight: 'bold', cursor: 'pointer' }}>Cancelar</button>
               <button onClick={eliminarCuenta} style={{ flex: 1, padding: '16px', background: '#FF4444', border: 'none', borderRadius: '14px', color: '#FFFFFF', fontSize: '15px', fontWeight: '900', cursor: 'pointer' }}>Eliminar</button>
             </div>
           </div>
