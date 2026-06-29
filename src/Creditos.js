@@ -125,12 +125,26 @@ function Creditos({ onVolver }) {
         </button>
 
         {/* Información */}
-        <div style={{ background: '#1A1A1E', borderRadius: '16px', padding: '16px', border: '1px solid #2A2A2E' }}>
-          <p style={{ color: '#FFFFFF', fontSize: '14px', fontWeight: 'bold', margin: '0 0 8px' }}>💡 ¿Cómo recargar?</p>
-          <p style={{ color: '#AAAAAA', fontSize: '13px', margin: '0', lineHeight: '1.5' }}>
-            Realiza tu pago por Nequi o Daviplata, recibe tu código de recarga y escríbelo aquí para sumar tus créditos.
-          </p>
-        </div>
+        <div style={{ background: '#1A1A1E', borderRadius: '20px', padding: '24px', border: '1px solid #FF7A2F' }}>
+          <p style={{ color: '#FF7A2F', fontSize: '13px', fontWeight: '900', margin: '0 0 16px', letterSpacing: '2px' }}>💡 ¿CÓMO RECARGAR?</p>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '14px', marginBottom: '14px' }}>
+            <span style={{ fontSize: '28px', flexShrink: 0 }}>1️⃣</span>
+            <div>
+              <p style={{ color: '#FFFFFF', fontSize: '15px', fontWeight: '900', margin: '0 0 4px' }}>Realiza tu pago</p>
+              <p style={{ color: '#AAAAAA', fontSize: '13px', margin: '0', lineHeight: '1.5' }}>Envía tu pago por <strong style={{ color: '#FFFFFF' }}>Nequi o Daviplata</strong> al número de GuajiraGo.</p>
+            </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '14px', marginBottom: '14px' }}>
+            <span style={{ fontSize: '28px', flexShrink: 0 }}>2️⃣</span>
+            <div>
+              <p style={{ color: '#FFFFFF', fontSize: '15px', fontWeight: '900', margin: '0 0 4px' }}>Recibe tu código</p>
+              <p style={{ color: '#AAAAAA', fontSize: '13px', margin: '0', lineHeight: '1.5' }}>Te enviaremos un <strong style={{ color: '#FFFFFF' }}>código único</strong> de recarga por WhatsApp.</p>
+            </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '14px' }}>
+            <span style={{ fontSize: '28px', flexShrink: 0 }}>3️⃣</span>
+            </div>
+          </div>
       </div>
     </div>
   );
