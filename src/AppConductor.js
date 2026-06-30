@@ -839,45 +839,6 @@ const cargarSaldo = useCallback(async (uid) => {
     if (!viajeActual) return;
     clearInterval(contadorRef.current);
     await updateDoc(doc(db, 'viajes', viajeActual.id), { fase: 'en_viaje' });
-
-    // Si el viaje tiene un descuento pendiente de consumir, se aplica justo ahora
-    if (viajeActual.descuentoInfo && !viajeActual.descuentoInfo.consumido) {
-      try {
-        const info = viajeActual.descuentoInfo;
-        await updateDoc(doc(db, 'viajes', viajeActual.id), { 'descuentoInfo.consumido': true });
-        await updateDoc(doc(db, 'usuarios', viajeActual.pasajeroId), { descuentoPendiente: null });
-
-        // El conductor recibe la diferencia como crédito en su saldo
-        const userConductor = auth.currentUser;
-        if (userConductor) {
-          const snapU = await getDoc(doc(db, 'usuarios', userConductor.uid));
-          const saldoActual = snapU.exists() ? (snapU.data().creditos || 0) : 0;
-          const nuevoSaldo = saldoActual + info.descuentoAplicado;
-          await setDoc(doc(db, 'usuarios', userConductor.uid), { creditos: nuevoSaldo }, { merge: true });
-          setSaldoCreditos(nuevoSaldo);
-          setSaldoVirtualRecibido(info.descuentoAplicado);
-        }
-
-        const refPromo = doc(db, 'promociones', info.promoId);
-        const refUso = doc(db, 'promociones', info.promoId, 'usos', viajeActual.pasajeroId);
-        const snapUso = await getDoc(refUso);
-        const usosPrevios = snapUso.exists() ? (snapUso.data().veces || 0) : 0;
-        const fechaUso = new Date().toISOString();
-        await setDoc(refUso, { veces: usosPrevios + 1, ultimaFecha: fechaUso }, { merge: true });
-
-        const snapPromo = await getDoc(refPromo);
-        if (snapPromo.exists()) {
-          const dPromo = snapPromo.data();
-          const historialPrevio = dPromo.historialUsos || [];
-          await updateDoc(refPromo, {
-            usosTotales: (dPromo.usosTotales || 0) + 1,
-            inversionTotal: (dPromo.inversionTotal || 0) + info.descuentoAplicado,
-            historialUsos: [...historialPrevio, { usuarioId: viajeActual.pasajeroId, fecha: fechaUso, valor: info.descuentoAplicado }],
-          });
-        }
-      } catch (e) {}
-    }
-
     setFase('en_viaje');
     geocodificarDestino(viajeActual.destino);
   };
@@ -919,8 +880,11 @@ const cargarSaldo = useCallback(async (uid) => {
     setUbicacionPasajero(null); setDestinoCoords(null); setActivo(true); setContador(240);
   };
 
-  const finalizarViaje = async () => {
-    clearInterval(contadorRef.current);
+  const [mostrarCodigoDescuento, setMostrarCodigoDescuento] = useState(false);
+  const [codigoDescuentoIngresado, setCodigoDescuentoIngresado] = useState('');
+  const [errorCodigoDescuento, setErrorCodigoDescuento] = useState('');
+
+  const cerrarViajeFinal = async () => {
     if (viajeActual) {
       try {
         await updateDoc(doc(db, 'viajes', viajeActual.id), { estado: 'finalizado', fase: 'finalizado' });
@@ -933,6 +897,79 @@ const cargarSaldo = useCallback(async (uid) => {
     setViajeActual(null); setTiempoLlegada(null); setDistancia(null);
     setRespuestaPasajero(null); setMensajeGrande(null); ultimoMensajeRef.current = null;
     setUbicacionPasajero(null); setDestinoCoords(null); setActivo(true); setContador(240);
+    setMostrarCodigoDescuento(false); setCodigoDescuentoIngresado(''); setErrorCodigoDescuento('');
+  };
+
+  const finalizarViaje = async () => {
+    clearInterval(contadorRef.current);
+    if (viajeActual?.descuentoInfo && !viajeActual.descuentoInfo.consumido) {
+      setCodigoDescuentoIngresado('');
+      setErrorCodigoDescuento('');
+      setMostrarCodigoDescuento(true);
+      return;
+    }
+    await cerrarViajeFinal();
+  };
+
+  const verificarCodigoDescuento = async () => {
+    if (!viajeActual) return;
+    try {
+      const info = viajeActual.descuentoInfo;
+      const codigoGuardado = String(info?.codigoVerificacion || '').trim().replace(/\D/g, '');
+      const codigoEscrito = codigoDescuentoIngresado.trim().replace(/\D/g, '');
+      if (!info || !codigoGuardado || codigoGuardado !== codigoEscrito) {
+        setErrorCodigoDescuento('Código incorrecto. Verifícalo con el pasajero');
+        return;
+      }
+
+      const montoDescuento = info.descuentoAplicado || 0;
+
+      // 1) Marcar el descuento como consumido en el VIAJE (el conductor sí puede escribir su propio viaje).
+      //    El pasajero, al ver consumido:true en su listener del viaje, borra él mismo su descuentoPendiente.
+      await updateDoc(doc(db, 'viajes', viajeActual.id), { 'descuentoInfo.consumido': true });
+
+      // 2) Acreditar el saldo al conductor en SU PROPIO documento (siempre permitido por las reglas).
+      const userConductor = auth.currentUser;
+      if (userConductor) {
+        const snapUC = await getDoc(doc(db, 'usuarios', userConductor.uid));
+        const saldoActual = snapUC.exists() ? (snapUC.data().creditos || 0) : 0;
+        const nuevoSaldo = saldoActual + montoDescuento;
+        await setDoc(doc(db, 'usuarios', userConductor.uid), { creditos: nuevoSaldo }, { merge: true });
+        setSaldoCreditos(nuevoSaldo);
+        setSaldoVirtualRecibido(montoDescuento);
+      }
+
+      // 3) Registro de uso de la promoción (analítica para el admin). Va en su PROPIO try
+      //    para que, si las reglas de Firestore no lo permiten, NO bloquee el cierre del viaje
+      //    ni el saldo ya acreditado al conductor.
+      try {
+        const refPromo = doc(db, 'promociones', info.promoId);
+        const refUso = doc(db, 'promociones', info.promoId, 'usos', viajeActual.pasajeroId);
+        const snapUso = await getDoc(refUso);
+        const usosPrevios = snapUso.exists() ? (snapUso.data().veces || 0) : 0;
+        const fechaUso = new Date().toISOString();
+        await setDoc(refUso, { veces: usosPrevios + 1, ultimaFecha: fechaUso }, { merge: true });
+
+        const snapPromo = await getDoc(refPromo);
+        if (snapPromo.exists()) {
+          const dPromo = snapPromo.data();
+          const historialPrevio = dPromo.historialUsos || [];
+          await updateDoc(refPromo, {
+            usosTotales: (dPromo.usosTotales || 0) + 1,
+            inversionTotal: (dPromo.inversionTotal || 0) + montoDescuento,
+            historialUsos: [...historialPrevio, { usuarioId: viajeActual.pasajeroId, fecha: fechaUso, valor: montoDescuento }],
+          });
+        }
+      } catch (ePromo) {}
+
+      await cerrarViajeFinal();
+    } catch (e) {
+      setErrorCodigoDescuento('Error al verificar. Intenta de nuevo');
+    }
+  };
+
+  const omitirCodigoDescuento = async () => {
+    await cerrarViajeFinal();
   };
 useEffect(() => {
     if (!viajeActual?.id) return;
@@ -1101,6 +1138,26 @@ useEffect(() => {
     return (
       <div style={{ backgroundColor: '#141416', minHeight: '100vh', position: 'relative' }}>
         {mensajeGrande && <MensajeGrande mensaje={mensajeGrande} onCerrar={() => setMensajeGrande(null)} />}
+        {mostrarCodigoDescuento && (
+          <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.92)', zIndex: 9998, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
+            <div style={{ background: 'linear-gradient(135deg, #1A1A1E, #2A2A2E)', borderRadius: '28px', padding: '32px 24px', width: '100%', maxWidth: '420px', border: '3px solid #2ECC71', textAlign: 'center' }}>
+              <div style={{ fontSize: '60px', marginBottom: '12px' }}>🎁</div>
+              <h2 style={{ color: '#FFFFFF', fontSize: '20px', fontWeight: '900', margin: '0 0 8px' }}>Código de promoción</h2>
+              <p style={{ color: '#AAAAAA', fontSize: '14px', margin: '0 0 20px', lineHeight: '1.5' }}>Este viaje tiene un descuento activo. Pídele al pasajero su código de 4 dígitos para recibir tu saldo</p>
+              <input
+                value={codigoDescuentoIngresado}
+                onChange={e => { setCodigoDescuentoIngresado(e.target.value.replace(/[^0-9]/g, '').slice(0, 4)); setErrorCodigoDescuento(''); }}
+                type="tel" inputMode="numeric" placeholder="••••"
+                style={{ width: '100%', background: '#141416', border: `2px solid ${errorCodigoDescuento ? '#FF4444' : '#2A2A2E'}`, borderRadius: '16px', padding: '18px', color: '#FFFFFF', fontSize: '32px', fontWeight: '900', textAlign: 'center', letterSpacing: '12px', outline: 'none', boxSizing: 'border-box', marginBottom: '12px' }}
+              />
+              {errorCodigoDescuento && <p style={{ color: '#FF4444', fontSize: '13px', margin: '0 0 12px', fontWeight: 'bold' }}>{errorCodigoDescuento}</p>}
+              <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>
+                <button onClick={omitirCodigoDescuento} style={{ flex: 1, padding: '16px', background: '#141416', border: '1px solid #2A2A2E', borderRadius: '16px', color: '#AAAAAA', fontSize: '14px', fontWeight: 'bold', cursor: 'pointer' }}>Omitir</button>
+                <button onClick={verificarCodigoDescuento} disabled={codigoDescuentoIngresado.length < 4} style={{ flex: 2, padding: '16px', background: codigoDescuentoIngresado.length < 4 ? '#2A2A2E' : 'linear-gradient(135deg, #2ECC71, #27AE60)', border: 'none', borderRadius: '16px', color: codigoDescuentoIngresado.length < 4 ? '#555' : '#FFFFFF', fontSize: '15px', fontWeight: '900', cursor: codigoDescuentoIngresado.length < 4 ? 'default' : 'pointer' }}>✅ Verificar</button>
+              </div>
+            </div>
+          </div>
+        )}
         <MapaConductor ubicacionConductor={ubicacion} ubicacionDestino={destinoCoords} colorRuta="#FF7A2F" tipo={viajeActual.tipo} onTiempo={(t, d) => { setTiempoLlegada(t); setDistancia(d); }} />
         <div style={{ position: 'absolute', top: '16px', left: '16px', right: '16px', zIndex: 10, background: 'rgba(20,20,22,0.95)', borderRadius: '16px', padding: '12px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div><p style={{ color: '#FF7A2F', fontSize: '11px', margin: '0', letterSpacing: '1px', fontWeight: 'bold' }}>🚀 VIAJE EN CURSO</p><p style={{ color: '#FFFFFF', fontSize: '15px', fontWeight: '900', margin: '2px 0 0' }}>🏁 {viajeActual.destino}</p></div>

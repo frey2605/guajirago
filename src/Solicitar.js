@@ -672,7 +672,8 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
         promoId: descuentoPendiente.promoId,
         tipoBeneficio: descuentoPendiente.tipoBeneficio,
         valorBeneficio: descuentoPendiente.valorBeneficio,
-        consumido: false, // se marca true cuando el conductor inicia el viaje
+        codigoVerificacion: descuentoPendiente.codigoVerificacion,
+        consumido: false,
       } : null;
 
       // El viaje SIEMPRE se crea con la tarifa COMPLETA: es lo que el conductor ve y debe recibir.
@@ -932,6 +933,13 @@ const PanelEmergencia = () => (
                 <p style={{ color: '#AAAAAA', fontSize: '12px', margin: '6px 0 0' }}>Dáselo al conductor cuando subas</p>
               </div>
             )}
+            {descuentoPendiente?.codigoVerificacion && (
+              <div style={{ background: 'linear-gradient(135deg, #1A1A1E, #2A2A2E)', borderRadius: '16px', padding: '16px', marginTop: '12px', border: '2px solid #2ECC71', textAlign: 'center' }}>
+                <p style={{ color: '#2ECC71', fontSize: '11px', margin: '0 0 6px', letterSpacing: '2px', fontWeight: 'bold' }}>🎁 CÓDIGO DE DESCUENTO</p>
+                <p style={{ color: '#FFFFFF', fontSize: '32px', fontWeight: '900', margin: '0', letterSpacing: '8px' }}>{descuentoPendiente.codigoVerificacion}</p>
+                <p style={{ color: '#AAAAAA', fontSize: '12px', margin: '6px 0 0' }}>Dáselo al conductor al finalizar el viaje</p>
+              </div>
+            )}
             <button onClick={() => setLlamandoConductor(true)} style={{ width: '100%', marginTop: '12px', padding: '14px', background: 'linear-gradient(135deg, #2ECC71, #27AE60)', border: 'none', borderRadius: '14px', color: '#FFFFFF', fontSize: '14px', fontWeight: 'bold', cursor: 'pointer' }}>📞 Llamar al conductor</button>
             <button onClick={() => setMostrarChat(!mostrarChat)} style={{ width: '100%', marginTop: '8px', padding: '14px', background: mostrarChat ? '#2A2A2E' : '#1A1A1E', border: '1px solid #2A2A2E', borderRadius: '14px', color: '#FFFFFF', fontSize: '14px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>💬 Chat con el conductor {mensajesChat.length > 0 ? `(${mensajesChat.length})` : ''}</button>
             {mostrarChat && (
@@ -990,6 +998,13 @@ const PanelEmergencia = () => (
             </div>
             <div style={{ textAlign: 'right' }}><p style={{ color: '#555', fontSize: '10px', margin: '0' }}>TARIFA</p><p style={{ color: '#2ECC71', fontSize: '18px', fontWeight: '900', margin: '4px 0 0' }}>{viaje?.tarifa}</p></div>
           </div>
+          {descuentoPendiente?.codigoVerificacion && (
+            <div style={{ background: '#141416', borderRadius: '14px', padding: '12px', marginBottom: '10px', border: '2px solid #2ECC71', textAlign: 'center' }}>
+              <p style={{ color: '#2ECC71', fontSize: '10px', margin: '0 0 4px', letterSpacing: '2px', fontWeight: 'bold' }}>🎁 CÓDIGO DE DESCUENTO</p>
+              <p style={{ color: '#FFFFFF', fontSize: '26px', fontWeight: '900', margin: '0', letterSpacing: '6px' }}>{descuentoPendiente.codigoVerificacion}</p>
+              <p style={{ color: '#888', fontSize: '11px', margin: '4px 0 0' }}>Dáselo al conductor al finalizar</p>
+            </div>
+          )}
           <p style={{ color: '#555', fontSize: '11px', letterSpacing: '2px', margin: '12px 0 8px' }}>RESPUESTAS RÁPIDAS</p>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '10px' }}>
             {RESPUESTAS_RAPIDAS.map((resp, i) => (
