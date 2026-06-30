@@ -414,6 +414,7 @@ function AppConductor({ nombre, telefono, placa, vehiculo, tipoVehiculo, onCerra
   const [puedeCerrarLlamado, setPuedeCerrarLlamado] = useState(false);
   const [sancionActiva, setSancionActiva] = useState(null);
   const [contadorSancion, setContadorSancion] = useState('');
+  const [saldoVirtualRecibido, setSaldoVirtualRecibido] = useState(null);
   useEffect(() => {
     const user = auth.currentUser;
     if (!user) return;
@@ -838,6 +839,45 @@ const cargarSaldo = useCallback(async (uid) => {
     if (!viajeActual) return;
     clearInterval(contadorRef.current);
     await updateDoc(doc(db, 'viajes', viajeActual.id), { fase: 'en_viaje' });
+
+    // Si el viaje tiene un descuento pendiente de consumir, se aplica justo ahora
+    if (viajeActual.descuentoInfo && !viajeActual.descuentoInfo.consumido) {
+      try {
+        const info = viajeActual.descuentoInfo;
+        await updateDoc(doc(db, 'viajes', viajeActual.id), { 'descuentoInfo.consumido': true });
+        await updateDoc(doc(db, 'usuarios', viajeActual.pasajeroId), { descuentoPendiente: null });
+
+        // El conductor recibe la diferencia como crédito en su saldo
+        const userConductor = auth.currentUser;
+        if (userConductor) {
+          const snapU = await getDoc(doc(db, 'usuarios', userConductor.uid));
+          const saldoActual = snapU.exists() ? (snapU.data().creditos || 0) : 0;
+          const nuevoSaldo = saldoActual + info.descuentoAplicado;
+          await setDoc(doc(db, 'usuarios', userConductor.uid), { creditos: nuevoSaldo }, { merge: true });
+          setSaldoCreditos(nuevoSaldo);
+          setSaldoVirtualRecibido(info.descuentoAplicado);
+        }
+
+        const refPromo = doc(db, 'promociones', info.promoId);
+        const refUso = doc(db, 'promociones', info.promoId, 'usos', viajeActual.pasajeroId);
+        const snapUso = await getDoc(refUso);
+        const usosPrevios = snapUso.exists() ? (snapUso.data().veces || 0) : 0;
+        const fechaUso = new Date().toISOString();
+        await setDoc(refUso, { veces: usosPrevios + 1, ultimaFecha: fechaUso }, { merge: true });
+
+        const snapPromo = await getDoc(refPromo);
+        if (snapPromo.exists()) {
+          const dPromo = snapPromo.data();
+          const historialPrevio = dPromo.historialUsos || [];
+          await updateDoc(refPromo, {
+            usosTotales: (dPromo.usosTotales || 0) + 1,
+            inversionTotal: (dPromo.inversionTotal || 0) + info.descuentoAplicado,
+            historialUsos: [...historialPrevio, { usuarioId: viajeActual.pasajeroId, fecha: fechaUso, valor: info.descuentoAplicado }],
+          });
+        }
+      } catch (e) {}
+    }
+
     setFase('en_viaje');
     geocodificarDestino(viajeActual.destino);
   };

@@ -281,6 +281,8 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
 
   useEffect(() => { pantallaRef.current = pantalla; }, [pantalla]);
 
+  const [descuentoPendiente, setDescuentoPendiente] = useState(null);
+
   useEffect(() => {
     const cargarFavoritos = async () => {
       try {
@@ -290,11 +292,29 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
         if (snap.exists()) {
           if (Array.isArray(snap.data().favoritos)) setFavoritos(snap.data().favoritos);
           setContactoEmergencia(snap.data().contactoConfianzaNumero || '');
+          if (snap.data().descuentoPendiente) setDescuentoPendiente(snap.data().descuentoPendiente);
         }
       } catch (e) {}
     };
     cargarFavoritos();
   }, []);
+
+  const calcularTarifaConDescuento = (tarifaBase) => {
+    if (!descuentoPendiente) return tarifaBase;
+    if (descuentoPendiente.tipoBeneficio === 'credito') {
+      return Math.max(0, tarifaBase - descuentoPendiente.valorBeneficio);
+    }
+    // descuento en %
+    return Math.round(tarifaBase * (1 - descuentoPendiente.valorBeneficio / 100));
+  };
+
+  // Tarifa que realmente debe pagar el pasajero (con descuento si el viaje lo tiene aplicado)
+  const tarifaParaPasajero = (v) => {
+    if (v?.descuentoInfo?.tarifaPasajeroPaga != null) {
+      return `$${v.descuentoInfo.tarifaPasajeroPaga.toLocaleString()}`;
+    }
+    return v?.tarifa;
+  };
 
   useEffect(() => {
     if (!navigator.geolocation) return;
@@ -644,6 +664,20 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
           }
         }
       } catch (e) {}
+      const tarifaConDescuento = calcularTarifaConDescuento(tarifa);
+      const datosDescuento = descuentoPendiente ? {
+        tarifaOriginal: tarifa,
+        tarifaPasajeroPaga: tarifaConDescuento,
+        descuentoAplicado: tarifa - tarifaConDescuento,
+        promoId: descuentoPendiente.promoId,
+        tipoBeneficio: descuentoPendiente.tipoBeneficio,
+        valorBeneficio: descuentoPendiente.valorBeneficio,
+        consumido: false, // se marca true cuando el conductor inicia el viaje
+      } : null;
+
+      // El viaje SIEMPRE se crea con la tarifa COMPLETA: es lo que el conductor ve y debe recibir.
+      // El descuento al pasajero solo se CONSUME (se descuenta del saldo del pasajero y se acredita
+      // al conductor) cuando el conductor presiona "Iniciar viaje" — no antes.
       const docRef = await addDoc(collection(db, 'viajes'), {
         pasajeroId: user.uid, pasajeroEmail: user.email,
         pasajeroNombre: nombrePasajero,
@@ -651,6 +685,7 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
         pasajeroLat: coordsRecogida.lat, pasajeroLng: coordsRecogida.lng,
         tipo, origen, destino, estado: 'esperando',
         tarifa: `$${tarifa.toLocaleString()}`, tarifaValor: tarifa,
+        ...(datosDescuento ? { descuentoInfo: datosDescuento } : {}),
         fechaSolicitud: new Date().toISOString(),
         radioBusqueda: 3,
       });
@@ -807,7 +842,8 @@ const PanelEmergencia = () => (
           <h2 style={{ color: '#FFFFFF', fontSize: '24px', fontWeight: '900', margin: '0 0 12px' }}>{confirmacionPendiente.conductorNombre || 'Conductor'}</h2>
           {confirmacionPendiente.conductorPlaca && <p style={{ color: '#FFCF4D', fontSize: '18px', fontWeight: '900', margin: '0 0 4px' }}>🚘 {confirmacionPendiente.conductorPlaca}</p>}
           {confirmacionPendiente.conductorVehiculo && <p style={{ color: '#AAAAAA', fontSize: '14px', margin: '0 0 12px' }}>{confirmacionPendiente.conductorVehiculo}{datosConductor?.color ? ` · ${datosConductor.color}` : ''}</p>}
-          <p style={{ color: '#2ECC71', fontSize: '32px', fontWeight: '900', margin: '8px 0 0' }}>{confirmacionPendiente.tarifa}</p>
+          <p style={{ color: '#2ECC71', fontSize: '32px', fontWeight: '900', margin: '8px 0 0' }}>{descuentoPendiente ? `$${calcularTarifaConDescuento(confirmacionPendiente.tarifaValor || parseInt((confirmacionPendiente.tarifa || '0').replace(/\D/g, ''), 10)).toLocaleString()}` : confirmacionPendiente.tarifa}</p>
+          {descuentoPendiente && <p style={{ color: '#888', fontSize: '13px', margin: '4px 0 0', textDecoration: 'line-through' }}>{confirmacionPendiente.tarifa}</p>}
         </div>
         <p style={{ color: '#FFFFFF', fontSize: '16px', margin: '24px 0 16px', textAlign: 'center', fontWeight: 'bold' }}>¿Confirmas este viaje?</p>
         <div style={{ display: 'flex', gap: '12px', width: '100%', maxWidth: '440px' }}>
@@ -847,7 +883,7 @@ const PanelEmergencia = () => (
             <p style={{ color: '#2ECC71', fontSize: '11px', margin: '0', letterSpacing: '1px', fontWeight: 'bold' }}>🚗 CONDUCTOR EN CAMINO</p>
             <p style={{ color: '#FFFFFF', fontSize: '14px', fontWeight: '900', margin: '2px 0 0' }}>{viaje?.conductorNombre} · {viaje?.conductorPlaca}</p>
           </div>
-          {tiempoLlegada && <div style={{ textAlign: 'right' }}><p style={{ color: '#FFCF4D', fontSize: '20px', fontWeight: '900', margin: '0' }}>⏱️ {tiempoLlegada}</p><p style={{ color: '#555', fontSize: '11px', margin: '0' }}>{distancia}</p></div>}
+          <div style={{ textAlign: 'right' }}><p style={{ color: '#555', fontSize: '10px', margin: '0' }}>TARIFA</p><p style={{ color: '#2ECC71', fontSize: '18px', fontWeight: '900', margin: '2px 0 0' }}>{tarifaParaPasajero(viaje)}</p></div>
         </div>
         {conductorEnPunto && (
           <div style={{ position: 'absolute', top: '90px', left: '16px', right: '16px', zIndex: 10, background: 'rgba(20,20,22,0.97)', borderRadius: '20px', padding: '20px', border: '2px solid #2ECC71' }}>
@@ -886,7 +922,7 @@ const PanelEmergencia = () => (
                 </div>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '8px' }}>
-                <div style={{ textAlign: 'right' }}><p style={{ color: '#555', fontSize: '10px', margin: '0' }}>TARIFA</p><p style={{ color: '#2ECC71', fontSize: '18px', fontWeight: '900', margin: '2px 0 0' }}>{viaje?.tarifa}</p></div>
+                <div style={{ textAlign: 'right' }}><p style={{ color: '#555', fontSize: '10px', margin: '0' }}>TARIFA</p><p style={{ color: '#2ECC71', fontSize: '18px', fontWeight: '900', margin: '2px 0 0' }}>{tarifaParaPasajero(viaje)}</p></div>
               </div>
             </div>
             {viaje?.codigoSeguridad && (
@@ -990,7 +1026,12 @@ const PanelEmergencia = () => (
         <div style={{ fontSize: '80px', marginBottom: '24px' }}>{buscandoAgotado ? '😕' : (tipo === 'Taxi' ? '🚗' : '🏍️')}</div>
         <h2 style={{ color: '#FFFFFF', fontSize: '22px', margin: '0 0 8px', textAlign: 'center' }}>{buscandoAgotado ? 'No encontramos conductor' : 'Buscando conductor...'}</h2>
         <p style={{ color: '#555', fontSize: '14px', margin: '0 0 4px', textAlign: 'center' }}>{origen} → {destino}</p>
-        {!buscandoAgotado && <p style={{ color: '#2ECC71', fontSize: '20px', fontWeight: '900', margin: '0 0 16px', textAlign: 'center' }}>Tu oferta: ${tarifa.toLocaleString()}</p>}
+        {!buscandoAgotado && (
+          <p style={{ color: '#2ECC71', fontSize: '20px', fontWeight: '900', margin: '0 0 16px', textAlign: 'center' }}>
+            Tu oferta: ${tarifa.toLocaleString()}
+            {descuentoPendiente && <span style={{ color: '#FFCF4D', fontSize: '14px' }}> · Pagas ${calcularTarifaConDescuento(tarifa).toLocaleString()} con tu descuento</span>}
+          </p>
+        )}
         {!buscandoAgotado && (
           <div style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px' }}>
             <div style={{ flex: 1, height: '8px', background: '#2A2A2E', borderRadius: '4px', overflow: 'hidden' }}>
@@ -1084,6 +1125,18 @@ const PanelEmergencia = () => (
                   <span onClick={() => borrarFavorito(i)} style={{ color: '#FF4444', fontSize: '18px', cursor: 'pointer', fontWeight: 'bold', paddingLeft: '4px' }}>✕</span>
                 </div>
               ))}
+            </div>
+          </div>
+        )}
+
+        {descuentoPendiente && (
+          <div style={{ background: 'linear-gradient(135deg, #2ECC71, #27AE60)', borderRadius: '16px', padding: '16px', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <span style={{ fontSize: '28px' }}>🎁</span>
+            <div>
+              <p style={{ color: '#FFFFFF', fontWeight: '900', fontSize: '15px', margin: '0' }}>
+                Tienes un descuento activo de {descuentoPendiente.tipoBeneficio === 'credito' ? `$${descuentoPendiente.valorBeneficio.toLocaleString()}` : `${descuentoPendiente.valorBeneficio}%`}
+              </p>
+              <p style={{ color: 'rgba(255,255,255,0.85)', fontSize: '12px', margin: '2px 0 0' }}>Se aplicará automáticamente a este viaje</p>
             </div>
           </div>
         )}
