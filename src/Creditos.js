@@ -157,29 +157,26 @@ function Creditos({ onVolver }) {
 
   return (
     <div style={{ backgroundColor: '#141416', minHeight: '100vh', fontFamily: 'Arial, sans-serif' }}>
-      <div style={{ background: 'linear-gradient(135deg, #1A1A1E, #2A2A2E)', padding: '24px 20px', position: 'relative', display: 'flex', alignItems: 'center' }}>
-        <div onClick={onVolver} style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(255,255,255,0.12)', borderRadius: '12px', color: '#FFFFFF', fontSize: '14px', fontWeight: '500', padding: '8px 16px', cursor: 'pointer' }}><span style={{ fontSize: '20px', fontWeight: '900', lineHeight: '1', position: 'relative', top: '-1px' }}>‹</span> Volver</div>
-        <h2 style={{ color: '#FFFFFF', margin: '0 auto', fontSize: '20px', fontWeight: '900' }}>Mis créditos</h2>
-      </div>
-
-      <div style={{ padding: '16px 20px' }}>
-        {/* Tarjeta de saldo */}
-        <div style={{ background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)', borderRadius: '18px', padding: '14px 20px', marginBottom: '14px', textAlign: 'center' }}>
-          <p style={{ color: 'rgba(20,20,22,0.7)', fontSize: '11px', margin: '0', letterSpacing: '2px', fontWeight: 'bold' }}>SALDO DISPONIBLE</p>
-          <p style={{ color: '#141416', fontSize: '30px', fontWeight: '900', margin: '4px 0 0' }}>
+      <div style={{ background: 'linear-gradient(135deg, #1A1A1E, #2A2A2E)', padding: '14px 20px', position: 'relative', display: 'flex', alignItems: 'stretch', justifyContent: 'space-between', gap: '12px' }}>
+        <div onClick={onVolver} style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(255,255,255,0.12)', borderRadius: '12px', color: '#FFFFFF', fontSize: '14px', fontWeight: '500', padding: '8px 16px', cursor: 'pointer', flexShrink: 0 }}><span style={{ fontSize: '20px', fontWeight: '900', lineHeight: '1', position: 'relative', top: '-1px' }}>‹</span> Volver</div>
+        <div style={{ background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F)', borderRadius: '14px', padding: '6px 24px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1 }}>
+          <p style={{ color: '#141416', fontSize: '11px', margin: '0', letterSpacing: '1px', fontWeight: '900' }}>SALDO DISPONIBLE</p>
+          <p style={{ color: '#141416', fontSize: '26px', fontWeight: '900', margin: '0' }}>
             {saldo === null ? '...' : `$${saldo.toLocaleString()}`}
           </p>
         </div>
+      </div>
 
+      <div style={{ padding: '16px 20px' }}>
         {/* Recargar con código */}
-        <p style={{ color: '#AAAAAA', fontSize: '11px', letterSpacing: '3px', margin: '0 0 8px' }}>RECARGAR CON CÓDIGO</p>
-        <div style={{ background: '#1A1A1E', borderRadius: '14px', padding: '12px', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <span style={{ fontSize: '18px' }}>🎟️</span>
+        <p style={{ color: '#FFCF4D', fontSize: '14px', letterSpacing: '2px', margin: '0 0 10px', fontWeight: '900' }}>RECARGAR CON CÓDIGO</p>
+        <div style={{ background: '#FFFFFF', borderRadius: '16px', padding: '18px 18px', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '12px', border: '3px solid #FF7A2F', boxShadow: '0 0 0 4px rgba(255,122,47,0.15)' }}>
+          <span style={{ fontSize: '24px' }}>🎟️</span>
           <input
             value={codigo}
             onChange={e => setCodigo(e.target.value.toUpperCase())}
-            placeholder="Escribe tu código"
-            style={{ background: 'none', border: 'none', outline: 'none', color: '#FFFFFF', fontSize: '15px', width: '100%', letterSpacing: '1px' }}
+            placeholder="ESCRIBE TU CÓDIGO"
+            style={{ background: 'none', border: 'none', outline: 'none', color: '#141416', fontSize: '20px', fontWeight: '900', width: '100%', letterSpacing: '2px' }}
           />
         </div>
 
@@ -226,17 +223,31 @@ function Creditos({ onVolver }) {
           <p style={{ color: '#777', fontSize: '12px', margin: '0 0 14px' }}>Envía tu comprobante de pago o haz un reclamo sobre tu recarga</p>
           <div style={{ maxHeight: '220px', overflowY: 'auto', marginBottom: '12px' }}>
             {mensajesRecarga.length === 0 && <p style={{ color: '#555', fontSize: '13px', textAlign: 'center', margin: '12px 0' }}>Sin mensajes aún</p>}
-            {mensajesRecarga.map((m, i) => (
-              <div key={i} style={{ display: 'flex', justifyContent: m.autor === 'conductor' ? 'flex-end' : 'flex-start', marginBottom: '8px' }}>
-                <div style={{ background: m.autor === 'conductor' ? 'linear-gradient(135deg, #FF7A2F, #D6357E)' : '#2A2A2E', borderRadius: '12px', padding: m.tipo === 'imagen' ? '6px' : '10px 14px', maxWidth: '85%' }}>
-                  {m.tipo === 'imagen' ? (
-                    <img src={m.url} alt="Comprobante" style={{ width: '100%', maxWidth: '220px', borderRadius: '10px', display: 'block' }} />
-                  ) : (
-                    <p style={{ color: '#FFFFFF', fontSize: '14px', margin: '0', lineHeight: '1.4', whiteSpace: 'pre-line' }}>{m.texto}</p>
-                  )}
+            {mensajesRecarga.map((m, i) => {
+              const matchCodigo = m.texto ? m.texto.match(/GGO-[A-Z0-9]{6}/) : null;
+              const codigoDetectado = matchCodigo ? matchCodigo[0] : null;
+              return (
+                <div key={i} style={{ display: 'flex', justifyContent: m.autor === 'conductor' ? 'flex-end' : 'flex-start', marginBottom: '8px' }}>
+                  <div style={{ background: m.autor === 'conductor' ? 'linear-gradient(135deg, #FF7A2F, #D6357E)' : '#2A2A2E', borderRadius: '12px', padding: m.tipo === 'imagen' ? '6px' : '10px 14px', maxWidth: '85%' }}>
+                    {m.tipo === 'imagen' ? (
+                      <img src={m.url} alt="Comprobante" style={{ width: '100%', maxWidth: '220px', borderRadius: '10px', display: 'block' }} />
+                    ) : (
+                      <>
+                        <p style={{ color: '#FFFFFF', fontSize: '14px', margin: '0', lineHeight: '1.4', whiteSpace: 'pre-line' }}>{m.texto}</p>
+                        {codigoDetectado && (
+                          <button
+                            onClick={() => { navigator.clipboard.writeText(codigoDetectado).catch(() => {}); setCodigo(codigoDetectado); }}
+                            style={{ marginTop: '8px', padding: '8px 12px', background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.3)', borderRadius: '8px', color: '#FFFFFF', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer', width: '100%' }}
+                          >
+                            📋 Copiar y usar este código
+                          </button>
+                        )}
+                      </>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
             <div ref={chatRecargaFinRef} />
           </div>
           {errorChatRecarga && <p style={{ color: '#FF4444', fontSize: '12px', margin: '0 0 8px' }}>{errorChatRecarga}</p>}
