@@ -170,26 +170,27 @@ function Creditos({ onVolver }) {
       <div style={{ padding: '16px 20px' }}>
         {/* Recargar con código */}
         <p style={{ color: '#FFCF4D', fontSize: '14px', letterSpacing: '2px', margin: '0 0 10px', fontWeight: '900' }}>RECARGAR CON CÓDIGO</p>
-        <div style={{ background: '#FFFFFF', borderRadius: '16px', padding: '18px 18px', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '12px', border: '3px solid #FF7A2F', boxShadow: '0 0 0 4px rgba(255,122,47,0.15)' }}>
-          <span style={{ fontSize: '24px' }}>🎟️</span>
-          <input
-            value={codigo}
-            onChange={e => setCodigo(e.target.value.toUpperCase())}
-            placeholder="ESCRIBE TU CÓDIGO"
-            style={{ background: 'none', border: 'none', outline: 'none', color: '#141416', fontSize: '20px', fontWeight: '900', width: '100%', letterSpacing: '2px' }}
-          />
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'stretch', marginBottom: '8px' }}>
+          <div style={{ flex: 1, background: '#FFFFFF', borderRadius: '12px', padding: '10px 12px', display: 'flex', alignItems: 'center', gap: '8px', border: '2px solid #FF7A2F', boxShadow: '0 0 0 3px rgba(255,122,47,0.15)' }}>
+            <span style={{ fontSize: '18px' }}>🎟️</span>
+            <input
+              value={codigo}
+              onChange={e => setCodigo(e.target.value.toUpperCase())}
+              placeholder="ESCRIBE TU CÓDIGO"
+              style={{ background: 'none', border: 'none', outline: 'none', color: '#141416', fontSize: '15px', fontWeight: '900', width: '100%', letterSpacing: '1px' }}
+            />
+          </div>
+          <button
+            onClick={recargar}
+            disabled={cargando}
+            style={{ flexShrink: 0, padding: '0 18px', background: cargando ? '#2A2A2E' : 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)', border: 'none', borderRadius: '12px', color: cargando ? '#AAAAAA' : '#141416', fontSize: '14px', fontWeight: '900', cursor: cargando ? 'default' : 'pointer' }}
+          >
+            {cargando ? '...' : 'Recargar'}
+          </button>
         </div>
 
         {error && <p style={{ color: '#FF4444', fontSize: '12px', textAlign: 'center', marginBottom: '8px' }}>{error}</p>}
-        {mensaje && <p style={{ color: '#2ECC71', fontSize: '13px', textAlign: 'center', marginBottom: '8px', fontWeight: 'bold' }}>{mensaje}</p>}
-
-        <button
-          onClick={recargar}
-          disabled={cargando}
-          style={{ width: '100%', padding: '14px', background: cargando ? '#2A2A2E' : 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)', border: 'none', borderRadius: '14px', color: cargando ? '#AAAAAA' : '#141416', fontSize: '16px', fontWeight: '900', cursor: 'pointer', marginBottom: '12px' }}
-        >
-          {cargando ? 'Recargando...' : 'Recargar créditos'}
-        </button>
+        {mensaje && <p style={{ color: '#2ECC71', fontSize: '13px', textAlign: 'center', marginBottom: '12px', fontWeight: 'bold' }}>{mensaje}</p>}
 
         {/* Información */}
         <div style={{ background: '#1A1A1E', borderRadius: '16px', padding: '16px', border: '1px solid #FF7A2F' }}>
