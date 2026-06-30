@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { db, auth } from './firebase';
-import { collection, addDoc, doc, onSnapshot, updateDoc, getDoc, runTransaction, query, orderBy } from 'firebase/firestore';
+import { collection, addDoc, doc, onSnapshot, updateDoc, getDoc, setDoc, runTransaction, query, orderBy } from 'firebase/firestore';
 import Calificacion from './Calificacion';
 import Llamada from './Llamada';
 import { alertarNuevoViaje, precargarAudio, activarAudioiOS } from './Notificaciones';
@@ -684,19 +684,10 @@ const confirmarViaje = async () => {
     setConfirmacionPendiente(null);
 
     try {
-      // Transacción: solo se queda con el conductor si todavía está libre (la "última silla")
-      await runTransaction(db, async (transaccion) => {
-        const refConductor = doc(db, 'conductores', datos.conductorId);
-        const snapConductor = await transaccion.get(refConductor);
-        if (snapConductor.exists() && snapConductor.data().ocupado === true) {
-          throw new Error('CONDUCTOR_OCUPADO');
-        }
-        // Marcar al conductor como ocupado y aceptar el viaje, todo junto
-        transaccion.set(refConductor, { ocupado: true }, { merge: true });
-        transaccion.update(doc(db, 'viajes', viajeId), { estado: 'aceptado' });
-      });
+      // El pasajero confirma: solo cambia el viaje a 'aceptado'.
+      // El conductor se marca 'ocupado' a sí mismo desde AppConductor.js.
+      await updateDoc(doc(db, 'viajes', viajeId), { estado: 'aceptado' });
 
-      // Éxito: el conductor era nuestro, celebramos
       setCelebrando(true);
       setTimeout(() => {
         setCelebrando(false);
@@ -704,7 +695,6 @@ const confirmarViaje = async () => {
         if (datos.conductorId) escucharConductor(datos.conductorId);
       }, 3000);
     } catch (e) {
-      // El conductor ya fue tomado por otro pasajero
       setConductorYaTomado(true);
     }
   };
@@ -787,7 +777,7 @@ const PanelEmergencia = () => (
       </div>
     ) : null
   );
-  if (mostrarCalificacion) return <Calificacion tipo={tipo} viajeId={viajeId} nombreCalificado={viaje?.conductorNombre} quienCalifica="pasajero" onFinalizar={onVolver} />;
+  if (mostrarCalificacion) return <Calificacion tipo={tipo} viajeId={viajeId} nombreCalificado={viaje?.conductorNombre} calificadoId={viaje?.conductorId} quienCalifica="pasajero" onFinalizar={onVolver} />;
   if (celebrando) return <Celebracion />;
   if (llamandoConductor) return <Llamada viajeId={viajeId} miRol="pasajero" nombreOtro={viaje?.conductorNombre || 'Conductor'} onCerrar={() => setLlamandoConductor(false)} />;
   if (llamadaEntrante) return <Llamada viajeId={viajeId} miRol="entrante" nombreOtro={viaje?.conductorNombre || 'Conductor'} onCerrar={() => setLlamadaEntrante(false)} />;

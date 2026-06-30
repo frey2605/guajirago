@@ -410,7 +410,108 @@ function AppConductor({ nombre, telefono, placa, vehiculo, tipoVehiculo, onCerra
   const solicitudesIdsRef = useRef(new Set());
   const ubicacionRef = useRef(null);
   const [refrescoListener, setRefrescoListener] = useState(0);
+  const [llamadoAtencion, setLlamadoAtencion] = useState(null);
+  const [puedeCerrarLlamado, setPuedeCerrarLlamado] = useState(false);
+  const [sancionActiva, setSancionActiva] = useState(null);
+  const [contadorSancion, setContadorSancion] = useState('');
+  useEffect(() => {
+    const user = auth.currentUser;
+    if (!user) return;
+    const unsub = onSnapshot(doc(db, 'usuarios', user.uid), (snap) => {
+      if (!snap.exists()) return;
+      const data = snap.data();
+      if (data.llamadoPendiente && !faseRef.current) {
+        setLlamadoAtencion(data.llamadoPendiente);
+        setPuedeCerrarLlamado(false);
+        setTimeout(() => setPuedeCerrarLlamado(true), 8000);
+      }
+    });
+    return () => unsub();
+  }, []);
 
+  const cerrarLlamado = async () => {
+    if (!puedeCerrarLlamado) return;
+    try {
+      const user = auth.currentUser;
+      await updateDoc(doc(db, 'usuarios', user.uid), { llamadoPendiente: null });
+    } catch(e) {}
+    setLlamadoAtencion(null);
+  };
+
+  const [textoApelacion, setTextoApelacion] = useState('');
+  const [mensajesApelacion, setMensajesApelacion] = useState([]);
+  const chatApelacionFinRef = useRef(null);
+
+  useEffect(() => {
+    if (chatApelacionFinRef.current) {
+      setTimeout(() => chatApelacionFinRef.current.scrollIntoView({ behavior: 'smooth' }), 100);
+    }
+  }, [mensajesApelacion]);
+
+  const enviarApelacion = async () => {
+    if (!textoApelacion.trim()) return;
+    const user = auth.currentUser;
+    if (!user) return;
+    try {
+      const nuevoMensaje = {
+        texto: textoApelacion.trim(),
+        autor: 'conductor',
+        fecha: new Date().toISOString(),
+      };
+      const previos = mensajesApelacion || [];
+      await updateDoc(doc(db, 'usuarios', user.uid), {
+        mensajesApelacion: [...previos, nuevoMensaje],
+      });
+      setTextoApelacion('');
+    } catch (e) {}
+  };
+  useEffect(() => {
+    const user = auth.currentUser;
+    if (!user) return;
+    const unsub = onSnapshot(doc(db, 'usuarios', user.uid), (snap) => {
+      if (!snap.exists()) return;
+      const data = snap.data();
+      const ahora = new Date();
+      const esPermanente = data.activo === false && !data.sancionHasta;
+      const esTemporalVigente = data.sancionHasta && new Date(data.sancionHasta) > ahora;
+
+      if (esPermanente || esTemporalVigente) {
+        const ultimaSancion = (data.sanciones || [])[data.sanciones.length - 1] || null;
+        setSancionActiva({
+          razon: ultimaSancion?.razon || 'Motivo no especificado',
+          duracion: ultimaSancion?.duracion || (esPermanente ? 'Permanente' : ''),
+          permanente: esPermanente,
+          sancionHasta: data.sancionHasta || null,
+        });
+        setMensajesApelacion(data.mensajesApelacion || []);
+      } else {
+        setSancionActiva(null);
+        setMensajesApelacion([]);
+      }
+    });
+    return () => unsub();
+  }, []);
+
+  useEffect(() => {
+    if (!sancionActiva || sancionActiva.permanente || !sancionActiva.sancionHasta) {
+      setContadorSancion('');
+      return;
+    }
+    const actualizar = () => {
+      const restante = new Date(sancionActiva.sancionHasta) - new Date();
+      if (restante <= 0) {
+        setContadorSancion('00:00:00');
+        return;
+      }
+      const horas = Math.floor(restante / 3600000);
+      const minutos = Math.floor((restante % 3600000) / 60000);
+      const segundos = Math.floor((restante % 60000) / 1000);
+      setContadorSancion(`${String(horas).padStart(2, '0')}:${String(minutos).padStart(2, '0')}:${String(segundos).padStart(2, '0')}`);
+    };
+    actualizar();
+    const intervalo = setInterval(actualizar, 1000);
+    return () => clearInterval(intervalo);
+  }, [sancionActiva]);
   useEffect(() => { celebrandoRef.current = celebrando; }, [celebrando]);
   useEffect(() => { faseRef.current = fase; }, [fase]);
 
@@ -783,7 +884,7 @@ const cargarSaldo = useCallback(async (uid) => {
     if (viajeActual) {
       try {
         await updateDoc(doc(db, 'viajes', viajeActual.id), { estado: 'finalizado', fase: 'finalizado' });
-        setDatosCalificacion({ viajeId: viajeActual.id, nombrePasajero: viajeActual.pasajeroNombre || 'Pasajero' });
+        setDatosCalificacion({ viajeId: viajeActual.id, nombrePasajero: viajeActual.pasajeroNombre || 'Pasajero', pasajeroId: viajeActual.pasajeroId || '' });
       } catch (err) {}
     }
     const user = auth.currentUser;
@@ -827,7 +928,7 @@ useEffect(() => {
 
   if (enLlamada) return <Llamada viajeId={viajeActual?.id} miRol="conductor" nombreOtro={viajeActual?.pasajeroNombre || 'Pasajero'} onCerrar={() => { setEnLlamada(false); }} />;
   if (llamadaEntrante) return <Llamada viajeId={viajeActual?.id} miRol="entrante" nombreOtro={viajeActual?.pasajeroNombre || 'Pasajero'} onCerrar={() => { setLlamadaEntrante(false); }} />;
-  if (datosCalificacion) return <Calificacion tipo={null} viajeId={datosCalificacion.viajeId} nombreCalificado={datosCalificacion.nombrePasajero} quienCalifica="conductor" onFinalizar={() => setDatosCalificacion(null)} />;
+  if (datosCalificacion) return <Calificacion tipo={null} viajeId={datosCalificacion.viajeId} nombreCalificado={datosCalificacion.nombrePasajero} calificadoId={datosCalificacion.pasajeroId} quienCalifica="conductor" onFinalizar={() => setDatosCalificacion(null)} />;
   if (verHistorial) return <HistorialConductor onVolver={() => setVerHistorial(false)} />;
   if (verCreditos) return <Creditos onVolver={() => setVerCreditos(false)} />;
   if (verPerfil) return <MiPerfil onVolver={() => setVerPerfil(false)} />;
@@ -975,7 +1076,57 @@ useEffect(() => {
       </div>
     );
   }
+if (sancionActiva) return (
+    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.95)', zIndex: 999999, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px', overflowY: 'auto' }}>
+      <div style={{ background: 'linear-gradient(135deg, #2A1414, #1A1A1E)', borderRadius: '28px', padding: '36px 28px', width: '100%', maxWidth: '460px', border: '3px solid #FF4444', textAlign: 'center' }}>
+        <div style={{ fontSize: '70px', marginBottom: '18px' }}>🚫</div>
+        <p style={{ color: '#FF4444', fontSize: '16px', letterSpacing: '3px', fontWeight: '900', margin: '0 0 16px' }}>CUENTA SANCIONADA</p>
+        <p style={{ color: '#FFFFFF', fontSize: '22px', lineHeight: '1.5', fontWeight: 'bold', margin: '0 0 24px' }}>{sancionActiva.razon}</p>
+        {sancionActiva.permanente ? (
+          <p style={{ color: '#FF4444', fontSize: '24px', fontWeight: '900', margin: '0 0 8px' }}>Suspensión permanente</p>
+        ) : (
+          <>
+            <p style={{ color: '#FFFFFF', fontSize: '17px', fontWeight: 'bold', margin: '0 0 12px' }}>Tiempo restante de la sanción ({sancionActiva.duracion}):</p>
+            <p style={{ color: '#FF4444', fontSize: '52px', fontWeight: '900', margin: '0 0 16px', fontVariantNumeric: 'tabular-nums' }}>{contadorSancion}</p>
+            <p style={{ color: '#FFCF4D', fontSize: '16px', fontWeight: 'bold', margin: '0' }}>Hasta: {sancionActiva.sancionHasta ? new Date(sancionActiva.sancionHasta).toLocaleString('es-CO') : '—'}</p>
+          </>
+        )}
+      </div>
+      <p style={{ color: '#CCCCCC', fontSize: '16px', margin: '24px 0 0', textAlign: 'center', maxWidth: '420px', lineHeight: '1.5' }}>{sancionActiva.permanente ? 'Contacta al soporte de GuajiraGo para más información.' : 'No podrás recibir viajes hasta que finalice la sanción.'}</p>
 
+      <div style={{ width: '100%', maxWidth: '460px', background: '#1A1A1E', borderRadius: '20px', padding: '16px', marginTop: '20px', border: '1px solid #2A2A2E' }}>
+        <p style={{ color: '#FFFFFF', fontSize: '15px', fontWeight: 'bold', margin: '0 0 10px' }}>💬 ¿Necesitas explicar tu caso?</p>
+        <div style={{ maxHeight: '180px', overflowY: 'auto', marginBottom: '10px' }}>
+          {mensajesApelacion.length === 0 && <p style={{ color: '#888', fontSize: '13px', textAlign: 'center', margin: '8px 0' }}>Escríbele a GuajiraGo si crees que esto es un error</p>}
+          {mensajesApelacion.map((m, i) => (
+            <div key={i} style={{ display: 'flex', justifyContent: m.autor === 'conductor' ? 'flex-end' : 'flex-start', marginBottom: '8px' }}>
+              <div style={{ background: m.autor === 'conductor' ? 'linear-gradient(135deg, #FF7A2F, #D6357E)' : '#2A2A2E', borderRadius: '12px', padding: '10px 14px', maxWidth: '85%' }}>
+                <p style={{ color: '#FFFFFF', fontSize: '14px', margin: '0', lineHeight: '1.4' }}>{m.texto}</p>
+              </div>
+            </div>
+          ))}
+          <div ref={chatApelacionFinRef} />
+        </div>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <input value={textoApelacion} onChange={e => setTextoApelacion(e.target.value)} onKeyDown={e => e.key === 'Enter' && enviarApelacion()} placeholder="Escribe tu mensaje..." style={{ flex: 1, background: '#141416', border: '1px solid #2A2A2E', borderRadius: '12px', padding: '12px 14px', color: '#FFFFFF', fontSize: '15px', outline: 'none' }} />
+          <button onClick={enviarApelacion} disabled={!textoApelacion.trim()} style={{ padding: '12px 18px', background: textoApelacion.trim() ? 'linear-gradient(135deg, #FF7A2F, #D6357E)' : '#2A2A2E', border: 'none', borderRadius: '12px', color: '#FFFFFF', fontSize: '20px', cursor: textoApelacion.trim() ? 'pointer' : 'default' }}>➤</button>
+        </div>
+      </div>
+    </div>
+  );
+
+if (llamadoAtencion && !fase) return (  
+    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.92)', zIndex: 99999, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
+      <div style={{ background: 'linear-gradient(135deg, #1A1A1E, #2A2A2E)', borderRadius: '28px', padding: '32px 24px', width: '100%', maxWidth: '420px', border: '3px solid #FF7A2F', textAlign: 'center' }}>
+        <div style={{ fontSize: '60px', marginBottom: '16px' }}>📢</div>
+        <p style={{ color: '#FF7A2F', fontSize: '12px', letterSpacing: '3px', fontWeight: 'bold', margin: '0 0 12px' }}>MENSAJE DE GUAJIRAGO</p>
+        <p style={{ color: '#FFFFFF', fontSize: '16px', lineHeight: '1.6', margin: '0 0 28px' }}>{llamadoAtencion}</p>
+        <button onClick={cerrarLlamado} disabled={!puedeCerrarLlamado} style={{ width: '100%', padding: '16px', background: puedeCerrarLlamado ? 'linear-gradient(135deg, #FFCF4D, #FF7A2F)' : '#2A2A2E', border: 'none', borderRadius: '16px', color: puedeCerrarLlamado ? '#141416' : '#555', fontSize: '16px', fontWeight: '900', cursor: puedeCerrarLlamado ? 'pointer' : 'default', transition: 'all 0.5s' }}>
+          {puedeCerrarLlamado ? 'Entendido ✓' : 'Lee el mensaje completo...'}
+        </button>
+      </div>
+    </div>
+  );
   return (
     <div style={{ backgroundColor: '#141416', minHeight: '100vh', fontFamily: 'Arial, sans-serif' }}>
       <div style={{ background: 'linear-gradient(135deg, #1A1A1E, #2A2A2E)', padding: '24px 20px', position: 'relative' }}>

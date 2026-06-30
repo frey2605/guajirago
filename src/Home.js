@@ -9,7 +9,7 @@ import Configuracion from './Configuracion';
 import Promociones from './Promociones';
 import { auth, db } from './firebase';
 import { signOut } from 'firebase/auth';
-import { collection, query, where, limit, getDocs, doc, getDoc } from 'firebase/firestore';
+import { collection, query, where, limit, getDocs, doc, getDoc, onSnapshot, updateDoc } from 'firebase/firestore';
 
 const ICONOS_FAVORITOS = ['🏠', '💼', '❤️', '⭐', '🏥', '🏫', '🛒', '🏖️', '⛪', '🏋️'];
 
@@ -165,8 +165,37 @@ function Home({ nombre, onCerrarSesion, onVolver }) {
   const [favoritos, setFavoritos] = useState(cargarFavoritos());
   const [recientes, setRecientes] = useState(cargarRecientes());
   const [mostrarModalFavorito, setMostrarModalFavorito] = useState(false);
+  const [llamadoAtención, setLlamadoAtencion] = useState(null);
+  const [puedeCerrarLlamado, setPuedeCerrarLlamado] = useState(false);
 
   const [fotoUsuario, setFotoUsuario] = useState(null);
+
+  // Listener de llamado de atención
+  useEffect(() => {
+    const user = auth.currentUser;
+    if (!user) return;
+    
+    const unsub = onSnapshot(doc(db, 'usuarios', user.uid), (snap) => {
+      if (!snap.exists()) return;
+      const data = snap.data();
+      if (data.llamadoPendiente && pantalla === 'home') {
+        setLlamadoAtencion(data.llamadoPendiente);
+        setPuedeCerrarLlamado(false);
+        setTimeout(() => setPuedeCerrarLlamado(true), 8000);
+      }
+    });
+    return () => unsub();
+  }, [pantalla]);
+
+  const cerrarLlamado = async () => {
+    if (!puedeCerrarLlamado) return;
+    try {
+      const user = auth.currentUser;
+      
+      await updateDoc(doc(db, 'usuarios', user.uid), { llamadoPendiente: null });
+    } catch(e) {}
+    setLlamadoAtencion(null);
+  };
 
   useEffect(() => {
     const cargar = async () => {
@@ -230,6 +259,36 @@ function Home({ nombre, onCerrarSesion, onVolver }) {
   return (
     <div style={{ backgroundColor: '#141416', minHeight: '100vh', fontFamily: 'Arial, sans-serif' }}>
       {mostrarModalFavorito && <ModalFavorito onGuardar={agregarFavorito} onCerrar={() => setMostrarModalFavorito(false)} />}
+
+      {llamadoAtención && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.92)', zIndex: 99999, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
+          <div style={{ background: 'linear-gradient(135deg, #1A1A1E, #2A2A2E)', borderRadius: '28px', padding: '32px 24px', width: '100%', maxWidth: '420px', border: '3px solid #FF7A2F', textAlign: 'center' }}>
+            <div style={{ fontSize: '60px', marginBottom: '16px' }}>📢</div>
+            <p style={{ color: '#FF7A2F', fontSize: '12px', letterSpacing: '3px', fontWeight: 'bold', margin: '0 0 12px' }}>MENSAJE DE GUAJIRAGO</p>
+            <p style={{ color: '#FFFFFF', fontSize: '16px', lineHeight: '1.6', margin: '0 0 28px' }}>{llamadoAtención}</p>
+            <button onClick={cerrarLlamado} disabled={!puedeCerrarLlamado} style={{ width: '100%', padding: '16px', background: puedeCerrarLlamado ? 'linear-gradient(135deg, #FFCF4D, #FF7A2F)' : '#2A2A2E', border: 'none', borderRadius: '16px', color: puedeCerrarLlamado ? '#141416' : '#555', fontSize: '16px', fontWeight: '900', cursor: puedeCerrarLlamado ? 'pointer' : 'default', transition: 'all 0.5s' }}>
+              {puedeCerrarLlamado ? 'Entendido ✓' : 'Lee el mensaje completo...'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {llamadoAtención && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.92)', zIndex: 99999, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
+          <div style={{ background: 'linear-gradient(135deg, #1A1A1E, #2A2A2E)', borderRadius: '28px', padding: '32px 24px', width: '100%', maxWidth: '420px', border: '3px solid #FF7A2F', textAlign: 'center' }}>
+            <div style={{ fontSize: '60px', marginBottom: '16px' }}>📢</div>
+            <p style={{ color: '#FF7A2F', fontSize: '12px', letterSpacing: '3px', fontWeight: 'bold', margin: '0 0 12px' }}>MENSAJE DE GUAJIRAGO</p>
+            <p style={{ color: '#FFFFFF', fontSize: '16px', lineHeight: '1.6', margin: '0 0 28px' }}>{llamadoAtención}</p>
+            <button
+              onClick={cerrarLlamado}
+              disabled={!puedeCerrarLlamado}
+              style={{ width: '100%', padding: '16px', background: puedeCerrarLlamado ? 'linear-gradient(135deg, #FFCF4D, #FF7A2F)' : '#2A2A2E', border: 'none', borderRadius: '16px', color: puedeCerrarLlamado ? '#141416' : '#555', fontSize: '16px', fontWeight: '900', cursor: puedeCerrarLlamado ? 'pointer' : 'default', transition: 'all 0.5s' }}
+            >
+              {puedeCerrarLlamado ? 'Entendido ✓' : 'Lee el mensaje completo...'}
+            </button>
+          </div>
+        </div>
+      )}
 
       <div style={{ background: 'linear-gradient(135deg, #1A1A1E, #2A2A2E)', padding: '24px 20px', position: 'relative' }}>
         <MenuLateral nombre={nombre} foto={fotoUsuario} onIrPerfil={() => setVerPerfil(true)} onIrViajes={() => setPantalla('historial')} onIrCreditos={() => setVerCreditos(true)} onIrSeguridad={() => setVerSeguridad(true)} onIrAyuda={() => setVerAyuda(true)} onIrConfig={() => setVerConfig(true)} onIrPromociones={() => setVerPromociones(true)} onCerrarSesion={onCerrarSesion} />
