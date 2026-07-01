@@ -70,7 +70,8 @@ function Promociones({ onVolver }) {
       const ahora = new Date();
       const lista = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(p => {
         if (!p.activa) return false;
-        if (new Date(p.fechaInicio) > ahora || new Date(p.fechaFin) < ahora) return false;
+        // Inicio desde el arranque del día (00:00) y fin hasta el final del día (23:59:59)
+        if (new Date(p.fechaInicio + 'T00:00:00') > ahora || new Date(p.fechaFin + 'T23:59:59') < ahora) return false;
         if (p.aplicaA === 'pasajeros' && tipo === 'conductor') return false;
         if (p.aplicaA === 'conductores' && tipo !== 'conductor') return false;
         return true;
@@ -104,7 +105,7 @@ function Promociones({ onVolver }) {
         const datosPromo = snapPromo.data();
         const ahora = new Date();
         if (!datosPromo.activa) throw new Error('NO_ACTIVA');
-        if (new Date(datosPromo.fechaInicio) > ahora || new Date(datosPromo.fechaFin) < ahora) throw new Error('FUERA_VIGENCIA');
+        if (new Date(datosPromo.fechaInicio + 'T00:00:00') > ahora || new Date(datosPromo.fechaFin + 'T23:59:59') < ahora) throw new Error('FUERA_VIGENCIA');
         if (datosPromo.aplicaA === 'pasajeros' && tipoUsuario === 'conductor') throw new Error('NO_APLICA');
         if (datosPromo.aplicaA === 'conductores' && tipoUsuario !== 'conductor') throw new Error('NO_APLICA');
 
