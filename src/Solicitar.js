@@ -215,7 +215,11 @@ function MapaPasajero({ ubicacionPasajero, ubicacionConductor, tipo, onTiempo })
     if (!mapaRef.current || !window.google || !ubicacionPasajero) return;
     if (marcadorPasajeroRef.current) marcadorPasajeroRef.current.setPosition(ubicacionPasajero);
     else marcadorPasajeroRef.current = new window.google.maps.Marker({ position: ubicacionPasajero, map: mapaRef.current, label: { text: '📍', fontSize: '24px' } });
-  }, [ubicacionPasajero]);
+    // Centrar el mapa en el pasajero mientras no haya conductor (evita quedar en el centro por defecto)
+    if (!ubicacionConductor && !ajustadoRef.current) {
+      mapaRef.current.setCenter(ubicacionPasajero);
+    }
+  }, [ubicacionPasajero, ubicacionConductor]);
 
   useEffect(() => {
     if (!mapaRef.current || !window.google || !ubicacionConductor) return;
@@ -237,7 +241,8 @@ function MapaPasajero({ ubicacionPasajero, ubicacionConductor, tipo, onTiempo })
           const bounds = new window.google.maps.LatLngBounds();
           bounds.extend(ubicacionConductor);
           bounds.extend(ubicacionPasajero);
-          mapaRef.current.fitBounds(bounds, { padding: 80 });
+          // Relleno grande abajo (tarjeta del conductor) y arriba (barra) para que la ruta quede en la zona visible
+          mapaRef.current.fitBounds(bounds, { top: 120, bottom: 380, left: 60, right: 60 });
         }
       }
     });
