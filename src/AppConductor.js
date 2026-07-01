@@ -63,6 +63,33 @@ function Celebracion() {
   );
 }
 
+function CelebracionConductor({ monto, onCerrar }) {
+  const confeti = Array.from({ length: 30 }, (_, i) => i);
+  const coloresConfeti = ['#FFCF4D', '#FF7A2F', '#D6357E', '#2ECC71', '#FFFFFF'];
+  return (
+    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: '#141416', zIndex: 99999, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px', overflow: 'hidden' }}>
+      {confeti.map(i => (
+        <span key={i} style={{
+          position: 'absolute', top: '-20px', left: `${Math.random() * 100}%`,
+          fontSize: `${14 + Math.random() * 14}px`,
+          color: coloresConfeti[i % coloresConfeti.length],
+          animation: `caer ${2 + Math.random() * 2}s linear ${Math.random() * 1.5}s infinite`,
+        }}>●</span>
+      ))}
+      <div style={{ fontSize: '70px', marginBottom: '12px' }}>🎉</div>
+      <h2 style={{ color: '#FFFFFF', fontSize: '24px', fontWeight: '900', margin: '0 0 6px', textAlign: 'center' }}>¡Recibiste tu saldo!</h2>
+      <p style={{ color: '#FFCF4D', fontSize: '16px', margin: '0 0 24px', textAlign: 'center', fontWeight: 'bold' }}>El descuento del pasajero es tuyo 🎁</p>
+      <div style={{ background: 'linear-gradient(135deg, #1A1A1E, #2A2A2E)', borderRadius: '28px', padding: '32px 24px', width: '100%', maxWidth: '420px', border: '3px solid #2ECC71', textAlign: 'center', zIndex: 2 }}>
+        <p style={{ color: '#2ECC71', fontSize: '12px', margin: '0 0 12px', letterSpacing: '2px', fontWeight: 'bold' }}>SALDO ACREDITADO A TUS CRÉDITOS</p>
+        <p style={{ color: '#FFFFFF', fontSize: '52px', fontWeight: '900', margin: '0' }}>${(monto || 0).toLocaleString()}</p>
+        <p style={{ color: '#AAAAAA', fontSize: '13px', margin: '16px 0 0', lineHeight: '1.5' }}>Ya está sumado a tu saldo de créditos. ¡Gracias por rodar con GuajiraGo!</p>
+      </div>
+      <button onClick={onCerrar} style={{ marginTop: '28px', width: '100%', maxWidth: '420px', padding: '18px', background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)', border: 'none', borderRadius: '16px', color: '#141416', fontSize: '17px', fontWeight: '900', cursor: 'pointer', zIndex: 2 }}>Continuar</button>
+      <style>{`@keyframes caer { from { transform: translateY(-20px) rotate(0deg); opacity: 1; } to { transform: translateY(100vh) rotate(360deg); opacity: 0.3; } }`}</style>
+    </div>
+  );
+}
+
 function MensajeGrande({ mensaje, onCerrar }) {
   return (
     <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', zIndex: 9998, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
@@ -962,7 +989,13 @@ const cargarSaldo = useCallback(async (uid) => {
         }
       } catch (ePromo) {}
 
-      await cerrarViajeFinal();
+      // Cerrar el modal del código y mostrar la pantalla de celebración.
+      // El cierre real del viaje (y el paso a calificación) ocurre cuando el
+      // conductor toca "Continuar" en la celebración.
+      setMostrarCodigoDescuento(false);
+      setCodigoDescuentoIngresado('');
+      setErrorCodigoDescuento('');
+      setSaldoVirtualRecibido(montoDescuento);
     } catch (e) {
       setErrorCodigoDescuento('Error al verificar. Intenta de nuevo');
     }
@@ -1015,6 +1048,13 @@ useEffect(() => {
   if (verConfig) return <Configuracion onVolver={() => setVerConfig(false)} onCerrarSesion={cerrarSesion} />;
   if (verPromociones) return <Promociones onVolver={() => setVerPromociones(false)} />;
   if (celebrando) return <Celebracion />;
+
+  if (saldoVirtualRecibido !== null) return (
+    <CelebracionConductor
+      monto={saldoVirtualRecibido}
+      onCerrar={() => { setSaldoVirtualRecibido(null); cerrarViajeFinal(); }}
+    />
+  );
 
   if (fase === 'cancelado_pasajero') {
     return (
