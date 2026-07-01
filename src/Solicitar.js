@@ -401,6 +401,16 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
       const data = snap.data();
       setViaje(data);
 
+      // El conductor marcó el descuento como consumido: el pasajero borra su propio código de bienvenida/promo
+      // para que no se pueda volver a usar en otro viaje.
+      if (data.descuentoInfo?.consumido === true && descuentoPendiente) {
+        const user = auth.currentUser;
+        if (user) {
+          updateDoc(doc(db, 'usuarios', user.uid), { descuentoPendiente: null }).catch(() => {});
+        }
+        setDescuentoPendiente(null);
+      }
+
       if (data.estado === 'cancelado_conductor') {
         clearInterval(contadorRef.current);
         setPantalla('cancelado_conductor');

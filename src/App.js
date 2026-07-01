@@ -146,6 +146,21 @@ function PantallaDatosConductor({ nombre, foto, celular, onGuardar, onVolver, on
       const urlFotoCedula = await subirFoto(fotoCedula, 'cedula', user.uid);
       const marcaFinal = marca === 'Otra' ? marcaOtra.trim() : marca;
       const vehiculo = `${marcaFinal} ${modelo}`;
+
+      // Créditos de bienvenida: solo si el usuario aún no tiene saldo (evita duplicar si edita sus datos)
+      // El monto depende del tipo de vehículo (mototaxi o taxi)
+      let creditosIniciales = null;
+      try {
+        const snapActual = await getDoc(doc(db, 'usuarios', user.uid));
+        const yaTieneCreditos = snapActual.exists() && (snapActual.data().creditos || 0) > 0;
+        if (!yaTieneCreditos) {
+          const snapCfg = await getDoc(doc(db, 'config', 'global'));
+          const d = snapCfg.exists() ? snapCfg.data() : {};
+          const monto = tipoVehiculo === 'Mototaxi' ? (d.incentivoNuevoMototaxi ?? 10000) : (d.incentivoNuevoTaxi ?? 20000);
+          if (monto > 0) creditosIniciales = monto;
+        }
+      } catch (e) {}
+
       await setDoc(doc(db, 'usuarios', user.uid), {
         tipo: 'conductor',
         tipoVehiculo,
@@ -158,8 +173,9 @@ function PantallaDatosConductor({ nombre, foto, celular, onGuardar, onVolver, on
         telefono,
         fotoConductor: urlFotoConductor,
         fotoCedula: urlFotoCedula,
+        ...(creditosIniciales !== null ? { creditos: creditosIniciales } : {}),
       }, { merge: true });
-      onGuardar(placa.toUpperCase(), vehiculo, telefono, tipoVehiculo);
+      onGuardar(placa.toUpperCase(), vehiculo, telefono, tipoVehiculo, creditosIniciales);
     } catch (e) { setError('Error al guardar. Revisa tu conexión e intenta de nuevo'); }
     setCargando(false);
   };
@@ -301,8 +317,40 @@ function PantallaMantenimiento({ mensaje, onVolver }) {
   );
 }
 
+function CelebracionBienvenidaConductor({ monto, onContinuar }) {
+  const confeti = Array.from({ length: 40 }, (_, i) => i);
+  const colores = ['#FFCF4D', '#FF7A2F', '#D6357E', '#2ECC71', '#4DA3FF', '#FFFFFF'];
+  return (
+    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: '#141416', zIndex: 999999, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px', overflow: 'hidden' }}>
+      {confeti.map(i => (
+        <span key={i} style={{
+          position: 'absolute', top: '-24px', left: `${Math.random() * 100}%`,
+          fontSize: `${16 + Math.random() * 18}px`,
+          color: colores[i % colores.length],
+          animation: `caerBienvenidaC ${2.2 + Math.random() * 2}s linear ${Math.random() * 1.2}s infinite`,
+        }}>●</span>
+      ))}
+      <div style={{ fontSize: '30px', marginBottom: '4px', animation: 'rebotarBienvenidaC 0.6s infinite alternate', zIndex: 2 }}>🎉🎊🎉</div>
+      <div style={{ fontSize: '90px', margin: '8px 0 4px', animation: 'rebotarBienvenidaC 0.6s infinite alternate', zIndex: 2 }}>🚗💰</div>
+      <h1 style={{ color: '#FFFFFF', fontSize: '26px', fontWeight: '900', margin: '8px 0 4px', textAlign: 'center', zIndex: 2 }}>¡Bienvenido, conductor!</h1>
+      <p style={{ color: '#FFCF4D', fontSize: '15px', margin: '0 0 24px', textAlign: 'center', fontWeight: 'bold', zIndex: 2 }}>Empiezas con saldo en tu cuenta 🥳</p>
+      <div style={{ background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)', borderRadius: '28px', padding: '32px 28px', width: '100%', maxWidth: '420px', textAlign: 'center', zIndex: 2, boxShadow: '0 8px 32px rgba(255,122,47,0.4)' }}>
+        <p style={{ color: '#141416', fontSize: '13px', margin: '0 0 8px', letterSpacing: '2px', fontWeight: '900' }}>CRÉDITOS DE BIENVENIDA</p>
+        <p style={{ color: '#141416', fontSize: '54px', fontWeight: '900', margin: '0', lineHeight: '1' }}>${(monto || 0).toLocaleString()}</p>
+        <p style={{ color: '#3A2400', fontSize: '13px', margin: '14px 0 0', lineHeight: '1.5', fontWeight: 'bold' }}>Ya está en tu saldo. Úsalo para pagar tus primeras comisiones 🚀</p>
+      </div>
+      <button onClick={onContinuar} style={{ marginTop: '28px', width: '100%', maxWidth: '420px', padding: '18px', background: '#FFFFFF', border: 'none', borderRadius: '16px', color: '#141416', fontSize: '18px', fontWeight: '900', cursor: 'pointer', zIndex: 2 }}>¡A rodar! 🎉</button>
+      <style>{`
+        @keyframes caerBienvenidaC { from { transform: translateY(-24px) rotate(0deg); opacity: 1; } to { transform: translateY(100vh) rotate(360deg); opacity: 0.2; } }
+        @keyframes rebotarBienvenidaC { from { transform: scale(1); } to { transform: scale(1.12); } }
+      `}</style>
+    </div>
+  );
+}
+
 function App() {
   const [screen, setScreen] = useState('splash');
+  const [celebracionCreditosConductor, setCelebracionCreditosConductor] = useState(null); // monto o null
   const [mensajeMantenimiento, setMensajeMantenimiento] = useState('');
   const [tipoUsuario, setTipoUsuario] = useState('');
   const [nombreUsuario, setNombreUsuario] = useState('');
@@ -422,13 +470,17 @@ function App() {
     }
   };
 
-  const handleDatosConductor = (placa, vehiculo, telefono, tipoVehiculo) => {
+  const handleDatosConductor = (placa, vehiculo, telefono, tipoVehiculo, creditosIniciales) => {
     setPlacaUsuario(placa);
     setVehiculoUsuario(vehiculo);
     setTelefonoUsuario(telefono);
     setTipoVehiculoUsuario(tipoVehiculo || '');
     guardarLocal({ tipo: 'conductor', nombre: nombreUsuario, celular: telefono, placa, vehiculo, tipoVehiculo: tipoVehiculo || '' });
-    setScreen('home');
+    if (creditosIniciales) {
+      setCelebracionCreditosConductor(creditosIniciales);
+    } else {
+      setScreen('home');
+    }
   };
 
   const handleCerrarSesion = () => {
@@ -436,6 +488,7 @@ function App() {
     setScreen('login');
   };
 
+  if (celebracionCreditosConductor) return <CelebracionBienvenidaConductor monto={celebracionCreditosConductor} onContinuar={() => { setCelebracionCreditosConductor(null); setScreen('home'); }} />;
   if (verPerfil) return <MiPerfil onVolver={() => setVerPerfil(false)} />;
   if (verGanancias) return <Ganancias onVolver={() => setVerGanancias(false)} />;
   if (verSeguridad) return <Seguridad onVolver={() => setVerSeguridad(false)} />;

@@ -1,9 +1,67 @@
 import React, { useState } from 'react';
 import { auth, db } from './firebase';
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, sendEmailVerification } from 'firebase/auth';
-import { doc, setDoc, getDoc } from 'firebase/firestore';
+import { doc, setDoc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import TerminosCondiciones from './TerminosCondiciones';
 import PoliticaPrivacidad from './PoliticaPrivacidad';
+
+const VALOR_CREDITO_BIENVENIDA = 8000; // Crédito fijo de bienvenida para pasajeros nuevos
+
+// Identificador único de este navegador/dispositivo (persiste en localStorage)
+function obtenerDeviceId() {
+  try {
+    let id = localStorage.getItem('gg_device_id');
+    if (!id) {
+      id = 'dev_' + Date.now() + '_' + Math.random().toString(36).slice(2, 12);
+      localStorage.setItem('gg_device_id', id);
+    }
+    return id;
+  } catch (e) {
+    return null;
+  }
+}
+
+// Obtiene la IP pública del usuario (solo informativa, nunca bloquea el registro)
+async function obtenerIP() {
+  try {
+    const resp = await fetch('https://api.ipify.org?format=json');
+    const data = await resp.json();
+    return data.ip || '';
+  } catch (e) {
+    return '';
+  }
+}
+
+function CelebracionBienvenida({ monto, onContinuar }) {
+  const confeti = Array.from({ length: 40 }, (_, i) => i);
+  const colores = ['#FFCF4D', '#FF7A2F', '#D6357E', '#2ECC71', '#4DA3FF', '#FFFFFF'];
+  return (
+    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: '#141416', zIndex: 999999, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px', overflow: 'hidden' }}>
+      {confeti.map(i => (
+        <span key={i} style={{
+          position: 'absolute', top: '-24px', left: `${Math.random() * 100}%`,
+          fontSize: `${16 + Math.random() * 18}px`,
+          color: colores[i % colores.length],
+          animation: `caerBienvenida ${2.2 + Math.random() * 2}s linear ${Math.random() * 1.2}s infinite`,
+        }}>●</span>
+      ))}
+      <div style={{ fontSize: '30px', marginBottom: '4px', animation: 'rebotarBienvenida 0.6s infinite alternate', zIndex: 2 }}>🎉🎊🎉</div>
+      <div style={{ fontSize: '90px', margin: '8px 0 4px', animation: 'rebotarBienvenida 0.6s infinite alternate', zIndex: 2 }}>🎁</div>
+      <h1 style={{ color: '#FFFFFF', fontSize: '26px', fontWeight: '900', margin: '8px 0 4px', textAlign: 'center', zIndex: 2 }}>¡Bienvenido a GuajiraGo!</h1>
+      <p style={{ color: '#FFCF4D', fontSize: '15px', margin: '0 0 24px', textAlign: 'center', fontWeight: 'bold', zIndex: 2 }}>Tenemos un regalo para ti 🥳</p>
+      <div style={{ background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)', borderRadius: '28px', padding: '32px 28px', width: '100%', maxWidth: '420px', textAlign: 'center', zIndex: 2, boxShadow: '0 8px 32px rgba(255,122,47,0.4)' }}>
+        <p style={{ color: '#141416', fontSize: '13px', margin: '0 0 8px', letterSpacing: '2px', fontWeight: '900' }}>CRÉDITO DE BIENVENIDA</p>
+        <p style={{ color: '#141416', fontSize: '54px', fontWeight: '900', margin: '0', lineHeight: '1' }}>${(monto || 0).toLocaleString()}</p>
+        <p style={{ color: '#3A2400', fontSize: '13px', margin: '14px 0 0', lineHeight: '1.5', fontWeight: 'bold' }}>Ya está en tu cuenta. Úsalo automáticamente en tu primer viaje 🚀</p>
+      </div>
+      <button onClick={onContinuar} style={{ marginTop: '28px', width: '100%', maxWidth: '420px', padding: '18px', background: '#FFFFFF', border: 'none', borderRadius: '16px', color: '#141416', fontSize: '18px', fontWeight: '900', cursor: 'pointer', zIndex: 2 }}>¡Vamos! 🎉</button>
+      <style>{`
+        @keyframes caerBienvenida { from { transform: translateY(-24px) rotate(0deg); opacity: 1; } to { transform: translateY(100vh) rotate(360deg); opacity: 0.2; } }
+        @keyframes rebotarBienvenida { from { transform: scale(1); } to { transform: scale(1.12); } }
+      `}</style>
+    </div>
+  );
+}
 
 function Login({ onEntrar }) {
   const [pantalla, setPantalla] = useState('inicio');
@@ -27,6 +85,7 @@ function Login({ onEntrar }) {
   const [aceptaTerminos, setAceptaTerminos] = useState(false);
   const [verTerminos, setVerTerminos] = useState(false);
   const [verPrivacidad, setVerPrivacidad] = useState(false);
+  const [celebracionBienvenida, setCelebracionBienvenida] = useState(null); // { monto, datosEntrar }
 
   const registrarse = async () => {
     if (!nombre || !email || !emailConfirm || !celular || !diaNac || !mesNac || !anioNac || !password || !passwordConfirm) { setError('Por favor completa todos los campos'); return; }
@@ -38,11 +97,72 @@ function Login({ onEntrar }) {
     if (!aceptaTerminos) { setError('Debes aceptar los Términos y condiciones para continuar'); return; }
     setEnviando(true); setError('');
     try {
-      const resultado = await createUserWithEmailAndPassword(auth, email.trim().toLowerCase(), password);
-      try { await sendEmailVerification(resultado.user); } catch (e) {}
+      const cuentaCreada = await createUserWithEmailAndPassword(auth, email.trim().toLowerCase(), password);
+
+      // Verificar que el celular no esté ya usado por otra cuenta (protege el beneficio de bienvenida)
+      const celularLimpio = celular.trim();
+      const snapCelular = await getDocs(query(collection(db, 'usuarios'), where('celular', '==', celularLimpio)));
+      if (!snapCelular.empty) {
+        try { await cuentaCreada.user.delete(); } catch (eDel) {}
+        try { await auth.signOut(); } catch (eSignOut) {}
+        setError('Ese número de celular ya está registrado en otra cuenta');
+        setEnviando(false);
+        return;
+      }
+
+      try { await sendEmailVerification(cuentaCreada.user); } catch (e) {}
       const fechaNacimiento = `${String(diaNac).padStart(2, '0')}/${String(mesNac).padStart(2, '0')}/${anioNac}`;
-      await setDoc(doc(db, 'usuarios', resultado.user.uid), { nombre, email: email.trim().toLowerCase(), celular, fechaNacimiento, contactoConfianzaNombre: contactoNombre.trim(), contactoConfianzaNumero: contactoNumero.trim(), tipo: '', placa: '', vehiculo: '', fechaRegistro: new Date().toISOString() });
-      onEntrar('', nombre, celular, '', '');
+
+      // Revisar si corresponde el crédito de bienvenida (según config global + huella de dispositivo)
+      let descuentoBienvenida = null;
+      let deviceId = null;
+      let ipRegistro = '';
+      try {
+        const snapCfg = await getDoc(doc(db, 'config', 'global'));
+        const activo = snapCfg.exists() ? (snapCfg.data().viajeGratisNuevoPasajero !== false) : true;
+        if (activo) {
+          deviceId = obtenerDeviceId();
+          let dispositivoYaUsado = false;
+          if (deviceId) {
+            const snapDispositivo = await getDoc(doc(db, 'dispositivosBeneficio', deviceId));
+            dispositivoYaUsado = snapDispositivo.exists();
+          }
+          if (!dispositivoYaUsado) {
+            descuentoBienvenida = {
+              promoId: 'BIENVENIDA',
+              tipoBeneficio: 'credito',
+              valorBeneficio: VALOR_CREDITO_BIENVENIDA,
+              codigoVerificacion: String(Math.floor(1000 + Math.random() * 9000)),
+              fechaActivacion: new Date().toISOString(),
+            };
+          }
+        }
+        ipRegistro = await obtenerIP();
+      } catch (e) {}
+
+      await setDoc(doc(db, 'usuarios', cuentaCreada.user.uid), {
+        nombre, email: email.trim().toLowerCase(), celular: celularLimpio, fechaNacimiento,
+        contactoConfianzaNombre: contactoNombre.trim(), contactoConfianzaNumero: contactoNumero.trim(),
+        tipo: '', placa: '', vehiculo: '', fechaRegistro: new Date().toISOString(),
+        ipRegistro,
+        ...(descuentoBienvenida ? { descuentoPendiente: descuentoBienvenida } : {}),
+      });
+
+      if (descuentoBienvenida && deviceId) {
+        try {
+          await setDoc(doc(db, 'dispositivosBeneficio', deviceId), {
+            usado: true,
+            uid: cuentaCreada.user.uid,
+            fecha: new Date().toISOString(),
+          });
+        } catch (e) {}
+      }
+
+      if (descuentoBienvenida) {
+        setCelebracionBienvenida({ monto: descuentoBienvenida.valorBeneficio, datosEntrar: ['', nombre, celular, '', ''] });
+      } else {
+        onEntrar('', nombre, celular, '', '');
+      }
     } catch (err) {
       if (err.code === 'auth/email-already-in-use') setError('Este correo ya está registrado');
       else if (err.code === 'auth/weak-password') setError('La contraseña debe tener mínimo 6 caracteres');
@@ -80,6 +200,7 @@ function Login({ onEntrar }) {
     setCargando(false);
   };
 
+  if (celebracionBienvenida) return <CelebracionBienvenida monto={celebracionBienvenida.monto} onContinuar={() => onEntrar(...celebracionBienvenida.datosEntrar)} />;
   if (verTerminos) return <TerminosCondiciones onVolver={() => setVerTerminos(false)} />;
   if (verPrivacidad) return <PoliticaPrivacidad onVolver={() => setVerPrivacidad(false)} />;
   if (pantalla === 'inicio') {
