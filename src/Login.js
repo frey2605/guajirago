@@ -91,6 +91,7 @@ function Login({ onEntrar }) {
     if (!nombre || !email || !emailConfirm || !celular || !diaNac || !mesNac || !anioNac || !password || !passwordConfirm) { setError('Por favor completa todos los campos'); return; }
     if (!contactoNombre.trim()) { setError('Escribe el nombre de tu contacto de emergencia'); return; }
     if (!contactoNumero.trim()) { setError('Escribe el número de tu contacto de emergencia'); return; }
+    if (contactoNumero.replace(/\D/g, '').length !== 10) { setError('El número del contacto de emergencia debe tener 10 dígitos'); return; }
     if (email.trim().toLowerCase() !== emailConfirm.trim().toLowerCase()) { setError('Los correos no coinciden'); return; }
     if (password !== passwordConfirm) { setError('Las contraseñas no coinciden'); return; }
     if (password.length < 6) { setError('La contraseña debe tener mínimo 6 caracteres'); return; }
@@ -283,7 +284,7 @@ function Login({ onEntrar }) {
         <p style={{ color: '#FF7A2F', fontSize: '11px', letterSpacing: '2px', margin: '0 0 10px 4px', fontWeight: 'bold' }}>🚨 CONTACTO DE EMERGENCIA</p>
         <div style={{ background: '#1A1A1E', borderRadius: '16px', padding: '16px', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '12px' }}>
           <span style={{ fontSize: '20px' }}>👥</span>
-          <input value={contactoNombre} onChange={e => setContactoNombre(e.target.value)} placeholder="Nombre del contacto" style={{ background: 'none', border: 'none', outline: 'none', color: '#FFFFFF', fontSize: '16px', width: '100%' }} />
+          <input value={contactoNombre} onChange={e => setContactoNombre(e.target.value.toUpperCase())} placeholder="Nombre del contacto" style={{ background: 'none', border: 'none', outline: 'none', color: '#FFFFFF', fontSize: '16px', width: '100%' }} />
         </div>
         <div style={{ background: '#1A1A1E', borderRadius: '16px', padding: '16px', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '12px' }}>
           <span style={{ color: '#FFFFFF', fontSize: '16px', fontWeight: '900', whiteSpace: 'nowrap' }}>+57</span>
