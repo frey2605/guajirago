@@ -806,27 +806,30 @@ const cargarSaldo = useCallback(async (uid) => {
     const unsub = onSnapshot(q, (snap) => {
       const ahora = Date.now();
       const tsDe = (v) => new Date(v.nuevaOferta || v.fechaSolicitud).getTime();
+      let diag = { total: snap.docs.length, tipo: 0, dist: 0, edad: 0, descartado: 0, sinFecha: 0, ok: 0 };
       const vigentes = snap.docs
         .map(d => ({ id: d.id, ...d.data() }))
         .filter(v => {
-          if (!v.nuevaOferta && !v.fechaSolicitud) return false;
+          if (!v.nuevaOferta && !v.fechaSolicitud) { diag.sinFecha++; return false; }
           // Filtro por tipo: el conductor solo ve solicitudes de su tipo de vehículo
-          if (tipoVehiculo && v.tipo && v.tipo !== tipoVehiculo) return false;
+          if (tipoVehiculo && v.tipo && v.tipo !== tipoVehiculo) { diag.tipo++; return false; }
           // Filtro por distancia: solo mostrar si el pasajero está dentro del radio de búsqueda actual
           if (ubicacionRef.current && v.pasajeroLat && v.pasajeroLng) {
             const radio = v.radioBusqueda || 7;
             const dist = calcularDistanciaKm(ubicacionRef.current.lat, ubicacionRef.current.lng, v.pasajeroLat, v.pasajeroLng);
-            if (dist > radio) return false;
+            if (dist > radio) { diag.dist++; return false; }
           }
           const ts = tsDe(v);
           const edad = ahora - ts;
-          if (edad < 0 || edad > VENTANA_MS) return false;
+          if (edad < 0 || edad > VENTANA_MS) { diag.edad++; return false; }
           const descartadoEn = descartadosRef.current[v.id];
-          if (descartadoEn && ts <= new Date(descartadoEn).getTime()) return false;
+          if (descartadoEn && ts <= new Date(descartadoEn).getTime()) { diag.descartado++; return false; }
+          diag.ok++;
           return true;
         })
         .sort((a, b) => tsDe(b) - tsDe(a))
         .slice(0, 5);
+      setDebugConfig('yo=' + (tipoVehiculo || 'VACIO') + ' | total=' + diag.total + ' tipo=' + diag.tipo + ' dist=' + diag.dist + ' edad=' + diag.edad + ' desc=' + diag.descartado + ' ok=' + diag.ok);
 
       const nuevas = vigentes.filter(v => !solicitudesIdsRef.current.has(v.id) && !v.nuevaOferta);
       if (nuevas.length > 0) alertarNuevoViaje();
