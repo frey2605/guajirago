@@ -12,6 +12,7 @@ import AyudaSoporte from './AyudaSoporte';
 import Configuracion from './Configuracion';
 import Promociones from './Promociones';
 import Creditos from './Creditos';
+import Anuncio from './Anuncio';
 import { auth, db, storage } from './firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
@@ -130,6 +131,7 @@ function PantallaDatosConductor({ nombre, foto, celular, onGuardar, onVolver, on
     if (!tipoVehiculo) { setError('Falta escoger el tipo de vehículo'); setCampoError('tipoVehiculo'); return; }
     if (!telefono) { setError('Falta el número de teléfono'); setCampoError('telefono'); return; }
     if (!placa) { setError('Falta la placa del vehículo'); setCampoError('placa'); return; }
+    if (placa.trim().length !== 6) { setError('La placa debe tener exactamente 6 caracteres'); setCampoError('placa'); return; }
     if (!marca) { setError('Falta escoger la marca'); setCampoError('marca'); return; }
     if (marca === 'Otra' && !marcaOtra.trim()) { setError('Escribe la marca del vehículo'); setCampoError('marcaOtra'); return; }
     if (!modelo) { setError('Falta el modelo'); setCampoError('modelo'); return; }
@@ -219,7 +221,7 @@ function PantallaDatosConductor({ nombre, foto, celular, onGuardar, onVolver, on
       </div>
       <div style={campoRojo('placa')}>
         <span style={{ fontSize: '20px' }}>🚘</span>
-        <input value={placa} onChange={e => setPlaca(e.target.value.toUpperCase())} placeholder="Placa del vehículo (ej: GUA 123)" style={estiloInput} />
+        <input value={placa} onChange={e => setPlaca(e.target.value.toUpperCase().slice(0, 6))} placeholder="Placa del vehículo (6 caracteres)" style={estiloInput} />
       </div>
       <div onClick={() => setListaMarcaAbierta(true)} style={{ ...campoRojo('marca'), cursor: 'pointer' }}>
         <span style={{ fontSize: '20px' }}>🏭</span>
@@ -247,7 +249,12 @@ function PantallaDatosConductor({ nombre, foto, celular, onGuardar, onVolver, on
       )}
       <div style={campoRojo('modelo')}>
         <span style={{ fontSize: '20px' }}>📅</span>
-        <input value={modelo} onChange={e => setModelo(e.target.value)} placeholder="Modelo (ej: 2020)" style={estiloInput} />
+        <select value={modelo} onChange={e => setModelo(e.target.value)} style={{ ...estiloInput, cursor: 'pointer' }}>
+          <option value="" style={{ background: '#1A1A1E' }}>Año del modelo</option>
+          {Array.from({ length: new Date().getFullYear() - 1989 }, (_, i) => new Date().getFullYear() - i).map(anio => (
+            <option key={anio} value={anio} style={{ background: '#1A1A1E' }}>{anio}</option>
+          ))}
+        </select>
       </div>
       <div onClick={() => setListaColorAbierta(true)} style={{ ...campoRojo('color'), cursor: 'pointer' }}>
         <span style={{ fontSize: '20px' }}>🎨</span>
@@ -499,7 +506,7 @@ function App() {
   if (verPromociones) return <Promociones onVolver={() => setVerPromociones(false)} />;
   if (screen === 'splash') return <Splash onFinish={() => {}} />;
   if (screen === 'login') return <Login onEntrar={handleEntrar} />;
-  if (screen === 'modulos') return <PantallaModulos nombre={nombreUsuario} foto={fotoUsuario} onSeleccionar={handleSeleccionarModulo} onVolver={() => setScreen('login')} onCerrarSesion={handleCerrarSesion} onIrPerfil={() => setVerPerfil(true)} onIrGanancias={() => setVerGanancias(true)} onIrSeguridad={() => setVerSeguridad(true)} onIrViajes={() => setVerMisViajes(true)} onIrCreditos={() => setVerCreditos(true)} onIrAyuda={() => setVerAyuda(true)} onIrConfig={() => setVerConfig(true)} onIrPromociones={() => setVerPromociones(true)} />;
+  if (screen === 'modulos') return <><PantallaModulos nombre={nombreUsuario} foto={fotoUsuario} onSeleccionar={handleSeleccionarModulo} onVolver={() => setScreen('login')} onCerrarSesion={handleCerrarSesion} onIrPerfil={() => setVerPerfil(true)} onIrGanancias={() => setVerGanancias(true)} onIrSeguridad={() => setVerSeguridad(true)} onIrViajes={() => setVerMisViajes(true)} onIrCreditos={() => setVerCreditos(true)} onIrAyuda={() => setVerAyuda(true)} onIrConfig={() => setVerConfig(true)} onIrPromociones={() => setVerPromociones(true)} /><Anuncio tipoUsuario={tipoUsuario} /></>;
   if (screen === 'rol') return <PantallaRol nombre={nombreUsuario} foto={fotoUsuario} onSeleccionar={handleSeleccionarRol} onVolver={() => setScreen('modulos')} onCerrarSesion={handleCerrarSesion} onIrPerfil={() => setVerPerfil(true)} onIrGanancias={() => setVerGanancias(true)} onIrSeguridad={() => setVerSeguridad(true)} onIrViajes={() => setVerMisViajes(true)} onIrCreditos={() => setVerCreditos(true)} onIrAyuda={() => setVerAyuda(true)} onIrConfig={() => setVerConfig(true)} onIrPromociones={() => setVerPromociones(true)} />;
   if (screen === 'mantenimiento') return <PantallaMantenimiento mensaje={mensajeMantenimiento} onVolver={() => setScreen('rol')} />;
   if (screen === 'datos_conductor') return <PantallaDatosConductor nombre={nombreUsuario} foto={fotoUsuario} celular={telefonoUsuario} onGuardar={handleDatosConductor} onVolver={() => setScreen('rol')} onCerrarSesion={handleCerrarSesion} onIrPerfil={() => setVerPerfil(true)} onIrGanancias={() => setVerGanancias(true)} onIrSeguridad={() => setVerSeguridad(true)} onIrViajes={() => setVerMisViajes(true)} onIrCreditos={() => setVerCreditos(true)} onIrAyuda={() => setVerAyuda(true)} onIrConfig={() => setVerConfig(true)} />;
