@@ -14,15 +14,30 @@ import Configuracion from './Configuracion';
 import Promociones from './Promociones';
 import MenuLateral from './MenuLateral';
 const centroRiohacha = { lat: 11.5444, lng: -72.9072 };
-const TARIFA_DIA = 8000;
-const TARIFA_NOCHE = 10000;
-function calcularTarifaMinima() {
+
+// Valores por defecto (respaldo). Se reemplazan por los de config/global cuando cargan.
+const CONFIG_APP_DEFECTO = {
+  tarifaMinimaDia: 8000,
+  tarifaMinimaNoche: 10000,
+  tarifaMinimaMototaxi: 3000,
+  horaInicioNoche: 18,
+  horaFinNoche: 6,
+  incrementoTarifa: 1000,
+  comisionMototaxi: 300,
+  comisionTaxi: 800,
+  tiempoEsperaConductor: 240,
+};
+
+function calcularTarifaMinima(cfg = CONFIG_APP_DEFECTO) {
   const hora = new Date().getHours();
-  // Noche: de 6 pm (18) a 6 am (6) → tarifa más alta
-  return (hora >= 18 || hora < 6) ? TARIFA_NOCHE : TARIFA_DIA;
+  return (hora >= cfg.horaInicioNoche || hora < cfg.horaFinNoche) ? cfg.tarifaMinimaNoche : cfg.tarifaMinimaDia;
 }
 const TARIFA_MINIMA = calcularTarifaMinima();
-const COMISION_POR_VIAJE = 800;
+
+// Devuelve la comisión según el tipo de vehículo, usando la config recibida
+function comisionSegunTipo(tipoVehiculo, cfg = CONFIG_APP_DEFECTO) {
+  return tipoVehiculo === 'Mototaxi' ? cfg.comisionMototaxi : cfg.comisionTaxi;
+}
 // Calcula la distancia en kilómetros entre dos puntos del mapa (fórmula Haversine)
 function calcularDistanciaKm(lat1, lng1, lat2, lng2) {
   const R = 6371; // radio de la Tierra en km
@@ -297,7 +312,7 @@ function HistorialConductor({ onVolver }) {
   );
 }
 
-function TarjetaSolicitud({ solicitud, nombre, telefono, placa, vehiculo, fotoConductor, colorConductor, saldoCreditos, descartadosRef, agregarViajeEscuchando, onRechazar }) {
+function TarjetaSolicitud({ solicitud, nombre, telefono, placa, vehiculo, tipoVehiculo, fotoConductor, colorConductor, saldoCreditos, configApp, descartadosRef, agregarViajeEscuchando, onRechazar }) {
   const [tarifaModificada, setTarifaModificada] = useState(solicitud.tarifaValor || TARIFA_MINIMA);
   const [tarifaCambiada, setTarifaCambiada] = useState(false);
 
@@ -307,7 +322,7 @@ function TarjetaSolicitud({ solicitud, nombre, telefono, placa, vehiculo, fotoCo
   }, [solicitud.tarifaValor]);
 
   const subirTarifa = () => {
-    setTarifaModificada(prev => (tarifaCambiada ? prev : (solicitud.tarifaValor || TARIFA_MINIMA)) + 1000);
+    setTarifaModificada(prev => (tarifaCambiada ? prev : (solicitud.tarifaValor || TARIFA_MINIMA)) + configApp.incrementoTarifa);
     setTarifaCambiada(true);
   };
 
@@ -316,13 +331,14 @@ function TarjetaSolicitud({ solicitud, nombre, telefono, placa, vehiculo, fotoCo
     setTarifaModificada(prev => {
       const actual = tarifaCambiada ? prev : minimo;
       if (actual <= minimo) return actual;
-      return actual - 1000;
+      return actual - configApp.incrementoTarifa;
     });
     setTarifaCambiada(true);
   };
 
   const aceptarOEnviar = async () => {
-    if (saldoCreditos !== null && saldoCreditos < COMISION_POR_VIAJE) {
+    const comisionAplicable = comisionSegunTipo(tipoVehiculo, configApp);
+    if (saldoCreditos !== null && saldoCreditos < comisionAplicable) {
       alert('No tienes saldo suficiente para tomar viajes. Recarga tus créditos.');
       return;
     }
@@ -442,6 +458,28 @@ function AppConductor({ nombre, telefono, placa, vehiculo, tipoVehiculo, onCerra
   const [sancionActiva, setSancionActiva] = useState(null);
   const [contadorSancion, setContadorSancion] = useState('');
   const [saldoVirtualRecibido, setSaldoVirtualRecibido] = useState(null);
+  const [configApp, setConfigApp] = useState(CONFIG_APP_DEFECTO);
+
+  // Cargar la configuración global (comisiones, tarifas, etc.) una vez al abrir
+  const [debugConfig, setDebugConfig] = useState('Cargando config...');
+  useEffect(() => {
+    const cargarConfigApp = async () => {
+      try {
+        const snap = await getDoc(doc(db, 'config', 'global'));
+        if (snap.exists()) {
+          const d = snap.data();
+          setConfigApp({ ...CONFIG_APP_DEFECTO, ...d });
+          setDebugConfig('CONFIG OK → comisionTaxi=' + d.comisionTaxi + ' / comisionMoto=' + d.comisionMototaxi);
+        } else {
+          setDebugConfig('config/global NO EXISTE');
+        }
+      } catch (e) {
+        setDebugConfig('ERROR: ' + (e.code || '') + ' ' + (e.message || ''));
+      }
+    };
+    cargarConfigApp();
+  }, []);
+
   useEffect(() => {
     const user = auth.currentUser;
     if (!user) return;
@@ -606,9 +644,22 @@ function AppConductor({ nombre, telefono, placa, vehiculo, tipoVehiculo, onCerra
           setDoc(doc(db, 'conductores', miId), { ocupado: true }, { merge: true }).catch(() => {});
           (async () => {
             try {
+              // Leer la comisión vigente directo de config/global en el momento del cobro
+              // (evita usar un valor "congelado" de configApp).
+              let comMoto = CONFIG_APP_DEFECTO.comisionMototaxi;
+              let comTaxi = CONFIG_APP_DEFECTO.comisionTaxi;
+              try {
+                const snapCfg = await getDoc(doc(db, 'config', 'global'));
+                if (snapCfg.exists()) {
+                  comMoto = snapCfg.data().comisionMototaxi ?? comMoto;
+                  comTaxi = snapCfg.data().comisionTaxi ?? comTaxi;
+                }
+              } catch (eCfg) {}
+              const comisionAplicable = tipoVehiculo === 'Mototaxi' ? comMoto : comTaxi;
+
               const snapU = await getDoc(doc(db, 'usuarios', miId));
               const saldoU = snapU.exists() ? (snapU.data().creditos || 0) : 0;
-              const nuevoU = saldoU - COMISION_POR_VIAJE;
+              const nuevoU = saldoU - comisionAplicable;
               await setDoc(doc(db, 'usuarios', miId), { creditos: nuevoU }, { merge: true });
               setSaldoCreditos(nuevoU);
             } catch (e) {}
@@ -852,7 +903,7 @@ const cargarSaldo = useCallback(async (uid) => {
     await updateDoc(doc(db, 'viajes', viajeActual.id), { conductorEnPunto: true, fase: 'en_punto', tiempoEspera: new Date().toISOString() });
     setRespuestaPasajero(null);
     setFase('en_punto');
-    setContador(240);
+    setContador(configApp.tiempoEsperaConductor || 240);
     geocodificarDestino(viajeActual.destino);
     contadorRef.current = setInterval(() => {
       setContador(prev => {
@@ -1293,7 +1344,7 @@ if (llamadoAtencion && !fase) return (
         
         <div style={{ background: '#1A1A1E', borderRadius: '14px', padding: '12px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
           <p style={{ color: activo ? '#FFFFFF' : '#AAAAAA', fontWeight: '900', fontSize: '15px', margin: '0' }}>{activo ? '🟢 Estoy disponible' : '⚪ No disponible'}</p>
-          <div onClick={() => { if (!activo && saldoCreditos !== null && saldoCreditos < COMISION_POR_VIAJE) { alert('No tienes saldo suficiente para recibir viajes. Recarga tus créditos.'); return; } activarAudioiOS(); precargarAudio(); setActivo(!activo); }} style={{ width: '52px', height: '30px', borderRadius: '15px', background: activo ? 'linear-gradient(135deg, #FFCF4D, #FF7A2F)' : '#2A2A2E', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '0 4px', justifyContent: activo ? 'flex-end' : 'flex-start', flexShrink: 0 }}>
+          <div onClick={() => { if (!activo && saldoCreditos !== null && saldoCreditos < comisionSegunTipo(tipoVehiculo, configApp)) { alert('No tienes saldo suficiente para recibir viajes. Recarga tus créditos.'); return; } activarAudioiOS(); precargarAudio(); setActivo(!activo); }} style={{ width: '52px', height: '30px', borderRadius: '15px', background: activo ? 'linear-gradient(135deg, #FFCF4D, #FF7A2F)' : '#2A2A2E', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '0 4px', justifyContent: activo ? 'flex-end' : 'flex-start', flexShrink: 0 }}>
             <div style={{ width: '22px', height: '22px', borderRadius: '50%', background: '#FFFFFF' }}/>
           </div>
         </div>
@@ -1331,9 +1382,11 @@ if (llamadoAtencion && !fase) return (
                 telefono={telefono}
                 placa={placa}
                 vehiculo={vehiculo}
+                tipoVehiculo={tipoVehiculo}
                 fotoConductor={fotoConductor}
                 colorConductor={colorConductor}
                 saldoCreditos={saldoCreditos}
+                configApp={configApp}
                 descartadosRef={descartadosRef}
                 agregarViajeEscuchando={agregarViajeEscuchando}
                 onRechazar={rechazarSolicitud}

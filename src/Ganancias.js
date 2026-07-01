@@ -1,19 +1,32 @@
 import React, { useState, useEffect } from 'react';
 import { db, auth } from './firebase';
-import { collection, query, where, getDocs } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
+
+const COMISION_DEFECTO_MOTO = 300;
+const COMISION_DEFECTO_TAXI = 800;
 
 function Ganancias({ onVolver }) {
   const [cargando, setCargando] = useState(true);
   const [hoy, setHoy] = useState({ total: 0, viajes: 0, comision: 0 });
   const [semana, setSemana] = useState({ total: 0, viajes: 0, comision: 0 });
   const [mes, setMes] = useState({ total: 0, viajes: 0, comision: 0 });
-  const COMISION = 800;
 
   useEffect(() => {
     const cargar = async () => {
       try {
         const user = auth.currentUser;
         if (!user) { setCargando(false); return; }
+
+        // Leer las comisiones vigentes desde la configuración global
+        let comMoto = COMISION_DEFECTO_MOTO;
+        let comTaxi = COMISION_DEFECTO_TAXI;
+        try {
+          const snapCfg = await getDoc(doc(db, 'config', 'global'));
+          if (snapCfg.exists()) {
+            comMoto = snapCfg.data().comisionMototaxi ?? comMoto;
+            comTaxi = snapCfg.data().comisionTaxi ?? comTaxi;
+          }
+        } catch (eCfg) {}
 
         const q = query(collection(db, 'viajes'),
           where('conductorId', '==', user.uid),
@@ -28,9 +41,12 @@ function Ganancias({ onVolver }) {
         inicioSemana.setDate(inicioHoy.getDate() - inicioHoy.getDay());
         const inicioMes = new Date(ahora.getFullYear(), ahora.getMonth(), 1);
 
+        // La comisión depende del tipo de cada viaje (mototaxi o taxi)
+        const comisionDe = (v) => (v.tipo === 'Mototaxi' ? comMoto : comTaxi);
+
         const calcular = (lista) => {
           const total = lista.reduce((acc, v) => acc + (v.tarifaValor || 0), 0);
-          const comision = lista.length * COMISION;
+          const comision = lista.reduce((acc, v) => acc + comisionDe(v), 0);
           return { total, viajes: lista.length, comision };
         };
 

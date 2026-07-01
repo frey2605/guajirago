@@ -6,17 +6,32 @@ import Llamada from './Llamada';
 import { alertarNuevoViaje, precargarAudio, activarAudioiOS } from './Notificaciones';
 
 const centroRiohacha = { lat: 11.5444, lng: -72.9072 };
-const TARIFA_DIA = 8000;
-const TARIFA_NOCHE = 10000;
-const TARIFA_MOTOTAXI = 3000;
-function calcularTarifaMinima(tipo) {
-  if (tipo === 'Mototaxi') return TARIFA_MOTOTAXI;
+
+// Valores por defecto (respaldo). Se reemplazan por los de config/global cuando cargan.
+const CONFIG_APP_DEFECTO = {
+  tarifaMinimaDia: 8000,
+  tarifaMinimaNoche: 10000,
+  tarifaMinimaMototaxi: 3000,
+  horaInicioNoche: 18,
+  horaFinNoche: 6,
+  incrementoTarifa: 1000,
+  radioBusquedaInicial: 3,
+  radioBusquedaAmpliado: 7,
+  maximoFavoritos: 3,
+  tiempoEsperaConductor: 240,
+  duracionContraoferta: 20,
+};
+
+// Calcula la tarifa mínima usando la config recibida (o los valores por defecto)
+function calcularTarifaMinima(tipo, cfg = CONFIG_APP_DEFECTO) {
+  if (tipo === 'Mototaxi') return cfg.tarifaMinimaMototaxi;
   const hora = new Date().getHours();
-  // Noche: de 6 pm (18) a 6 am (6) → tarifa más alta
-  return (hora >= 18 || hora < 6) ? TARIFA_NOCHE : TARIFA_DIA;
+  const inicioNoche = cfg.horaInicioNoche;
+  const finNoche = cfg.horaFinNoche;
+  // Noche: desde horaInicioNoche hasta horaFinNoche → tarifa más alta
+  return (hora >= inicioNoche || hora < finNoche) ? cfg.tarifaMinimaNoche : cfg.tarifaMinimaDia;
 }
 const BOUNDS_RIOHACHA = { north: 11.7, south: 11.3, east: -72.6, west: -73.0 };
-const DURACION_CONTRAOFERTA_MS = 20000; // 20 segundos
 
 const RESPUESTAS_RAPIDAS = [
   '🏃 Ya voy saliendo',
@@ -97,7 +112,7 @@ function ModalCancelacion({ razones, onConfirmar, onCerrar }) {
 }
 
 // Tarjeta de contraoferta con barra de tiempo
-function TarjetaContraoferta({ oferta, onAceptar, onRechazar }) {
+function TarjetaContraoferta({ oferta, onAceptar, onRechazar, duracionMs }) {
   const [progreso, setProgreso] = useState(100);
   const [fotoConductor, setFotoConductor] = useState(null);
 
@@ -109,7 +124,7 @@ function TarjetaContraoferta({ oferta, onAceptar, onRechazar }) {
     const inicio = Date.now();
     const intervalo = setInterval(() => {
       const transcurrido = Date.now() - inicio;
-      const restante = Math.max(0, 100 - (transcurrido / DURACION_CONTRAOFERTA_MS * 100));
+      const restante = Math.max(0, 100 - (transcurrido / (duracionMs || 20000) * 100));
       setProgreso(restante);
       if (restante === 0) {
         clearInterval(intervalo);
@@ -241,8 +256,9 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
   const [viajeId, setViajeId] = useState(null);
   const [viaje, setViaje] = useState(null);
   const [error, setError] = useState('');
-  const TARIFA_MINIMA = calcularTarifaMinima(tipo);
-  const [tarifa, setTarifa] = useState(TARIFA_MINIMA);
+  const [configApp, setConfigApp] = useState(CONFIG_APP_DEFECTO);
+  const TARIFA_MINIMA = calcularTarifaMinima(tipo, configApp);
+  const [tarifa, setTarifa] = useState(calcularTarifaMinima(tipo, CONFIG_APP_DEFECTO));
   const [ubicacionPasajero, setUbicacionPasajero] = useState(centroRiohacha);
   const [ubicacionConductor, setUbicacionConductor] = useState(null);
   const [tiempoLlegada, setTiempoLlegada] = useState(null);
@@ -280,6 +296,26 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
   const chatFinRef = useRef(null);
 
   useEffect(() => { pantallaRef.current = pantalla; }, [pantalla]);
+
+  // Cargar la configuración global (tarifas, radios, etc.) una sola vez al abrir
+  useEffect(() => {
+    const cargarConfigApp = async () => {
+      try {
+        const snap = await getDoc(doc(db, 'config', 'global'));
+        if (snap.exists()) {
+          const nueva = { ...CONFIG_APP_DEFECTO, ...snap.data() };
+          setConfigApp(nueva);
+          // Si el pasajero aún no ha tocado la tarifa, ajustarla a la mínima según la config real
+          setTarifa(prev => {
+            const minimaVieja = calcularTarifaMinima(tipo, CONFIG_APP_DEFECTO);
+            // Solo la reajustamos si sigue en la mínima por defecto (no la ha modificado el usuario)
+            return prev === minimaVieja ? calcularTarifaMinima(tipo, nueva) : prev;
+          });
+        }
+      } catch (e) {}
+    };
+    cargarConfigApp();
+  }, [tipo]);
 
   const [descuentoPendiente, setDescuentoPendiente] = useState(null);
 
@@ -555,7 +591,7 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
     if (!destino) return;
     const user = auth.currentUser;
     if (!user) return;
-    if (favoritos.length >= 3) { setAvisoLimite(true); return; }
+    if (favoritos.length >= configApp.maximoFavoritos) { setAvisoLimite(true); return; }
     if (favoritos.find(f => f.direccion === destino)) { setError('Ese lugar ya está guardado'); return; }
     const nuevo = { nombre: destino.length > 18 ? destino.slice(0, 18) + '…' : destino, direccion: destino, icono: '⭐' };
     const nuevos = [...favoritos, nuevo];
@@ -577,14 +613,14 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
 
   const subirNuevaTarifa = () => {
     const base = nuevaTarifa !== null ? nuevaTarifa : tarifa;
-    setNuevaTarifa(base + 1000);
+    setNuevaTarifa(base + configApp.incrementoTarifa);
     setOfertaModificada(true);
   };
 
   const bajarNuevaTarifa = () => {
     const base = nuevaTarifa !== null ? nuevaTarifa : tarifa;
     if (base <= tarifa) return; // no puede bajar de la oferta original
-    setNuevaTarifa(base - 1000);
+    setNuevaTarifa(base - configApp.incrementoTarifa);
     setOfertaModificada(true);
   };
 
@@ -606,11 +642,11 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
     if (!viajeId) return;
     setBuscandoAgotado(false);
     setTiempoBusqueda(120);
-    updateDoc(doc(db, 'viajes', viajeId), { radioBusqueda: 3, nuevaOferta: new Date().toISOString() }).catch(() => {});
+    updateDoc(doc(db, 'viajes', viajeId), { radioBusqueda: configApp.radioBusquedaInicial, nuevaOferta: new Date().toISOString() }).catch(() => {});
     if (radioRef.current) { clearTimeout(radioRef.current.ampliar); clearTimeout(radioRef.current.agotar); }
     radioRef.current = {
       ampliar: setTimeout(() => {
-        updateDoc(doc(db, 'viajes', viajeId), { radioBusqueda: 7 }).catch(() => {});
+        updateDoc(doc(db, 'viajes', viajeId), { radioBusqueda: configApp.radioBusquedaAmpliado }).catch(() => {});
       }, 60000),
       agotar: setTimeout(() => {
         setBuscandoAgotado(true);
@@ -621,8 +657,8 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
       setTiempoBusqueda(prev => { if (prev <= 1) { clearInterval(contadorBusquedaRef.current); return 0; } return prev - 1; });
     }, 1000);
   };
-  const subirTarifa = () => setTarifa(t => t + 1000);
-  const bajarTarifa = () => setTarifa(t => Math.max(TARIFA_MINIMA, t - 1000));
+  const subirTarifa = () => setTarifa(t => t + configApp.incrementoTarifa);
+  const bajarTarifa = () => setTarifa(t => Math.max(TARIFA_MINIMA, t - configApp.incrementoTarifa));
 
   const solicitarViaje = async () => {
     if (!origen || !destino) { setError('Por favor escribe el origen y destino'); return; }
@@ -688,7 +724,7 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
         tarifa: `$${tarifa.toLocaleString()}`, tarifaValor: tarifa,
         ...(datosDescuento ? { descuentoInfo: datosDescuento } : {}),
         fechaSolicitud: new Date().toISOString(),
-        radioBusqueda: 3,
+        radioBusqueda: configApp.radioBusquedaInicial,
       });
       setViajeId(docRef.id);
       setContraofertas([]);
@@ -700,7 +736,7 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
       // Temporizadores de radio: al 1 min amplía a 7km, a los 2 min marca agotado
       radioRef.current = {
         ampliar: setTimeout(() => {
-          updateDoc(doc(db, 'viajes', docRef.id), { radioBusqueda: 7 }).catch(() => {});
+          updateDoc(doc(db, 'viajes', docRef.id), { radioBusqueda: configApp.radioBusquedaAmpliado }).catch(() => {});
         }, 60000),
         agotar: setTimeout(() => {
           setBuscandoAgotado(true);
@@ -1070,6 +1106,7 @@ const PanelEmergencia = () => (
               <TarjetaContraoferta
                 key={oferta.conductorId}
                 oferta={oferta}
+                duracionMs={configApp.duracionContraoferta * 1000}
                 onAceptar={() => aceptarContraoferta(oferta)}
                 onRechazar={() => rechazarContraoferta(oferta.conductorId)}
               />
