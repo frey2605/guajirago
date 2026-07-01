@@ -288,8 +288,22 @@ function PantallaDatosConductor({ nombre, foto, celular, onGuardar, onVolver, on
   );
 }
 
+function PantallaMantenimiento({ mensaje, onVolver }) {
+  return (
+    <div style={{ backgroundColor: '#141416', minHeight: '100vh', fontFamily: 'Arial, sans-serif', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px 24px', textAlign: 'center' }}>
+      <div style={{ fontSize: '70px', marginBottom: '20px' }}>🛠️</div>
+      <h2 style={{ color: '#FFFFFF', fontSize: '24px', fontWeight: '900', margin: '0 0 16px' }}>Estamos en mantenimiento</h2>
+      <div style={{ background: 'linear-gradient(135deg, #1A1A1E, #2A2A2E)', borderRadius: '20px', padding: '24px', width: '100%', maxWidth: '420px', border: '1px solid #FF7A2F', marginBottom: '24px' }}>
+        <p style={{ color: '#FFFFFF', fontSize: '15px', margin: '0', lineHeight: '1.6' }}>{mensaje}</p>
+      </div>
+      <button onClick={onVolver} style={{ padding: '14px 32px', background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)', border: 'none', borderRadius: '14px', color: '#141416', fontSize: '15px', fontWeight: '900', cursor: 'pointer' }}>Volver</button>
+    </div>
+  );
+}
+
 function App() {
   const [screen, setScreen] = useState('splash');
+  const [mensajeMantenimiento, setMensajeMantenimiento] = useState('');
   const [tipoUsuario, setTipoUsuario] = useState('');
   const [nombreUsuario, setNombreUsuario] = useState('');
   const [telefonoUsuario, setTelefonoUsuario] = useState('');
@@ -375,7 +389,26 @@ function App() {
     }
   };
 
+  // Revisa si hay mantenimiento activo para el tipo de usuario. Devuelve true si está bloqueado.
+  const revisarMantenimiento = async (rol) => {
+    try {
+      const snap = await getDoc(doc(db, 'config', 'global'));
+      if (!snap.exists()) return false;
+      const d = snap.data();
+      const bloqueado = (rol === 'pasajero' && d.mantPasajeros) || (rol === 'conductor' && d.mantConductores);
+      if (bloqueado) {
+        setMensajeMantenimiento(d.mensajeMantenimiento || 'Estamos haciendo mejoras. Volvemos muy pronto.');
+        return true;
+      }
+    } catch (e) {}
+    return false;
+  };
+
   const handleSeleccionarRol = async (rol) => {
+    // Antes de entrar, revisar si hay mantenimiento activo para ese tipo de usuario
+    const bloqueado = await revisarMantenimiento(rol);
+    if (bloqueado) { setScreen('mantenimiento'); return; }
+
     setTipoUsuario(rol);
     if (rol === 'pasajero') {
       guardarLocal({ tipo: 'pasajero', nombre: nombreUsuario, celular: telefonoUsuario, placa: placaUsuario, vehiculo: vehiculoUsuario });
@@ -415,6 +448,7 @@ function App() {
   if (screen === 'login') return <Login onEntrar={handleEntrar} />;
   if (screen === 'modulos') return <PantallaModulos nombre={nombreUsuario} foto={fotoUsuario} onSeleccionar={handleSeleccionarModulo} onVolver={() => setScreen('login')} onCerrarSesion={handleCerrarSesion} onIrPerfil={() => setVerPerfil(true)} onIrGanancias={() => setVerGanancias(true)} onIrSeguridad={() => setVerSeguridad(true)} onIrViajes={() => setVerMisViajes(true)} onIrCreditos={() => setVerCreditos(true)} onIrAyuda={() => setVerAyuda(true)} onIrConfig={() => setVerConfig(true)} onIrPromociones={() => setVerPromociones(true)} />;
   if (screen === 'rol') return <PantallaRol nombre={nombreUsuario} foto={fotoUsuario} onSeleccionar={handleSeleccionarRol} onVolver={() => setScreen('modulos')} onCerrarSesion={handleCerrarSesion} onIrPerfil={() => setVerPerfil(true)} onIrGanancias={() => setVerGanancias(true)} onIrSeguridad={() => setVerSeguridad(true)} onIrViajes={() => setVerMisViajes(true)} onIrCreditos={() => setVerCreditos(true)} onIrAyuda={() => setVerAyuda(true)} onIrConfig={() => setVerConfig(true)} onIrPromociones={() => setVerPromociones(true)} />;
+  if (screen === 'mantenimiento') return <PantallaMantenimiento mensaje={mensajeMantenimiento} onVolver={() => setScreen('rol')} />;
   if (screen === 'datos_conductor') return <PantallaDatosConductor nombre={nombreUsuario} foto={fotoUsuario} celular={telefonoUsuario} onGuardar={handleDatosConductor} onVolver={() => setScreen('rol')} onCerrarSesion={handleCerrarSesion} onIrPerfil={() => setVerPerfil(true)} onIrGanancias={() => setVerGanancias(true)} onIrSeguridad={() => setVerSeguridad(true)} onIrViajes={() => setVerMisViajes(true)} onIrCreditos={() => setVerCreditos(true)} onIrAyuda={() => setVerAyuda(true)} onIrConfig={() => setVerConfig(true)} />;
 
   if (screen === 'home') {
