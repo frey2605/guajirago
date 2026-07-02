@@ -25,6 +25,7 @@ const CONFIG_APP_DEFECTO = {
   incrementoTarifa: 1000,
   comisionMototaxi: 300,
   comisionTaxi: 800,
+  comisionDomicilio: 1000,
   tiempoEsperaConductor: 240,
 };
 
@@ -35,7 +36,9 @@ function calcularTarifaMinima(cfg = CONFIG_APP_DEFECTO) {
 const TARIFA_MINIMA = calcularTarifaMinima();
 
 // Devuelve la comisión según el tipo de vehículo, usando la config recibida
-function comisionSegunTipo(tipoVehiculo, cfg = CONFIG_APP_DEFECTO) {
+function comisionSegunTipo(tipoVehiculo, cfg = CONFIG_APP_DEFECTO, tipoViaje) {
+  // Un mandado (Mensajería) cobra la comisión de domicilio, aunque lo haga un mototaxista
+  if (tipoViaje === 'Mensajería') return cfg.comisionDomicilio ?? 1000;
   return tipoVehiculo === 'Mototaxi' ? cfg.comisionMototaxi : cfg.comisionTaxi;
 }
 // Calcula la distancia en kilómetros entre dos puntos del mapa (fórmula Haversine)
@@ -337,7 +340,7 @@ function TarjetaSolicitud({ solicitud, nombre, telefono, placa, vehiculo, tipoVe
   };
 
   const aceptarOEnviar = async () => {
-    const comisionAplicable = comisionSegunTipo(tipoVehiculo, configApp);
+    const comisionAplicable = comisionSegunTipo(tipoVehiculo, configApp, solicitud.tipo);
     if (saldoCreditos !== null && saldoCreditos < comisionAplicable) {
       alert('No tienes saldo suficiente para tomar viajes. Recarga tus créditos.');
       return;
@@ -665,14 +668,17 @@ function AppConductor({ nombre, telefono, placa, vehiculo, tipoVehiculo, onCerra
               // (evita usar un valor "congelado" de configApp).
               let comMoto = CONFIG_APP_DEFECTO.comisionMototaxi;
               let comTaxi = CONFIG_APP_DEFECTO.comisionTaxi;
+              let comDom = CONFIG_APP_DEFECTO.comisionDomicilio;
               try {
                 const snapCfg = await getDoc(doc(db, 'config', 'global'));
                 if (snapCfg.exists()) {
                   comMoto = snapCfg.data().comisionMototaxi ?? comMoto;
                   comTaxi = snapCfg.data().comisionTaxi ?? comTaxi;
+                  comDom = snapCfg.data().comisionDomicilio ?? comDom;
                 }
               } catch (eCfg) {}
-              const comisionAplicable = tipoVehiculo === 'Mototaxi' ? comMoto : comTaxi;
+              // Si el viaje es un mandado, cobra la comisión de domicilio (no la de mototaxi)
+              const comisionAplicable = data.tipo === 'Mensajería' ? comDom : (tipoVehiculo === 'Mototaxi' ? comMoto : comTaxi);
 
               const snapU = await getDoc(doc(db, 'usuarios', miId));
               const saldoU = snapU.exists() ? (snapU.data().creditos || 0) : 0;
@@ -748,14 +754,17 @@ function AppConductor({ nombre, telefono, placa, vehiculo, tipoVehiculo, onCerra
         try {
           let comMoto = CONFIG_APP_DEFECTO.comisionMototaxi;
           let comTaxi = CONFIG_APP_DEFECTO.comisionTaxi;
+          let comDom = CONFIG_APP_DEFECTO.comisionDomicilio;
           try {
             const snapCfg = await getDoc(doc(db, 'config', 'global'));
             if (snapCfg.exists()) {
               comMoto = snapCfg.data().comisionMototaxi ?? comMoto;
               comTaxi = snapCfg.data().comisionTaxi ?? comTaxi;
+              comDom = snapCfg.data().comisionDomicilio ?? comDom;
             }
           } catch (eCfg) {}
-          const comisionAplicable = tipoVehiculo === 'Mototaxi' ? comMoto : comTaxi;
+          // Si el viaje es un mandado, cobra la comisión de domicilio (no la de mototaxi)
+          const comisionAplicable = data.tipo === 'Mensajería' ? comDom : (tipoVehiculo === 'Mototaxi' ? comMoto : comTaxi);
           const snapU = await getDoc(doc(db, 'usuarios', miId));
           const saldoU = snapU.exists() ? (snapU.data().creditos || 0) : 0;
           await setDoc(doc(db, 'usuarios', miId), { creditos: saldoU - comisionAplicable }, { merge: true });
