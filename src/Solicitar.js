@@ -162,9 +162,11 @@ function TarjetaContraoferta({ oferta, onAceptar, onRechazar, duracionMs }) {
   );
 }
 
-function AutocompleteInput({ value, onChange, placeholder, icon }) {
+function AutocompleteInput({ value, onChange, placeholder, icon, onPlaceCoords }) {
   const inputRef = useRef(null);
   const autocompleteRef = useRef(null);
+  const onPlaceCoordsRef = useRef(onPlaceCoords);
+  useEffect(() => { onPlaceCoordsRef.current = onPlaceCoords; }, [onPlaceCoords]);
   useEffect(() => {
     if (!inputRef.current || !window.google) return;
     autocompleteRef.current = new window.google.maps.places.Autocomplete(inputRef.current, {
@@ -178,13 +180,151 @@ function AutocompleteInput({ value, onChange, placeholder, icon }) {
     autocompleteRef.current.addListener('place_changed', () => {
       const place = autocompleteRef.current.getPlace();
       if (place && place.name) onChange(place.name);
+      // Si la sugerencia elegida trae coordenadas exactas, las reportamos (para mover el pin del mapa)
+      if (onPlaceCoordsRef.current && place && place.geometry && place.geometry.location) {
+        onPlaceCoordsRef.current({ lat: place.geometry.location.lat(), lng: place.geometry.location.lng() });
+      }
     });
   }, [onChange]);
   return (
-    <div style={{ background: '#1A1A1E', borderRadius: '16px', padding: '16px', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '12px' }}>
-      <div style={{ width: '12px', height: '12px', borderRadius: icon === 'origen' ? '50%' : '2px', background: icon === 'origen' ? '#2ECC71' : '#FF7A2F', flexShrink: 0 }}/>
+    <div style={{ background: '#1A1A1E', borderRadius: '14px', padding: '10px 14px', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+      <div style={{ width: '10px', height: '10px', borderRadius: icon === 'origen' ? '50%' : '2px', background: icon === 'origen' ? '#2ECC71' : '#FF7A2F', flexShrink: 0 }}/>
       <input ref={inputRef} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder}
         style={{ background: 'none', border: 'none', outline: 'none', color: '#FFFFFF', fontSize: '16px', width: '100%' }}/>
+    </div>
+  );
+}
+
+// NUEVO: mapa de recogida con pin fijo en el centro y dirección automática (geocodificación inversa, estilo InDriver).
+// Se agranda a pantalla completa mientras se mantiene presionado. Solo se cierra cuando se levantan TODOS los dedos
+// (si sueltas uno y sigues con otro, NO se cierra). Botón verde "usar mi ubicación" abajo a la derecha cuando está cerrado.
+function MapaRecogida({ ubicacionInicial, onCambioPunto }) {
+  const mapRef = useRef(null);
+  const mapaRef = useRef(null);
+  const geocoderRef = useRef(null);
+  const listenerRef = useRef(null);
+  const ultimoPuntoRef = useRef(null);
+  const [expandido, setExpandido] = useState(false);
+
+  const resolverDireccion = useCallback((lat, lng) => {
+    const clave = lat.toFixed(6) + ',' + lng.toFixed(6);
+    ultimoPuntoRef.current = clave;
+    if (!geocoderRef.current) {
+      onCambioPunto({ lat, lng }, '');
+      return;
+    }
+    geocoderRef.current.geocode({ location: { lat, lng } }, (results, status) => {
+      if (ultimoPuntoRef.current !== clave) return; // llegó tarde, el usuario ya movió el mapa
+      if (status === 'OK' && results && results[0]) {
+        onCambioPunto({ lat, lng }, results[0].formatted_address);
+      } else {
+        // Diagnóstico para F12: si aquí sale REQUEST_DENIED, falta habilitar la Geocoding API en el key de Maps.
+        console.log('Geocodificación inversa status:', status);
+        onCambioPunto({ lat, lng }, ''); // si falla, dejamos el campo de recogida como está (no metemos texto raro)
+      }
+    });
+  }, [onCambioPunto]);
+
+  useEffect(() => {
+    if (!window.google || !mapRef.current || mapaRef.current) return;
+    mapaRef.current = new window.google.maps.Map(mapRef.current, {
+      center: ubicacionInicial || centroRiohacha,
+      zoom: 16,
+      styles: [], // mapa blanco (tema normal de Google, no el oscuro)
+      zoomControl: false,
+      mapTypeControl: false,
+      streetViewControl: false,
+      fullscreenControl: false,
+      gestureHandling: 'greedy', // se mueve con un solo dedo
+      clickableIcons: false,
+    });
+    geocoderRef.current = new window.google.maps.Geocoder();
+
+    listenerRef.current = mapaRef.current.addListener('idle', () => {
+      const centro = mapaRef.current.getCenter();
+      resolverDireccion(centro.lat(), centro.lng());
+    });
+
+    return () => {
+      if (listenerRef.current) listenerRef.current.remove();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (!mapaRef.current || !ubicacionInicial) return;
+    mapaRef.current.setCenter(ubicacionInicial);
+  }, [ubicacionInicial]);
+
+  // Al agrandar/achicar el mapa hay que avisarle a Google para que redibuje bien y mantenga el centro (el pin no se mueve de lugar)
+  useEffect(() => {
+    if (!mapaRef.current || !window.google) return;
+    const centroActual = mapaRef.current.getCenter();
+    setTimeout(() => {
+      window.google.maps.event.trigger(mapaRef.current, 'resize');
+      if (centroActual) mapaRef.current.setCenter(centroActual);
+    }, 80);
+  }, [expandido]);
+
+  // Cierra SOLO cuando ya no queda ningún dedo tocando la pantalla.
+  // El listener se pone directo al tocar (no en un useEffect) para que un toque rápido no lo deje pegado.
+  const alSoltar = useCallback((e) => {
+    if (e.touches && e.touches.length > 0) return; // todavía hay un dedo → seguir abierto
+    setExpandido(false);
+    document.removeEventListener('touchend', alSoltar);
+  }, []);
+  const alSoltarMouse = useCallback(() => {
+    setExpandido(false);
+    document.removeEventListener('mouseup', alSoltarMouse);
+  }, []);
+
+  const abrir = () => {
+    setExpandido(true);
+    document.addEventListener('touchend', alSoltar); // NO usamos 'touchcancel' para que no se cierre solo al arrastrar
+  };
+  const abrirMouse = () => {
+    setExpandido(true);
+    document.addEventListener('mouseup', alSoltarMouse);
+  };
+
+  const usarMiUbicacion = (e) => {
+    if (e) e.stopPropagation();
+    if (!navigator.geolocation || !mapaRef.current) return;
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        mapaRef.current.setCenter({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+        mapaRef.current.setZoom(16);
+      },
+      () => {},
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  };
+
+  // Pequeño (normal) o a pantalla completa mientras se mantiene presionado
+  const estiloContenedor = expandido
+    ? { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, width: '100%', height: '100%', zIndex: 99999, marginBottom: '0', borderRadius: '0', border: 'none' }
+    : { position: 'relative', width: '100%', height: '300px', borderRadius: '16px', overflow: 'hidden', marginBottom: '12px', border: '1px solid #2A2A2E' };
+
+  return (
+    <div
+      style={estiloContenedor}
+      onTouchStart={abrir}
+      onMouseDown={abrirMouse}
+    >
+      <div ref={mapRef} style={{ width: '100%', height: '100%' }} />
+      <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -100%)', pointerEvents: 'none', zIndex: 5, fontSize: '42px', lineHeight: '1', filter: 'drop-shadow(0 3px 4px rgba(0,0,0,0.5))' }}>📍</div>
+      <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: '8px', height: '8px', borderRadius: '50%', background: 'rgba(0,0,0,0.45)', pointerEvents: 'none', zIndex: 4 }} />
+      {!expandido && (
+        <div style={{ position: 'absolute', top: '10px', left: '50%', transform: 'translateX(-50%)', background: 'rgba(20,20,22,0.9)', color: '#FFFFFF', fontSize: '12px', fontWeight: 'bold', padding: '6px 14px', borderRadius: '20px', whiteSpace: 'nowrap', pointerEvents: 'none', zIndex: 6 }}>👆 Mantén presionado para ajustar</div>
+      )}
+      {!expandido && (
+        <button
+          onClick={usarMiUbicacion}
+          onTouchStart={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
+          style={{ position: 'absolute', bottom: '12px', right: '12px', zIndex: 7, background: 'linear-gradient(135deg, #2ECC71, #27AE60)', border: 'none', borderRadius: '12px', padding: '10px 14px', color: '#FFFFFF', fontSize: '13px', fontWeight: 'bold', cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.35)', display: 'flex', alignItems: 'center', gap: '6px' }}
+        >📍 Usar mi ubicación</button>
+      )}
     </div>
   );
 }
@@ -265,7 +405,15 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
   const TARIFA_MINIMA = calcularTarifaMinima(tipo, configApp);
   const [tarifa, setTarifa] = useState(calcularTarifaMinima(tipo, CONFIG_APP_DEFECTO));
   const [ubicacionPasajero, setUbicacionPasajero] = useState(centroRiohacha);
+  // NUEVO: punto exacto del pin de recogida (se usa al crear el viaje)
+  const [puntoRecogida, setPuntoRecogida] = useState(null);
+  // NUEVO: centro del mapa de recogida. Arranca en el GPS y se mueve cuando el usuario elige una dirección de la lista
+  const [centroMapa, setCentroMapa] = useState(centroRiohacha);
+  // true = la recogida corresponde al pin (moviste el mapa o elegiste una sugerencia). false = escribiste a mano.
+  const pinActivoRef = useRef(true);
   const [ubicacionConductor, setUbicacionConductor] = useState(null);
+  // NUEVO: punto real de recogida del viaje, para que el mapa del pasajero muestre lo mismo que ve el conductor (no el GPS)
+  const [ubicacionRecogida, setUbicacionRecogida] = useState(null);
   const [tiempoLlegada, setTiempoLlegada] = useState(null);
   const [distancia, setDistancia] = useState(null);
   const [celebrando, setCelebrando] = useState(false);
@@ -369,6 +517,16 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
       { enableHighAccuracy: false, timeout: 8000, maximumAge: 0 }
     );
   }, []);
+
+  // El mapa de recogida arranca centrado en el GPS del pasajero cuando este se obtiene
+  useEffect(() => { setCentroMapa(ubicacionPasajero); }, [ubicacionPasajero]);
+
+  // Cuando el viaje ya tiene guardado el punto de recogida, el mapa del pasajero usa ESE punto (el mismo del conductor), no el GPS
+  useEffect(() => {
+    const lat = viaje?.pasajeroLat;
+    const lng = viaje?.pasajeroLng;
+    if (lat != null && lng != null) setUbicacionRecogida({ lat, lng });
+  }, [viaje?.pasajeroLat, viaje?.pasajeroLng]);
 
   useEffect(() => {
     if (!viajeId) return;
@@ -681,23 +839,30 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
     precargarAudio();
     setCargando(true); setError('');
 
-    // Convertir la dirección escrita del origen en coordenadas (más confiable que el GPS)
-    let coordsRecogida = { lat: ubicacionPasajero.lat, lng: ubicacionPasajero.lng };
-    try {
-      if (window.google) {
-        const geocoder = new window.google.maps.Geocoder();
-        const resultado = await new Promise((resolve) => {
-          geocoder.geocode({ address: origen + ', Riohacha, Colombia' }, (results, status) => {
-            if (status === 'OK' && results[0]) {
-              resolve({ lat: results[0].geometry.location.lat(), lng: results[0].geometry.location.lng() });
-            } else {
-              resolve(null);
-            }
+    // Punto de recogida:
+    // - Si lo escrito COINCIDE con la dirección del pin (movió el mapa o eligió una sugerencia) → usamos el pin (exacto).
+    // - Si el usuario ESCRIBIÓ otra dirección a mano (ej: pide para otra persona) → geocodificamos ese texto, NO el pin.
+    const usarPin = puntoRecogida && pinActivoRef.current;
+    let coordsRecogida = usarPin
+      ? { lat: puntoRecogida.lat, lng: puntoRecogida.lng }
+      : { lat: ubicacionPasajero.lat, lng: ubicacionPasajero.lng };
+    if (!usarPin) {
+      try {
+        if (window.google) {
+          const geocoder = new window.google.maps.Geocoder();
+          const resultado = await new Promise((resolve) => {
+            geocoder.geocode({ address: origen + ', Riohacha, Colombia' }, (results, status) => {
+              if (status === 'OK' && results[0]) {
+                resolve({ lat: results[0].geometry.location.lat(), lng: results[0].geometry.location.lng() });
+              } else {
+                resolve(null);
+              }
+            });
           });
-        });
-        if (resultado) coordsRecogida = resultado;
-      }
-    } catch (e) {}
+          if (resultado) coordsRecogida = resultado;
+        }
+      } catch (e) {}
+    }
 
     try {
       const user = auth.currentUser;
@@ -925,7 +1090,7 @@ const PanelEmergencia = () => (
         {mostrarCancelacion && <ModalCancelacion razones={RAZONES_CANCELACION_PASAJERO} onConfirmar={cancelarViaje} onCerrar={() => setMostrarCancelacion(false)} />}
         {mostrarLlego && <ConductorLlego nombre={viaje?.conductorNombre} placa={viaje?.conductorPlaca} onCerrar={() => setMostrarLlego(false)} />}
         <PanelEmergencia />
-        <MapaPasajero ubicacionPasajero={ubicacionPasajero} ubicacionConductor={ubicacionConductor} tipo={tipo} />
+        <MapaPasajero ubicacionPasajero={ubicacionRecogida || ubicacionPasajero} ubicacionConductor={ubicacionConductor} tipo={tipo} />
         <div onClick={() => setMostrarEmergencia(true)} style={{ position: 'absolute', top: '86px', right: '16px', zIndex: 20, background: 'linear-gradient(135deg, #FF4444, #CC0000)', borderRadius: '14px', padding: '10px 14px', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', boxShadow: '0 4px 12px rgba(255,68,68,0.5)' }}>
           <span style={{ fontSize: '20px' }}>🚨</span>
           <span style={{ color: '#FFFFFF', fontSize: '14px', fontWeight: '900' }}>Emergencia</span>
@@ -1164,20 +1329,30 @@ const PanelEmergencia = () => (
           </div>
         </div>
       )}
-      <div style={{ background: 'linear-gradient(135deg, #1A1A1E, #2A2A2E)', padding: '24px 20px', display: 'flex', alignItems: 'center', gap: '16px' }}>
+      <div style={{ background: 'linear-gradient(135deg, #1A1A1E, #2A2A2E)', padding: '12px 20px', display: 'flex', alignItems: 'center', gap: '16px' }}>
         <div onClick={onVolver} style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(255,255,255,0.12)', borderRadius: '12px', color: '#FFFFFF', fontSize: '14px', fontWeight: '500', padding: '8px 16px', cursor: 'pointer' }}><span style={{ fontSize: '22px', fontWeight: '900', lineHeight: '1', position: 'relative', top: '-1px' }}>‹</span> Volver</div>
         <h2 style={{ color: '#FFFFFF', margin: '0', fontSize: '20px' }}>Solicitar {tipo}</h2>
       </div>
-      <div style={{ padding: '24px 20px' }}>
-        <AutocompleteInput value={origen} onChange={setOrigen} placeholder="¿Dónde estás? (Riohacha)" icon="origen" />
-        <AutocompleteInput value={destino} onChange={setDestino} placeholder="¿A dónde vas? (Riohacha)" icon="destino" />
-
-        {destino && !favoritos.find(f => f.direccion === destino) && (
-          <div onClick={guardarFavorito} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F)', borderRadius: '16px', padding: '16px', marginBottom: '16px', cursor: 'pointer', boxShadow: '0 4px 16px rgba(255,122,47,0.4)' }}>
-            <span style={{ fontSize: '22px' }}>⭐</span>
-            <span style={{ color: '#141416', fontSize: '16px', fontWeight: '900' }}>Guardar este lugar</span>
+      <div style={{ padding: '12px 20px 24px' }}>
+        <AutocompleteInput value={origen} onChange={(v) => { setOrigen(v); pinActivoRef.current = false; }} placeholder="¿Dónde estás? (Riohacha)" icon="origen" onPlaceCoords={(coords) => { setPuntoRecogida(coords); setCentroMapa(coords); pinActivoRef.current = true; }} />
+        <div style={{ display: 'flex', alignItems: 'stretch', gap: '8px' }}>
+          <div style={{ flex: 1 }}>
+            <AutocompleteInput value={destino} onChange={setDestino} placeholder="¿A dónde vas? (Riohacha)" icon="destino" />
           </div>
-        )}
+          {destino && !favoritos.find(f => f.direccion === destino) && (
+            <div onClick={guardarFavorito} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F)', borderRadius: '16px', padding: '0 14px', marginBottom: '12px', cursor: 'pointer', flexShrink: 0 }}>
+              <span style={{ color: '#141416', fontSize: '20px', fontWeight: '900', lineHeight: '1' }}>➕</span>
+              <span style={{ color: '#141416', fontSize: '9px', fontWeight: '900', marginTop: '2px', textAlign: 'center', lineHeight: '1.1' }}>Guardar<br/>lugar</span>
+            </div>
+          )}
+        </div>
+
+        {/* NUEVO: mapa de recogida con pin fijo. La dirección se auto-llena arriba en el campo de recogida (y se puede editar). */}
+        <p style={{ color: '#FFFFFF', fontSize: '11px', letterSpacing: '2px', margin: '0 0 8px' }}>MUEVE EL MAPA PARA MARCAR TU RECOGIDA</p>
+        <MapaRecogida
+          ubicacionInicial={centroMapa}
+          onCambioPunto={(punto, direccion) => { setPuntoRecogida(punto); pinActivoRef.current = true; if (direccion) setOrigen(direccion); }}
+        />
 
         {favoritos.length > 0 && (
           <div style={{ marginBottom: '20px' }}>
@@ -1208,20 +1383,19 @@ const PanelEmergencia = () => (
           </div>
         )}
 
-        <div style={{ background: '#1A1A1E', borderRadius: '16px', padding: '20px', marginBottom: '24px' }}>
-          <p style={{ color: '#555', fontSize: '11px', margin: '0 0 12px', letterSpacing: '2px' }}>TU OFERTA</p>
+        <div style={{ background: '#1A1A1E', borderRadius: '12px', padding: '8px 14px', marginBottom: '12px' }}>
+          <p style={{ color: '#555', fontSize: '9px', margin: '0 0 4px', letterSpacing: '2px' }}>TU OFERTA</p>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <button onClick={bajarTarifa} style={{ width: '48px', height: '48px', background: tarifa <= TARIFA_MINIMA ? '#2A2A2E' : '#1A1A1E', border: `2px solid ${tarifa <= TARIFA_MINIMA ? '#2A2A2E' : '#FF7A2F'}`, borderRadius: '14px', color: tarifa <= TARIFA_MINIMA ? '#555' : '#FF7A2F', fontSize: '24px', cursor: tarifa <= TARIFA_MINIMA ? 'default' : 'pointer', fontWeight: 'bold' }}>−</button>
+            <button onClick={bajarTarifa} style={{ width: '36px', height: '36px', background: tarifa <= TARIFA_MINIMA ? '#2A2A2E' : '#1A1A1E', border: `2px solid ${tarifa <= TARIFA_MINIMA ? '#2A2A2E' : '#FF7A2F'}`, borderRadius: '10px', color: tarifa <= TARIFA_MINIMA ? '#555' : '#FF7A2F', fontSize: '20px', cursor: tarifa <= TARIFA_MINIMA ? 'default' : 'pointer', fontWeight: 'bold' }}>−</button>
             <div style={{ textAlign: 'center' }}>
-              <p style={{ color: '#FFFFFF', fontSize: '36px', fontWeight: '900', margin: '0' }}>${tarifa.toLocaleString()}</p>
-              <p style={{ color: '#555', fontSize: '11px', margin: '4px 0 0' }}>{tarifa === TARIFA_MINIMA ? 'Tarifa mínima' : 'Oferta personalizada'}</p>
+              <p style={{ color: '#FFFFFF', fontSize: '24px', fontWeight: '900', margin: '0' }}>${tarifa.toLocaleString()}</p>
+              <p style={{ color: '#555', fontSize: '9px', margin: '1px 0 0' }}>{tarifa === TARIFA_MINIMA ? 'Tarifa mínima' : 'Oferta personalizada'}</p>
             </div>
-            <button onClick={subirTarifa} style={{ width: '48px', height: '48px', background: '#1A1A1E', border: '2px solid #2ECC71', borderRadius: '14px', color: '#2ECC71', fontSize: '24px', cursor: 'pointer', fontWeight: 'bold' }}>+</button>
+            <button onClick={subirTarifa} style={{ width: '36px', height: '36px', background: '#1A1A1E', border: '2px solid #2ECC71', borderRadius: '10px', color: '#2ECC71', fontSize: '20px', cursor: 'pointer', fontWeight: 'bold' }}>+</button>
           </div>
-          <p style={{ color: '#555', fontSize: '11px', margin: '12px 0 0', textAlign: 'center' }}>💡 Ofrece más para que te atiendan más rápido</p>
         </div>
         {error && <p style={{ color: '#FF4444', fontSize: '13px', textAlign: 'center', marginBottom: '12px' }}>{error}</p>}
-        <button onClick={solicitarViaje} style={{ width: '100%', padding: '18px', background: cargando ? '#2A2A2E' : 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)', border: 'none', borderRadius: '16px', color: cargando ? '#555' : '#141416', fontSize: '18px', fontWeight: '900', cursor: cargando ? 'default' : 'pointer' }}>
+        <button onClick={solicitarViaje} style={{ width: '100%', padding: '13px', background: cargando ? '#2A2A2E' : 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)', border: 'none', borderRadius: '14px', color: cargando ? '#555' : '#141416', fontSize: '16px', fontWeight: '900', cursor: cargando ? 'default' : 'pointer' }}>
           {cargando ? 'Enviando...' : `Solicitar ${tipo} — $${tarifa.toLocaleString()}`}
         </button>
       </div>
