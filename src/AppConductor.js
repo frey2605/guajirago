@@ -156,7 +156,7 @@ function MapaConductor({ ubicacionConductor, ubicacionDestino, colorRuta, tipo, 
     mapaRef.current = new window.google.maps.Map(mapRef.current, {
       center: ubicacionConductor || centroRiohacha,
       zoom: 15,
-      styles: MAP_STYLES,
+      styles: [], // mapa blanco (tema normal de Google)
       zoomControl: true,
       mapTypeControl: false,
       streetViewControl: false,

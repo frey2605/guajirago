@@ -354,7 +354,7 @@ function MapaPasajero({ ubicacionPasajero, ubicacionConductor, tipo, onTiempo })
     mapaRef.current = new window.google.maps.Map(mapRef.current, {
       center: ubicacionPasajero || centroRiohacha,
       zoom: 15,
-      styles: MAP_STYLES,
+      styles: [], // mapa blanco (tema normal de Google)
       zoomControl: true,
       mapTypeControl: false,
       streetViewControl: false,
