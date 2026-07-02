@@ -64,6 +64,13 @@ function PantallaModulos({ nombre, foto, onSeleccionar, onVolver, onCerrarSesion
             <p style={{ color: '#AAAAAA', fontSize: '13px', margin: '4px 0 0' }}>Taxi y mototaxi en Riohacha</p>
           </div>
         </div>
+        <div onClick={() => onSeleccionar('mensajeria')} style={{ background: '#1A1A1E', borderRadius: '20px', padding: '24px', display: 'flex', alignItems: 'center', gap: '16px', cursor: 'pointer', border: '1px solid #FF7A2F' }}>
+          <span style={{ fontSize: '40px' }}>📦</span>
+          <div>
+            <p style={{ color: '#FFFFFF', fontWeight: '900', fontSize: '18px', margin: '0' }}>Mensajería y Mandados</p>
+            <p style={{ color: '#AAAAAA', fontSize: '13px', margin: '4px 0 0' }}>Envía paquetes y haz mandados en moto</p>
+          </div>
+        </div>
         <div style={{ background: '#1A1A1E', borderRadius: '20px', padding: '24px', display: 'flex', alignItems: 'center', gap: '16px', border: '1px solid #2A2A2E', opacity: 0.4 }}>
           <span style={{ fontSize: '40px' }}>🛒</span>
           <div>
@@ -97,6 +104,33 @@ function PantallaRol({ nombre, foto, onSeleccionar, onVolver, onCerrarSesion, on
           <div>
             <p style={{ color: '#FFFFFF', fontWeight: '900', fontSize: '18px', margin: '0' }}>Soy conductor</p>
             <p style={{ color: '#AAAAAA', fontSize: '13px', margin: '4px 0 0' }}>Quiero recibir y hacer viajes</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PantallaMensajeria({ nombre, onEnviar, onDomiciliario, onVolver }) {
+  return (
+    <div style={{ backgroundColor: '#141416', minHeight: '100vh', fontFamily: 'Arial, sans-serif', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px 24px', position: 'relative' }}>
+      <div onClick={onVolver} style={{ position: 'absolute', top: '18px', left: '20px', display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(255,255,255,0.12)', borderRadius: '12px', color: '#FFFFFF', fontSize: '14px', fontWeight: '500', padding: '8px 16px', cursor: 'pointer', zIndex: 5 }}><span style={{ fontSize: '20px', fontWeight: '900', lineHeight: '1' }}>‹</span> Volver</div>
+      <span style={{ fontSize: '52px', marginBottom: '8px' }}>📦</span>
+      <h2 style={{ color: '#FFFFFF', fontSize: '26px', fontWeight: '900', margin: '0 0 4px', textAlign: 'center' }}>Mensajería y Mandados</h2>
+      <p style={{ color: '#AAAAAA', fontSize: '14px', letterSpacing: '2px', margin: '0 0 28px', textAlign: 'center' }}>¿QUÉ QUIERES HACER?</p>
+      <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        <div onClick={onEnviar} style={{ background: '#1A1A1E', borderRadius: '20px', padding: '24px', display: 'flex', alignItems: 'center', gap: '16px', cursor: 'pointer', border: '1px solid #FF7A2F' }}>
+          <span style={{ fontSize: '40px' }}>📦</span>
+          <div>
+            <p style={{ color: '#FFFFFF', fontWeight: '900', fontSize: '18px', margin: '0' }}>Quiero enviar algo</p>
+            <p style={{ color: '#AAAAAA', fontSize: '13px', margin: '4px 0 0' }}>Enviar un paquete o pedir un mandado</p>
+          </div>
+        </div>
+        <div onClick={onDomiciliario} style={{ background: '#1A1A1E', borderRadius: '20px', padding: '24px', display: 'flex', alignItems: 'center', gap: '16px', cursor: 'pointer', border: '1px solid #2A2A2E' }}>
+          <span style={{ fontSize: '40px' }}>🏍️</span>
+          <div>
+            <p style={{ color: '#FFFFFF', fontWeight: '900', fontSize: '18px', margin: '0' }}>Soy domiciliario</p>
+            <p style={{ color: '#AAAAAA', fontSize: '13px', margin: '4px 0 0' }}>Recibir mandados y llevarlos en moto</p>
           </div>
         </div>
       </div>
@@ -441,6 +475,8 @@ function App() {
   const handleSeleccionarModulo = (modulo) => {
     if (modulo === 'transporte') {
       setScreen('rol');
+    } else if (modulo === 'mensajeria') {
+      setScreen('mensajeria');
     }
   };
 
@@ -508,6 +544,7 @@ function App() {
   if (screen === 'login') return <Login onEntrar={handleEntrar} />;
   if (screen === 'modulos') return <><PantallaModulos nombre={nombreUsuario} foto={fotoUsuario} onSeleccionar={handleSeleccionarModulo} onVolver={() => setScreen('login')} onCerrarSesion={handleCerrarSesion} onIrPerfil={() => setVerPerfil(true)} onIrGanancias={() => setVerGanancias(true)} onIrSeguridad={() => setVerSeguridad(true)} onIrViajes={() => setVerMisViajes(true)} onIrCreditos={() => setVerCreditos(true)} onIrAyuda={() => setVerAyuda(true)} onIrConfig={() => setVerConfig(true)} onIrPromociones={() => setVerPromociones(true)} /><Anuncio tipoUsuario={tipoUsuario} /></>;
   if (screen === 'rol') return <PantallaRol nombre={nombreUsuario} foto={fotoUsuario} onSeleccionar={handleSeleccionarRol} onVolver={() => setScreen('modulos')} onCerrarSesion={handleCerrarSesion} onIrPerfil={() => setVerPerfil(true)} onIrGanancias={() => setVerGanancias(true)} onIrSeguridad={() => setVerSeguridad(true)} onIrViajes={() => setVerMisViajes(true)} onIrCreditos={() => setVerCreditos(true)} onIrAyuda={() => setVerAyuda(true)} onIrConfig={() => setVerConfig(true)} onIrPromociones={() => setVerPromociones(true)} />;
+  if (screen === 'mensajeria') return <PantallaMensajeria nombre={nombreUsuario} onVolver={() => setScreen('modulos')} onEnviar={() => alert('📦 Enviar: en el siguiente paso conectamos la pantalla para pedir el mandado (recogida, entrega, qué envías y quién recibe).')} onDomiciliario={() => alert('🏍️ Domiciliario: en el siguiente paso el mototaxista verá aquí los mandados disponibles.')} />;
   if (screen === 'mantenimiento') return <PantallaMantenimiento mensaje={mensajeMantenimiento} onVolver={() => setScreen('rol')} />;
   if (screen === 'datos_conductor') return <PantallaDatosConductor nombre={nombreUsuario} foto={fotoUsuario} celular={telefonoUsuario} onGuardar={handleDatosConductor} onVolver={() => setScreen('rol')} onCerrarSesion={handleCerrarSesion} onIrPerfil={() => setVerPerfil(true)} onIrGanancias={() => setVerGanancias(true)} onIrSeguridad={() => setVerSeguridad(true)} onIrViajes={() => setVerMisViajes(true)} onIrCreditos={() => setVerCreditos(true)} onIrAyuda={() => setVerAyuda(true)} onIrConfig={() => setVerConfig(true)} />;
 
