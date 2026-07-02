@@ -378,10 +378,26 @@ function TarjetaSolicitud({ solicitud, nombre, telefono, placa, vehiculo, tipoVe
 
   return (
     <div style={{ background: '#1A1A1E', borderRadius: '20px', padding: '20px', border: '1px solid #FF7A2F', marginBottom: '12px' }}>
-      <p style={{ color: '#FF7A2F', fontSize: '11px', margin: '0 0 8px', letterSpacing: '2px', fontWeight: 'bold' }}>🔔 SOLICITUD</p>
-      <p style={{ color: '#FFFFFF', fontWeight: '900', fontSize: '15px', margin: '0 0 3px' }}>{solicitud.tipo}</p>
-      <p style={{ color: '#AAAAAA', fontSize: '13px', margin: '0 0 2px' }}>📍 {solicitud.origen}</p>
-      <p style={{ color: '#AAAAAA', fontSize: '13px', margin: '0 0 14px' }}>🏁 {solicitud.destino}</p>
+      {solicitud.tipo === 'Mensajería' ? (
+        <>
+          <div style={{ background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F)', borderRadius: '10px', padding: '8px 12px', margin: '0 0 12px', display: 'inline-block' }}>
+            <p style={{ color: '#141416', fontSize: '15px', margin: '0', letterSpacing: '1px', fontWeight: '900' }}>📦 MENSAJERÍA / MANDADO</p>
+          </div>
+          {solicitud.mensajeria?.queEnvia && <p style={{ color: '#FFFFFF', fontWeight: '900', fontSize: '17px', margin: '0 0 8px' }}>📦 Envía: {solicitud.mensajeria.queEnvia}</p>}
+          <p style={{ color: '#FFFFFF', fontSize: '15px', margin: '0 0 4px', fontWeight: 'bold' }}>📍 Recoger en: {solicitud.origen}</p>
+          <p style={{ color: '#FFFFFF', fontSize: '15px', margin: '0 0 8px', fontWeight: 'bold' }}>🏁 Entregar en: {solicitud.destino}</p>
+          {solicitud.mensajeria?.recibeNombre && <p style={{ color: '#FFFFFF', fontSize: '15px', margin: '0 0 4px', fontWeight: 'bold' }}>🙋 Recibe: {solicitud.mensajeria.recibeNombre}{solicitud.mensajeria?.recibeTel ? ` · 📞 ${solicitud.mensajeria.recibeTel}` : ''}</p>}
+          {solicitud.mensajeria?.nota && <p style={{ color: '#FFCF4D', fontSize: '14px', margin: '0 0 14px', fontWeight: 'bold' }}>📝 {solicitud.mensajeria.nota}</p>}
+          {!solicitud.mensajeria?.nota && <div style={{ marginBottom: '14px' }} />}
+        </>
+      ) : (
+        <>
+          <p style={{ color: '#FF7A2F', fontSize: '11px', margin: '0 0 8px', letterSpacing: '2px', fontWeight: 'bold' }}>🔔 SOLICITUD</p>
+          <p style={{ color: '#FFFFFF', fontWeight: '900', fontSize: '15px', margin: '0 0 3px' }}>{solicitud.tipo}</p>
+          <p style={{ color: '#AAAAAA', fontSize: '13px', margin: '0 0 2px' }}>📍 {solicitud.origen}</p>
+          <p style={{ color: '#AAAAAA', fontSize: '13px', margin: '0 0 14px' }}>🏁 {solicitud.destino}</p>
+        </>
+      )}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px', background: '#141416', borderRadius: '14px', padding: '14px' }}>
         <div>
           <p style={{ color: '#AAAAAA', fontSize: '10px', margin: '0' }}>{tarifaCambiada ? 'TU CONTRAOFERTA' : 'OFERTA DEL PASAJERO'}</p>
@@ -863,8 +879,12 @@ const cargarSaldo = useCallback(async (uid) => {
         .map(d => ({ id: d.id, ...d.data() }))
         .filter(v => {
           if (!v.nuevaOferta && !v.fechaSolicitud) return false;
-          // Filtro por tipo: el conductor solo ve solicitudes de su tipo de vehículo
-          if (tipoVehiculo && v.tipo && v.tipo !== tipoVehiculo) return false;
+          // Filtro por tipo: el conductor ve solicitudes de su tipo de vehículo.
+          // Los mototaxistas ADEMÁS ven los mandados de mensajería.
+          if (tipoVehiculo && v.tipo && v.tipo !== tipoVehiculo) {
+            const esMandadoParaMoto = v.tipo === 'Mensajería' && tipoVehiculo === 'Mototaxi';
+            if (!esMandadoParaMoto) return false;
+          }
           // Filtro por distancia: solo mostrar si el pasajero está dentro del radio de búsqueda actual
           if (ubicacionRef.current && v.pasajeroLat && v.pasajeroLng) {
             const radio = v.radioBusqueda || 7;

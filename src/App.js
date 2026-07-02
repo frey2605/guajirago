@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import Splash from './Splash';
 import Login from './Login';
 import Home from './Home';
+import SolicitarMensajeria from './SolicitarMensajeria';
 import AppConductor from './AppConductor';
 import MenuLateral from './MenuLateral';
 import MiPerfil from './MiPerfil';
@@ -544,7 +545,8 @@ function App() {
   if (screen === 'login') return <Login onEntrar={handleEntrar} />;
   if (screen === 'modulos') return <><PantallaModulos nombre={nombreUsuario} foto={fotoUsuario} onSeleccionar={handleSeleccionarModulo} onVolver={() => setScreen('login')} onCerrarSesion={handleCerrarSesion} onIrPerfil={() => setVerPerfil(true)} onIrGanancias={() => setVerGanancias(true)} onIrSeguridad={() => setVerSeguridad(true)} onIrViajes={() => setVerMisViajes(true)} onIrCreditos={() => setVerCreditos(true)} onIrAyuda={() => setVerAyuda(true)} onIrConfig={() => setVerConfig(true)} onIrPromociones={() => setVerPromociones(true)} /><Anuncio tipoUsuario={tipoUsuario} /></>;
   if (screen === 'rol') return <PantallaRol nombre={nombreUsuario} foto={fotoUsuario} onSeleccionar={handleSeleccionarRol} onVolver={() => setScreen('modulos')} onCerrarSesion={handleCerrarSesion} onIrPerfil={() => setVerPerfil(true)} onIrGanancias={() => setVerGanancias(true)} onIrSeguridad={() => setVerSeguridad(true)} onIrViajes={() => setVerMisViajes(true)} onIrCreditos={() => setVerCreditos(true)} onIrAyuda={() => setVerAyuda(true)} onIrConfig={() => setVerConfig(true)} onIrPromociones={() => setVerPromociones(true)} />;
-  if (screen === 'mensajeria') return <PantallaMensajeria nombre={nombreUsuario} onVolver={() => setScreen('modulos')} onEnviar={() => alert('📦 Enviar: en el siguiente paso conectamos la pantalla para pedir el mandado (recogida, entrega, qué envías y quién recibe).')} onDomiciliario={() => alert('🏍️ Domiciliario: en el siguiente paso el mototaxista verá aquí los mandados disponibles.')} />;
+  if (screen === 'mensajeria') return <PantallaMensajeria nombre={nombreUsuario} onVolver={() => setScreen('modulos')} onEnviar={() => setScreen('enviar')} onDomiciliario={() => alert('🏍️ Domiciliario: en el siguiente paso el mototaxista verá aquí los mandados disponibles.')} />;
+  if (screen === 'enviar') return <SolicitarMensajeria onVolver={() => setScreen('mensajeria')} />;
   if (screen === 'mantenimiento') return <PantallaMantenimiento mensaje={mensajeMantenimiento} onVolver={() => setScreen('rol')} />;
   if (screen === 'datos_conductor') return <PantallaDatosConductor nombre={nombreUsuario} foto={fotoUsuario} celular={telefonoUsuario} onGuardar={handleDatosConductor} onVolver={() => setScreen('rol')} onCerrarSesion={handleCerrarSesion} onIrPerfil={() => setVerPerfil(true)} onIrGanancias={() => setVerGanancias(true)} onIrSeguridad={() => setVerSeguridad(true)} onIrViajes={() => setVerMisViajes(true)} onIrCreditos={() => setVerCreditos(true)} onIrAyuda={() => setVerAyuda(true)} onIrConfig={() => setVerConfig(true)} />;
 
