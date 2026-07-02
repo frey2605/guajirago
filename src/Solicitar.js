@@ -827,7 +827,8 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
     if (!viajeId) return;
     setBuscandoAgotado(false);
     setTiempoBusqueda(120);
-    updateDoc(doc(db, 'viajes', viajeId), { radioBusqueda: configApp.radioBusquedaInicial, nuevaOferta: new Date().toISOString() }).catch(() => {});
+    // Revivir el viaje: vuelve a 'esperando' con tiempo nuevo para que reaparezca en los conductores
+    updateDoc(doc(db, 'viajes', viajeId), { estado: 'esperando', radioBusqueda: configApp.radioBusquedaInicial, nuevaOferta: new Date().toISOString() }).catch(() => {});
     if (radioRef.current) { clearTimeout(radioRef.current.ampliar); clearTimeout(radioRef.current.agotar); }
     radioRef.current = {
       ampliar: setTimeout(() => {
@@ -835,6 +836,8 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
       }, 60000),
       agotar: setTimeout(() => {
         setBuscandoAgotado(true);
+        // Si se acaba otra vez, volver a marcarlo vencido
+        updateDoc(doc(db, 'viajes', viajeId), { estado: 'vencido' }).catch(() => {});
       }, 120000),
     };
     clearInterval(contadorBusquedaRef.current);
@@ -932,6 +935,8 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
         }, 60000),
         agotar: setTimeout(() => {
           setBuscandoAgotado(true);
+          // El tiempo se acabó: marcar el viaje como vencido para que desaparezca de TODOS los conductores
+          updateDoc(doc(db, 'viajes', docRef.id), { estado: 'vencido' }).catch(() => {});
         }, 120000),
       };
       // Contador visible (cuenta regresiva de 4:00 a 0:00)
