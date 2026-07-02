@@ -1062,6 +1062,14 @@ const PanelEmergencia = () => (
       </div>
     ) : null
   );
+  const resumenMandado = (tipo === 'Mensajería') ? (
+    <div style={{ background: '#1A1A1E', borderRadius: '14px', padding: '12px 14px', margin: '0 0 16px', border: '1px solid #FF7A2F', width: '100%', maxWidth: '400px', boxSizing: 'border-box' }}>
+      <p style={{ color: '#FFCF4D', fontSize: '11px', margin: '0 0 6px', letterSpacing: '1px', fontWeight: '900' }}>📦 TU MANDADO</p>
+      {queEnvia && <p style={{ color: '#FFFFFF', fontSize: '14px', margin: '0 0 3px', fontWeight: 'bold' }}>📦 Envías: {queEnvia}</p>}
+      {recibeNombre && <p style={{ color: '#FFFFFF', fontSize: '14px', margin: '0 0 3px' }}>🙋 Recibe: {recibeNombre}{recibeTel ? ` · 📞 ${recibeTel}` : ''}</p>}
+      {notaEnvio && <p style={{ color: '#FFCF4D', fontSize: '13px', margin: '0', fontWeight: 'bold' }}>📝 {notaEnvio}</p>}
+    </div>
+  ) : null;
   if (mostrarCalificacion) return <Calificacion tipo={tipo} viajeId={viajeId} nombreCalificado={viaje?.conductorNombre} calificadoId={viaje?.conductorId} quienCalifica="pasajero" onFinalizar={onVolver} />;
   if (celebrando) return <Celebracion />;
   if (llamandoConductor) return <Llamada viajeId={viajeId} miRol="pasajero" nombreOtro={viaje?.conductorNombre || 'Conductor'} onCerrar={() => setLlamandoConductor(false)} />;
@@ -1254,6 +1262,8 @@ const PanelEmergencia = () => (
               <p style={{ color: '#888', fontSize: '11px', margin: '4px 0 0' }}>Dáselo al conductor al finalizar</p>
             </div>
           )}
+          {resumenMandado}
+          <button onClick={() => setLlamandoConductor(true)} style={{ width: '100%', marginBottom: '10px', padding: '13px', background: 'linear-gradient(135deg, #2ECC71, #27AE60)', border: 'none', borderRadius: '14px', color: '#FFFFFF', fontSize: '14px', fontWeight: 'bold', cursor: 'pointer' }}>📞 Llamar al conductor</button>
           <p style={{ color: '#555', fontSize: '11px', letterSpacing: '2px', margin: '12px 0 8px' }}>RESPUESTAS RÁPIDAS</p>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '10px' }}>
             {RESPUESTAS_RAPIDAS.map((resp, i) => (
@@ -1290,6 +1300,7 @@ const PanelEmergencia = () => (
         <div style={{ fontSize: '80px', marginBottom: '24px' }}>{buscandoAgotado ? '😕' : (tipo === 'Taxi' ? '🚗' : '🏍️')}</div>
         <h2 style={{ color: '#FFFFFF', fontSize: '22px', margin: '0 0 8px', textAlign: 'center' }}>{buscandoAgotado ? 'No encontramos conductor' : 'Buscando conductor...'}</h2>
         <p style={{ color: '#555', fontSize: '14px', margin: '0 0 4px', textAlign: 'center' }}>{origen} → {destino}</p>
+        {resumenMandado}
         {!buscandoAgotado && (
           <p style={{ color: '#2ECC71', fontSize: '20px', fontWeight: '900', margin: '0 0 16px', textAlign: 'center' }}>
             Tu oferta: ${tarifa.toLocaleString()}

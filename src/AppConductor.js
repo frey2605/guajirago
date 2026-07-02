@@ -1171,6 +1171,45 @@ useEffect(() => {
 
   if (enLlamada) return <Llamada viajeId={viajeActual?.id} miRol="conductor" nombreOtro={viajeActual?.pasajeroNombre || 'Pasajero'} onCerrar={() => { setEnLlamada(false); }} />;
   if (llamadaEntrante) return <Llamada viajeId={viajeActual?.id} miRol="entrante" nombreOtro={viajeActual?.pasajeroNombre || 'Pasajero'} onCerrar={() => { setLlamadaEntrante(false); }} />;
+  const llamarQuienRecibe = () => {
+    const tel = viajeActual?.mensajeria?.recibeTel;
+    if (tel) window.location.href = 'tel:' + tel;
+  };
+  const tarjetaMensajeria = (viajeActual?.tipo === 'Mensajería' && viajeActual?.mensajeria) ? (
+    <div style={{ background: '#141416', borderRadius: '16px', padding: '14px', marginBottom: '14px', border: '1px solid #FF7A2F' }}>
+      <p style={{ color: '#FFCF4D', fontSize: '11px', margin: '0 0 8px', letterSpacing: '1px', fontWeight: '900' }}>📦 DATOS DEL MANDADO</p>
+      {viajeActual.mensajeria.queEnvia && <p style={{ color: '#FFFFFF', fontSize: '15px', margin: '0 0 4px', fontWeight: 'bold' }}>📦 Paquete: {viajeActual.mensajeria.queEnvia}</p>}
+      <p style={{ color: '#FFFFFF', fontSize: '14px', margin: '0 0 3px' }}>📍 Recoger en: {viajeActual.origen}</p>
+      <p style={{ color: '#FFFFFF', fontSize: '14px', margin: '0 0 3px' }}>🏁 Entregar en: {viajeActual.destino}</p>
+      {viajeActual.mensajeria.recibeNombre && <p style={{ color: '#FFFFFF', fontSize: '14px', margin: '0 0 3px' }}>🙋 Recibe: {viajeActual.mensajeria.recibeNombre}</p>}
+      {viajeActual.mensajeria.nota && <p style={{ color: '#FFCF4D', fontSize: '13px', margin: '0 0 8px', fontWeight: 'bold' }}>📝 {viajeActual.mensajeria.nota}</p>}
+      {viajeActual.mensajeria.recibeTel && (
+        <button onClick={llamarQuienRecibe} style={{ width: '100%', padding: '12px', background: 'linear-gradient(135deg, #2ECC71, #27AE60)', border: 'none', borderRadius: '12px', color: '#FFFFFF', fontSize: '14px', fontWeight: '900', cursor: 'pointer', marginTop: '4px' }}>📞 Llamar a quien recibe ({viajeActual.mensajeria.recibeTel})</button>
+      )}
+    </div>
+  ) : null;
+  const esMandado = viajeActual?.tipo === 'Mensajería';
+  const comunicacionCompacta = (
+    <div style={{ marginBottom: '10px' }}>
+      <button onClick={() => setEnLlamada(true)} style={{ width: '100%', marginBottom: '6px', padding: '9px', background: 'linear-gradient(135deg, #2ECC71, #27AE60)', border: 'none', borderRadius: '10px', color: '#FFFFFF', fontSize: '13px', fontWeight: 'bold', cursor: 'pointer' }}>📞 {esMandado ? 'Llamar a quien envía' : 'Llamar al pasajero'}</button>
+      <div style={{ background: '#141416', borderRadius: '10px', padding: '7px', border: '1px solid #2A2A2E' }}>
+        <div style={{ maxHeight: '70px', overflowY: 'auto', marginBottom: '5px' }}>
+          {mensajesChat.length === 0 && <p style={{ color: '#555', fontSize: '11px', textAlign: 'center', margin: '3px 0' }}>Sin mensajes aún</p>}
+          {mensajesChat.map(m => (
+            <div key={m.id} style={{ display: 'flex', justifyContent: m.autor === 'conductor' ? 'flex-end' : 'flex-start', marginBottom: '4px' }}>
+              <div style={{ background: m.autor === 'conductor' ? 'linear-gradient(135deg, #FF7A2F, #D6357E)' : '#2A2A2E', borderRadius: '9px', padding: '5px 9px', maxWidth: '80%' }}>
+                <p style={{ color: '#FFFFFF', fontSize: '12px', margin: '0', lineHeight: '1.3' }}>{m.texto}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+        <div style={{ display: 'flex', gap: '6px' }}>
+          <input value={textoChat} onChange={e => setTextoChat(e.target.value)} onKeyDown={e => e.key === 'Enter' && enviarMensajeConductor()} placeholder="Escribe un mensaje..." style={{ flex: 1, background: '#1A1A1E', border: '1px solid #2A2A2E', borderRadius: '8px', padding: '7px 10px', color: '#FFFFFF', fontSize: '13px', outline: 'none' }} />
+          <button onClick={enviarMensajeConductor} disabled={!textoChat.trim()} style={{ padding: '7px 12px', background: textoChat.trim() ? 'linear-gradient(135deg, #FF7A2F, #D6357E)' : '#2A2A2E', border: 'none', borderRadius: '8px', color: '#FFFFFF', fontSize: '16px', cursor: textoChat.trim() ? 'pointer' : 'default' }}>➤</button>
+        </div>
+      </div>
+    </div>
+  );
   if (datosCalificacion) return <Calificacion tipo={null} viajeId={datosCalificacion.viajeId} nombreCalificado={datosCalificacion.nombrePasajero} calificadoId={datosCalificacion.pasajeroId} quienCalifica="conductor" onFinalizar={() => setDatosCalificacion(null)} />;
   if (verHistorial) return <HistorialConductor onVolver={() => setVerHistorial(false)} />;
   if (verCreditos) return <Creditos onVolver={() => setVerCreditos(false)} />;
@@ -1256,26 +1295,10 @@ useEffect(() => {
             <div><p style={{ color: '#AAAAAA', fontSize: '10px', margin: '0' }}>PASAJERO</p><p style={{ color: '#FFFFFF', fontSize: '14px', fontWeight: 'bold', margin: '4px 0 0' }}>{viajeActual?.pasajeroNombre || 'Pasajero'}</p></div>
             <div style={{ textAlign: 'right' }}><p style={{ color: '#AAAAAA', fontSize: '10px', margin: '0' }}>TARIFA</p><p style={{ color: '#2ECC71', fontSize: '20px', fontWeight: '900', margin: '4px 0 0' }}>{viajeActual?.tarifa}</p></div>
           </div>
+          {tarjetaMensajeria}
           {fase === 'recogiendo' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              <button onClick={() => setEnLlamada(true)} style={{ width: '100%', padding: '14px', background: 'linear-gradient(135deg, #2ECC71, #27AE60)', border: 'none', borderRadius: '14px', color: '#FFFFFF', fontSize: '15px', fontWeight: 'bold', cursor: 'pointer' }}>📞 Llamar al pasajero</button>
-              <div style={{ background: '#141416', borderRadius: '14px', padding: '10px', border: '1px solid #2A2A2E', marginTop: '8px' }}>
-                <div style={{ maxHeight: '120px', overflowY: 'auto', marginBottom: '8px' }}>
-                  {mensajesChat.length === 0 && <p style={{ color: '#555', fontSize: '13px', textAlign: 'center', margin: '8px 0' }}>Sin mensajes aún</p>}
-                  {mensajesChat.map(m => (
-                    <div key={m.id} style={{ display: 'flex', justifyContent: m.autor === 'conductor' ? 'flex-end' : 'flex-start', marginBottom: '6px' }}>
-                      <div style={{ background: m.autor === 'conductor' ? 'linear-gradient(135deg, #FF7A2F, #D6357E)' : '#2A2A2E', borderRadius: '12px', padding: '8px 12px', maxWidth: '80%' }}>
-                        <p style={{ color: '#FFFFFF', fontSize: '13px', margin: '0', lineHeight: '1.4' }}>{m.texto}</p>
-                      </div>
-                    </div>
-                  ))}
-                  <div ref={chatFinRef} />
-                </div>
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  <input value={textoChat} onChange={e => setTextoChat(e.target.value)} onKeyDown={e => e.key === 'Enter' && enviarMensajeConductor()} placeholder="Escribe un mensaje..." style={{ flex: 1, background: '#1A1A1E', border: '1px solid #2A2A2E', borderRadius: '10px', padding: '10px 12px', color: '#FFFFFF', fontSize: '14px', outline: 'none' }} />
-                  <button onClick={enviarMensajeConductor} disabled={!textoChat.trim()} style={{ padding: '10px 16px', background: textoChat.trim() ? 'linear-gradient(135deg, #FF7A2F, #D6357E)' : '#2A2A2E', border: 'none', borderRadius: '10px', color: '#FFFFFF', fontSize: '18px', cursor: textoChat.trim() ? 'pointer' : 'default' }}>➤</button>
-                </div>
-              </div>
+              {comunicacionCompacta}
               <div style={{ display: 'flex', gap: '10px' }}>
                 <button onClick={() => setMostrarCancelacion(true)} style={{ flex: 1, padding: '14px', background: 'transparent', border: '1px solid #FF4444', borderRadius: '14px', color: '#FF4444', fontSize: '14px', cursor: 'pointer' }}>Cancelar</button>
                 <button onClick={llegueAlPunto} style={{ flex: 2, padding: '16px', background: 'linear-gradient(135deg, #2ECC71, #27AE60)', border: 'none', borderRadius: '16px', color: '#FFFFFF', fontSize: '16px', fontWeight: '900', cursor: 'pointer' }}>📍 Llegué al punto</button>
@@ -1296,6 +1319,23 @@ useEffect(() => {
                   <p style={{ color: '#FF7A2F', fontSize: '13px', fontWeight: 'bold', margin: '0' }}>💬 Pasajero: "{respuestaPasajero}"</p>
                 </div>
               )}
+              <button onClick={() => setEnLlamada(true)} style={{ width: '100%', marginBottom: '10px', padding: '14px', background: 'linear-gradient(135deg, #2ECC71, #27AE60)', border: 'none', borderRadius: '14px', color: '#FFFFFF', fontSize: '15px', fontWeight: 'bold', cursor: 'pointer' }}>📞 Llamar al pasajero</button>
+              <div style={{ background: '#141416', borderRadius: '14px', padding: '10px', border: '1px solid #2A2A2E', marginBottom: '12px' }}>
+                <div style={{ maxHeight: '120px', overflowY: 'auto', marginBottom: '8px' }}>
+                  {mensajesChat.length === 0 && <p style={{ color: '#555', fontSize: '13px', textAlign: 'center', margin: '8px 0' }}>Sin mensajes aún</p>}
+                  {mensajesChat.map(m => (
+                    <div key={m.id} style={{ display: 'flex', justifyContent: m.autor === 'conductor' ? 'flex-end' : 'flex-start', marginBottom: '6px' }}>
+                      <div style={{ background: m.autor === 'conductor' ? 'linear-gradient(135deg, #FF7A2F, #D6357E)' : '#2A2A2E', borderRadius: '12px', padding: '8px 12px', maxWidth: '80%' }}>
+                        <p style={{ color: '#FFFFFF', fontSize: '13px', margin: '0', lineHeight: '1.4' }}>{m.texto}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <input value={textoChat} onChange={e => setTextoChat(e.target.value)} onKeyDown={e => e.key === 'Enter' && enviarMensajeConductor()} placeholder="Escribe un mensaje..." style={{ flex: 1, background: '#1A1A1E', border: '1px solid #2A2A2E', borderRadius: '10px', padding: '10px 12px', color: '#FFFFFF', fontSize: '14px', outline: 'none' }} />
+                  <button onClick={enviarMensajeConductor} disabled={!textoChat.trim()} style={{ padding: '10px 16px', background: textoChat.trim() ? 'linear-gradient(135deg, #FF7A2F, #D6357E)' : '#2A2A2E', border: 'none', borderRadius: '10px', color: '#FFFFFF', fontSize: '18px', cursor: textoChat.trim() ? 'pointer' : 'default' }}>➤</button>
+                </div>
+              </div>
               <div style={{ display: 'flex', gap: '12px' }}>
                 <button onClick={() => setMostrarCancelacion(true)} style={{ flex: 1, padding: '14px', background: 'transparent', border: '1px solid #FF4444', borderRadius: '14px', color: '#FF4444', fontSize: '14px', cursor: 'pointer' }}>Cancelar</button>
                 <button onClick={intentarIniciar} style={{ flex: 2, padding: '16px', background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)', border: 'none', borderRadius: '16px', color: '#141416', fontSize: '16px', fontWeight: '900', cursor: 'pointer' }}>🚀 Iniciar viaje</button>
@@ -1341,6 +1381,8 @@ useEffect(() => {
             <div><p style={{ color: '#AAAAAA', fontSize: '10px', margin: '0' }}>PASAJERO</p><p style={{ color: '#FFFFFF', fontSize: '14px', fontWeight: 'bold', margin: '4px 0 0' }}>{viajeActual.pasajeroNombre || 'Pasajero'}</p></div>
             <div style={{ textAlign: 'right' }}><p style={{ color: '#AAAAAA', fontSize: '10px', margin: '0' }}>TARIFA</p><p style={{ color: '#2ECC71', fontSize: '20px', fontWeight: '900', margin: '4px 0 0' }}>{viajeActual.tarifa}</p></div>
           </div>
+          {tarjetaMensajeria}
+          {comunicacionCompacta}
           <button onClick={finalizarViaje} style={{ width: '100%', padding: '16px', background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)', border: 'none', borderRadius: '16px', color: '#141416', fontSize: '18px', fontWeight: '900', cursor: 'pointer' }}>🏁 Finalizar viaje</button>
         </div>
       </div>
