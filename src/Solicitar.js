@@ -167,6 +167,8 @@ function AutocompleteInput({ value, onChange, placeholder, icon, onPlaceCoords }
   const autocompleteRef = useRef(null);
   const onPlaceCoordsRef = useRef(onPlaceCoords);
   useEffect(() => { onPlaceCoordsRef.current = onPlaceCoords; }, [onPlaceCoords]);
+  const onChangeRef = useRef(onChange);
+  useEffect(() => { onChangeRef.current = onChange; }, [onChange]);
   useEffect(() => {
     if (!inputRef.current || !window.google) return;
     autocompleteRef.current = new window.google.maps.places.Autocomplete(inputRef.current, {
@@ -176,16 +178,26 @@ function AutocompleteInput({ value, onChange, placeholder, icon, onPlaceCoords }
         new window.google.maps.LatLng(BOUNDS_RIOHACHA.north, BOUNDS_RIOHACHA.east)
       ),
       strictBounds: true, types: ['establishment', 'geocode'],
+      fields: ['geometry', 'name', 'formatted_address'],
     });
     autocompleteRef.current.addListener('place_changed', () => {
       const place = autocompleteRef.current.getPlace();
-      if (place && place.name) onChange(place.name);
-      // Si la sugerencia elegida trae coordenadas exactas, las reportamos (para mover el pin del mapa)
+      if (place && place.name) onChangeRef.current(place.name);
+      // Si Google ya trae las coordenadas de la sugerencia, las usamos directo (mueve el pin al instante)
       if (onPlaceCoordsRef.current && place && place.geometry && place.geometry.location) {
         onPlaceCoordsRef.current({ lat: place.geometry.location.lat(), lng: place.geometry.location.lng() });
+      } else if (onPlaceCoordsRef.current && place && place.name && window.google) {
+        // Respaldo: si Google no trajo las coordenadas, las buscamos para que el pin salte a la primera
+        const geocoder = new window.google.maps.Geocoder();
+        geocoder.geocode({ address: place.name + ', Riohacha, Colombia' }, (results, status) => {
+          if (status === 'OK' && results && results[0] && onPlaceCoordsRef.current) {
+            onPlaceCoordsRef.current({ lat: results[0].geometry.location.lat(), lng: results[0].geometry.location.lng() });
+          }
+        });
       }
     });
-  }, [onChange]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   return (
     <div style={{ background: '#1A1A1E', borderRadius: '14px', padding: '10px 14px', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '10px' }}>
       <div style={{ width: '10px', height: '10px', borderRadius: icon === 'origen' ? '50%' : '2px', background: icon === 'origen' ? '#2ECC71' : '#FF7A2F', flexShrink: 0 }}/>

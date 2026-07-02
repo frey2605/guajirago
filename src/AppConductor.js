@@ -633,6 +633,7 @@ function AppConductor({ nombre, telefono, placa, vehiculo, tipoVehiculo, onCerra
       if (!snap.exists()) { cerrarEsteVigilante(); return; }
       const data = snap.data();
 
+      // El pasajero aceptó (contraoferta o directo): este viaje es mío → celebrar aunque el estado llegue junto con los datos.
       if ((data.estado === 'confirmado' || data.estado === 'aceptado') && data.conductorId === miId && !celebrandoRef.current && !faseRef.current) {
         const dataCopy = { id: idViaje, ...data };
         limpiarVigilantesMenos(idViaje);
@@ -702,6 +703,58 @@ function AppConductor({ nombre, telefono, placa, vehiculo, tipoVehiculo, onCerra
       if (unsubsViajesRef.current[idViaje]) cerrarEsteVigilante();
     }, 180000);
   }, [limpiarVigilantesMenos, limpiarViajesOtrosConductor]);
+
+  // NUEVO: vigilante global. Escucha TODOS los viajes del conductor a la vez y detecta cuando un pasajero acepta,
+  // sin importar cuántas contraofertas haya enviado (arregla que la 2ª contraoferta no le llegara la respuesta).
+  useEffect(() => {
+    const miId = auth.currentUser?.uid;
+    if (!miId) return;
+    const q = query(collection(db, 'viajes'), where('conductorId', '==', miId));
+    const unsub = onSnapshot(q, (snap) => {
+      if (celebrandoRef.current || faseRef.current) return; // ya está celebrando o en viaje: no hacer nada
+      const d = snap.docs.find(docu => {
+        const dt = docu.data();
+        const e = dt.estado;
+        if (e !== 'aceptado' && e !== 'confirmado') return false;
+        if (dt.fase === 'en_viaje') return false; // ya arrancó, no re-celebrar
+        const t = new Date(dt.nuevaOferta || dt.fechaSolicitud).getTime();
+        if (isNaN(t)) return true;
+        return (Date.now() - t) < 10 * 60 * 1000; // solo aceptaciones recientes
+      });
+      if (!d) return;
+      const data = { id: d.id, ...d.data() };
+      limpiarTodosVigilantes();
+      limpiarViajesOtrosConductor(miId, data.id);
+      setCelebrando(true);
+      celebrandoRef.current = true; // se marca de inmediato para que no cobre doble
+      setDoc(doc(db, 'conductores', miId), { ocupado: true }, { merge: true }).catch(() => {});
+      (async () => {
+        try {
+          let comMoto = CONFIG_APP_DEFECTO.comisionMototaxi;
+          let comTaxi = CONFIG_APP_DEFECTO.comisionTaxi;
+          try {
+            const snapCfg = await getDoc(doc(db, 'config', 'global'));
+            if (snapCfg.exists()) {
+              comMoto = snapCfg.data().comisionMototaxi ?? comMoto;
+              comTaxi = snapCfg.data().comisionTaxi ?? comTaxi;
+            }
+          } catch (eCfg) {}
+          const comisionAplicable = tipoVehiculo === 'Mototaxi' ? comMoto : comTaxi;
+          const snapU = await getDoc(doc(db, 'usuarios', miId));
+          const saldoU = snapU.exists() ? (snapU.data().creditos || 0) : 0;
+          await setDoc(doc(db, 'usuarios', miId), { creditos: saldoU - comisionAplicable }, { merge: true });
+          setSaldoCreditos(saldoU - comisionAplicable);
+        } catch (e) {}
+      })();
+      setTimeout(() => {
+        setCelebrando(false);
+        celebrandoRef.current = false;
+        iniciarFase1(data);
+      }, 3000);
+    });
+    return () => unsub();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [limpiarTodosVigilantes, limpiarViajesOtrosConductor, tipoVehiculo]);
 
   const cerrarSesion = async () => {
     try {
@@ -802,7 +855,7 @@ const cargarSaldo = useCallback(async (uid) => {
   useEffect(() => {
     if (!activo) { setSolicitudes([]); solicitudesIdsRef.current.clear(); return; }
     const VENTANA_MS = 2 * 60 * 1000;
-    const q = query(collection(db, 'viajes'), where('estado', 'in', ['esperando', 'en_negociacion', 'confirmando']));
+    const q = query(collection(db, 'viajes'), where('estado', 'in', ['esperando', 'en_negociacion', 'confirmando', 'contraoferta']));
     const unsub = onSnapshot(q, (snap) => {
       const ahora = Date.now();
       const tsDe = (v) => new Date(v.nuevaOferta || v.fechaSolicitud).getTime();
