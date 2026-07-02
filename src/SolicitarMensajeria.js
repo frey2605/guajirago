@@ -413,6 +413,7 @@ function SolicitarMensajeria({ onVolver, destinoInicial }) {
   const [recibeNombre, setRecibeNombre] = useState('');
   const [recibeTel, setRecibeTel] = useState('');
   const [notaEnvio, setNotaEnvio] = useState('');
+  const [avisoFaltan, setAvisoFaltan] = useState(null);
   const [favoritos, setFavoritos] = useState([]);
   const [avisoLimite, setAvisoLimite] = useState(false);
   const [pantalla, setPantalla] = useState('solicitar');
@@ -856,11 +857,14 @@ function SolicitarMensajeria({ onVolver, destinoInicial }) {
   const bajarTarifa = () => setTarifa(t => Math.max(TARIFA_MINIMA, t - configApp.incrementoTarifa));
 
   const solicitarViaje = async () => {
-    if (!origen || !destino) { setError('Escribe dónde se recoge y dónde se entrega'); return; }
-    if (!queEnvia.trim()) { setError('Escribe qué vas a enviar'); return; }
-    if (!recibeNombre.trim()) { setError('Escribe el nombre de quien recibe'); return; }
-    if (recibeTel.trim().length !== 10) { setError('El teléfono de quien recibe debe tener 10 números'); return; }
-    if (!notaEnvio.trim()) { setError('Escribe una nota para el domiciliario'); return; }
+    const faltan = [];
+    if (!origen) faltan.push('Dónde se recoge');
+    if (!destino) faltan.push('Dónde se entrega');
+    if (!queEnvia.trim()) faltan.push('Qué vas a enviar');
+    if (!recibeNombre.trim()) faltan.push('Nombre de quien recibe');
+    if (recibeTel.trim().length !== 10) faltan.push('Teléfono de quien recibe (10 números)');
+    if (!notaEnvio.trim()) faltan.push('Nota para el domiciliario');
+    if (faltan.length > 0) { setAvisoFaltan(faltan); return; }
     activarAudioiOS();
     precargarAudio();
     setCargando(true); setError('');
@@ -1347,6 +1351,24 @@ const PanelEmergencia = () => (
 
   return (
     <div style={{ backgroundColor: '#141416', minHeight: '100vh', fontFamily: 'Arial, sans-serif' }}>
+      {avisoFaltan && (
+        <div onClick={() => setAvisoFaltan(null)} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
+          <div onClick={e => e.stopPropagation()} style={{ background: '#1A1A1E', borderRadius: '24px', padding: '28px 24px', width: '100%', maxWidth: '400px', border: '2px solid #FF7A2F' }}>
+            <div style={{ fontSize: '48px', textAlign: 'center', marginBottom: '8px' }}>📋</div>
+            <p style={{ color: '#FF7A2F', fontSize: '13px', margin: '0 0 6px', letterSpacing: '2px', fontWeight: 'bold', textAlign: 'center' }}>TE FALTAN DATOS</p>
+            <p style={{ color: '#FFFFFF', fontSize: '18px', fontWeight: '900', margin: '0 0 18px', textAlign: 'center' }}>Completa esto para enviar tu mandado:</p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '22px' }}>
+              {avisoFaltan.map((f, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '10px', background: '#141416', borderRadius: '12px', padding: '12px 14px' }}>
+                  <span style={{ fontSize: '18px' }}>❌</span>
+                  <span style={{ color: '#FFFFFF', fontSize: '15px', fontWeight: 'bold' }}>{f}</span>
+                </div>
+              ))}
+            </div>
+            <button onClick={() => setAvisoFaltan(null)} style={{ width: '100%', padding: '16px', background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)', border: 'none', borderRadius: '14px', color: '#141416', fontSize: '16px', fontWeight: '900', cursor: 'pointer' }}>Entendido</button>
+          </div>
+        </div>
+      )}
       {avisoLimite && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
           <div style={{ background: '#1A1A1E', borderRadius: '24px', padding: '32px 24px', width: '100%', maxWidth: '380px', border: '1px solid #FF7A2F', textAlign: 'center', position: 'relative' }}>
