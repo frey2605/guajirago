@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1080 1080" width="1080" height="1080">
+  <defs><linearGradient id="g" x1="10%" y1="90%" x2="90%" y2="5%">
+      <stop offset="0%" stop-color="#FFCF4D"/>
+      <stop offset="40%" stop-color="#FF7A2F"/>
+      <stop offset="100%" stop-color="#D6357E"/>
+    </linearGradient></defs>
+  
+  <rect width="1080" height="1080" fill="url(#g)"/>
+  <g transform="translate(540,430) scale(3.0)">
+    <g transform="translate(-48,-70)">
+    <path fill-rule="evenodd" fill="#FFFFFF" d="M 52 88 C 30 88, 14 74, 14 55 C 14 36, 28 24, 42 20 C 50 17, 58 16, 62 10 C 64 6, 63 2, 63 2 C 72 10, 76 22, 72 34 C 70 40, 66 45, 62 48 L 82 48 L 82 56 C 82 73, 69 88, 52 88 Z M 52 78 C 36 78, 26 68, 26 55 C 26 42, 35 33, 46 30 C 53 27, 60 26, 64 20 C 66 30, 62 38, 56 42 L 70 42 L 70 56 C 70 63, 62 78, 52 78 Z"/>
+    <rect x="44" y="51" width="10" height="10" transform="rotate(45 49 56)" fill="#FFFFFF"/>
+  </g>
+  </g>
+  <text x="540" y="720" text-anchor="middle" font-family="'Arial Black','Helvetica Neue',Arial,sans-serif" font-weight="900" font-size="150" letter-spacing="-4.5" fill="#FFFFFF">Guajira<tspan fill="#FFFFFF" font-size="153">GO</tspan></text>
+  <text x="540" y="800" text-anchor="middle" font-family="Arial,sans-serif" font-weight="700" font-size="30" letter-spacing="10" fill="rgba(255,255,255,0.9)">VIVE  •  DESCUBRE  •  CONECTA</text>
+</svg>

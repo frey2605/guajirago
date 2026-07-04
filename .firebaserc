@@ -1,0 +1,15 @@
+{
+  "projects": {
+    "default": "guajirago"
+  },
+  "targets": {
+    "guajirago": {
+      "hosting": {
+        "admin": [
+          "guajirago-admin"
+        ]
+      }
+    }
+  },
+  "etags": {}
+}

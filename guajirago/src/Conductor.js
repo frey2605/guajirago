@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { GoogleMap, LoadScript, Marker } from '@react-google-maps/api';
 import Calificacion from './Calificacion';
+import Logo from './Logo';
 
 const GOOGLE_MAPS_KEY = 'AIzaSyDCo-KBq_QWq18FbKy3otxItajq8cKvtXY';
 
@@ -74,10 +75,12 @@ function Conductor({ tipo, onCancelar }) {
 
   return (
     <div style={{
-      backgroundColor: '#141416',
+      backgroundColor: '#FFFFFF',
       minHeight: '100vh',
       fontFamily: 'Arial, sans-serif',
+      position: 'relative',
     }}>
+      <Logo size={28} style={{ position: 'absolute', top: '14px', right: '16px', zIndex: 6 }} />
 
       {/* Mapa real de Google */}
       <LoadScript googleMapsApiKey={GOOGLE_MAPS_KEY}>
@@ -113,7 +116,8 @@ function Conductor({ tipo, onCancelar }) {
       {/* Card conductor */}
       <div style={{
         margin: '-20px 16px 0',
-        background: '#1A1A1E',
+        background: '#FFFFFF',
+        border: '1.5px solid #ECECEF',
         borderRadius: '24px',
         padding: '24px',
         boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
@@ -122,7 +126,8 @@ function Conductor({ tipo, onCancelar }) {
       }}>
         {/* Tiempo */}
         <div style={{
-          background: '#141416',
+          background: '#FFFFFF',
+          border: '1.5px solid #ECECEF',
           borderRadius: '16px',
           padding: '12px 16px',
           display: 'flex',
@@ -131,7 +136,7 @@ function Conductor({ tipo, onCancelar }) {
           marginBottom: '20px',
         }}>
           <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#2ECC71' }}/>
-          <span style={{ color: '#FFFFFF', fontSize: '14px', fontWeight: 'bold' }}>
+          <span style={{ color: '#1A1A1E', fontSize: '14px', fontWeight: 'bold' }}>
             En camino · {minutos}:{segs.toString().padStart(2, '0')}
           </span>
         </div>
@@ -147,22 +152,24 @@ function Conductor({ tipo, onCancelar }) {
             👨🏽
           </div>
           <div style={{ flex: 1 }}>
-            <p style={{ color: '#FFFFFF', fontWeight: '900', fontSize: '18px', margin: '0' }}>Carlos Epieyu</p>
-            <p style={{ color: '#FFCF4D', fontSize: '14px', margin: '4px 0 0' }}>⭐ 4.9 · 312 viajes</p>
+            <p style={{ color: '#1A1A1E', fontWeight: '900', fontSize: '18px', margin: '0' }}>Carlos Epieyu</p>
+            <p style={{ color: '#FF7A2F', fontSize: '14px', margin: '4px 0 0' }}>⭐ 4.9 · 312 viajes</p>
           </div>
           <div style={{
-            background: '#141416',
+            background: '#FFFFFF',
+            border: '1.5px solid #ECECEF',
             borderRadius: '12px',
             padding: '8px 14px',
             textAlign: 'center',
           }}>
-            <p style={{ color: '#555', fontSize: '9px', margin: '0', letterSpacing: '1px' }}>PLACA</p>
-            <p style={{ color: '#FFCF4D', fontSize: '16px', fontWeight: '900', margin: '2px 0 0' }}>GUA 123</p>
+            <p style={{ color: '#6B7280', fontSize: '9px', margin: '0', letterSpacing: '1px' }}>PLACA</p>
+            <p style={{ color: '#FF7A2F', fontSize: '16px', fontWeight: '900', margin: '2px 0 0' }}>GUA 123</p>
           </div>
         </div>
 
         <div style={{
-          background: '#141416',
+          background: '#FFFFFF',
+          border: '1.5px solid #ECECEF',
           borderRadius: '16px',
           padding: '16px',
           display: 'flex',
@@ -170,31 +177,31 @@ function Conductor({ tipo, onCancelar }) {
           marginBottom: '20px',
         }}>
           <div style={{ textAlign: 'center' }}>
-            <p style={{ color: '#555', fontSize: '10px', margin: '0', letterSpacing: '1px' }}>VEHÍCULO</p>
-            <p style={{ color: '#FFFFFF', fontSize: '13px', fontWeight: 'bold', margin: '4px 0 0' }}>
+            <p style={{ color: '#6B7280', fontSize: '10px', margin: '0', letterSpacing: '1px' }}>VEHÍCULO</p>
+            <p style={{ color: '#1A1A1E', fontSize: '13px', fontWeight: 'bold', margin: '4px 0 0' }}>
               {tipo === 'Taxi' ? 'Chevrolet Spark' : 'Honda CB125'}
             </p>
           </div>
-          <div style={{ width: '1px', background: '#2A2A2E' }}/>
+          <div style={{ width: '1px', background: '#ECECEF' }}/>
           <div style={{ textAlign: 'center' }}>
-            <p style={{ color: '#555', fontSize: '10px', margin: '0', letterSpacing: '1px' }}>LLEGA EN</p>
+            <p style={{ color: '#6B7280', fontSize: '10px', margin: '0', letterSpacing: '1px' }}>LLEGA EN</p>
             <p style={{ color: '#FF7A2F', fontSize: '20px', fontWeight: '900', margin: '4px 0 0' }}>
               {minutos}:{segs.toString().padStart(2, '0')}
             </p>
           </div>
-          <div style={{ width: '1px', background: '#2A2A2E' }}/>
+          <div style={{ width: '1px', background: '#ECECEF' }}/>
           <div style={{ textAlign: 'center' }}>
-            <p style={{ color: '#555', fontSize: '10px', margin: '0', letterSpacing: '1px' }}>TARIFA</p>
-            <p style={{ color: '#FFFFFF', fontSize: '13px', fontWeight: 'bold', margin: '4px 0 0' }}>$5.000</p>
+            <p style={{ color: '#6B7280', fontSize: '10px', margin: '0', letterSpacing: '1px' }}>TARIFA</p>
+            <p style={{ color: '#1A1A1E', fontSize: '13px', fontWeight: 'bold', margin: '4px 0 0' }}>$5.000</p>
           </div>
         </div>
 
         <div style={{ display: 'flex', gap: '12px' }}>
           <button style={{
             flex: 1, padding: '14px',
-            background: '#141416',
-            border: 'none', borderRadius: '14px',
-            color: '#FFFFFF', fontSize: '14px',
+            background: '#FFFFFF',
+            border: '1.5px solid #ECECEF', borderRadius: '14px',
+            color: '#1A1A1E', fontSize: '14px',
             fontWeight: 'bold', cursor: 'pointer',
             display: 'flex', alignItems: 'center',
             justifyContent: 'center', gap: '8px',
@@ -205,7 +212,7 @@ function Conductor({ tipo, onCancelar }) {
             flex: 1, padding: '14px',
             background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F)',
             border: 'none', borderRadius: '14px',
-            color: '#141416', fontSize: '14px',
+            color: '#FFFFFF', fontSize: '14px',
             fontWeight: 'bold', cursor: 'pointer',
             display: 'flex', alignItems: 'center',
             justifyContent: 'center', gap: '8px',
@@ -218,9 +225,9 @@ function Conductor({ tipo, onCancelar }) {
           width: '100%', marginTop: '12px',
           padding: '14px',
           background: 'transparent',
-          border: '1px solid #2A2A2E',
+          border: '1px solid #ECECEF',
           borderRadius: '14px',
-          color: '#555', fontSize: '14px',
+          color: '#6B7280', fontSize: '14px',
           cursor: 'pointer',
         }}>
           Cancelar viaje

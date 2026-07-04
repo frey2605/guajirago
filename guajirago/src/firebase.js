@@ -1,6 +1,8 @@
 import { initializeApp } from "firebase/app";
-import { getFirestore } from "firebase/firestore";
-import { getAuth } from "firebase/auth";
+import { getFirestore, enableIndexedDbPersistence } from "firebase/firestore";
+import { initializeAuth, browserLocalPersistence } from "firebase/auth";
+import { getMessaging } from "firebase/messaging";
+import { getStorage } from "firebase/storage";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCP9QFCiJ-ugqpowMedEdabxTcg4tC0X2A",
@@ -14,4 +16,9 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
-export const auth = getAuth(app);
+export const auth = initializeAuth(app, { persistence: browserLocalPersistence });
+auth.settings.appVerificationDisabledForTesting = false;
+export const messaging = getMessaging(app);
+export const storage = getStorage(app);
+
+enableIndexedDbPersistence(db).catch(() => {});

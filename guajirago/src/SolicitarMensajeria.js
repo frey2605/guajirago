@@ -25,6 +25,7 @@ const CONFIG_APP_DEFECTO = {
 
 // Calcula la tarifa mínima usando la config recibida (o los valores por defecto)
 function calcularTarifaMinima(tipo, cfg = CONFIG_APP_DEFECTO) {
+  if (tipo === 'Mensajería') return cfg.tarifaMinimaMensajeria || 5000;
   if (tipo === 'Mototaxi') return cfg.tarifaMinimaMototaxi;
   const hora = new Date().getHours();
   const inicioNoche = cfg.horaInicioNoche;
@@ -399,9 +400,16 @@ function MapaPasajero({ ubicacionPasajero, ubicacionConductor, tipo, onTiempo })
   return <div ref={mapRef} style={{ width: '100%', height: '100vh' }} />;
 }
 
-function Solicitar({ tipo, onVolver, destinoInicial }) {
+function SolicitarMensajeria({ onVolver, destinoInicial }) {
+  const tipo = 'Mensajería';
   const [origen, setOrigen] = useState('');
   const [destino, setDestino] = useState(destinoInicial || '');
+  // NUEVO (mensajería): datos del paquete
+  const [queEnvia, setQueEnvia] = useState('');
+  const [recibeNombre, setRecibeNombre] = useState('');
+  const [recibeTel, setRecibeTel] = useState('');
+  const [notaEnvio, setNotaEnvio] = useState('');
+  const [avisoFaltan, setAvisoFaltan] = useState(null);
   const [favoritos, setFavoritos] = useState([]);
   const [avisoLimite, setAvisoLimite] = useState(false);
   const [pantalla, setPantalla] = useState('solicitar');
@@ -846,7 +854,14 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
   const bajarTarifa = () => setTarifa(t => Math.max(TARIFA_MINIMA, t - configApp.incrementoTarifa));
 
   const solicitarViaje = async () => {
-    if (!origen || !destino) { setError('Por favor escribe el origen y destino'); return; }
+    const faltan = [];
+    if (!origen) faltan.push('Dónde se recoge');
+    if (!destino) faltan.push('Dónde se entrega');
+    if (!queEnvia.trim()) faltan.push('Qué vas a enviar');
+    if (!recibeNombre.trim()) faltan.push('Nombre de quien recibe');
+    if (recibeTel.trim().length !== 10) faltan.push('Teléfono de quien recibe (10 números)');
+    if (!notaEnvio.trim()) faltan.push('Nota para el domiciliario');
+    if (faltan.length > 0) { setAvisoFaltan(faltan); return; }
     activarAudioiOS();
     precargarAudio();
     setCargando(true); setError('');
@@ -913,6 +928,7 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
         codigoSeguridad: codigoSeguridad,
         pasajeroLat: coordsRecogida.lat, pasajeroLng: coordsRecogida.lng,
         tipo, origen, destino, estado: 'esperando',
+        mensajeria: { queEnvia: queEnvia.trim(), recibeNombre: recibeNombre.trim(), recibeTel: recibeTel.trim(), nota: notaEnvio.trim() },
         tarifa: `$${tarifa.toLocaleString()}`, tarifaValor: tarifa,
         ...(datosDescuento ? { descuentoInfo: datosDescuento } : {}),
         fechaSolicitud: new Date().toISOString(),
@@ -1043,6 +1059,14 @@ const PanelEmergencia = () => (
       </div>
     ) : null
   );
+  const resumenMandado = (tipo === 'Mensajería') ? (
+    <div style={{ background: '#FFFFFF', borderRadius: '14px', padding: '12px 14px', margin: '0 0 16px', border: '1px solid #FF7A2F', width: '100%', maxWidth: '400px', boxSizing: 'border-box' }}>
+      <p style={{ color: '#FF7A2F', fontSize: '11px', margin: '0 0 6px', letterSpacing: '1px', fontWeight: '900' }}>📦 TU MANDADO</p>
+      {queEnvia && <p style={{ color: '#1A1A1E', fontSize: '14px', margin: '0 0 3px', fontWeight: 'bold' }}>📦 Envías: {queEnvia}</p>}
+      {recibeNombre && <p style={{ color: '#1A1A1E', fontSize: '14px', margin: '0 0 3px' }}>🙋 Recibe: {recibeNombre}{recibeTel ? ` · 📞 ${recibeTel}` : ''}</p>}
+      {notaEnvio && <p style={{ color: '#FF7A2F', fontSize: '13px', margin: '0', fontWeight: 'bold' }}>📝 {notaEnvio}</p>}
+    </div>
+  ) : null;
   if (mostrarCalificacion) return <Calificacion tipo={tipo} viajeId={viajeId} nombreCalificado={viaje?.conductorNombre} calificadoId={viaje?.conductorId} quienCalifica="pasajero" onFinalizar={onVolver} />;
   if (celebrando) return <Celebracion />;
   if (llamandoConductor) return <Llamada viajeId={viajeId} miRol="pasajero" nombreOtro={viaje?.conductorNombre || 'Conductor'} onCerrar={() => setLlamandoConductor(false)} />;
@@ -1235,6 +1259,8 @@ const PanelEmergencia = () => (
               <p style={{ color: '#6B7280', fontSize: '11px', margin: '4px 0 0' }}>Dáselo al conductor al finalizar</p>
             </div>
           )}
+          {resumenMandado}
+          <button onClick={() => setLlamandoConductor(true)} style={{ width: '100%', marginBottom: '10px', padding: '13px', background: 'linear-gradient(135deg, #2ECC71, #27AE60)', border: 'none', borderRadius: '14px', color: '#FFFFFF', fontSize: '14px', fontWeight: 'bold', cursor: 'pointer' }}>📞 Llamar al conductor</button>
           <p style={{ color: '#6B7280', fontSize: '11px', letterSpacing: '2px', margin: '12px 0 8px' }}>RESPUESTAS RÁPIDAS</p>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '10px' }}>
             {RESPUESTAS_RAPIDAS.map((resp, i) => (
@@ -1271,6 +1297,7 @@ const PanelEmergencia = () => (
         <div style={{ fontSize: '80px', marginBottom: '24px' }}>{buscandoAgotado ? '😕' : (tipo === 'Taxi' ? '🚗' : '🏍️')}</div>
         <h2 style={{ color: '#1A1A1E', fontSize: '22px', margin: '0 0 8px', textAlign: 'center' }}>{buscandoAgotado ? 'No encontramos conductor' : 'Buscando conductor...'}</h2>
         <p style={{ color: '#6B7280', fontSize: '14px', margin: '0 0 4px', textAlign: 'center' }}>{origen} → {destino}</p>
+        {resumenMandado}
         {!buscandoAgotado && (
           <p style={{ color: '#2ECC71', fontSize: '20px', fontWeight: '900', margin: '0 0 16px', textAlign: 'center' }}>
             Tu oferta: ${tarifa.toLocaleString()}
@@ -1332,6 +1359,24 @@ const PanelEmergencia = () => (
 
   return (
     <div style={{ backgroundColor: '#FFFFFF', minHeight: '100vh', fontFamily: 'Arial, sans-serif' }}>
+      {avisoFaltan && (
+        <div onClick={() => setAvisoFaltan(null)} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
+          <div onClick={e => e.stopPropagation()} style={{ background: '#FFFFFF', borderRadius: '24px', padding: '28px 24px', width: '100%', maxWidth: '400px', border: '2px solid #FF7A2F' }}>
+            <div style={{ fontSize: '48px', textAlign: 'center', marginBottom: '8px' }}>📋</div>
+            <p style={{ color: '#FF7A2F', fontSize: '13px', margin: '0 0 6px', letterSpacing: '2px', fontWeight: 'bold', textAlign: 'center' }}>TE FALTAN DATOS</p>
+            <p style={{ color: '#1A1A1E', fontSize: '18px', fontWeight: '900', margin: '0 0 18px', textAlign: 'center' }}>Completa esto para enviar tu mandado:</p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '22px' }}>
+              {avisoFaltan.map((f, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '10px', background: '#FFFFFF', borderRadius: '12px', padding: '12px 14px' }}>
+                  <span style={{ fontSize: '18px' }}>❌</span>
+                  <span style={{ color: '#1A1A1E', fontSize: '15px', fontWeight: 'bold' }}>{f}</span>
+                </div>
+              ))}
+            </div>
+            <button onClick={() => setAvisoFaltan(null)} style={{ width: '100%', padding: '16px', background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)', border: 'none', borderRadius: '14px', color: '#1A1A1E', fontSize: '16px', fontWeight: '900', cursor: 'pointer' }}>Entendido</button>
+          </div>
+        </div>
+      )}
       {avisoLimite && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
           <div style={{ background: '#FFFFFF', borderRadius: '24px', padding: '32px 24px', width: '100%', maxWidth: '380px', border: '1px solid #FF7A2F', textAlign: 'center', position: 'relative' }}>
@@ -1345,14 +1390,14 @@ const PanelEmergencia = () => (
       )}
       <div style={{ background: '#FFFFFF', padding: '12px 20px', display: 'flex', alignItems: 'center', gap: '16px', position: 'relative', borderBottom: '1px solid #ECECEF' }}>
         <div onClick={onVolver} style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(0,0,0,0.06)', borderRadius: '12px', color: '#1A1A1E', fontSize: '14px', fontWeight: '500', padding: '8px 16px', cursor: 'pointer' }}><span style={{ fontSize: '22px', fontWeight: '900', lineHeight: '1', position: 'relative', top: '-1px' }}>‹</span> Volver</div>
-        <h2 style={{ color: '#1A1A1E', margin: '0', fontSize: '20px' }}>Solicitar {tipo}</h2>
+        <h2 style={{ color: '#1A1A1E', margin: '0', fontSize: '20px' }}>Pedir mandado 📦</h2>
         <Logo size={26} style={{ position: 'absolute', top: '12px', right: '16px' }} />
       </div>
       <div style={{ padding: '12px 20px 24px' }}>
-        <AutocompleteInput value={origen} onChange={(v) => { setOrigen(v); pinActivoRef.current = false; }} placeholder="¿Dónde estás? (Riohacha)" icon="origen" onPlaceCoords={(coords) => { setPuntoRecogida(coords); setCentroMapa(coords); pinActivoRef.current = true; }} />
+        <AutocompleteInput value={origen} onChange={(v) => { setOrigen(v); pinActivoRef.current = false; }} placeholder="¿Dónde se recoge? (Riohacha)" icon="origen" onPlaceCoords={(coords) => { setPuntoRecogida(coords); setCentroMapa(coords); pinActivoRef.current = true; }} />
         <div style={{ display: 'flex', alignItems: 'stretch', gap: '8px' }}>
           <div style={{ flex: 1 }}>
-            <AutocompleteInput value={destino} onChange={setDestino} placeholder="¿A dónde vas? (Riohacha)" icon="destino" />
+            <AutocompleteInput value={destino} onChange={setDestino} placeholder="¿Dónde se entrega? (Riohacha)" icon="destino" />
           </div>
           {destino && !favoritos.find(f => f.direccion === destino) && (
             <div onClick={guardarFavorito} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F)', borderRadius: '16px', padding: '0 14px', marginBottom: '12px', cursor: 'pointer', flexShrink: 0 }}>
@@ -1368,6 +1413,25 @@ const PanelEmergencia = () => (
           ubicacionInicial={centroMapa}
           onCambioPunto={(punto, direccion) => { setPuntoRecogida(punto); pinActivoRef.current = true; if (direccion) setOrigen(direccion); }}
         />
+
+        {/* NUEVO (mensajería): datos del envío */}
+        <p style={{ color: '#1A1A1E', fontSize: '11px', letterSpacing: '2px', margin: '4px 0 8px' }}>DATOS DEL ENVÍO</p>
+        <div style={{ background: '#FFFFFF', border: '1.5px solid #ECECEF', borderRadius: '14px', padding: '10px 14px', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <span style={{ fontSize: '18px' }}>📦</span>
+          <input value={queEnvia} onChange={e => setQueEnvia(e.target.value)} placeholder="¿Qué envías? (ej: una caja)" style={{ background: 'none', border: 'none', outline: 'none', color: '#1A1A1E', fontSize: '16px', width: '100%' }} />
+        </div>
+        <div style={{ background: '#FFFFFF', border: '1.5px solid #ECECEF', borderRadius: '14px', padding: '10px 14px', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <span style={{ fontSize: '18px' }}>🙋</span>
+          <input value={recibeNombre} onChange={e => setRecibeNombre(e.target.value.toUpperCase())} placeholder="NOMBRE DE QUIEN RECIBE" style={{ background: 'none', border: 'none', outline: 'none', color: '#1A1A1E', fontSize: '16px', width: '100%', textTransform: 'uppercase' }} />
+        </div>
+        <div style={{ background: '#FFFFFF', border: '1.5px solid #ECECEF', borderRadius: '14px', padding: '10px 14px', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <span style={{ fontSize: '18px' }}>📞</span>
+          <input value={recibeTel} onChange={e => setRecibeTel(e.target.value.replace(/\D/g, '').slice(0, 10))} placeholder="Teléfono (10 números)" type="tel" inputMode="numeric" maxLength={10} style={{ background: 'none', border: 'none', outline: 'none', color: '#1A1A1E', fontSize: '16px', width: '100%' }} />
+        </div>
+        <div style={{ background: '#FFFFFF', border: '1.5px solid #ECECEF', borderRadius: '14px', padding: '10px 14px', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <span style={{ fontSize: '18px' }}>📝</span>
+          <input value={notaEnvio} onChange={e => setNotaEnvio(e.target.value)} placeholder="Nota para el domiciliario (ej: dejar en portería)" style={{ background: 'none', border: 'none', outline: 'none', color: '#1A1A1E', fontSize: '16px', width: '100%' }} />
+        </div>
 
         {favoritos.length > 0 && (
           <div style={{ marginBottom: '20px' }}>
@@ -1411,11 +1475,11 @@ const PanelEmergencia = () => (
         </div>
         {error && <p style={{ color: '#FF4444', fontSize: '13px', textAlign: 'center', marginBottom: '12px' }}>{error}</p>}
         <button onClick={solicitarViaje} style={{ width: '100%', padding: '13px', background: cargando ? '#ECECEF' : 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)', border: 'none', borderRadius: '14px', color: cargando ? '#6B7280' : '#FFFFFF', fontSize: '16px', fontWeight: '900', cursor: cargando ? 'default' : 'pointer' }}>
-          {cargando ? 'Enviando...' : `Solicitar ${tipo} — $${tarifa.toLocaleString()}`}
+          {cargando ? 'Enviando...' : `Pedir mandado — $${tarifa.toLocaleString()}`}
         </button>
       </div>
     </div>
   );
 }
 
-export default Solicitar;
+export default SolicitarMensajeria;

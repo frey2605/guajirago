@@ -1,90 +1,334 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Solicitar from './Solicitar';
-import { auth } from './firebase';
-import { signOut } from 'firebase/auth';
+import Restaurantes from './Restaurantes';
+import MenuLateral from './MenuLateral';
+import MiPerfil from './MiPerfil';
+import Seguridad from './Seguridad';
+import Creditos from './Creditos';
+import AyudaSoporte from './AyudaSoporte';
+import Configuracion from './Configuracion';
+import Promociones from './Promociones';
+import Logo from './Logo';
+import { auth, db } from './firebase';
+import { collection, query, where, limit, getDocs, doc, getDoc, onSnapshot, updateDoc } from 'firebase/firestore';
 
-function Home({ nombre }) {
+const ICONOS_FAVORITOS = ['🏠', '💼', '❤️', '⭐', '🏥', '🏫', '🛒', '🏖️', '⛪', '🏋️'];
+
+const BOUNDS_RIOHACHA = { north: 11.7, south: 11.3, east: -72.6, west: -73.0 };
+
+function ModalFavorito({ onGuardar, onCerrar }) {
+  const [nombre, setNombre] = useState('');
+  const [direccion, setDireccion] = useState('');
+  const [icono, setIcono] = useState('⭐');
+  const inputDireccionRef = useRef(null);
+  const autocompleteRef = useRef(null);
+
+  useEffect(() => {
+    if (!inputDireccionRef.current || !window.google) return;
+    autocompleteRef.current = new window.google.maps.places.Autocomplete(inputDireccionRef.current, {
+      componentRestrictions: { country: 'co' },
+      bounds: new window.google.maps.LatLngBounds(
+        new window.google.maps.LatLng(BOUNDS_RIOHACHA.south, BOUNDS_RIOHACHA.west),
+        new window.google.maps.LatLng(BOUNDS_RIOHACHA.north, BOUNDS_RIOHACHA.east)
+      ),
+      strictBounds: true,
+      types: ['establishment', 'geocode'],
+    });
+    autocompleteRef.current.addListener('place_changed', () => {
+      const place = autocompleteRef.current.getPlace();
+      if (place && place.name) setDireccion(place.name);
+    });
+  }, []);
+
+  return (
+    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', zIndex: 999, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+      <div style={{ background: '#FFFFFF', border: '1.5px solid #ECECEF', borderRadius: '24px 24px 0 0', padding: '28px 24px', width: '100%', maxWidth: '480px' }}>
+        <p style={{ color: '#1A1A1E', fontSize: '18px', fontWeight: '900', margin: '0 0 20px', textAlign: 'center' }}>Agregar lugar favorito</p>
+        <p style={{ color: '#6B7280', fontSize: '12px', margin: '0 0 10px', letterSpacing: '1px' }}>ÍCONO</p>
+        <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', flexWrap: 'wrap' }}>
+          {ICONOS_FAVORITOS.map(i => (
+            <div key={i} onClick={() => setIcono(i)} style={{ width: '44px', height: '44px', borderRadius: '12px', background: icono === i ? 'linear-gradient(135deg, #FFCF4D, #FF7A2F)' : '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '22px', cursor: 'pointer', border: icono === i ? 'none' : '1px solid #ECECEF' }}>
+              {i}
+            </div>
+          ))}
+        </div>
+        <p style={{ color: '#6B7280', fontSize: '12px', margin: '0 0 8px', letterSpacing: '1px' }}>NOMBRE (ej: Casa, Trabajo, Mamá)</p>
+        <input value={nombre} onChange={e => setNombre(e.target.value)} placeholder="¿Cómo lo llamas?" style={{ width: '100%', padding: '14px 16px', background: '#FFFFFF', border: '1px solid #ECECEF', borderRadius: '14px', color: '#1A1A1E', fontSize: '16px', outline: 'none', marginBottom: '12px', boxSizing: 'border-box' }} />
+        <p style={{ color: '#6B7280', fontSize: '12px', margin: '0 0 8px', letterSpacing: '1px' }}>DIRECCIÓN</p>
+        <input ref={inputDireccionRef} value={direccion} onChange={e => setDireccion(e.target.value)} placeholder="Escribe la dirección o lugar" style={{ width: '100%', padding: '14px 16px', background: '#FFFFFF', border: '1px solid #ECECEF', borderRadius: '14px', color: '#1A1A1E', fontSize: '16px', outline: 'none', marginBottom: '20px', boxSizing: 'border-box' }} />
+        <div style={{ display: 'flex', gap: '12px' }}>
+          <button onClick={onCerrar} style={{ flex: 1, padding: '14px', background: '#FFFFFF', border: '1px solid #ECECEF', borderRadius: '14px', color: '#6B7280', fontSize: '14px', cursor: 'pointer' }}>Cancelar</button>
+          <button onClick={() => nombre && direccion && onGuardar({ nombre, direccion, icono })} style={{ flex: 2, padding: '14px', background: nombre && direccion ? 'linear-gradient(135deg, #FFCF4D, #FF7A2F)' : '#ECECEF', border: 'none', borderRadius: '14px', color: nombre && direccion ? '#FFFFFF' : '#6B7280', fontSize: '14px', fontWeight: '900', cursor: nombre && direccion ? 'pointer' : 'default' }}>Guardar</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Historial({ onVolver }) {
+  const [viajes, setViajes] = useState([]);
+  const [cargando, setCargando] = useState(true);
+
+  useEffect(() => {
+    const cargar = async () => {
+      try {
+        const user = auth.currentUser;
+        if (!user) return;
+        const q = query(collection(db, 'viajes'), where('pasajeroId', '==', user.uid), limit(50));
+        const snap = await getDocs(q);
+        const lista = snap.docs
+          .map(d => ({ id: d.id, ...d.data() }))
+          .filter(v => v.estado === 'finalizado' || v.estado === 'cancelado')
+          .sort((a, b) => new Date(b.fechaSolicitud) - new Date(a.fechaSolicitud));
+        setViajes(lista);
+      } catch (e) {}
+      setCargando(false);
+    };
+    cargar();
+  }, []);
+
+  return (
+    <div style={{ backgroundColor: '#FFFFFF', minHeight: '100vh', fontFamily: 'Arial, sans-serif' }}>
+      <div style={{ background: '#FFFFFF', padding: '24px 20px', position: 'relative', display: 'flex', alignItems: 'center' }}>
+        <div onClick={onVolver} style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(0,0,0,0.06)', borderRadius: '12px', color: '#1A1A1E', fontSize: '14px', fontWeight: '500', padding: '8px 16px', cursor: 'pointer' }}><span style={{ fontSize: '20px', fontWeight: '900', lineHeight: '1', position: 'relative', top: '-1px' }}>‹</span> Volver</div>
+        <h2 style={{ color: '#1A1A1E', margin: '0 auto', fontSize: '20px', fontWeight: '900' }}>Mis viajes</h2>
+        <Logo size={28} style={{ position: 'absolute', top: '16px', right: '16px' }} />
+      </div>
+      <div style={{ padding: '20px' }}>
+        {cargando && <p style={{ color: '#6B7280', textAlign: 'center', marginTop: '40px' }}>Cargando...</p>}
+        {!cargando && viajes.length === 0 && (
+          <div style={{ textAlign: 'center', marginTop: '60px' }}>
+            <p style={{ fontSize: '60px', margin: '0 0 16px' }}>🚗</p>
+            <p style={{ color: '#6B7280', fontSize: '15px' }}>Aún no tienes viajes</p>
+          </div>
+        )}
+        {viajes.map((v) => {
+          const fecha = v.fechaSolicitud ? new Date(v.fechaSolicitud).toLocaleDateString('es-CO', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
+          const cancelado = v.estado === 'cancelado';
+          return (
+            <div key={v.id} style={{ background: '#FFFFFF', borderRadius: '20px', padding: '20px', marginBottom: '12px', border: `1px solid ${cancelado ? '#2A1A1A' : '#1A2A1A'}` }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <span style={{ fontSize: '28px' }}>{v.tipo === 'Taxi' ? '🚗' : '🏍️'}</span>
+                  <div>
+                    <p style={{ color: '#1A1A1E', fontWeight: '900', fontSize: '15px', margin: '0' }}>{v.tipo}</p>
+                    <p style={{ color: '#6B7280', fontSize: '12px', margin: '3px 0 0' }}>{fecha}</p>
+                  </div>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <p style={{ color: cancelado ? '#FF4444' : '#2ECC71', fontSize: '13px', fontWeight: 'bold', margin: '0' }}>{cancelado ? 'Cancelado' : 'Completado'}</p>
+                  <p style={{ color: '#1A1A1E', fontSize: '18px', fontWeight: '900', margin: '4px 0 0' }}>{v.tarifa}</p>
+                </div>
+              </div>
+              <div style={{ background: '#FFFFFF', border: '1px solid #ECECEF', borderRadius: '12px', padding: '12px' }}>
+                <div style={{ display: 'flex', gap: '8px', marginBottom: '6px' }}>
+                  <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#2ECC71', marginTop: '3px', flexShrink: 0 }}/>
+                  <p style={{ color: '#1A1A1E', fontSize: '13px', margin: '0' }}>{v.origen}</p>
+                </div>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <div style={{ width: '10px', height: '10px', borderRadius: '2px', background: '#FF7A2F', marginTop: '3px', flexShrink: 0 }}/>
+                  <p style={{ color: '#1A1A1E', fontSize: '13px', margin: '0' }}>{v.destino}</p>
+                </div>
+              </div>
+              {v.conductorNombre && <p style={{ color: '#6B7280', fontSize: '12px', margin: '10px 0 0' }}>Conductor: <span style={{ color: '#FF7A2F' }}>{v.conductorNombre}</span></p>}
+              {cancelado && v.razonCancelacion && <p style={{ color: '#6B7280', fontSize: '12px', margin: '4px 0 0' }}>Razón: {v.razonCancelacion}</p>}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+const STORAGE_FAVORITOS = 'guajirago_favoritos';
+const STORAGE_RECIENTES = 'guajirago_recientes';
+
+function cargarFavoritos() { try { return JSON.parse(localStorage.getItem(STORAGE_FAVORITOS)) || []; } catch(e) { return []; } }
+function guardarFavoritos(f) { try { localStorage.setItem(STORAGE_FAVORITOS, JSON.stringify(f)); } catch(e) {} }
+function cargarRecientes() { try { return JSON.parse(localStorage.getItem(STORAGE_RECIENTES)) || []; } catch(e) { return []; } }
+function guardarReciente(destino) {
+  try {
+    const recientes = cargarRecientes().filter(r => r !== destino);
+    recientes.unshift(destino);
+    localStorage.setItem(STORAGE_RECIENTES, JSON.stringify(recientes.slice(0, 5)));
+  } catch(e) {}
+}
+
+function Home({ nombre, onCerrarSesion, onVolver }) {
   const [pantalla, setPantalla] = useState('home');
+  const [verPerfil, setVerPerfil] = useState(false);
+  const [verSeguridad, setVerSeguridad] = useState(false);
+  const [verCreditos, setVerCreditos] = useState(false);
+  const [verAyuda, setVerAyuda] = useState(false);
+  const [verConfig, setVerConfig] = useState(false);
+  const [verPromociones, setVerPromociones] = useState(false);
   const [tipoSeleccionado, setTipoSeleccionado] = useState('');
+  const [destinoPredefinido, setDestinoPredefinido] = useState('');
+  const [favoritos, setFavoritos] = useState(cargarFavoritos());
+  const [, setRecientes] = useState(cargarRecientes());
+  const [mostrarModalFavorito, setMostrarModalFavorito] = useState(false);
+  const [llamadoAtención, setLlamadoAtencion] = useState(null);
+  const [puedeCerrarLlamado, setPuedeCerrarLlamado] = useState(false);
 
-  const cerrarSesion = async () => {
-    await signOut(auth);
-    window.location.reload();
+  const [fotoUsuario, setFotoUsuario] = useState(null);
+
+  // Listener de llamado de atención
+  useEffect(() => {
+    const user = auth.currentUser;
+    if (!user) return;
+    
+    const unsub = onSnapshot(doc(db, 'usuarios', user.uid), (snap) => {
+      if (!snap.exists()) return;
+      const data = snap.data();
+      if (data.llamadoPendiente && pantalla === 'home') {
+        setLlamadoAtencion(data.llamadoPendiente);
+        setPuedeCerrarLlamado(false);
+        setTimeout(() => setPuedeCerrarLlamado(true), 8000);
+      }
+    });
+    return () => unsub();
+  }, [pantalla]);
+
+  const cerrarLlamado = async () => {
+    if (!puedeCerrarLlamado) return;
+    try {
+      const user = auth.currentUser;
+      
+      await updateDoc(doc(db, 'usuarios', user.uid), { llamadoPendiente: null });
+    } catch(e) {}
+    setLlamadoAtencion(null);
+  };
+
+  useEffect(() => {
+    const cargar = async () => {
+      try {
+        const user = auth.currentUser;
+        if (!user) return;
+        const snap = await getDoc(doc(db, 'usuarios', user.uid));
+        if (snap.exists()) setFotoUsuario(snap.data().fotoConductor || snap.data().foto || null);
+      } catch (e) {}
+    };
+    cargar();
+  }, []);
+
+  const irASolicitar = (tipo, destino = '') => {
+    if (destino) guardarReciente(destino);
+    setRecientes(cargarRecientes());
+    setTipoSeleccionado(tipo);
+    setDestinoPredefinido(destino);
+    setPantalla('solicitar');
+  };
+
+  const agregarFavorito = ({ nombre, direccion, icono }) => {
+    const nuevos = [...favoritos, { nombre, direccion, icono }];
+    setFavoritos(nuevos);
+    guardarFavoritos(nuevos);
+    setMostrarModalFavorito(false);
   };
 
   if (pantalla === 'solicitar') {
-    return <Solicitar tipo={tipoSeleccionado} onVolver={() => setPantalla('home')} />;
+    return <Solicitar tipo={tipoSeleccionado} destinoInicial={destinoPredefinido} onVolver={() => setPantalla('home')} />;
+  }
+
+  if (pantalla === 'historial') {
+    return <Historial onVolver={() => setPantalla('home')} />;
+  }
+
+  if (pantalla === 'restaurantes') {
+    return <Restaurantes nombre={nombre} onVolver={() => setPantalla('home')} />;
+  }
+  if (verPerfil) {
+    return <MiPerfil onVolver={() => setVerPerfil(false)} />;
+  }
+  if (verSeguridad) {
+    return <Seguridad onVolver={() => setVerSeguridad(false)} />;
+  }
+  if (verCreditos) {
+    return <Creditos onVolver={() => setVerCreditos(false)} />;
+  }
+  if (verAyuda) {
+    return <AyudaSoporte onVolver={() => setVerAyuda(false)} />;
+  }
+  if (verConfig) {
+    return <Configuracion onVolver={() => setVerConfig(false)} onCerrarSesion={onCerrarSesion} />;
+  }
+  if (verPromociones) {
+    return <Promociones onVolver={() => setVerPromociones(false)} />;
   }
 
   return (
-    <div style={{ backgroundColor: '#141416', minHeight: '100vh', fontFamily: 'Arial, sans-serif' }}>
+    <div style={{ backgroundColor: '#FFFFFF', minHeight: '100vh', fontFamily: 'Arial, sans-serif' }}>
+      {mostrarModalFavorito && <ModalFavorito onGuardar={agregarFavorito} onCerrar={() => setMostrarModalFavorito(false)} />}
 
-      {/* Header */}
-      <div style={{
-        background: 'linear-gradient(135deg, #1A1A1E, #2A2A2E)',
-        padding: '24px 20px',
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'flex-start',
-      }}>
-        <div>
-          <p style={{ color: '#555', fontSize: '12px', margin: '0', letterSpacing: '2px' }}>UBICACIÓN</p>
-          <p style={{ color: '#FFFFFF', fontSize: '16px', margin: '4px 0 0', fontWeight: 'bold' }}>📍 Riohacha, La Guajira</p>
-          <h2 style={{ color: '#FFFFFF', fontSize: '22px', margin: '12px 0 0', fontWeight: '900' }}>
-            Hola, {nombre || 'pasajero'} 👋
-          </h2>
-          <p style={{ color: '#555', fontSize: '14px', margin: '4px 0 0' }}>¿A dónde vamos hoy?</p>
+      {llamadoAtención && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.92)', zIndex: 99999, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
+          <div style={{ background: '#FFFFFF', borderRadius: '28px', padding: '32px 24px', width: '100%', maxWidth: '420px', border: '3px solid #FF7A2F', textAlign: 'center' }}>
+            <div style={{ fontSize: '60px', marginBottom: '16px' }}>📢</div>
+            <p style={{ color: '#FF7A2F', fontSize: '12px', letterSpacing: '3px', fontWeight: 'bold', margin: '0 0 12px' }}>MENSAJE DE GUAJIRAGO</p>
+            <p style={{ color: '#1A1A1E', fontSize: '16px', lineHeight: '1.6', margin: '0 0 28px' }}>{llamadoAtención}</p>
+            <button onClick={cerrarLlamado} disabled={!puedeCerrarLlamado} style={{ width: '100%', padding: '16px', background: puedeCerrarLlamado ? 'linear-gradient(135deg, #FFCF4D, #FF7A2F)' : '#2A2A2E', border: 'none', borderRadius: '16px', color: puedeCerrarLlamado ? '#FFFFFF' : '#6B7280', fontSize: '16px', fontWeight: '900', cursor: puedeCerrarLlamado ? 'pointer' : 'default', transition: 'all 0.5s' }}>
+              {puedeCerrarLlamado ? 'Entendido ✓' : 'Lee el mensaje completo...'}
+            </button>
+          </div>
         </div>
-        <button onClick={cerrarSesion} style={{
-          background: '#141416',
-          border: 'none',
-          borderRadius: '12px',
-          padding: '10px 16px',
-          color: '#FF4444',
-          fontSize: '13px',
-          fontWeight: 'bold',
-          cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '6px',
-        }}>
-          🚪 Salir
-        </button>
+      )}
+
+      {llamadoAtención && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.92)', zIndex: 99999, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
+          <div style={{ background: '#FFFFFF', borderRadius: '28px', padding: '32px 24px', width: '100%', maxWidth: '420px', border: '3px solid #FF7A2F', textAlign: 'center' }}>
+            <div style={{ fontSize: '60px', marginBottom: '16px' }}>📢</div>
+            <p style={{ color: '#FF7A2F', fontSize: '12px', letterSpacing: '3px', fontWeight: 'bold', margin: '0 0 12px' }}>MENSAJE DE GUAJIRAGO</p>
+            <p style={{ color: '#1A1A1E', fontSize: '16px', lineHeight: '1.6', margin: '0 0 28px' }}>{llamadoAtención}</p>
+            <button
+              onClick={cerrarLlamado}
+              disabled={!puedeCerrarLlamado}
+              style={{ width: '100%', padding: '16px', background: puedeCerrarLlamado ? 'linear-gradient(135deg, #FFCF4D, #FF7A2F)' : '#2A2A2E', border: 'none', borderRadius: '16px', color: puedeCerrarLlamado ? '#FFFFFF' : '#6B7280', fontSize: '16px', fontWeight: '900', cursor: puedeCerrarLlamado ? 'pointer' : 'default', transition: 'all 0.5s' }}
+            >
+              {puedeCerrarLlamado ? 'Entendido ✓' : 'Lee el mensaje completo...'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div style={{ background: '#FFFFFF', padding: '24px 20px', position: 'relative' }}>
+        <MenuLateral nombre={nombre} foto={fotoUsuario} onIrPerfil={() => setVerPerfil(true)} onIrViajes={() => setPantalla('historial')} onIrCreditos={() => setVerCreditos(true)} onIrSeguridad={() => setVerSeguridad(true)} onIrAyuda={() => setVerAyuda(true)} onIrConfig={() => setVerConfig(true)} onIrPromociones={() => setVerPromociones(true)} onCerrarSesion={onCerrarSesion} />
+        <Logo size={34} style={{ position: 'absolute', top: '16px', right: '16px', zIndex: 5 }} />
+        <div onClick={onVolver} style={{ position: 'absolute', top: '18px', left: '120px', display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(0,0,0,0.06)', borderRadius: '12px', color: '#1A1A1E', fontSize: '14px', fontWeight: '500', padding: '8px 16px', cursor: 'pointer', zIndex: 5 }}><span style={{ fontSize: '20px', fontWeight: '900', lineHeight: '1' }}>‹</span> Volver</div>
+        <div style={{ marginTop: '48px' }}>
+          <p style={{ color: '#6B7280', fontSize: '12px', margin: '0', letterSpacing: '2px' }}>UBICACIÓN</p>
+          <p style={{ color: '#1A1A1E', fontSize: '16px', margin: '4px 0 0', fontWeight: 'bold' }}>📍 Riohacha, La Guajira</p>
+          <h2 style={{ color: '#1A1A1E', fontSize: '22px', margin: '12px 0 0', fontWeight: '900' }}>Hola, {nombre || 'pasajero'} 👋</h2>
+        </div>
       </div>
 
-      {/* Servicios */}
-      <div style={{ padding: '24px 20px' }}>
-        <p style={{ color: '#555', fontSize: '11px', letterSpacing: '3px', margin: '0 0 16px' }}>SERVICIOS</p>
-
-        {/* Taxi */}
-        <div onClick={() => { setTipoSeleccionado('Taxi'); setPantalla('solicitar'); }}
-          style={{
-            background: 'linear-gradient(135deg, #1A1A1E, #2A2A2E)',
-            borderRadius: '20px', padding: '20px', marginBottom: '12px',
-            display: 'flex', alignItems: 'center', gap: '16px',
-            border: '1px solid #2A2A2E', cursor: 'pointer',
-          }}>
-          <span style={{ fontSize: '36px' }}>🚗</span>
-          <div>
-            <p style={{ color: '#FFFFFF', fontWeight: '900', fontSize: '16px', margin: '0' }}>Taxi</p>
-            <p style={{ color: '#FF7A2F', fontSize: '12px', margin: '4px 0 0' }}>Disponible ahora</p>
+      <div style={{ padding: '20px' }}>
+        <p style={{ color: '#6B7280', fontSize: '11px', letterSpacing: '3px', margin: '0 0 12px' }}>¿QUÉ NECESITAS?</p>
+        <div style={{ display: 'flex', gap: '12px', marginBottom: '28px' }}>
+          <div onClick={() => irASolicitar('Taxi')} style={{ flex: 1, background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F)', borderRadius: '20px', padding: '20px 16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px', cursor: 'pointer', boxShadow: '0 4px 20px rgba(255,122,47,0.3)' }}>
+            <span style={{ fontSize: '44px' }}>🚗</span>
+            <p style={{ color: '#141416', fontWeight: '900', fontSize: '18px', margin: '0' }}>Taxi</p>
+            <p style={{ color: 'rgba(20,20,22,0.7)', fontSize: '12px', margin: '0', fontWeight: 'bold' }}>Disponible ahora</p>
+          </div>
+          <div onClick={() => irASolicitar('Mototaxi')} style={{ flex: 1, background: 'linear-gradient(135deg, #D6357E, #FF7A2F)', borderRadius: '20px', padding: '20px 16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px', cursor: 'pointer', boxShadow: '0 4px 20px rgba(214,53,126,0.3)' }}>
+            <span style={{ fontSize: '44px' }}>🏍️</span>
+            <p style={{ color: '#FFFFFF', fontWeight: '900', fontSize: '18px', margin: '0' }}>Mototaxi</p>
+            <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '12px', margin: '0', fontWeight: 'bold' }}>Disponible ahora</p>
           </div>
         </div>
 
-        {/* Mototaxi */}
-        <div onClick={() => { setTipoSeleccionado('Mototaxi'); setPantalla('solicitar'); }}
-          style={{
-            background: 'linear-gradient(135deg, #1A1A1E, #2A2A2E)',
-            borderRadius: '20px', padding: '20px', marginBottom: '12px',
-            display: 'flex', alignItems: 'center', gap: '16px',
-            border: '1px solid #2A2A2E', cursor: 'pointer',
-          }}>
-          <span style={{ fontSize: '36px' }}>🏍️</span>
+        <div onClick={() => setPantalla('restaurantes')} style={{ background: '#FFFFFF', borderRadius: '20px', padding: '20px', marginBottom: '28px', display: 'flex', alignItems: 'center', gap: '16px', border: '2px solid #1C8EF9', cursor: 'pointer', boxShadow: '0 4px 20px rgba(28,142,249,0.12)' }}>
+          <span style={{ fontSize: '44px' }}>🍽️</span>
           <div>
-            <p style={{ color: '#FFFFFF', fontWeight: '900', fontSize: '16px', margin: '0' }}>Mototaxi</p>
-            <p style={{ color: '#FF7A2F', fontSize: '12px', margin: '4px 0 0' }}>Disponible ahora</p>
+            <p style={{ color: '#1A1A1E', fontWeight: '900', fontSize: '18px', margin: '0' }}>Restaurantes</p>
+            <p style={{ color: '#FF7A2F', fontSize: '12px', margin: '4px 0 0', fontWeight: 'bold' }}>¡Nuevo! Pide tu comida a domicilio</p>
           </div>
         </div>
+
+        
+
+        
+
+        
       </div>
     </div>
   );
