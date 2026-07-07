@@ -4,21 +4,21 @@ function PoliticaPrivacidad({ onVolver }) {
   const seccion = (titulo, texto) => (
     <div style={{ marginBottom: '20px' }}>
       <h3 style={{ color: '#FF7A2F', fontSize: '15px', fontWeight: '900', margin: '0 0 8px' }}>{titulo}</h3>
-      <p style={{ color: '#AAAAAA', fontSize: '14px', margin: '0', lineHeight: '1.6' }}>{texto}</p>
+      <p style={{ color: '#6B7280', fontSize: '14px', margin: '0', lineHeight: '1.6' }}>{texto}</p>
     </div>
   );
 
   return (
-    <div style={{ backgroundColor: '#141416', minHeight: '100vh', fontFamily: 'Arial, sans-serif' }}>
-      <div style={{ background: 'linear-gradient(135deg, #1A1A1E, #2A2A2E)', padding: '24px 20px', position: 'relative', display: 'flex', alignItems: 'center' }}>
-        <div onClick={onVolver} style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(255,255,255,0.12)', borderRadius: '12px', color: '#FFFFFF', fontSize: '14px', fontWeight: '500', padding: '8px 16px', cursor: 'pointer' }}>
+    <div style={{ backgroundColor: '#FFFFFF', minHeight: '100vh', fontFamily: 'Arial, sans-serif' }}>
+      <div style={{ background: 'linear-gradient(135deg, #FFFFFF, #ECECEF)', padding: '24px 20px', position: 'relative', display: 'flex', alignItems: 'center' }}>
+        <div onClick={onVolver} style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(0,0,0,0.06)', borderRadius: '12px', color: '#1A1A1E', fontSize: '14px', fontWeight: '500', padding: '8px 16px', cursor: 'pointer' }}>
           <span style={{ fontSize: '20px', fontWeight: '900', lineHeight: '1', position: 'relative', top: '-1px' }}>‹</span> Volver
         </div>
-        <h2 style={{ color: '#FFFFFF', margin: '0 auto', fontSize: '18px', fontWeight: '900' }}>Política de privacidad</h2>
+        <h2 style={{ color: '#1A1A1E', margin: '0 auto', fontSize: '18px', fontWeight: '900' }}>Política de privacidad</h2>
       </div>
 
       <div style={{ padding: '24px 20px' }}>
-        <p style={{ color: '#555', fontSize: '12px', margin: '0 0 20px' }}>Última actualización: junio de 2026</p>
+        <p style={{ color: '#6B7280', fontSize: '12px', margin: '0 0 20px' }}>Última actualización: junio de 2026</p>
 
         {seccion('1. Introducción', 'En GuajiraGo valoramos y protegemos tu privacidad. Esta política explica qué datos personales recopilamos, cómo los usamos y cómo los protegemos, en cumplimiento de la Ley 1581 de 2012 de Protección de Datos Personales de Colombia (Habeas Data).')}
 

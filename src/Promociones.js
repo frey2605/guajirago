@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { db, auth } from './firebase';
 import { collection, getDocs, doc, getDoc, runTransaction } from 'firebase/firestore';
+import Logo from './Logo';
 
 function CelebracionPromo({ codigo, textoValor, onCerrar }) {
   const confeti = Array.from({ length: 30 }, (_, i) => i);
-  const coloresConfeti = ['#FFCF4D', '#FF7A2F', '#D6357E', '#2ECC71', '#FFFFFF'];
+  const coloresConfeti = ['#FFCF4D', '#FF7A2F', '#D6357E', '#2ECC71', '#1C8EF9'];
   return (
-    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: '#141416', zIndex: 99999, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px', overflow: 'hidden' }}>
+    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: '#FFFFFF', zIndex: 99999, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px', overflow: 'hidden' }}>
       {confeti.map(i => (
         <span key={i} style={{
           position: 'absolute', top: '-20px', left: `${Math.random() * 100}%`,
@@ -16,14 +17,14 @@ function CelebracionPromo({ codigo, textoValor, onCerrar }) {
         }}>●</span>
       ))}
       <div style={{ fontSize: '70px', marginBottom: '12px' }}>🎉</div>
-      <h2 style={{ color: '#FFFFFF', fontSize: '24px', fontWeight: '900', margin: '0 0 6px', textAlign: 'center' }}>¡Código activado!</h2>
-      <p style={{ color: '#FFCF4D', fontSize: '16px', margin: '0 0 24px', textAlign: 'center', fontWeight: 'bold' }}>Tendrás {textoValor} de descuento 🎁</p>
-      <div style={{ background: 'linear-gradient(135deg, #1A1A1E, #2A2A2E)', borderRadius: '28px', padding: '32px 24px', width: '100%', maxWidth: '420px', border: '3px solid #2ECC71', textAlign: 'center', zIndex: 2 }}>
+      <h2 style={{ color: '#1A1A1E', fontSize: '24px', fontWeight: '900', margin: '0 0 6px', textAlign: 'center' }}>¡Código activado!</h2>
+      <p style={{ color: '#FF7A2F', fontSize: '16px', margin: '0 0 24px', textAlign: 'center', fontWeight: 'bold' }}>Tendrás {textoValor} de descuento 🎁</p>
+      <div style={{ background: 'linear-gradient(135deg, #FFFFFF, #ECECEF)', borderRadius: '28px', padding: '32px 24px', width: '100%', maxWidth: '420px', border: '3px solid #2ECC71', textAlign: 'center', zIndex: 2 }}>
         <p style={{ color: '#2ECC71', fontSize: '12px', margin: '0 0 12px', letterSpacing: '2px', fontWeight: 'bold' }}>TU CÓDIGO PARA EL CONDUCTOR</p>
-        <p style={{ color: '#FFFFFF', fontSize: '52px', fontWeight: '900', margin: '0', letterSpacing: '14px' }}>{codigo}</p>
-        <p style={{ color: '#AAAAAA', fontSize: '13px', margin: '16px 0 0', lineHeight: '1.5' }}>Dáselo al conductor cuando finalice tu viaje para recibir el descuento</p>
+        <p style={{ color: '#1A1A1E', fontSize: '52px', fontWeight: '900', margin: '0', letterSpacing: '14px' }}>{codigo}</p>
+        <p style={{ color: '#6B7280', fontSize: '13px', margin: '16px 0 0', lineHeight: '1.5' }}>Dáselo al conductor cuando finalice tu viaje para recibir el descuento</p>
       </div>
-      <button onClick={onCerrar} style={{ marginTop: '28px', width: '100%', maxWidth: '420px', padding: '18px', background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)', border: 'none', borderRadius: '16px', color: '#141416', fontSize: '17px', fontWeight: '900', cursor: 'pointer', zIndex: 2 }}>Entendido</button>
+      <button onClick={onCerrar} style={{ marginTop: '28px', width: '100%', maxWidth: '420px', padding: '18px', background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)', border: 'none', borderRadius: '16px', color: '#FFFFFF', fontSize: '17px', fontWeight: '900', cursor: 'pointer', zIndex: 2 }}>Entendido</button>
       <style>{`@keyframes caer { from { transform: translateY(-20px) rotate(0deg); opacity: 1; } to { transform: translateY(100vh) rotate(360deg); opacity: 0.3; } }`}</style>
     </div>
   );
@@ -148,38 +149,39 @@ function Promociones({ onVolver }) {
   if (celebrandoPromo) return <CelebracionPromo codigo={celebrandoPromo.codigo} textoValor={celebrandoPromo.textoValor} onCerrar={() => setCelebrandoPromo(null)} />;
 
   return (
-    <div style={{ backgroundColor: '#141416', minHeight: '100vh', fontFamily: 'Arial, sans-serif' }}>
-      <div style={{ background: 'linear-gradient(135deg, #1A1A1E, #2A2A2E)', padding: '24px 20px', display: 'flex', alignItems: 'center' }}>
-        <div onClick={onVolver} style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(255,255,255,0.12)', borderRadius: '12px', color: '#FFFFFF', fontSize: '14px', fontWeight: '500', padding: '8px 16px', cursor: 'pointer' }}>
+    <div style={{ backgroundColor: '#FFFFFF', minHeight: '100vh', fontFamily: 'Arial, sans-serif' }}>
+      <div style={{ background: 'linear-gradient(135deg, #FFFFFF, #ECECEF)', padding: '24px 20px', position: 'relative', display: 'flex', alignItems: 'center' }}>
+        <div onClick={onVolver} style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(0,0,0,0.06)', borderRadius: '12px', color: '#1A1A1E', fontSize: '14px', fontWeight: '500', padding: '8px 16px', cursor: 'pointer' }}>
           <span style={{ fontSize: '20px', fontWeight: '900', lineHeight: '1', position: 'relative', top: '-1px' }}>‹</span> Volver
         </div>
-        <h2 style={{ color: '#FFFFFF', margin: '0 auto', fontSize: '20px', fontWeight: '900' }}>Promociones</h2>
+        <h2 style={{ color: '#1A1A1E', margin: '0 auto', fontSize: '20px', fontWeight: '900' }}>Promociones</h2>
+        <Logo size={28} style={{ position: 'absolute', top: '14px', right: '16px', zIndex: 6 }} />
       </div>
 
       <div style={{ padding: '20px' }}>
         {descuentoActivo && (
-          <div style={{ background: 'linear-gradient(135deg, #1A1A1E, #2A2A2E)', borderRadius: '20px', padding: '20px', marginBottom: '20px', border: '2px solid #2ECC71' }}>
+          <div style={{ background: 'linear-gradient(135deg, #FFFFFF, #ECECEF)', borderRadius: '20px', padding: '20px', marginBottom: '20px', border: '2px solid #2ECC71' }}>
             <p style={{ color: '#2ECC71', fontSize: '11px', margin: '0 0 4px', letterSpacing: '2px', fontWeight: 'bold' }}>🎁 TIENES UN DESCUENTO PENDIENTE DE {descuentoActivo.textoValor}</p>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '8px' }}>
               <div>
-                <p style={{ color: '#888', fontSize: '10px', margin: '0' }}>CÓDIGO PARA EL CONDUCTOR</p>
-                <p style={{ color: '#FFFFFF', fontSize: '32px', fontWeight: '900', margin: '2px 0 0', letterSpacing: '8px' }}>{descuentoActivo.codigoVerificacion}</p>
+                <p style={{ color: '#6B7280', fontSize: '10px', margin: '0' }}>CÓDIGO PARA EL CONDUCTOR</p>
+                <p style={{ color: '#1A1A1E', fontSize: '32px', fontWeight: '900', margin: '2px 0 0', letterSpacing: '8px' }}>{descuentoActivo.codigoVerificacion}</p>
               </div>
             </div>
           </div>
         )}
 
         {/* Tengo un código */}
-        <div style={{ background: '#1A1A1E', borderRadius: '16px', padding: '16px', marginBottom: '20px', border: '1px solid #2A2A2E' }}>
-          <p style={{ color: '#FFCF4D', fontSize: '12px', letterSpacing: '2px', margin: '0 0 10px', fontWeight: '900' }}>¿TIENES UN CÓDIGO?</p>
+        <div style={{ background: '#FFFFFF', borderRadius: '16px', padding: '16px', marginBottom: '20px', border: '1px solid #ECECEF' }}>
+          <p style={{ color: '#FF7A2F', fontSize: '12px', letterSpacing: '2px', margin: '0 0 10px', fontWeight: '900' }}>¿TIENES UN CÓDIGO?</p>
           <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
             <input
               value={codigo}
               onChange={e => setCodigo(e.target.value.toUpperCase())}
               placeholder="Escribe el código"
-              style={{ flex: 1, background: '#141416', border: '1px solid #2A2A2E', borderRadius: '12px', padding: '12px 14px', color: '#FFFFFF', fontSize: '15px', outline: 'none' }}
+              style={{ flex: 1, background: '#FFFFFF', border: '1px solid #ECECEF', borderRadius: '12px', padding: '12px 14px', color: '#1A1A1E', fontSize: '15px', outline: 'none' }}
             />
-            <button onClick={aplicarCodigo} disabled={aplicando} style={{ padding: '12px 18px', background: aplicando ? '#2A2A2E' : 'linear-gradient(135deg, #FF7A2F, #D6357E)', border: 'none', borderRadius: '12px', color: '#FFFFFF', fontSize: '14px', fontWeight: '900', cursor: aplicando ? 'default' : 'pointer' }}>
+            <button onClick={aplicarCodigo} disabled={aplicando} style={{ padding: '12px 18px', background: aplicando ? '#ECECEF' : 'linear-gradient(135deg, #FF7A2F, #D6357E)', border: 'none', borderRadius: '12px', color: aplicando ? '#6B7280' : '#FFFFFF', fontSize: '14px', fontWeight: '900', cursor: aplicando ? 'default' : 'pointer' }}>
               {aplicando ? '...' : 'Aplicar'}
             </button>
           </div>
@@ -188,35 +190,35 @@ function Promociones({ onVolver }) {
         </div>
 
         {cargando ? (
-          <p style={{ color: '#555', textAlign: 'center', marginTop: '40px' }}>Cargando...</p>
+          <p style={{ color: '#6B7280', textAlign: 'center', marginTop: '40px' }}>Cargando...</p>
         ) : promos.length === 0 ? (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '60px 24px', textAlign: 'center' }}>
             <div style={{ fontSize: '70px', marginBottom: '20px' }}>🎁</div>
-            <h2 style={{ color: '#FFFFFF', fontSize: '20px', fontWeight: '900', margin: '0 0 10px' }}>No hay ofertas activas</h2>
-            <p style={{ color: '#555', fontSize: '14px', margin: '0', lineHeight: '1.6' }}>En este momento no hay promociones disponibles. Vuelve pronto, ¡pronto habrá sorpresas para ti!</p>
+            <h2 style={{ color: '#1A1A1E', fontSize: '20px', fontWeight: '900', margin: '0 0 10px' }}>No hay ofertas activas</h2>
+            <p style={{ color: '#6B7280', fontSize: '14px', margin: '0', lineHeight: '1.6' }}>En este momento no hay promociones disponibles. Vuelve pronto, ¡pronto habrá sorpresas para ti!</p>
           </div>
         ) : (
           <div>
-            <p style={{ color: '#AAAAAA', fontSize: '11px', letterSpacing: '3px', margin: '0 0 12px' }}>OFERTAS DISPONIBLES</p>
+            <p style={{ color: '#6B7280', fontSize: '11px', letterSpacing: '3px', margin: '0 0 12px' }}>OFERTAS DISPONIBLES</p>
             {promos.map(p => {
               const cat = categoriaInfo(p.categoria);
               return (
-                <div key={p.id} style={{ background: 'linear-gradient(135deg, #1A1A1E, #2A2A2E)', borderRadius: '20px', padding: '20px', marginBottom: '12px', border: '1px solid #FF7A2F' }}>
+                <div key={p.id} style={{ background: 'linear-gradient(135deg, #FFFFFF, #ECECEF)', borderRadius: '20px', padding: '20px', marginBottom: '12px', border: '1px solid #FF7A2F' }}>
                   <span style={{ fontSize: '10px', fontWeight: 'bold', padding: '3px 10px', borderRadius: '20px', background: 'rgba(255,122,47,0.15)', color: '#FF7A2F' }}>{cat.icono} {cat.label}</span>
-                  <p style={{ color: '#FFFFFF', fontSize: '17px', fontWeight: '900', margin: '10px 0 6px' }}>{p.nombre}</p>
+                  <p style={{ color: '#1A1A1E', fontSize: '17px', fontWeight: '900', margin: '10px 0 6px' }}>{p.nombre}</p>
                   <p style={{ color: '#2ECC71', fontSize: '20px', fontWeight: '900', margin: '0 0 8px' }}>
                     {p.tipoBeneficio === 'descuento' ? `${p.valorBeneficio}% de descuento` : `$${(p.valorBeneficio || 0).toLocaleString()} de crédito`}
                   </p>
-                  {p.descripcion && <p style={{ color: '#AAAAAA', fontSize: '13px', margin: '0 0 10px', lineHeight: '1.5' }}>{p.descripcion}</p>}
+                  {p.descripcion && <p style={{ color: '#6B7280', fontSize: '13px', margin: '0 0 10px', lineHeight: '1.5' }}>{p.descripcion}</p>}
                   {p.requiereCodigo ? (
-                    <div onClick={() => setCodigo(p.id)} style={{ background: '#141416', borderRadius: '10px', padding: '10px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}>
-                      <span style={{ color: '#FFCF4D', fontSize: '14px', fontWeight: '900', letterSpacing: '1px' }}>{p.id}</span>
-                      <span style={{ color: '#888', fontSize: '11px' }}>Tocar para usar ↑</span>
+                    <div onClick={() => setCodigo(p.id)} style={{ background: '#FFFFFF', border: '1.5px solid #ECECEF', borderRadius: '10px', padding: '10px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}>
+                      <span style={{ color: '#FF7A2F', fontSize: '14px', fontWeight: '900', letterSpacing: '1px' }}>{p.id}</span>
+                      <span style={{ color: '#6B7280', fontSize: '11px' }}>Tocar para usar ↑</span>
                     </div>
                   ) : (
-                    <p style={{ color: '#888', fontSize: '11px', margin: 0 }}>Se aplica automáticamente</p>
+                    <p style={{ color: '#6B7280', fontSize: '11px', margin: 0 }}>Se aplica automáticamente</p>
                   )}
-                  <p style={{ color: '#666', fontSize: '11px', margin: '10px 0 0' }}>Válida hasta {new Date(p.fechaFin).toLocaleDateString('es-CO')}</p>
+                  <p style={{ color: '#6B7280', fontSize: '11px', margin: '10px 0 0' }}>Válida hasta {new Date(p.fechaFin).toLocaleDateString('es-CO')}</p>
                 </div>
               );
             })}

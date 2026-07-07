@@ -10,9 +10,10 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="GuajiraGo" />
     <meta name="description" content="Solicita taxi o mototaxi en Riohacha, La Guajira" />
-    <link rel="apple-touch-icon" href="%PUBLIC_URL%/logo192.png" />
+    <link rel="apple-touch-icon" href="%PUBLIC_URL%/logo-icon-192.png" />
+    <link rel="apple-touch-icon" sizes="512x512" href="%PUBLIC_URL%/logo-icon-512.png" />
     <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
-    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyALvmrJPSDPUGiO41O1aPJQ55PiHUoZO1g&libraries=places"></script>
+    <script defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyALvmrJPSDPUGiO41O1aPJQ55PiHUoZO1g&libraries=places"></script>
     <title>GuajiraGo</title>
     <script>
       if ('serviceWorker' in navigator) {
@@ -24,7 +25,15 @@
   </head>
   <body>
     <noscript>You need to enable JavaScript to run this app.</noscript>
-    <div id="root"></div>
+    <div id="root">
+      <div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:#FFFFFF;font-family:Arial,sans-serif;">
+        <div style="text-align:center">
+          <div style="font-size:42px">🚕</div>
+          <p style="color:#FF7A2F;font-size:15px;font-weight:bold;margin:10px 0 0">GuajiraGo</p>
+          <p style="color:#9AA0A6;font-size:13px;margin:4px 0 0">Cargando…</p>
+        </div>
+      </div>
+    </div>
   </body>
   <div id="recaptcha-container"></div>
 </html>

@@ -4,6 +4,7 @@ import { createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswor
 import { doc, setDoc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import TerminosCondiciones from './TerminosCondiciones';
 import PoliticaPrivacidad from './PoliticaPrivacidad';
+import Logo from './Logo';
 
 const VALOR_CREDITO_BIENVENIDA = 8000; // Crédito fijo de bienvenida para pasajeros nuevos
 
@@ -34,9 +35,9 @@ async function obtenerIP() {
 
 function CelebracionBienvenida({ monto, onContinuar }) {
   const confeti = Array.from({ length: 40 }, (_, i) => i);
-  const colores = ['#FFCF4D', '#FF7A2F', '#D6357E', '#2ECC71', '#4DA3FF', '#FFFFFF'];
+  const colores = ['#FFCF4D', '#FF7A2F', '#D6357E', '#1C8EF9', '#2ECC71'];
   return (
-    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: '#141416', zIndex: 999999, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px', overflow: 'hidden' }}>
+    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: '#FFFFFF', zIndex: 999999, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px', overflow: 'hidden' }}>
       {confeti.map(i => (
         <span key={i} style={{
           position: 'absolute', top: '-24px', left: `${Math.random() * 100}%`,
@@ -47,14 +48,14 @@ function CelebracionBienvenida({ monto, onContinuar }) {
       ))}
       <div style={{ fontSize: '30px', marginBottom: '4px', animation: 'rebotarBienvenida 0.6s infinite alternate', zIndex: 2 }}>🎉🎊🎉</div>
       <div style={{ fontSize: '90px', margin: '8px 0 4px', animation: 'rebotarBienvenida 0.6s infinite alternate', zIndex: 2 }}>🎁</div>
-      <h1 style={{ color: '#FFFFFF', fontSize: '26px', fontWeight: '900', margin: '8px 0 4px', textAlign: 'center', zIndex: 2 }}>¡Bienvenido a GuajiraGo!</h1>
-      <p style={{ color: '#FFCF4D', fontSize: '15px', margin: '0 0 24px', textAlign: 'center', fontWeight: 'bold', zIndex: 2 }}>Tenemos un regalo para ti 🥳</p>
+      <h1 style={{ color: '#1A1A1E', fontSize: '26px', fontWeight: '900', margin: '8px 0 4px', textAlign: 'center', zIndex: 2 }}>¡Bienvenido a GuajiraGo!</h1>
+      <p style={{ color: '#FF7A2F', fontSize: '15px', margin: '0 0 24px', textAlign: 'center', fontWeight: 'bold', zIndex: 2 }}>Tenemos un regalo para ti 🥳</p>
       <div style={{ background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)', borderRadius: '28px', padding: '32px 28px', width: '100%', maxWidth: '420px', textAlign: 'center', zIndex: 2, boxShadow: '0 8px 32px rgba(255,122,47,0.4)' }}>
-        <p style={{ color: '#141416', fontSize: '13px', margin: '0 0 8px', letterSpacing: '2px', fontWeight: '900' }}>CRÉDITO DE BIENVENIDA</p>
-        <p style={{ color: '#141416', fontSize: '54px', fontWeight: '900', margin: '0', lineHeight: '1' }}>${(monto || 0).toLocaleString()}</p>
-        <p style={{ color: '#3A2400', fontSize: '13px', margin: '14px 0 0', lineHeight: '1.5', fontWeight: 'bold' }}>Ya está en tu cuenta. Úsalo automáticamente en tu primer viaje 🚀</p>
+        <p style={{ color: '#FFFFFF', fontSize: '13px', margin: '0 0 8px', letterSpacing: '2px', fontWeight: '900' }}>CRÉDITO DE BIENVENIDA</p>
+        <p style={{ color: '#FFFFFF', fontSize: '54px', fontWeight: '900', margin: '0', lineHeight: '1' }}>${(monto || 0).toLocaleString()}</p>
+        <p style={{ color: 'rgba(255,255,255,0.9)', fontSize: '13px', margin: '14px 0 0', lineHeight: '1.5', fontWeight: 'bold' }}>Ya está en tu cuenta. Úsalo automáticamente en tu primer viaje 🚀</p>
       </div>
-      <button onClick={onContinuar} style={{ marginTop: '28px', width: '100%', maxWidth: '420px', padding: '18px', background: '#FFFFFF', border: 'none', borderRadius: '16px', color: '#141416', fontSize: '18px', fontWeight: '900', cursor: 'pointer', zIndex: 2 }}>¡Vamos! 🎉</button>
+      <button onClick={onContinuar} style={{ marginTop: '28px', width: '100%', maxWidth: '420px', padding: '18px', background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)', border: 'none', borderRadius: '16px', color: '#FFFFFF', fontSize: '18px', fontWeight: '900', cursor: 'pointer', zIndex: 2 }}>¡Vamos! 🎉</button>
       <style>{`
         @keyframes caerBienvenida { from { transform: translateY(-24px) rotate(0deg); opacity: 1; } to { transform: translateY(100vh) rotate(360deg); opacity: 0.2; } }
         @keyframes rebotarBienvenida { from { transform: scale(1); } to { transform: scale(1.12); } }
@@ -201,17 +202,21 @@ function Login({ onEntrar }) {
     setCargando(false);
   };
 
+  // ---- Estilos reutilizables del tema claro ----
+  const estiloCampo = { background: '#FFFFFF', border: '1.5px solid #ECECEF', borderRadius: '16px', padding: '16px', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '12px' };
+  const estiloInput = { background: 'none', border: 'none', outline: 'none', color: '#1A1A1E', fontSize: '16px', width: '100%' };
+  const btnPrimario = { width: '100%', padding: '18px', background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)', border: 'none', borderRadius: '16px', color: '#FFFFFF', fontSize: '18px', fontWeight: '900', cursor: 'pointer' };
+
   if (celebracionBienvenida) return <CelebracionBienvenida monto={celebracionBienvenida.monto} onContinuar={() => onEntrar(...celebracionBienvenida.datosEntrar)} />;
   if (verTerminos) return <TerminosCondiciones onVolver={() => setVerTerminos(false)} />;
   if (verPrivacidad) return <PoliticaPrivacidad onVolver={() => setVerPrivacidad(false)} />;
   if (pantalla === 'inicio') {
     return (
-      <div style={{ backgroundColor: '#141416', minHeight: '100vh', fontFamily: 'Arial, sans-serif', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px 24px' }}>
-        <h1 style={{ fontSize: '42px', color: '#FFFFFF', margin: '0', fontFamily: 'Arial Black, sans-serif', letterSpacing: '-1px', textAlign: 'center' }}>Guajira</h1>
-        <h1 style={{ fontSize: '56px', background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', margin: '0 0 60px', fontFamily: 'Arial Black, sans-serif', letterSpacing: '-2px' }}>GO</h1>
+      <div style={{ backgroundColor: '#FFFFFF', minHeight: '100vh', fontFamily: 'Arial, sans-serif', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px 24px' }}>
+        <img src="/logo-completo.svg" alt="GuajiraGo" style={{ width: '360px', maxWidth: '90vw', height: 'auto', marginBottom: '36px' }} />
         <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          <button onClick={() => { setError(''); setPantalla('registro'); }} style={{ width: '100%', padding: '18px', background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)', border: 'none', borderRadius: '16px', color: '#141416', fontSize: '18px', fontWeight: '900', cursor: 'pointer' }}>Crear cuenta</button>
-          <button onClick={() => { setError(''); setMensajeRecuperar(''); setPantalla('login'); }} style={{ width: '100%', padding: '18px', background: '#1A1A1E', border: '1px solid #2A2A2E', borderRadius: '16px', color: '#FFFFFF', fontSize: '18px', fontWeight: '900', cursor: 'pointer' }}>Ya tengo cuenta</button>
+          <button onClick={() => { setError(''); setPantalla('registro'); }} style={btnPrimario}>Crear cuenta</button>
+          <button onClick={() => { setError(''); setMensajeRecuperar(''); setPantalla('login'); }} style={{ width: '100%', padding: '18px', background: '#FFFFFF', border: '1.5px solid #1C8EF9', borderRadius: '16px', color: '#1C8EF9', fontSize: '18px', fontWeight: '900', cursor: 'pointer' }}>Ya tengo cuenta</button>
         </div>
       </div>
     );
@@ -219,82 +224,83 @@ function Login({ onEntrar }) {
 
   if (pantalla === 'registro') {
     return (
-      <div style={{ backgroundColor: '#141416', minHeight: '100vh', fontFamily: 'Arial, sans-serif', display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '32px 24px' }}>
+      <div style={{ backgroundColor: '#FFFFFF', minHeight: '100vh', fontFamily: 'Arial, sans-serif', display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '32px 24px' }}>
         {error && (
-          <div onClick={() => setError('')} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
-            <div onClick={(e) => e.stopPropagation()} style={{ background: '#1A1A1E', borderRadius: '24px', padding: '32px 24px', width: '100%', maxWidth: '380px', border: '2px solid #FF4444', textAlign: 'center', position: 'relative' }}>
-              <span onClick={() => setError('')} style={{ position: 'absolute', top: '16px', right: '20px', color: '#AAAAAA', fontSize: '26px', cursor: 'pointer', lineHeight: '1' }}>✕</span>
+          <div onClick={() => setError('')} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
+            <div onClick={(e) => e.stopPropagation()} style={{ background: '#FFFFFF', borderRadius: '24px', padding: '32px 24px', width: '100%', maxWidth: '380px', border: '2px solid #FF4444', textAlign: 'center', position: 'relative', boxShadow: '0 12px 40px rgba(0,0,0,0.18)' }}>
+              <span onClick={() => setError('')} style={{ position: 'absolute', top: '16px', right: '20px', color: '#9AA0A6', fontSize: '26px', cursor: 'pointer', lineHeight: '1' }}>✕</span>
               <div style={{ fontSize: '54px', marginBottom: '12px' }}>⚠️</div>
-              <h2 style={{ color: '#FFFFFF', fontSize: '20px', fontWeight: '900', margin: '0 0 10px' }}>Atención</h2>
-              <p style={{ color: '#FFFFFF', fontSize: '17px', margin: '0 0 24px', lineHeight: '1.5', fontWeight: 'bold' }}>{error}</p>
-              <button onClick={() => setError('')} style={{ width: '100%', padding: '16px', background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F)', border: 'none', borderRadius: '14px', color: '#141416', fontSize: '16px', fontWeight: '900', cursor: 'pointer' }}>Entendido</button>
+              <h2 style={{ color: '#1A1A1E', fontSize: '20px', fontWeight: '900', margin: '0 0 10px' }}>Atención</h2>
+              <p style={{ color: '#1A1A1E', fontSize: '17px', margin: '0 0 24px', lineHeight: '1.5', fontWeight: 'bold' }}>{error}</p>
+              <button onClick={() => setError('')} style={{ width: '100%', padding: '16px', background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F)', border: 'none', borderRadius: '14px', color: '#FFFFFF', fontSize: '16px', fontWeight: '900', cursor: 'pointer' }}>Entendido</button>
             </div>
           </div>
         )}
-        <div style={{ textAlign: 'center', marginBottom: '32px' }}>
-          <h1 style={{ fontSize: '28px', color: '#FFFFFF', margin: '0', fontFamily: 'Arial Black, sans-serif' }}>Crear cuenta</h1>
-          <p style={{ color: '#555', fontSize: '13px', margin: '8px 0 0' }}>Ingresa tus datos para registrarte</p>
+        <div style={{ textAlign: 'center', marginBottom: '28px' }}>
+          <Logo size={64} style={{ marginBottom: '10px' }} />
+          <h1 style={{ fontSize: '28px', color: '#1A1A1E', margin: '0', fontFamily: 'Arial Black, sans-serif' }}>Crear cuenta</h1>
+          <p style={{ color: '#6B7280', fontSize: '13px', margin: '8px 0 0' }}>Ingresa tus datos para registrarte</p>
         </div>
-        <div style={{ background: '#1A1A1E', borderRadius: '16px', padding: '16px', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <div style={estiloCampo}>
           <span style={{ fontSize: '20px' }}>👤</span>
-          <input value={nombre} onChange={e => setNombre(e.target.value.toUpperCase())} placeholder="NOMBRE COMPLETO" style={{ background: 'none', border: 'none', outline: 'none', color: '#FFFFFF', fontSize: '16px', width: '100%' }} />
+          <input value={nombre} onChange={e => setNombre(e.target.value.toUpperCase())} placeholder="NOMBRE COMPLETO" style={estiloInput} />
         </div>
-        <div style={{ background: '#1A1A1E', borderRadius: '16px', padding: '16px', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <div style={estiloCampo}>
           <span style={{ fontSize: '20px' }}>📧</span>
-          <input value={email} onChange={e => setEmail(e.target.value)} placeholder="Correo electrónico" type="email" style={{ background: 'none', border: 'none', outline: 'none', color: '#FFFFFF', fontSize: '16px', width: '100%' }} />
+          <input value={email} onChange={e => setEmail(e.target.value)} placeholder="Correo electrónico" type="email" style={estiloInput} />
         </div>
-        <div style={{ background: '#1A1A1E', borderRadius: '16px', padding: '16px', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <div style={estiloCampo}>
           <span style={{ fontSize: '20px' }}>📧</span>
-          <input value={emailConfirm} onChange={e => setEmailConfirm(e.target.value)} onPaste={e => e.preventDefault()} placeholder="Confirmar correo electrónico" type="email" style={{ background: 'none', border: 'none', outline: 'none', color: '#FFFFFF', fontSize: '16px', width: '100%' }} />
+          <input value={emailConfirm} onChange={e => setEmailConfirm(e.target.value)} onPaste={e => e.preventDefault()} placeholder="Confirmar correo electrónico" type="email" style={estiloInput} />
         </div>
-        <div style={{ background: '#1A1A1E', borderRadius: '16px', padding: '16px', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <span style={{ color: '#FFFFFF', fontSize: '16px', fontWeight: '900', whiteSpace: 'nowrap' }}>+57</span>
-          <input value={celular} onChange={e => setCelular(e.target.value)} placeholder="3001234567" type="tel" style={{ background: 'none', border: 'none', outline: 'none', color: '#FFFFFF', fontSize: '16px', width: '100%' }} />
+        <div style={estiloCampo}>
+          <span style={{ color: '#1A1A1E', fontSize: '16px', fontWeight: '900', whiteSpace: 'nowrap' }}>+57</span>
+          <input value={celular} onChange={e => setCelular(e.target.value)} placeholder="3001234567" type="tel" style={estiloInput} />
         </div>
-        <div style={{ background: '#1A1A1E', borderRadius: '16px', padding: '16px', marginBottom: '12px' }}>
+        <div style={{ background: '#FFFFFF', border: '1.5px solid #ECECEF', borderRadius: '16px', padding: '16px', marginBottom: '12px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
             <span style={{ fontSize: '20px' }}>🎂</span>
-            <span style={{ color: '#AAAAAA', fontSize: '14px' }}>Fecha de nacimiento</span>
+            <span style={{ color: '#6B7280', fontSize: '14px' }}>Fecha de nacimiento</span>
           </div>
           <div style={{ display: 'flex', gap: '8px' }}>
-            <select value={diaNac} onChange={e => setDiaNac(e.target.value)} style={{ flex: 1, background: '#141416', border: '1px solid #2A2A2E', borderRadius: '12px', padding: '12px', color: '#FFFFFF', fontSize: '15px', outline: 'none', cursor: 'pointer' }}>
+            <select value={diaNac} onChange={e => setDiaNac(e.target.value)} style={{ flex: 1, background: '#FFFFFF', border: '1px solid #ECECEF', borderRadius: '12px', padding: '12px', color: '#1A1A1E', fontSize: '15px', outline: 'none', cursor: 'pointer' }}>
               <option value="">Día</option>
-              {Array.from({ length: 31 }, (_, i) => i + 1).map(d => <option key={d} value={d} style={{ background: '#1A1A1E' }}>{d}</option>)}
+              {Array.from({ length: 31 }, (_, i) => i + 1).map(d => <option key={d} value={d}>{d}</option>)}
             </select>
-            <select value={mesNac} onChange={e => setMesNac(e.target.value)} style={{ flex: 1, background: '#141416', border: '1px solid #2A2A2E', borderRadius: '12px', padding: '12px', color: '#FFFFFF', fontSize: '15px', outline: 'none', cursor: 'pointer' }}>
+            <select value={mesNac} onChange={e => setMesNac(e.target.value)} style={{ flex: 1, background: '#FFFFFF', border: '1px solid #ECECEF', borderRadius: '12px', padding: '12px', color: '#1A1A1E', fontSize: '15px', outline: 'none', cursor: 'pointer' }}>
               <option value="">Mes</option>
-              {Array.from({ length: 12 }, (_, i) => i + 1).map(m => <option key={m} value={m} style={{ background: '#1A1A1E' }}>{m}</option>)}
+              {Array.from({ length: 12 }, (_, i) => i + 1).map(m => <option key={m} value={m}>{m}</option>)}
             </select>
-            <select value={anioNac} onChange={e => setAnioNac(e.target.value)} style={{ flex: 1.3, background: '#141416', border: '1px solid #2A2A2E', borderRadius: '12px', padding: '12px', color: '#FFFFFF', fontSize: '15px', outline: 'none', cursor: 'pointer' }}>
+            <select value={anioNac} onChange={e => setAnioNac(e.target.value)} style={{ flex: 1.3, background: '#FFFFFF', border: '1px solid #ECECEF', borderRadius: '12px', padding: '12px', color: '#1A1A1E', fontSize: '15px', outline: 'none', cursor: 'pointer' }}>
               <option value="">Año</option>
-              {Array.from({ length: 90 }, (_, i) => new Date().getFullYear() - 15 - i).map(a => <option key={a} value={a} style={{ background: '#1A1A1E' }}>{a}</option>)}
+              {Array.from({ length: 90 }, (_, i) => new Date().getFullYear() - 15 - i).map(a => <option key={a} value={a}>{a}</option>)}
             </select>
           </div>
         </div>
-        <div style={{ background: '#1A1A1E', borderRadius: '16px', padding: '16px', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <div style={estiloCampo}>
           <span style={{ fontSize: '20px' }}>🔒</span>
-          <input value={password} onChange={e => setPassword(e.target.value)} placeholder="Contraseña (mínimo 6 caracteres)" type={verPassword ? 'text' : 'password'} style={{ background: 'none', border: 'none', outline: 'none', color: '#FFFFFF', fontSize: '16px', width: '100%' }} />
+          <input value={password} onChange={e => setPassword(e.target.value)} placeholder="Contraseña (mínimo 6 caracteres)" type={verPassword ? 'text' : 'password'} style={estiloInput} />
           <span onClick={() => setVerPassword(!verPassword)} style={{ fontSize: '20px', cursor: 'pointer' }}>{verPassword ? '🙈' : '👁️'}</span>
         </div>
-        <div style={{ background: '#1A1A1E', borderRadius: '16px', padding: '16px', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <div style={estiloCampo}>
           <span style={{ fontSize: '20px' }}>🔒</span>
-          <input value={passwordConfirm} onChange={e => setPasswordConfirm(e.target.value)} onPaste={e => e.preventDefault()} placeholder="Confirmar contraseña" type={verPasswordConfirm ? 'text' : 'password'} style={{ background: 'none', border: 'none', outline: 'none', color: '#FFFFFF', fontSize: '16px', width: '100%' }} />
+          <input value={passwordConfirm} onChange={e => setPasswordConfirm(e.target.value)} onPaste={e => e.preventDefault()} placeholder="Confirmar contraseña" type={verPasswordConfirm ? 'text' : 'password'} style={estiloInput} />
           <span onClick={() => setVerPasswordConfirm(!verPasswordConfirm)} style={{ fontSize: '20px', cursor: 'pointer' }}>{verPasswordConfirm ? '🙈' : '👁️'}</span>
         </div>
         <p style={{ color: '#FF7A2F', fontSize: '11px', letterSpacing: '2px', margin: '0 0 10px 4px', fontWeight: 'bold' }}>🚨 CONTACTO DE EMERGENCIA</p>
-        <div style={{ background: '#1A1A1E', borderRadius: '16px', padding: '16px', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <div style={estiloCampo}>
           <span style={{ fontSize: '20px' }}>👥</span>
-          <input value={contactoNombre} onChange={e => setContactoNombre(e.target.value.toUpperCase())} placeholder="Nombre del contacto" style={{ background: 'none', border: 'none', outline: 'none', color: '#FFFFFF', fontSize: '16px', width: '100%' }} />
+          <input value={contactoNombre} onChange={e => setContactoNombre(e.target.value.toUpperCase())} placeholder="Nombre del contacto" style={estiloInput} />
         </div>
-        <div style={{ background: '#1A1A1E', borderRadius: '16px', padding: '16px', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <span style={{ color: '#FFFFFF', fontSize: '16px', fontWeight: '900', whiteSpace: 'nowrap' }}>+57</span>
-          <input value={contactoNumero} onChange={e => setContactoNumero(e.target.value)} placeholder="3001234567" type="tel" style={{ background: 'none', border: 'none', outline: 'none', color: '#FFFFFF', fontSize: '16px', width: '100%' }} />
+        <div style={{ ...estiloCampo, marginBottom: '20px' }}>
+          <span style={{ color: '#1A1A1E', fontSize: '16px', fontWeight: '900', whiteSpace: 'nowrap' }}>+57</span>
+          <input value={contactoNumero} onChange={e => setContactoNumero(e.target.value)} placeholder="3001234567" type="tel" style={estiloInput} />
         </div>
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', marginBottom: '16px', padding: '14px', background: '#1A1A1E', borderRadius: '14px', border: `1px solid ${aceptaTerminos ? '#FF7A2F' : '#2A2A2E'}` }}>
-          <div onClick={() => setAceptaTerminos(!aceptaTerminos)} style={{ width: '22px', height: '22px', borderRadius: '6px', background: aceptaTerminos ? 'linear-gradient(135deg, #FFCF4D, #FF7A2F)' : '#2A2A2E', border: aceptaTerminos ? 'none' : '2px solid #555', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0, marginTop: '2px' }}>
-            {aceptaTerminos && <span style={{ color: '#141416', fontSize: '14px', fontWeight: '900' }}>✓</span>}
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', marginBottom: '16px', padding: '14px', background: '#FFFFFF', borderRadius: '14px', border: `1.5px solid ${aceptaTerminos ? '#FF7A2F' : '#ECECEF'}` }}>
+          <div onClick={() => setAceptaTerminos(!aceptaTerminos)} style={{ width: '22px', height: '22px', borderRadius: '6px', background: aceptaTerminos ? 'linear-gradient(135deg, #FFCF4D, #FF7A2F)' : '#FFFFFF', border: aceptaTerminos ? 'none' : '2px solid #C9CDD3', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0, marginTop: '2px' }}>
+            {aceptaTerminos && <span style={{ color: '#FFFFFF', fontSize: '14px', fontWeight: '900' }}>✓</span>}
           </div>
-          <p style={{ color: '#AAAAAA', fontSize: '13px', margin: '0', lineHeight: '1.5' }}>
+          <p style={{ color: '#6B7280', fontSize: '13px', margin: '0', lineHeight: '1.5' }}>
             He leído y acepto los{' '}
             <span onClick={() => setVerTerminos(true)} style={{ color: '#FF7A2F', fontWeight: 'bold', cursor: 'pointer', textDecoration: 'underline' }}>Términos y condiciones</span>
             {' '}y la{' '}
@@ -302,45 +308,46 @@ function Login({ onEntrar }) {
             {' '}de GuajiraGo.
           </p>
         </div>
-        <button onClick={registrarse} disabled={enviando} style={{ width: '100%', padding: '18px', background: enviando ? '#2A2A2E' : 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)', border: 'none', borderRadius: '16px', color: enviando ? '#555' : '#141416', fontSize: '18px', fontWeight: '900', cursor: 'pointer' }}>
+        <button onClick={registrarse} disabled={enviando} style={{ ...btnPrimario, background: enviando ? '#E7E7EA' : 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)', color: enviando ? '#9AA0A6' : '#FFFFFF' }}>
           {enviando ? 'Creando cuenta...' : 'Crear cuenta'}
         </button>
-        <button onClick={() => { setError(''); setPantalla('inicio'); }} style={{ background: 'none', border: 'none', color: '#555', fontSize: '13px', cursor: 'pointer', marginTop: '16px' }}>Volver</button>
+        <button onClick={() => { setError(''); setPantalla('inicio'); }} style={{ background: 'none', border: 'none', color: '#6B7280', fontSize: '13px', cursor: 'pointer', marginTop: '16px' }}>Volver</button>
       </div>
     );
   }
 
   if (pantalla === 'login') {
     return (
-      <div style={{ backgroundColor: '#141416', minHeight: '100vh', fontFamily: 'Arial, sans-serif', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px 24px' }}>
+      <div style={{ backgroundColor: '#FFFFFF', minHeight: '100vh', fontFamily: 'Arial, sans-serif', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px 24px' }}>
         <div style={{ width: '100%', maxWidth: '440px', display: 'flex', flexDirection: 'column', gap: '0px' }}>
-          <div style={{ textAlign: 'center', marginBottom: '32px' }}>
-            <h1 style={{ fontSize: '28px', color: '#FFFFFF', margin: '0', fontFamily: 'Arial Black, sans-serif' }}>Bienvenido</h1>
-            <p style={{ color: '#555', fontSize: '13px', margin: '8px 0 0' }}>Ingresa con tu correo y contraseña</p>
+          <div style={{ textAlign: 'center', marginBottom: '28px' }}>
+            <Logo size={80} style={{ marginBottom: '12px' }} />
+            <h1 style={{ fontSize: '28px', color: '#1A1A1E', margin: '0', fontFamily: 'Arial Black, sans-serif' }}>Bienvenido</h1>
+            <p style={{ color: '#6B7280', fontSize: '13px', margin: '8px 0 0' }}>Ingresa con tu correo y contraseña</p>
           </div>
-          <div style={{ background: '#1A1A1E', borderRadius: '16px', padding: '16px', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div style={estiloCampo}>
             <span style={{ fontSize: '20px' }}>📧</span>
-            <input value={email} onChange={e => setEmail(e.target.value)} placeholder="Correo electrónico" type="email" style={{ background: 'none', border: 'none', outline: 'none', color: '#FFFFFF', fontSize: '16px', width: '100%' }} />
+            <input value={email} onChange={e => setEmail(e.target.value)} placeholder="Correo electrónico" type="email" style={estiloInput} />
           </div>
-          <div style={{ background: '#1A1A1E', borderRadius: '16px', padding: '16px', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div style={estiloCampo}>
             <span style={{ fontSize: '20px' }}>🔒</span>
-            <input value={password} onChange={e => setPassword(e.target.value)} placeholder="Contraseña" type="password" style={{ background: 'none', border: 'none', outline: 'none', color: '#FFFFFF', fontSize: '16px', width: '100%' }} />
+            <input value={password} onChange={e => setPassword(e.target.value)} placeholder="Contraseña" type="password" style={estiloInput} />
           </div>
           {error && <p style={{ color: '#FF4444', fontSize: '13px', textAlign: 'center', marginBottom: '12px' }}>{error}</p>}
           {mensajeRecuperar && <p style={{ color: '#2ECC71', fontSize: '13px', textAlign: 'center', marginBottom: '12px' }}>{mensajeRecuperar}</p>}
-          <button onClick={iniciarSesion} style={{ width: '100%', padding: '18px', background: cargando ? '#2A2A2E' : 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)', border: 'none', borderRadius: '16px', color: cargando ? '#555' : '#141416', fontSize: '18px', fontWeight: '900', cursor: 'pointer', marginBottom: '12px', marginTop: '8px' }}>
+          <button onClick={iniciarSesion} style={{ ...btnPrimario, background: cargando ? '#E7E7EA' : 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)', color: cargando ? '#9AA0A6' : '#FFFFFF', marginBottom: '12px', marginTop: '8px' }}>
             {cargando ? 'Cargando...' : 'Entrar a GuajiraGo'}
           </button>
-          <button onClick={recuperarContrasena} style={{ width: '100%', padding: '16px', background: '#FFFFFF', border: 'none', borderRadius: '16px', color: '#141416', fontSize: '15px', fontWeight: '900', cursor: 'pointer', marginBottom: '12px' }}>
+          <button onClick={recuperarContrasena} style={{ width: '100%', padding: '16px', background: '#FFFFFF', border: '1.5px solid #1C8EF9', borderRadius: '16px', color: '#1C8EF9', fontSize: '15px', fontWeight: '900', cursor: 'pointer', marginBottom: '12px' }}>
             ¿Olvidaste tu contraseña?
           </button>
-          <button onClick={() => { setError(''); setMensajeRecuperar(''); setPantalla('inicio'); }} style={{ width: '100%', padding: '14px', background: 'none', border: 'none', color: '#FFFFFF', fontSize: '15px', fontWeight: 'bold', cursor: 'pointer' }}>Volver</button>
+          <button onClick={() => { setError(''); setMensajeRecuperar(''); setPantalla('inicio'); }} style={{ width: '100%', padding: '14px', background: 'none', border: 'none', color: '#6B7280', fontSize: '15px', fontWeight: 'bold', cursor: 'pointer' }}>Volver</button>
         </div>
       </div>
     );
   }
 
-  
+
 }
 
 export default Login;

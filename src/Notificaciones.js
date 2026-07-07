@@ -41,6 +41,22 @@ export const registrarTokenFCM = async () => {
   }
 };
 
+// Pide permiso y devuelve el token de notificaciones del cliente (sin guardarlo),
+// para adjuntarlo al pedido y poder avisarle los cambios de estado.
+export const obtenerTokenFCM = async () => {
+  try {
+    if (!('Notification' in window)) return null;
+    const permiso = await Notification.requestPermission();
+    if (permiso !== 'granted') return null;
+    if ('serviceWorker' in navigator) await navigator.serviceWorker.ready;
+    const messaging = getMessaging();
+    const token = await getToken(messaging, { vapidKey: VAPID_KEY });
+    return token || null;
+  } catch (e) {
+    return null;
+  }
+};
+
 export const alertarNuevoViaje = () => {
   if (navigator.vibrate) navigator.vibrate([300, 100, 300, 100, 600]);
   try {

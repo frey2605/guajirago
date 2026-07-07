@@ -3,6 +3,8 @@ import Splash from './Splash';
 import Login from './Login';
 import Home from './Home';
 import SolicitarMensajeria from './SolicitarMensajeria';
+import Restaurantes from './Restaurantes';
+import Turismo from './Turismo';
 import AppConductor from './AppConductor';
 import MenuLateral from './MenuLateral';
 import MiPerfil from './MiPerfil';
@@ -14,6 +16,7 @@ import Configuracion from './Configuracion';
 import Promociones from './Promociones';
 import Creditos from './Creditos';
 import Anuncio from './Anuncio';
+import Logo from './Logo';
 import { auth, db, storage } from './firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
@@ -51,34 +54,72 @@ function cargarLocal() {
 }
 
 function PantallaModulos({ nombre, foto, onSeleccionar, onVolver, onCerrarSesion, onIrPerfil, onIrGanancias, onIrSeguridad, onIrViajes, onIrCreditos, onIrAyuda, onIrConfig, onIrPromociones }) {
+  // NUEVO: interruptores de módulos desde config/global (Superadmin). Por defecto Transporte y Mensajería van prendidos.
+  const [modulos, setModulos] = useState({ moduloTransporte: true, moduloMensajeria: true, moduloRestaurantes: false, moduloTurismo: false });
+  useEffect(() => {
+    getDoc(doc(db, 'config', 'global')).then(snap => {
+      if (snap.exists()) {
+        const d = snap.data();
+        setModulos({
+          moduloTransporte: d.moduloTransporte !== false,
+          moduloMensajeria: d.moduloMensajeria !== false,
+          moduloRestaurantes: d.moduloRestaurantes === true,
+          moduloTurismo: d.moduloTurismo === true,
+        });
+      }
+    }).catch(() => {});
+  }, []);
   return (
-    <div style={{ backgroundColor: '#141416', minHeight: '100vh', fontFamily: 'Arial, sans-serif', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start', padding: '72px 24px 32px', position: 'relative' }}>
+    <div style={{ backgroundColor: '#FFFFFF', minHeight: '100vh', fontFamily: 'Arial, sans-serif', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start', padding: '72px 24px 32px', position: 'relative' }}>
       <MenuLateral nombre={nombre} foto={foto} onIrPerfil={onIrPerfil} onIrGanancias={onIrGanancias} onIrSeguridad={onIrSeguridad} onIrViajes={onIrViajes} onIrCreditos={onIrCreditos} onIrAyuda={onIrAyuda} onIrConfig={onIrConfig} onIrPromociones={onIrPromociones} onCerrarSesion={onCerrarSesion} />
-      <div style={{ position: 'absolute', top: '18px', right: '20px', display: 'flex', alignItems: 'baseline', gap: '2px' }}>
-        <span style={{ fontSize: '20px', color: '#FFFFFF', fontWeight: '900', fontFamily: 'Arial Black, sans-serif', letterSpacing: '-0.5px' }}>Guajira</span>
+      <div style={{ position: 'absolute', top: '16px', right: '20px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+        <Logo size={24} />
+        <span style={{ fontSize: '20px', color: '#1A1A1E', fontWeight: '900', fontFamily: 'Arial Black, sans-serif', letterSpacing: '-0.5px' }}>Guajira</span>
         <span style={{ fontSize: '20px', background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', fontWeight: '900', fontFamily: 'Arial Black, sans-serif', letterSpacing: '-0.5px' }}>GO</span>
       </div>
-      <p style={{ color: '#AAAAAA', fontSize: '14px', letterSpacing: '3px', margin: '0 0 24px', textAlign: 'center' }}>¿QUÉ QUIERES HACER?</p>
+      <p style={{ color: '#6B7280', fontSize: '14px', letterSpacing: '3px', margin: '0 0 24px', textAlign: 'center' }}>¿QUÉ QUIERES HACER?</p>
       <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-        <div onClick={() => onSeleccionar('transporte')} style={{ background: '#1A1A1E', borderRadius: '20px', padding: '24px', display: 'flex', alignItems: 'center', gap: '16px', cursor: 'pointer', border: '1px solid #FF7A2F' }}>
-          <span style={{ fontSize: '40px' }}>🚗</span>
-          <div>
-            <p style={{ color: '#FFFFFF', fontWeight: '900', fontSize: '18px', margin: '0' }}>Transporte y movilidad</p>
-            <p style={{ color: '#AAAAAA', fontSize: '13px', margin: '4px 0 0' }}>Taxi y mototaxi en Riohacha</p>
+        {modulos.moduloTransporte && (
+          <div onClick={() => onSeleccionar('transporte')} style={{ background: '#FFFFFF', borderRadius: '20px', padding: '24px', display: 'flex', alignItems: 'center', gap: '16px', cursor: 'pointer', border: '2px solid #1C8EF9' }}>
+            <span style={{ fontSize: '40px' }}>🚗</span>
+            <div>
+              <p style={{ color: '#1A1A1E', fontWeight: '900', fontSize: '18px', margin: '0' }}>Transporte y movilidad</p>
+              <p style={{ color: '#6B7280', fontSize: '13px', margin: '4px 0 0' }}>Taxi y mototaxi en Riohacha</p>
+            </div>
           </div>
-        </div>
-        <div onClick={() => onSeleccionar('mensajeria')} style={{ background: '#1A1A1E', borderRadius: '20px', padding: '24px', display: 'flex', alignItems: 'center', gap: '16px', cursor: 'pointer', border: '1px solid #FF7A2F' }}>
-          <span style={{ fontSize: '40px' }}>📦</span>
-          <div>
-            <p style={{ color: '#FFFFFF', fontWeight: '900', fontSize: '18px', margin: '0' }}>Mensajería y Mandados</p>
-            <p style={{ color: '#AAAAAA', fontSize: '13px', margin: '4px 0 0' }}>Envía paquetes y haz mandados en moto</p>
+        )}
+        {modulos.moduloMensajeria && (
+          <div onClick={() => onSeleccionar('mensajeria')} style={{ background: '#FFFFFF', borderRadius: '20px', padding: '24px', display: 'flex', alignItems: 'center', gap: '16px', cursor: 'pointer', border: '2px solid #1C8EF9' }}>
+            <span style={{ fontSize: '40px' }}>📦</span>
+            <div>
+              <p style={{ color: '#1A1A1E', fontWeight: '900', fontSize: '18px', margin: '0' }}>Mensajería y Mandados</p>
+              <p style={{ color: '#6B7280', fontSize: '13px', margin: '4px 0 0' }}>Envía paquetes y haz mandados en moto</p>
+            </div>
           </div>
-        </div>
-        <div style={{ background: '#1A1A1E', borderRadius: '20px', padding: '24px', display: 'flex', alignItems: 'center', gap: '16px', border: '1px solid #2A2A2E', opacity: 0.4 }}>
+        )}
+        {modulos.moduloRestaurantes && (
+          <div onClick={() => onSeleccionar('restaurantes')} style={{ background: '#FFFFFF', borderRadius: '20px', padding: '24px', display: 'flex', alignItems: 'center', gap: '16px', cursor: 'pointer', border: '2px solid #1C8EF9' }}>
+            <span style={{ fontSize: '40px' }}>🍽️</span>
+            <div>
+              <p style={{ color: '#1A1A1E', fontWeight: '900', fontSize: '18px', margin: '0' }}>Restaurantes</p>
+              <p style={{ color: '#6B7280', fontSize: '13px', margin: '4px 0 0' }}>Pide tu comida a domicilio</p>
+            </div>
+          </div>
+        )}
+        {modulos.moduloTurismo && (
+          <div onClick={() => onSeleccionar('turismo')} style={{ background: '#FFFFFF', borderRadius: '20px', padding: '24px', display: 'flex', alignItems: 'center', gap: '16px', cursor: 'pointer', border: '2px solid #1C8EF9' }}>
+            <span style={{ fontSize: '40px' }}>🧭</span>
+            <div>
+              <p style={{ color: '#1A1A1E', fontWeight: '900', fontSize: '18px', margin: '0' }}>Turismo</p>
+              <p style={{ color: '#6B7280', fontSize: '13px', margin: '4px 0 0' }}>Tours y alquileres en La Guajira</p>
+            </div>
+          </div>
+        )}
+        <div style={{ background: '#FFFFFF', borderRadius: '20px', padding: '24px', display: 'flex', alignItems: 'center', gap: '16px', border: '1px solid #ECECEF', opacity: 0.4 }}>
           <span style={{ fontSize: '40px' }}>🛒</span>
           <div>
-            <p style={{ color: '#FFFFFF', fontWeight: '900', fontSize: '18px', margin: '0' }}>Más módulos</p>
-            <p style={{ color: '#AAAAAA', fontSize: '13px', margin: '4px 0 0' }}>Próximamente</p>
+            <p style={{ color: '#1A1A1E', fontWeight: '900', fontSize: '18px', margin: '0' }}>Más módulos</p>
+            <p style={{ color: '#6B7280', fontSize: '13px', margin: '4px 0 0' }}>Próximamente</p>
           </div>
         </div>
       </div>
@@ -88,25 +129,26 @@ function PantallaModulos({ nombre, foto, onSeleccionar, onVolver, onCerrarSesion
 
 function PantallaRol({ nombre, foto, onSeleccionar, onVolver, onCerrarSesion, onIrPerfil, onIrGanancias, onIrSeguridad, onIrViajes, onIrCreditos, onIrAyuda, onIrConfig, onIrPromociones }) {
   return (
-    <div style={{ backgroundColor: '#141416', minHeight: '100vh', fontFamily: 'Arial, sans-serif', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px 24px', position: 'relative' }}>
+    <div style={{ backgroundColor: '#FFFFFF', minHeight: '100vh', fontFamily: 'Arial, sans-serif', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px 24px', position: 'relative' }}>
       <MenuLateral nombre={nombre} foto={foto} onIrPerfil={onIrPerfil} onIrGanancias={onIrGanancias} onIrSeguridad={onIrSeguridad} onIrViajes={onIrViajes} onIrCreditos={onIrCreditos} onIrAyuda={onIrAyuda} onIrConfig={onIrConfig} onIrPromociones={onIrPromociones} onCerrarSesion={onCerrarSesion} />
-      <div onClick={onVolver} style={{ position: 'absolute', top: '18px', left: '120px', display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(255,255,255,0.12)', borderRadius: '12px', color: '#FFFFFF', fontSize: '14px', fontWeight: '500', padding: '8px 16px', cursor: 'pointer', zIndex: 5 }}><span style={{ fontSize: '20px', fontWeight: '900', lineHeight: '1' }}>‹</span> Volver</div>
-      <p style={{ color: '#AAAAAA', fontSize: '14px', letterSpacing: '3px', marginBottom: '8px', textAlign: 'center' }}>BIENVENIDO</p>
-      <h2 style={{ color: '#FFFFFF', fontSize: '26px', fontWeight: '900', margin: '0 0 32px', textAlign: 'center' }}>{nombre || 'Usuario'}</h2>
-      <p style={{ color: '#AAAAAA', fontSize: '14px', letterSpacing: '2px', marginBottom: '24px', textAlign: 'center' }}>¿CÓMO VAS A USAR GUAJIRAGO?</p>
+      <div onClick={onVolver} style={{ position: 'absolute', top: '18px', left: '120px', display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(0,0,0,0.06)', borderRadius: '12px', color: '#1A1A1E', fontSize: '14px', fontWeight: '500', padding: '8px 16px', cursor: 'pointer', zIndex: 5 }}><span style={{ fontSize: '20px', fontWeight: '900', lineHeight: '1' }}>‹</span> Volver</div>
+      <Logo size={100} style={{ marginBottom: '20px' }} />
+      <p style={{ color: '#6B7280', fontSize: '14px', letterSpacing: '3px', marginBottom: '8px', textAlign: 'center' }}>BIENVENIDO</p>
+      <h2 style={{ color: '#1A1A1E', fontSize: '26px', fontWeight: '900', margin: '0 0 32px', textAlign: 'center' }}>{nombre || 'Usuario'}</h2>
+      <p style={{ color: '#6B7280', fontSize: '14px', letterSpacing: '2px', marginBottom: '24px', textAlign: 'center' }}>¿CÓMO VAS A USAR GUAJIRAGO?</p>
       <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-        <div onClick={() => onSeleccionar('pasajero')} style={{ background: '#1A1A1E', borderRadius: '20px', padding: '24px', display: 'flex', alignItems: 'center', gap: '16px', cursor: 'pointer', border: '1px solid #2A2A2E' }}>
+        <div onClick={() => onSeleccionar('pasajero')} style={{ background: '#FFFFFF', borderRadius: '20px', padding: '24px', display: 'flex', alignItems: 'center', gap: '16px', cursor: 'pointer', border: '2px solid #1C8EF9' }}>
           <span style={{ fontSize: '40px' }}>🙋</span>
           <div>
-            <p style={{ color: '#FFFFFF', fontWeight: '900', fontSize: '18px', margin: '0' }}>Soy pasajero</p>
-            <p style={{ color: '#AAAAAA', fontSize: '13px', margin: '4px 0 0' }}>Quiero solicitar taxi o mototaxi</p>
+            <p style={{ color: '#1A1A1E', fontWeight: '900', fontSize: '18px', margin: '0' }}>Soy pasajero</p>
+            <p style={{ color: '#6B7280', fontSize: '13px', margin: '4px 0 0' }}>Quiero solicitar taxi o mototaxi</p>
           </div>
         </div>
-        <div onClick={() => onSeleccionar('conductor')} style={{ background: '#1A1A1E', borderRadius: '20px', padding: '24px', display: 'flex', alignItems: 'center', gap: '16px', cursor: 'pointer', border: '1px solid #2A2A2E' }}>
+        <div onClick={() => onSeleccionar('conductor')} style={{ background: '#FFFFFF', borderRadius: '20px', padding: '24px', display: 'flex', alignItems: 'center', gap: '16px', cursor: 'pointer', border: '2px solid #1C8EF9' }}>
           <span style={{ fontSize: '40px' }}>🚗</span>
           <div>
-            <p style={{ color: '#FFFFFF', fontWeight: '900', fontSize: '18px', margin: '0' }}>Soy conductor</p>
-            <p style={{ color: '#AAAAAA', fontSize: '13px', margin: '4px 0 0' }}>Quiero recibir y hacer viajes</p>
+            <p style={{ color: '#1A1A1E', fontWeight: '900', fontSize: '18px', margin: '0' }}>Soy conductor</p>
+            <p style={{ color: '#6B7280', fontSize: '13px', margin: '4px 0 0' }}>Quiero recibir y hacer viajes</p>
           </div>
         </div>
       </div>
@@ -114,26 +156,28 @@ function PantallaRol({ nombre, foto, onSeleccionar, onVolver, onCerrarSesion, on
   );
 }
 
-function PantallaMensajeria({ nombre, onEnviar, onDomiciliario, onVolver }) {
+function PantallaMensajeria({ nombre, foto, onEnviar, onDomiciliario, onVolver, onCerrarSesion, onIrPerfil, onIrCreditos, onIrViajes, onIrGanancias, onIrSeguridad, onIrAyuda, onIrConfig, onIrPromociones }) {
   return (
-    <div style={{ backgroundColor: '#141416', minHeight: '100vh', fontFamily: 'Arial, sans-serif', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px 24px', position: 'relative' }}>
-      <div onClick={onVolver} style={{ position: 'absolute', top: '18px', left: '20px', display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(255,255,255,0.12)', borderRadius: '12px', color: '#FFFFFF', fontSize: '14px', fontWeight: '500', padding: '8px 16px', cursor: 'pointer', zIndex: 5 }}><span style={{ fontSize: '20px', fontWeight: '900', lineHeight: '1' }}>‹</span> Volver</div>
+    <div style={{ backgroundColor: '#FFFFFF', minHeight: '100vh', fontFamily: 'Arial, sans-serif', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px 24px', position: 'relative' }}>
+      <MenuLateral nombre={nombre} foto={foto} onIrPerfil={onIrPerfil} onIrCreditos={onIrCreditos} onIrViajes={onIrViajes} onIrGanancias={onIrGanancias} onIrSeguridad={onIrSeguridad} onIrAyuda={onIrAyuda} onIrConfig={onIrConfig} onIrPromociones={onIrPromociones} onCerrarSesion={onCerrarSesion} />
+      <div onClick={onVolver} style={{ position: 'absolute', top: '18px', left: '120px', display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(0,0,0,0.06)', borderRadius: '12px', color: '#1A1A1E', fontSize: '14px', fontWeight: '500', padding: '8px 16px', cursor: 'pointer', zIndex: 5 }}><span style={{ fontSize: '20px', fontWeight: '900', lineHeight: '1' }}>‹</span> Volver</div>
+      <Logo size={34} style={{ position: 'absolute', top: '16px', right: '16px', zIndex: 5 }} />
       <span style={{ fontSize: '52px', marginBottom: '8px' }}>📦</span>
-      <h2 style={{ color: '#FFFFFF', fontSize: '26px', fontWeight: '900', margin: '0 0 4px', textAlign: 'center' }}>Mensajería y Mandados</h2>
-      <p style={{ color: '#AAAAAA', fontSize: '14px', letterSpacing: '2px', margin: '0 0 28px', textAlign: 'center' }}>¿QUÉ QUIERES HACER?</p>
+      <h2 style={{ color: '#1A1A1E', fontSize: '26px', fontWeight: '900', margin: '0 0 4px', textAlign: 'center' }}>Mensajería y Mandados</h2>
+      <p style={{ color: '#6B7280', fontSize: '14px', letterSpacing: '2px', margin: '0 0 28px', textAlign: 'center' }}>¿QUÉ QUIERES HACER?</p>
       <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-        <div onClick={onEnviar} style={{ background: '#1A1A1E', borderRadius: '20px', padding: '24px', display: 'flex', alignItems: 'center', gap: '16px', cursor: 'pointer', border: '1px solid #FF7A2F' }}>
+        <div onClick={onEnviar} style={{ background: '#FFFFFF', borderRadius: '20px', padding: '24px', display: 'flex', alignItems: 'center', gap: '16px', cursor: 'pointer', border: '2px solid #1C8EF9' }}>
           <span style={{ fontSize: '40px' }}>📦</span>
           <div>
-            <p style={{ color: '#FFFFFF', fontWeight: '900', fontSize: '18px', margin: '0' }}>Quiero enviar algo</p>
-            <p style={{ color: '#AAAAAA', fontSize: '13px', margin: '4px 0 0' }}>Enviar un paquete o pedir un mandado</p>
+            <p style={{ color: '#1A1A1E', fontWeight: '900', fontSize: '18px', margin: '0' }}>Quiero enviar algo</p>
+            <p style={{ color: '#6B7280', fontSize: '13px', margin: '4px 0 0' }}>Enviar un paquete o pedir un mandado</p>
           </div>
         </div>
-        <div onClick={onDomiciliario} style={{ background: '#1A1A1E', borderRadius: '20px', padding: '24px', display: 'flex', alignItems: 'center', gap: '16px', cursor: 'pointer', border: '1px solid #2A2A2E' }}>
+        <div onClick={onDomiciliario} style={{ background: '#FFFFFF', borderRadius: '20px', padding: '24px', display: 'flex', alignItems: 'center', gap: '16px', cursor: 'pointer', border: '2px solid #1C8EF9' }}>
           <span style={{ fontSize: '40px' }}>🏍️</span>
           <div>
-            <p style={{ color: '#FFFFFF', fontWeight: '900', fontSize: '18px', margin: '0' }}>Soy domiciliario</p>
-            <p style={{ color: '#AAAAAA', fontSize: '13px', margin: '4px 0 0' }}>Recibir mandados y llevarlos en moto</p>
+            <p style={{ color: '#1A1A1E', fontWeight: '900', fontSize: '18px', margin: '0' }}>Soy domiciliario</p>
+            <p style={{ color: '#6B7280', fontSize: '13px', margin: '4px 0 0' }}>Recibir mandados y llevarlos en moto</p>
           </div>
         </div>
       </div>
@@ -219,37 +263,37 @@ function PantallaDatosConductor({ nombre, foto, celular, onGuardar, onVolver, on
     setCargando(false);
   };
 
-  const estiloCampoBase = { background: '#1A1A1E', borderRadius: '16px', padding: '16px', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '12px' };
+  const estiloCampoBase = { background: '#FFFFFF', border: '1.5px solid #ECECEF', borderRadius: '16px', padding: '16px', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '12px' };
   const estiloCampo = estiloCampoBase;
   const campoRojo = (campo) => campoError === campo ? { ...estiloCampoBase, border: '2px solid #FF4444' } : estiloCampoBase;
-  const estiloInput = { background: 'none', border: 'none', outline: 'none', color: '#FFFFFF', fontSize: '16px', width: '100%' };
+  const estiloInput = { background: 'none', border: 'none', outline: 'none', color: '#1A1A1E', fontSize: '16px', width: '100%' };
 
   return (
-    <div style={{ backgroundColor: '#141416', minHeight: '100vh', fontFamily: 'Arial, sans-serif', display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '32px 24px', position: 'relative' }}>
+    <div style={{ backgroundColor: '#FFFFFF', minHeight: '100vh', fontFamily: 'Arial, sans-serif', display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '32px 24px', position: 'relative' }}>
       {error && campoError && (
         <div onClick={() => setError('')} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
-          <div onClick={(e) => e.stopPropagation()} style={{ background: '#1A1A1E', borderRadius: '24px', padding: '32px 24px', width: '100%', maxWidth: '380px', border: '2px solid #FF4444', textAlign: 'center', position: 'relative' }}>
-            <span onClick={() => setError('')} style={{ position: 'absolute', top: '16px', right: '20px', color: '#AAAAAA', fontSize: '26px', cursor: 'pointer', lineHeight: '1' }}>✕</span>
+          <div onClick={(e) => e.stopPropagation()} style={{ background: '#FFFFFF', borderRadius: '24px', padding: '32px 24px', width: '100%', maxWidth: '380px', border: '2px solid #FF4444', textAlign: 'center', position: 'relative' }}>
+            <span onClick={() => setError('')} style={{ position: 'absolute', top: '16px', right: '20px', color: '#6B7280', fontSize: '26px', cursor: 'pointer', lineHeight: '1' }}>✕</span>
             <div style={{ fontSize: '54px', marginBottom: '12px' }}>⚠️</div>
-            <h2 style={{ color: '#FFFFFF', fontSize: '20px', fontWeight: '900', margin: '0 0 10px' }}>Falta un dato</h2>
-            <p style={{ color: '#FFFFFF', fontSize: '17px', margin: '0 0 24px', lineHeight: '1.5', fontWeight: 'bold' }}>{error}</p>
+            <h2 style={{ color: '#1A1A1E', fontSize: '20px', fontWeight: '900', margin: '0 0 10px' }}>Falta un dato</h2>
+            <p style={{ color: '#1A1A1E', fontSize: '17px', margin: '0 0 24px', lineHeight: '1.5', fontWeight: 'bold' }}>{error}</p>
             <button onClick={() => setError('')} style={{ width: '100%', padding: '16px', background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F)', border: 'none', borderRadius: '14px', color: '#141416', fontSize: '16px', fontWeight: '900', cursor: 'pointer' }}>Entendido</button>
           </div>
         </div>
       )}
       <MenuLateral nombre={nombre} foto={foto} onIrPerfil={onIrPerfil} onIrGanancias={onIrGanancias} onIrSeguridad={onIrSeguridad} onIrViajes={onIrViajes} onIrCreditos={onIrCreditos} onIrAyuda={onIrAyuda} onIrConfig={onIrConfig} onIrPromociones={onIrPromociones} onCerrarSesion={onCerrarSesion} />
-      <div onClick={onVolver} style={{ position: 'absolute', top: '18px', left: '120px', display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(255,255,255,0.12)', borderRadius: '12px', color: '#FFFFFF', fontSize: '14px', fontWeight: '500', padding: '8px 16px', cursor: 'pointer', zIndex: 5 }}><span style={{ fontSize: '20px', fontWeight: '900', lineHeight: '1' }}>‹</span> Volver</div>
+      <div onClick={onVolver} style={{ position: 'absolute', top: '18px', left: '120px', display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(0,0,0,0.06)', borderRadius: '12px', color: '#1A1A1E', fontSize: '14px', fontWeight: '500', padding: '8px 16px', cursor: 'pointer', zIndex: 5 }}><span style={{ fontSize: '20px', fontWeight: '900', lineHeight: '1' }}>‹</span> Volver</div>
       <div style={{ textAlign: 'center', marginBottom: '32px' }}>
         <span style={{ fontSize: '48px' }}>🚗</span>
-        <h2 style={{ color: '#FFFFFF', fontSize: '22px', fontWeight: '900', margin: '12px 0 4px' }}>Datos del conductor</h2>
-        <p style={{ color: '#AAAAAA', fontSize: '13px', margin: '0' }}>Completa tu perfil de conductor</p>
+        <h2 style={{ color: '#1A1A1E', fontSize: '22px', fontWeight: '900', margin: '12px 0 4px' }}>Datos del conductor</h2>
+        <p style={{ color: '#6B7280', fontSize: '13px', margin: '0' }}>Completa tu perfil de conductor</p>
       </div>
       <div style={estiloCampo}>
         <span style={{ fontSize: '20px' }}>🚖</span>
         <select value={tipoVehiculo} onChange={e => setTipoVehiculo(e.target.value)} style={{ ...estiloInput, cursor: 'pointer' }}>
-          <option value="" style={{ background: '#1A1A1E' }}>Tipo de vehículo</option>
-          <option value="Taxi" style={{ background: '#1A1A1E' }}>🚗 Taxi</option>
-          <option value="Mototaxi" style={{ background: '#1A1A1E' }}>🏍️ Mototaxi</option>
+          <option value="" style={{ background: '#FFFFFF' }}>Tipo de vehículo</option>
+          <option value="Taxi" style={{ background: '#FFFFFF' }}>🚗 Taxi</option>
+          <option value="Mototaxi" style={{ background: '#FFFFFF' }}>🏍️ Mototaxi</option>
         </select>
       </div>
       <div style={campoRojo('telefono')}>
@@ -263,7 +307,7 @@ function PantallaDatosConductor({ nombre, foto, celular, onGuardar, onVolver, on
       <div onClick={() => setListaMarcaAbierta(true)} style={{ ...campoRojo('marca'), cursor: 'pointer' }}>
         <span style={{ fontSize: '20px' }}>🏭</span>
         <span style={{ color: marca ? '#FFFFFF' : '#AAAAAA', fontSize: '16px', flex: 1 }}>{marca || 'Marca del vehículo'}</span>
-        <span style={{ color: '#AAAAAA', fontSize: '14px' }}>▼</span>
+        <span style={{ color: '#6B7280', fontSize: '14px' }}>▼</span>
       </div>
       {marca === 'Otra' && (
         <div style={campoRojo('marcaOtra')}>
@@ -274,11 +318,11 @@ function PantallaDatosConductor({ nombre, foto, celular, onGuardar, onVolver, on
 
       {listaMarcaAbierta && (
         <div onClick={() => setListaMarcaAbierta(false)} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
-          <div onClick={(e) => e.stopPropagation()} style={{ background: '#1A1A1E', borderRadius: '20px', padding: '20px', width: '100%', maxWidth: '380px', maxHeight: '70vh', overflowY: 'auto' }}>
-            <p style={{ color: '#FFFFFF', fontSize: '16px', fontWeight: '900', margin: '0 0 16px', textAlign: 'center' }}>Escoge la marca</p>
+          <div onClick={(e) => e.stopPropagation()} style={{ background: '#FFFFFF', borderRadius: '20px', padding: '20px', width: '100%', maxWidth: '380px', maxHeight: '70vh', overflowY: 'auto' }}>
+            <p style={{ color: '#1A1A1E', fontSize: '16px', fontWeight: '900', margin: '0 0 16px', textAlign: 'center' }}>Escoge la marca</p>
             {MARCAS_VEHICULO.map(m => (
               <div key={m} onClick={() => { setMarca(m); if (m !== 'Otra') setMarcaOtra(''); setListaMarcaAbierta(false); }} style={{ display: 'flex', alignItems: 'center', padding: '14px', borderRadius: '12px', cursor: 'pointer', background: marca === m ? '#2A2A2E' : 'transparent', marginBottom: '4px' }}>
-                <span style={{ color: '#FFFFFF', fontSize: '16px' }}>{m}</span>
+                <span style={{ color: '#1A1A1E', fontSize: '16px' }}>{m}</span>
               </div>
             ))}
           </div>
@@ -287,9 +331,9 @@ function PantallaDatosConductor({ nombre, foto, celular, onGuardar, onVolver, on
       <div style={campoRojo('modelo')}>
         <span style={{ fontSize: '20px' }}>📅</span>
         <select value={modelo} onChange={e => setModelo(e.target.value)} style={{ ...estiloInput, cursor: 'pointer' }}>
-          <option value="" style={{ background: '#1A1A1E' }}>Año del modelo</option>
+          <option value="" style={{ background: '#FFFFFF' }}>Año del modelo</option>
           {Array.from({ length: new Date().getFullYear() - 1989 }, (_, i) => new Date().getFullYear() - i).map(anio => (
-            <option key={anio} value={anio} style={{ background: '#1A1A1E' }}>{anio}</option>
+            <option key={anio} value={anio} style={{ background: '#FFFFFF' }}>{anio}</option>
           ))}
         </select>
       </div>
@@ -298,22 +342,22 @@ function PantallaDatosConductor({ nombre, foto, celular, onGuardar, onVolver, on
         {color ? (
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1 }}>
             <span style={{ width: '20px', height: '20px', borderRadius: '50%', background: COLORES_VEHICULO.find(c => c.nombre === color)?.hex || '#888', border: '1px solid #555', flexShrink: 0 }} />
-            <span style={{ color: '#FFFFFF', fontSize: '16px' }}>{color}</span>
+            <span style={{ color: '#1A1A1E', fontSize: '16px' }}>{color}</span>
           </div>
         ) : (
-          <span style={{ color: '#AAAAAA', fontSize: '16px', flex: 1 }}>Color del vehículo</span>
+          <span style={{ color: '#6B7280', fontSize: '16px', flex: 1 }}>Color del vehículo</span>
         )}
-        <span style={{ color: '#AAAAAA', fontSize: '14px' }}>▼</span>
+        <span style={{ color: '#6B7280', fontSize: '14px' }}>▼</span>
       </div>
 
       {listaColorAbierta && (
         <div onClick={() => setListaColorAbierta(false)} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
-          <div onClick={(e) => e.stopPropagation()} style={{ background: '#1A1A1E', borderRadius: '20px', padding: '20px', width: '100%', maxWidth: '380px', maxHeight: '70vh', overflowY: 'auto' }}>
-            <p style={{ color: '#FFFFFF', fontSize: '16px', fontWeight: '900', margin: '0 0 16px', textAlign: 'center' }}>Escoge el color</p>
+          <div onClick={(e) => e.stopPropagation()} style={{ background: '#FFFFFF', borderRadius: '20px', padding: '20px', width: '100%', maxWidth: '380px', maxHeight: '70vh', overflowY: 'auto' }}>
+            <p style={{ color: '#1A1A1E', fontSize: '16px', fontWeight: '900', margin: '0 0 16px', textAlign: 'center' }}>Escoge el color</p>
             {COLORES_VEHICULO.map(c => (
               <div key={c.nombre} onClick={() => { setColor(c.nombre); setListaColorAbierta(false); }} style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '14px', borderRadius: '12px', cursor: 'pointer', background: color === c.nombre ? '#2A2A2E' : 'transparent', marginBottom: '4px' }}>
                 <span style={{ width: '26px', height: '26px', borderRadius: '50%', background: c.hex, border: '1px solid #555', flexShrink: 0 }} />
-                <span style={{ color: '#FFFFFF', fontSize: '16px' }}>{c.nombre}</span>
+                <span style={{ color: '#1A1A1E', fontSize: '16px' }}>{c.nombre}</span>
               </div>
             ))}
           </div>
@@ -350,11 +394,11 @@ function PantallaDatosConductor({ nombre, foto, celular, onGuardar, onVolver, on
 
 function PantallaMantenimiento({ mensaje, onVolver }) {
   return (
-    <div style={{ backgroundColor: '#141416', minHeight: '100vh', fontFamily: 'Arial, sans-serif', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px 24px', textAlign: 'center' }}>
+    <div style={{ backgroundColor: '#FFFFFF', minHeight: '100vh', fontFamily: 'Arial, sans-serif', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px 24px', textAlign: 'center' }}>
       <div style={{ fontSize: '70px', marginBottom: '20px' }}>🛠️</div>
-      <h2 style={{ color: '#FFFFFF', fontSize: '24px', fontWeight: '900', margin: '0 0 16px' }}>Estamos en mantenimiento</h2>
-      <div style={{ background: 'linear-gradient(135deg, #1A1A1E, #2A2A2E)', borderRadius: '20px', padding: '24px', width: '100%', maxWidth: '420px', border: '1px solid #FF7A2F', marginBottom: '24px' }}>
-        <p style={{ color: '#FFFFFF', fontSize: '15px', margin: '0', lineHeight: '1.6' }}>{mensaje}</p>
+      <h2 style={{ color: '#1A1A1E', fontSize: '24px', fontWeight: '900', margin: '0 0 16px' }}>Estamos en mantenimiento</h2>
+      <div style={{ background: 'linear-gradient(135deg, #FFFFFF, #FFF6EE)', borderRadius: '20px', padding: '24px', width: '100%', maxWidth: '420px', border: '1px solid #FF7A2F', marginBottom: '24px' }}>
+        <p style={{ color: '#1A1A1E', fontSize: '15px', margin: '0', lineHeight: '1.6' }}>{mensaje}</p>
       </div>
       <button onClick={onVolver} style={{ padding: '14px 32px', background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)', border: 'none', borderRadius: '14px', color: '#141416', fontSize: '15px', fontWeight: '900', cursor: 'pointer' }}>Volver</button>
     </div>
@@ -363,9 +407,9 @@ function PantallaMantenimiento({ mensaje, onVolver }) {
 
 function CelebracionBienvenidaConductor({ monto, onContinuar }) {
   const confeti = Array.from({ length: 40 }, (_, i) => i);
-  const colores = ['#FFCF4D', '#FF7A2F', '#D6357E', '#2ECC71', '#4DA3FF', '#FFFFFF'];
+  const colores = ['#FFCF4D', '#FF7A2F', '#D6357E', '#2ECC71', '#4DA3FF', '#1C8EF9'];
   return (
-    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: '#141416', zIndex: 999999, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px', overflow: 'hidden' }}>
+    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: '#FFFFFF', zIndex: 999999, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px', overflow: 'hidden' }}>
       {confeti.map(i => (
         <span key={i} style={{
           position: 'absolute', top: '-24px', left: `${Math.random() * 100}%`,
@@ -376,8 +420,8 @@ function CelebracionBienvenidaConductor({ monto, onContinuar }) {
       ))}
       <div style={{ fontSize: '30px', marginBottom: '4px', animation: 'rebotarBienvenidaC 0.6s infinite alternate', zIndex: 2 }}>🎉🎊🎉</div>
       <div style={{ fontSize: '90px', margin: '8px 0 4px', animation: 'rebotarBienvenidaC 0.6s infinite alternate', zIndex: 2 }}>🚗💰</div>
-      <h1 style={{ color: '#FFFFFF', fontSize: '26px', fontWeight: '900', margin: '8px 0 4px', textAlign: 'center', zIndex: 2 }}>¡Bienvenido, conductor!</h1>
-      <p style={{ color: '#FFCF4D', fontSize: '15px', margin: '0 0 24px', textAlign: 'center', fontWeight: 'bold', zIndex: 2 }}>Empiezas con saldo en tu cuenta 🥳</p>
+      <h1 style={{ color: '#1A1A1E', fontSize: '26px', fontWeight: '900', margin: '8px 0 4px', textAlign: 'center', zIndex: 2 }}>¡Bienvenido, conductor!</h1>
+      <p style={{ color: '#FF7A2F', fontSize: '15px', margin: '0 0 24px', textAlign: 'center', fontWeight: 'bold', zIndex: 2 }}>Empiezas con saldo en tu cuenta 🥳</p>
       <div style={{ background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)', borderRadius: '28px', padding: '32px 28px', width: '100%', maxWidth: '420px', textAlign: 'center', zIndex: 2, boxShadow: '0 8px 32px rgba(255,122,47,0.4)' }}>
         <p style={{ color: '#141416', fontSize: '13px', margin: '0 0 8px', letterSpacing: '2px', fontWeight: '900' }}>CRÉDITOS DE BIENVENIDA</p>
         <p style={{ color: '#141416', fontSize: '54px', fontWeight: '900', margin: '0', lineHeight: '1' }}>${(monto || 0).toLocaleString()}</p>
@@ -480,6 +524,10 @@ function App() {
       setScreen('rol');
     } else if (modulo === 'mensajeria') {
       setScreen('mensajeria');
+    } else if (modulo === 'restaurantes') {
+      setScreen('restaurantes');
+    } else if (modulo === 'turismo') {
+      setScreen('turismo');
     }
   };
 
@@ -547,8 +595,10 @@ function App() {
   if (screen === 'login') return <Login onEntrar={handleEntrar} />;
   if (screen === 'modulos') return <><PantallaModulos nombre={nombreUsuario} foto={fotoUsuario} onSeleccionar={handleSeleccionarModulo} onVolver={() => setScreen('login')} onCerrarSesion={handleCerrarSesion} onIrPerfil={() => setVerPerfil(true)} onIrGanancias={() => setVerGanancias(true)} onIrSeguridad={() => setVerSeguridad(true)} onIrViajes={() => setVerMisViajes(true)} onIrCreditos={() => setVerCreditos(true)} onIrAyuda={() => setVerAyuda(true)} onIrConfig={() => setVerConfig(true)} onIrPromociones={() => setVerPromociones(true)} /><Anuncio tipoUsuario={tipoUsuario} /></>;
   if (screen === 'rol') return <PantallaRol nombre={nombreUsuario} foto={fotoUsuario} onSeleccionar={handleSeleccionarRol} onVolver={() => setScreen('modulos')} onCerrarSesion={handleCerrarSesion} onIrPerfil={() => setVerPerfil(true)} onIrGanancias={() => setVerGanancias(true)} onIrSeguridad={() => setVerSeguridad(true)} onIrViajes={() => setVerMisViajes(true)} onIrCreditos={() => setVerCreditos(true)} onIrAyuda={() => setVerAyuda(true)} onIrConfig={() => setVerConfig(true)} onIrPromociones={() => setVerPromociones(true)} />;
-  if (screen === 'mensajeria') return <PantallaMensajeria nombre={nombreUsuario} onVolver={() => setScreen('modulos')} onEnviar={() => setScreen('enviar')} onDomiciliario={() => handleSeleccionarRol('conductor')} />;
+  if (screen === 'mensajeria') return <PantallaMensajeria nombre={nombreUsuario} foto={fotoUsuario} onVolver={() => setScreen('modulos')} onEnviar={() => setScreen('enviar')} onDomiciliario={() => handleSeleccionarRol('conductor')} onCerrarSesion={handleCerrarSesion} onIrPerfil={() => setVerPerfil(true)} onIrGanancias={() => setVerGanancias(true)} onIrSeguridad={() => setVerSeguridad(true)} onIrViajes={() => setVerMisViajes(true)} onIrCreditos={() => setVerCreditos(true)} onIrAyuda={() => setVerAyuda(true)} onIrConfig={() => setVerConfig(true)} onIrPromociones={() => setVerPromociones(true)} />;
   if (screen === 'enviar') return <SolicitarMensajeria onVolver={() => setScreen('mensajeria')} />;
+  if (screen === 'restaurantes') return <Restaurantes nombre={nombreUsuario} foto={fotoUsuario} onVolver={() => setScreen('modulos')} onCerrarSesion={handleCerrarSesion} onIrPerfil={() => setVerPerfil(true)} onIrGanancias={() => setVerGanancias(true)} onIrSeguridad={() => setVerSeguridad(true)} onIrViajes={() => setVerMisViajes(true)} onIrCreditos={() => setVerCreditos(true)} onIrAyuda={() => setVerAyuda(true)} onIrConfig={() => setVerConfig(true)} onIrPromociones={() => setVerPromociones(true)} />;
+  if (screen === 'turismo') return <Turismo nombre={nombreUsuario} foto={fotoUsuario} onVolver={() => setScreen('modulos')} onCerrarSesion={handleCerrarSesion} onIrPerfil={() => setVerPerfil(true)} onIrGanancias={() => setVerGanancias(true)} onIrSeguridad={() => setVerSeguridad(true)} onIrViajes={() => setVerMisViajes(true)} onIrCreditos={() => setVerCreditos(true)} onIrAyuda={() => setVerAyuda(true)} onIrConfig={() => setVerConfig(true)} onIrPromociones={() => setVerPromociones(true)} />;
   if (screen === 'mantenimiento') return <PantallaMantenimiento mensaje={mensajeMantenimiento} onVolver={() => setScreen('rol')} />;
   if (screen === 'datos_conductor') return <PantallaDatosConductor nombre={nombreUsuario} foto={fotoUsuario} celular={telefonoUsuario} onGuardar={handleDatosConductor} onVolver={() => setScreen('rol')} onCerrarSesion={handleCerrarSesion} onIrPerfil={() => setVerPerfil(true)} onIrGanancias={() => setVerGanancias(true)} onIrSeguridad={() => setVerSeguridad(true)} onIrViajes={() => setVerMisViajes(true)} onIrCreditos={() => setVerCreditos(true)} onIrAyuda={() => setVerAyuda(true)} onIrConfig={() => setVerConfig(true)} />;
 
@@ -566,7 +616,7 @@ function App() {
         />
       );
     }
-    return <Home nombre={nombreUsuario} onCerrarSesion={handleCerrarSesion} onVolver={() => setScreen('rol')} />;
+    return <Home nombre={nombreUsuario} onCerrarSesion={handleCerrarSesion} onVolver={() => setScreen('rol')} onCambiarNegocio={() => setScreen('modulos')} />;
   }
 }
 

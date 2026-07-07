@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import Logo from './Logo';
 
 const CORREO_SOPORTE = 'soporte@guajirago.com.co';
 
@@ -49,19 +50,20 @@ function AyudaSoporte({ onVolver }) {
   );
 
   return (
-    <div style={{ backgroundColor: '#141416', minHeight: '100vh', fontFamily: 'Arial, sans-serif' }}>
-      <div style={{ background: 'linear-gradient(135deg, #1A1A1E, #2A2A2E)', padding: '24px 20px', position: 'relative', display: 'flex', alignItems: 'center' }}>
-        <div onClick={onVolver} style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(255,255,255,0.12)', borderRadius: '12px', color: '#FFFFFF', fontSize: '14px', fontWeight: '500', padding: '8px 16px', cursor: 'pointer' }}>
+    <div style={{ backgroundColor: '#FFFFFF', minHeight: '100vh', fontFamily: 'Arial, sans-serif' }}>
+      <div style={{ background: 'linear-gradient(135deg, #FFFFFF, #ECECEF)', padding: '24px 20px', position: 'relative', display: 'flex', alignItems: 'center' }}>
+        <div onClick={onVolver} style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(0,0,0,0.06)', borderRadius: '12px', color: '#1A1A1E', fontSize: '14px', fontWeight: '500', padding: '8px 16px', cursor: 'pointer' }}>
           <span style={{ fontSize: '20px', fontWeight: '900', lineHeight: '1', position: 'relative', top: '-1px' }}>‹</span> Volver
         </div>
-        <h2 style={{ color: '#FFFFFF', margin: '0 auto', fontSize: '20px', fontWeight: '900' }}>Ayuda y soporte</h2>
+        <h2 style={{ color: '#1A1A1E', margin: '0 auto', fontSize: '20px', fontWeight: '900' }}>Ayuda y soporte</h2>
+        <Logo size={28} style={{ position: 'absolute', top: '14px', right: '16px', zIndex: 6 }} />
       </div>
 
       <div style={{ padding: '24px 20px' }}>
         {/* Tarjeta de contacto */}
         <div style={{ background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)', borderRadius: '20px', padding: '20px', marginBottom: '24px' }}>
-          <p style={{ color: '#141416', fontSize: '15px', fontWeight: '900', margin: '0 0 4px' }}>¿Necesitas ayuda?</p>
-          <p style={{ color: 'rgba(20,20,22,0.75)', fontSize: '13px', margin: '0 0 14px', lineHeight: '1.4' }}>Escríbenos y te responderemos lo antes posible.</p>
+          <p style={{ color: '#FFFFFF', fontSize: '15px', fontWeight: '900', margin: '0 0 4px' }}>¿Necesitas ayuda?</p>
+          <p style={{ color: 'rgba(255,255,255,0.9)', fontSize: '13px', margin: '0 0 14px', lineHeight: '1.4' }}>Escríbenos y te responderemos lo antes posible.</p>
           <a href={`mailto:${CORREO_SOPORTE}`} style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'rgba(20,20,22,0.85)', borderRadius: '14px', padding: '14px 16px', textDecoration: 'none' }}>
             <span style={{ fontSize: '22px' }}>📧</span>
             <span style={{ color: '#FFFFFF', fontSize: '14px', fontWeight: 'bold' }}>{CORREO_SOPORTE}</span>
@@ -69,39 +71,39 @@ function AyudaSoporte({ onVolver }) {
         </div>
 
         {/* Buscador */}
-        <div style={{ background: '#1A1A1E', borderRadius: '16px', padding: '14px 16px', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '12px', border: '1px solid #2A2A2E' }}>
+        <div style={{ background: '#FFFFFF', borderRadius: '16px', padding: '14px 16px', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '12px', border: '1px solid #ECECEF' }}>
           <span style={{ fontSize: '20px' }}>🔍</span>
           <input
             value={busqueda}
             onChange={e => setBusqueda(e.target.value)}
             placeholder="Busca tu pregunta..."
-            style={{ background: 'none', border: 'none', outline: 'none', color: '#FFFFFF', fontSize: '16px', width: '100%' }}
+            style={{ background: 'none', border: 'none', outline: 'none', color: '#1A1A1E', fontSize: '16px', width: '100%' }}
           />
-          {busqueda && <span onClick={() => setBusqueda('')} style={{ color: '#AAAAAA', fontSize: '20px', cursor: 'pointer' }}>✕</span>}
+          {busqueda && <span onClick={() => setBusqueda('')} style={{ color: '#6B7280', fontSize: '20px', cursor: 'pointer' }}>✕</span>}
         </div>
 
-        <p style={{ color: '#555', fontSize: '11px', letterSpacing: '3px', margin: '0 0 12px' }}>PREGUNTAS FRECUENTES</p>
+        <p style={{ color: '#6B7280', fontSize: '11px', letterSpacing: '3px', margin: '0 0 12px' }}>PREGUNTAS FRECUENTES</p>
 
         {/* Lista de preguntas (acordeón) */}
         {filtradas.length === 0 && (
           <div style={{ textAlign: 'center', marginTop: '40px' }}>
             <p style={{ fontSize: '50px', margin: '0 0 12px' }}>🤔</p>
-            <p style={{ color: '#AAAAAA', fontSize: '14px', margin: '0' }}>No encontramos preguntas con esa palabra.</p>
-            <p style={{ color: '#555', fontSize: '13px', margin: '8px 0 0' }}>Escríbenos al correo de soporte y te ayudamos.</p>
+            <p style={{ color: '#6B7280', fontSize: '14px', margin: '0' }}>No encontramos preguntas con esa palabra.</p>
+            <p style={{ color: '#6B7280', fontSize: '13px', margin: '8px 0 0' }}>Escríbenos al correo de soporte y te ayudamos.</p>
           </div>
         )}
 
         {filtradas.map((p, i) => {
           const estaAbierta = abierta === p.pregunta;
           return (
-            <div key={i} style={{ background: '#1A1A1E', borderRadius: '16px', marginBottom: '10px', border: `1px solid ${estaAbierta ? '#FF7A2F' : '#2A2A2E'}`, overflow: 'hidden' }}>
+            <div key={i} style={{ background: '#FFFFFF', borderRadius: '16px', marginBottom: '10px', border: `1px solid ${estaAbierta ? '#FF7A2F' : '#ECECEF'}`, overflow: 'hidden' }}>
               <div onClick={() => setAbierta(estaAbierta ? null : p.pregunta)} style={{ padding: '16px', display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}>
-                <span style={{ color: '#FFFFFF', fontSize: '15px', fontWeight: 'bold', flex: 1, lineHeight: '1.4' }}>{p.pregunta}</span>
+                <span style={{ color: '#1A1A1E', fontSize: '15px', fontWeight: 'bold', flex: 1, lineHeight: '1.4' }}>{p.pregunta}</span>
                 <span style={{ color: '#FF7A2F', fontSize: '18px', fontWeight: '900', flexShrink: 0, transform: estaAbierta ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}>⌄</span>
               </div>
               {estaAbierta && (
                 <div style={{ padding: '0 16px 16px' }}>
-                  <p style={{ color: '#AAAAAA', fontSize: '14px', margin: '0', lineHeight: '1.6' }}>{p.respuesta}</p>
+                  <p style={{ color: '#6B7280', fontSize: '14px', margin: '0', lineHeight: '1.6' }}>{p.respuesta}</p>
                 </div>
               )}
             </div>

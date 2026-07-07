@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { db, auth, storage } from './firebase';
-import { doc, getDoc, updateDoc, setDoc, runTransaction, onSnapshot } from 'firebase/firestore';
+import Logo from './Logo';
+import { doc, getDoc, updateDoc, runTransaction, onSnapshot } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 function contieneInfoSensible(texto) {
@@ -156,20 +157,21 @@ function Creditos({ onVolver }) {
   };
 
   return (
-    <div style={{ backgroundColor: '#141416', minHeight: '100vh', fontFamily: 'Arial, sans-serif' }}>
-      <div style={{ background: 'linear-gradient(135deg, #1A1A1E, #2A2A2E)', padding: '14px 20px', position: 'relative', display: 'flex', alignItems: 'stretch', justifyContent: 'space-between', gap: '12px' }}>
-        <div onClick={onVolver} style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(255,255,255,0.12)', borderRadius: '12px', color: '#FFFFFF', fontSize: '14px', fontWeight: '500', padding: '8px 16px', cursor: 'pointer', flexShrink: 0 }}><span style={{ fontSize: '20px', fontWeight: '900', lineHeight: '1', position: 'relative', top: '-1px' }}>‹</span> Volver</div>
+    <div style={{ backgroundColor: '#FFFFFF', minHeight: '100vh', fontFamily: 'Arial, sans-serif' }}>
+      <div style={{ background: 'linear-gradient(135deg, #FFFFFF, #ECECEF)', padding: '14px 20px', position: 'relative', display: 'flex', alignItems: 'stretch', justifyContent: 'space-between', gap: '12px' }}>
+        <div onClick={onVolver} style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(0,0,0,0.06)', borderRadius: '12px', color: '#1A1A1E', fontSize: '14px', fontWeight: '500', padding: '8px 16px', cursor: 'pointer', flexShrink: 0 }}><span style={{ fontSize: '20px', fontWeight: '900', lineHeight: '1', position: 'relative', top: '-1px' }}>‹</span> Volver</div>
         <div style={{ background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F)', borderRadius: '14px', padding: '6px 24px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1 }}>
-          <p style={{ color: '#141416', fontSize: '11px', margin: '0', letterSpacing: '1px', fontWeight: '900' }}>SALDO DISPONIBLE</p>
-          <p style={{ color: '#141416', fontSize: '26px', fontWeight: '900', margin: '0' }}>
+          <p style={{ color: '#FFFFFF', fontSize: '11px', margin: '0', letterSpacing: '1px', fontWeight: '900' }}>SALDO DISPONIBLE</p>
+          <p style={{ color: '#FFFFFF', fontSize: '26px', fontWeight: '900', margin: '0' }}>
             {saldo === null ? '...' : `$${saldo.toLocaleString()}`}
           </p>
         </div>
+        <Logo size={28} style={{ position: 'absolute', top: '14px', right: '16px', zIndex: 6 }} />
       </div>
 
       <div style={{ padding: '16px 20px' }}>
         {/* Recargar con código */}
-        <p style={{ color: '#FFCF4D', fontSize: '14px', letterSpacing: '2px', margin: '0 0 10px', fontWeight: '900' }}>RECARGAR CON CÓDIGO</p>
+        <p style={{ color: '#FF7A2F', fontSize: '14px', letterSpacing: '2px', margin: '0 0 10px', fontWeight: '900' }}>RECARGAR CON CÓDIGO</p>
         <div style={{ display: 'flex', gap: '8px', alignItems: 'stretch', marginBottom: '8px' }}>
           <div style={{ flex: 1, background: '#FFFFFF', borderRadius: '12px', padding: '10px 12px', display: 'flex', alignItems: 'center', gap: '8px', border: '2px solid #FF7A2F', boxShadow: '0 0 0 3px rgba(255,122,47,0.15)' }}>
             <span style={{ fontSize: '18px' }}>🎟️</span>
@@ -183,7 +185,7 @@ function Creditos({ onVolver }) {
           <button
             onClick={recargar}
             disabled={cargando}
-            style={{ flexShrink: 0, padding: '0 18px', background: cargando ? '#2A2A2E' : 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)', border: 'none', borderRadius: '12px', color: cargando ? '#AAAAAA' : '#141416', fontSize: '14px', fontWeight: '900', cursor: cargando ? 'default' : 'pointer' }}
+            style={{ flexShrink: 0, padding: '0 18px', background: cargando ? '#ECECEF' : 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)', border: 'none', borderRadius: '12px', color: cargando ? '#6B7280' : '#FFFFFF', fontSize: '14px', fontWeight: '900', cursor: cargando ? 'default' : 'pointer' }}
           >
             {cargando ? '...' : 'Recargar'}
           </button>
@@ -193,52 +195,52 @@ function Creditos({ onVolver }) {
         {mensaje && <p style={{ color: '#2ECC71', fontSize: '13px', textAlign: 'center', marginBottom: '12px', fontWeight: 'bold' }}>{mensaje}</p>}
 
         {/* Información */}
-        <div style={{ background: '#1A1A1E', borderRadius: '16px', padding: '16px', border: '1px solid #FF7A2F' }}>
+        <div style={{ background: '#FFFFFF', borderRadius: '16px', padding: '16px', border: '1px solid #FF7A2F' }}>
           <p style={{ color: '#FF7A2F', fontSize: '12px', fontWeight: '900', margin: '0 0 10px', letterSpacing: '2px' }}>💡 ¿CÓMO RECARGAR?</p>
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', marginBottom: '10px' }}>
             <span style={{ fontSize: '22px', flexShrink: 0 }}>1️⃣</span>
             <div>
-              <p style={{ color: '#FFFFFF', fontSize: '15px', fontWeight: '900', margin: '0 0 4px' }}>Realiza tu pago</p>
-              <p style={{ color: '#AAAAAA', fontSize: '13px', margin: '0', lineHeight: '1.5' }}>Envía tu pago por <strong style={{ color: '#FFFFFF' }}>Nequi o Daviplata</strong> al número de GuajiraGo.</p>
+              <p style={{ color: '#1A1A1E', fontSize: '15px', fontWeight: '900', margin: '0 0 4px' }}>Realiza tu pago</p>
+              <p style={{ color: '#6B7280', fontSize: '13px', margin: '0', lineHeight: '1.5' }}>Envía tu pago por <strong style={{ color: '#1A1A1E' }}>Nequi o Daviplata</strong> al número de GuajiraGo.</p>
             </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: '14px', marginBottom: '14px' }}>
             <span style={{ fontSize: '28px', flexShrink: 0 }}>2️⃣</span>
             <div>
-              <p style={{ color: '#FFFFFF', fontSize: '15px', fontWeight: '900', margin: '0 0 4px' }}>Recibe tu código</p>
-              <p style={{ color: '#AAAAAA', fontSize: '13px', margin: '0', lineHeight: '1.5' }}>Te enviaremos un <strong style={{ color: '#FFFFFF' }}>código único</strong> de recarga por el chat de recargas, aquí abajo.</p>
+              <p style={{ color: '#1A1A1E', fontSize: '15px', fontWeight: '900', margin: '0 0 4px' }}>Recibe tu código</p>
+              <p style={{ color: '#6B7280', fontSize: '13px', margin: '0', lineHeight: '1.5' }}>Te enviaremos un <strong style={{ color: '#1A1A1E' }}>código único</strong> de recarga por el chat de recargas, aquí abajo.</p>
             </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: '14px' }}>
             <span style={{ fontSize: '28px', flexShrink: 0 }}>3️⃣</span>
             <div>
-              <p style={{ color: '#FFFFFF', fontSize: '15px', fontWeight: '900', margin: '0 0 4px' }}>Ingresa el código</p>
-              <p style={{ color: '#AAAAAA', fontSize: '13px', margin: '0', lineHeight: '1.5' }}>Escríbelo arriba y listo, tus créditos se suman al instante.</p>
+              <p style={{ color: '#1A1A1E', fontSize: '15px', fontWeight: '900', margin: '0 0 4px' }}>Ingresa el código</p>
+              <p style={{ color: '#6B7280', fontSize: '13px', margin: '0', lineHeight: '1.5' }}>Escríbelo arriba y listo, tus créditos se suman al instante.</p>
             </div>
           </div>
         </div>
 
         {/* Chat de recargas */}
-        <div style={{ background: '#1A1A1E', borderRadius: '20px', padding: '20px', marginTop: '16px', border: '1px solid #2A2A2E' }}>
-          <p style={{ color: '#FFFFFF', fontSize: '15px', fontWeight: '900', margin: '0 0 4px' }}>💬 Chat de recargas</p>
-          <p style={{ color: '#777', fontSize: '12px', margin: '0 0 14px' }}>Envía tu comprobante de pago o haz un reclamo sobre tu recarga</p>
+        <div style={{ background: '#FFFFFF', borderRadius: '20px', padding: '20px', marginTop: '16px', border: '1px solid #ECECEF' }}>
+          <p style={{ color: '#1A1A1E', fontSize: '15px', fontWeight: '900', margin: '0 0 4px' }}>💬 Chat de recargas</p>
+          <p style={{ color: '#6B7280', fontSize: '12px', margin: '0 0 14px' }}>Envía tu comprobante de pago o haz un reclamo sobre tu recarga</p>
           <div style={{ maxHeight: '220px', overflowY: 'auto', marginBottom: '12px' }}>
-            {mensajesRecarga.length === 0 && <p style={{ color: '#555', fontSize: '13px', textAlign: 'center', margin: '12px 0' }}>Sin mensajes aún</p>}
+            {mensajesRecarga.length === 0 && <p style={{ color: '#6B7280', fontSize: '13px', textAlign: 'center', margin: '12px 0' }}>Sin mensajes aún</p>}
             {mensajesRecarga.map((m, i) => {
               const matchCodigo = m.texto ? m.texto.match(/GGO-[A-Z0-9]{6}/) : null;
               const codigoDetectado = matchCodigo ? matchCodigo[0] : null;
               return (
                 <div key={i} style={{ display: 'flex', justifyContent: m.autor === 'conductor' ? 'flex-end' : 'flex-start', marginBottom: '8px' }}>
-                  <div style={{ background: m.autor === 'conductor' ? 'linear-gradient(135deg, #FF7A2F, #D6357E)' : '#2A2A2E', borderRadius: '12px', padding: m.tipo === 'imagen' ? '6px' : '10px 14px', maxWidth: '85%' }}>
+                  <div style={{ background: m.autor === 'conductor' ? 'linear-gradient(135deg, #FF7A2F, #D6357E)' : '#ECECEF', borderRadius: '12px', padding: m.tipo === 'imagen' ? '6px' : '10px 14px', maxWidth: '85%' }}>
                     {m.tipo === 'imagen' ? (
                       <img src={m.url} alt="Comprobante" style={{ width: '100%', maxWidth: '220px', borderRadius: '10px', display: 'block' }} />
                     ) : (
                       <>
-                        <p style={{ color: '#FFFFFF', fontSize: '14px', margin: '0', lineHeight: '1.4', whiteSpace: 'pre-line' }}>{m.texto}</p>
+                        <p style={{ color: m.autor === 'conductor' ? '#FFFFFF' : '#1A1A1E', fontSize: '14px', margin: '0', lineHeight: '1.4', whiteSpace: 'pre-line' }}>{m.texto}</p>
                         {codigoDetectado && (
                           <button
                             onClick={() => { navigator.clipboard.writeText(codigoDetectado).catch(() => {}); setCodigo(codigoDetectado); }}
-                            style={{ marginTop: '8px', padding: '8px 12px', background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.3)', borderRadius: '8px', color: '#FFFFFF', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer', width: '100%' }}
+                            style={{ marginTop: '8px', padding: '8px 12px', background: m.autor === 'conductor' ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.06)', border: `1px solid ${m.autor === 'conductor' ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.15)'}`, borderRadius: '8px', color: m.autor === 'conductor' ? '#FFFFFF' : '#1A1A1E', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer', width: '100%' }}
                           >
                             📋 Copiar y usar este código
                           </button>
@@ -253,7 +255,7 @@ function Creditos({ onVolver }) {
           </div>
           {errorChatRecarga && <p style={{ color: '#FF4444', fontSize: '12px', margin: '0 0 8px' }}>{errorChatRecarga}</p>}
           <div style={{ display: 'flex', gap: '8px' }}>
-            <label style={{ width: '46px', height: '46px', flexShrink: 0, background: '#141416', border: '1px solid #2A2A2E', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: subiendoComprobante ? 'default' : 'pointer', fontSize: '20px' }}>
+            <label style={{ width: '46px', height: '46px', flexShrink: 0, background: '#FFFFFF', border: '1px solid #ECECEF', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: subiendoComprobante ? 'default' : 'pointer', fontSize: '20px' }}>
               {subiendoComprobante ? '⏳' : '📎'}
               <input type="file" accept="image/*" disabled={subiendoComprobante} onChange={e => { if (e.target.files[0]) enviarComprobante(e.target.files[0]); e.target.value = ''; }} style={{ display: 'none' }} />
             </label>
@@ -262,9 +264,9 @@ function Creditos({ onVolver }) {
               onChange={e => setTextoChatRecarga(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && enviarMensajeRecarga()}
               placeholder="Escribe tu mensaje..."
-              style={{ flex: 1, background: '#141416', border: '1px solid #2A2A2E', borderRadius: '12px', padding: '12px 14px', color: '#FFFFFF', fontSize: '15px', outline: 'none' }}
+              style={{ flex: 1, background: '#FFFFFF', border: '1px solid #ECECEF', borderRadius: '12px', padding: '12px 14px', color: '#1A1A1E', fontSize: '15px', outline: 'none' }}
             />
-            <button onClick={enviarMensajeRecarga} disabled={!textoChatRecarga.trim()} style={{ padding: '12px 18px', background: textoChatRecarga.trim() ? 'linear-gradient(135deg, #FF7A2F, #D6357E)' : '#2A2A2E', border: 'none', borderRadius: '12px', color: '#FFFFFF', fontSize: '20px', cursor: textoChatRecarga.trim() ? 'pointer' : 'default' }}>➤</button>
+            <button onClick={enviarMensajeRecarga} disabled={!textoChatRecarga.trim()} style={{ padding: '12px 18px', background: textoChatRecarga.trim() ? 'linear-gradient(135deg, #FF7A2F, #D6357E)' : '#ECECEF', border: 'none', borderRadius: '12px', color: textoChatRecarga.trim() ? '#FFFFFF' : '#6B7280', fontSize: '20px', cursor: textoChatRecarga.trim() ? 'pointer' : 'default' }}>➤</button>
           </div>
         </div>
       </div>

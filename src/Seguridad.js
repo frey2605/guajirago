@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { db, auth } from './firebase';
 import { doc, getDoc, setDoc, collection, query, where, getDocs } from 'firebase/firestore';
+import Logo from './Logo';
 
 function Seguridad({ onVolver }) {
   const [contactoNombre, setContactoNombre] = useState('');
@@ -108,12 +109,13 @@ function Seguridad({ onVolver }) {
   };
 
   return (
-    <div style={{ backgroundColor: '#141416', minHeight: '100vh', fontFamily: 'Arial, sans-serif' }}>
-      <div style={{ background: 'linear-gradient(135deg, #1A1A1E, #2A2A2E)', padding: '24px 20px', position: 'relative', display: 'flex', alignItems: 'center' }}>
-        <div onClick={onVolver} style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(255,255,255,0.12)', borderRadius: '12px', color: '#FFFFFF', fontSize: '14px', fontWeight: '500', padding: '8px 16px', cursor: 'pointer' }}>
+    <div style={{ backgroundColor: '#FFFFFF', minHeight: '100vh', fontFamily: 'Arial, sans-serif' }}>
+      <div style={{ background: 'linear-gradient(135deg, #FFFFFF, #ECECEF)', padding: '24px 20px', position: 'relative', display: 'flex', alignItems: 'center' }}>
+        <div onClick={onVolver} style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(0,0,0,0.06)', borderRadius: '12px', color: '#1A1A1E', fontSize: '14px', fontWeight: '500', padding: '8px 16px', cursor: 'pointer' }}>
           <span style={{ fontSize: '20px', fontWeight: '900', lineHeight: '1', position: 'relative', top: '-1px' }}>‹</span> Volver
         </div>
-        <h2 style={{ color: '#FFFFFF', margin: '0 auto', fontSize: '20px', fontWeight: '900' }}>Seguridad</h2>
+        <h2 style={{ color: '#1A1A1E', margin: '0 auto', fontSize: '20px', fontWeight: '900' }}>Seguridad</h2>
+        <Logo size={28} style={{ position: 'absolute', top: '14px', right: '16px', zIndex: 6 }} />
       </div>
 
       <div style={{ padding: '24px 20px' }}>
@@ -128,49 +130,49 @@ function Seguridad({ onVolver }) {
         </div>
 
         {/* Contacto de confianza */}
-        <p style={{ color: '#555', fontSize: '11px', letterSpacing: '3px', margin: '0 0 12px' }}>CONTACTO DE CONFIANZA</p>
+        <p style={{ color: '#6B7280', fontSize: '11px', letterSpacing: '3px', margin: '0 0 12px' }}>CONTACTO DE CONFIANZA</p>
 
-        <p style={{ color: '#555', fontSize: '11px', letterSpacing: '2px', margin: '0 0 6px' }}>NOMBRE</p>
-        <div style={{ background: '#1A1A1E', borderRadius: '16px', padding: '12px 16px', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <p style={{ color: '#6B7280', fontSize: '11px', letterSpacing: '2px', margin: '0 0 6px' }}>NOMBRE</p>
+        <div style={{ background: '#FFFFFF', border: '1.5px solid #ECECEF', borderRadius: '16px', padding: '12px 16px', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '12px' }}>
           <span style={{ fontSize: '20px' }}>👤</span>
           {editandoNombre ? (
-            <input value={contactoNombre} onChange={e => { setContactoNombre(e.target.value); setHayCambios(true); }} autoFocus placeholder="Nombre del contacto" style={{ background: 'none', border: 'none', outline: 'none', color: '#FFFFFF', fontSize: '16px', width: '100%' }} />
+            <input value={contactoNombre} onChange={e => { setContactoNombre(e.target.value); setHayCambios(true); }} autoFocus placeholder="Nombre del contacto" style={{ background: 'none', border: 'none', outline: 'none', color: '#1A1A1E', fontSize: '16px', width: '100%' }} />
           ) : (
-            <span style={{ color: contactoNombre ? '#FFFFFF' : '#555', fontSize: '16px', flex: 1 }}>{contactoNombre || 'Sin nombre'}</span>
+            <span style={{ color: contactoNombre ? '#1A1A1E' : '#6B7280', fontSize: '16px', flex: 1 }}>{contactoNombre || 'Sin nombre'}</span>
           )}
-          <div onClick={() => setEditandoNombre(!editandoNombre)} style={{ display: 'flex', alignItems: 'center', gap: '4px', background: '#2A2A2E', borderRadius: '8px', padding: '6px 10px', cursor: 'pointer', flexShrink: 0 }}>
+          <div onClick={() => setEditandoNombre(!editandoNombre)} style={{ display: 'flex', alignItems: 'center', gap: '4px', background: '#ECECEF', borderRadius: '8px', padding: '6px 10px', cursor: 'pointer', flexShrink: 0 }}>
             <span style={{ fontSize: '13px' }}>✏️</span>
-            <span style={{ color: '#AAAAAA', fontSize: '12px', fontWeight: 'bold' }}>Editar</span>
+            <span style={{ color: '#6B7280', fontSize: '12px', fontWeight: 'bold' }}>Editar</span>
           </div>
         </div>
 
-        <p style={{ color: '#555', fontSize: '11px', letterSpacing: '2px', margin: '0 0 6px' }}>NÚMERO WHATSAPP</p>
-        <div style={{ background: '#1A1A1E', borderRadius: '16px', padding: '12px 16px', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <p style={{ color: '#6B7280', fontSize: '11px', letterSpacing: '2px', margin: '0 0 6px' }}>NÚMERO WHATSAPP</p>
+        <div style={{ background: '#FFFFFF', border: '1.5px solid #ECECEF', borderRadius: '16px', padding: '12px 16px', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
           <span style={{ fontSize: '20px' }}>📞</span>
           {editandoNumero ? (
-            <input value={contactoNumero} onChange={e => { setContactoNumero(e.target.value); setHayCambios(true); }} autoFocus placeholder="Ej: 3001234567" type="tel" style={{ background: 'none', border: 'none', outline: 'none', color: '#FFFFFF', fontSize: '16px', width: '100%' }} />
+            <input value={contactoNumero} onChange={e => { setContactoNumero(e.target.value); setHayCambios(true); }} autoFocus placeholder="Ej: 3001234567" type="tel" style={{ background: 'none', border: 'none', outline: 'none', color: '#1A1A1E', fontSize: '16px', width: '100%' }} />
           ) : (
-            <span style={{ color: contactoNumero ? '#FFFFFF' : '#555', fontSize: '16px', flex: 1 }}>{contactoNumero || 'Sin número'}</span>
+            <span style={{ color: contactoNumero ? '#1A1A1E' : '#6B7280', fontSize: '16px', flex: 1 }}>{contactoNumero || 'Sin número'}</span>
           )}
-          <div onClick={() => setEditandoNumero(!editandoNumero)} style={{ display: 'flex', alignItems: 'center', gap: '4px', background: '#2A2A2E', borderRadius: '8px', padding: '6px 10px', cursor: 'pointer', flexShrink: 0 }}>
+          <div onClick={() => setEditandoNumero(!editandoNumero)} style={{ display: 'flex', alignItems: 'center', gap: '4px', background: '#ECECEF', borderRadius: '8px', padding: '6px 10px', cursor: 'pointer', flexShrink: 0 }}>
             <span style={{ fontSize: '13px' }}>✏️</span>
-            <span style={{ color: '#AAAAAA', fontSize: '12px', fontWeight: 'bold' }}>Editar</span>
+            <span style={{ color: '#6B7280', fontSize: '12px', fontWeight: 'bold' }}>Editar</span>
           </div>
         </div>
 
         {error && <p style={{ color: '#FF4444', fontSize: '13px', textAlign: 'center', margin: '0 0 12px' }}>{error}</p>}
         {mensaje && <p style={{ color: '#2ECC71', fontSize: '14px', textAlign: 'center', margin: '0 0 12px', fontWeight: 'bold' }}>{mensaje}</p>}
 
-        <button onClick={guardar} disabled={guardando || !hayCambios} style={{ width: '100%', padding: '16px', marginBottom: '12px', background: guardando || !hayCambios ? '#2A2A2E' : 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)', border: 'none', borderRadius: '16px', color: guardando || !hayCambios ? '#555' : '#141416', fontSize: '16px', fontWeight: '900', cursor: guardando || !hayCambios ? 'default' : 'pointer' }}>
+        <button onClick={guardar} disabled={guardando || !hayCambios} style={{ width: '100%', padding: '16px', marginBottom: '12px', background: guardando || !hayCambios ? '#E7E7EA' : 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)', border: 'none', borderRadius: '16px', color: guardando || !hayCambios ? '#9AA0A6' : '#FFFFFF', fontSize: '16px', fontWeight: '900', cursor: guardando || !hayCambios ? 'default' : 'pointer' }}>
           {guardando ? 'Guardando...' : 'Guardar contacto'}
         </button>
 
         {/* Compartir ubicación */}
-        <div onClick={compartirUbicacion} style={{ background: '#1A1A1E', borderRadius: '20px', padding: '20px', display: 'flex', alignItems: 'center', gap: '16px', cursor: 'pointer', border: '1px solid #25D366', marginTop: '8px' }}>
+        <div onClick={compartirUbicacion} style={{ background: '#FFFFFF', borderRadius: '20px', padding: '20px', display: 'flex', alignItems: 'center', gap: '16px', cursor: 'pointer', border: '1px solid #25D366', marginTop: '8px' }}>
           <span style={{ fontSize: '32px' }}>📤</span>
           <div>
-            <p style={{ color: '#FFFFFF', fontWeight: '900', fontSize: '15px', margin: '0', lineHeight: '1.3' }}>Compartir ubicación, ruta e identidad del conductor</p>
-            <p style={{ color: '#AAAAAA', fontSize: '12px', margin: '6px 0 0', lineHeight: '1.4' }}>Nombre, foto, placa, color, marca y modelo</p>
+            <p style={{ color: '#1A1A1E', fontWeight: '900', fontSize: '15px', margin: '0', lineHeight: '1.3' }}>Compartir ubicación, ruta e identidad del conductor</p>
+            <p style={{ color: '#6B7280', fontSize: '12px', margin: '6px 0 0', lineHeight: '1.4' }}>Nombre, foto, placa, color, marca y modelo</p>
             <p style={{ color: '#25D366', fontSize: '13px', margin: '6px 0 0' }}>
               {contactoNombre ? `Enviar por WhatsApp a ${contactoNombre}` : 'Guarda un contacto primero'}
             </p>

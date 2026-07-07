@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { auth, db, storage } from './firebase';
+import Logo from './Logo';
 import { doc, getDoc, setDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
@@ -100,14 +101,15 @@ function MiPerfil({ onVolver }) {
   const fotoMostrar = fotoPreview || foto;
 
   return (
-    <div style={{ backgroundColor: '#141416', minHeight: '100vh', fontFamily: 'Arial, sans-serif' }}>
-      <div style={{ background: 'linear-gradient(135deg, #1A1A1E, #2A2A2E)', padding: '24px 20px', position: 'relative', display: 'flex', alignItems: 'center' }}>
-        <div onClick={onVolver} style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(255,255,255,0.12)', borderRadius: '12px', color: '#FFFFFF', fontSize: '14px', fontWeight: '500', padding: '8px 16px', cursor: 'pointer' }}><span style={{ fontSize: '20px', fontWeight: '900', lineHeight: '1', position: 'relative', top: '-1px' }}>‹</span> Volver</div>
-        <h2 style={{ color: '#FFFFFF', margin: '0 auto', fontSize: '20px', fontWeight: '900' }}>Mi perfil</h2>
+    <div style={{ backgroundColor: '#FFFFFF', minHeight: '100vh', fontFamily: 'Arial, sans-serif' }}>
+      <div style={{ background: '#FFFFFF', padding: '24px 20px', position: 'relative', display: 'flex', alignItems: 'center' }}>
+        <div onClick={onVolver} style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(0,0,0,0.06)', borderRadius: '12px', color: '#1A1A1E', fontSize: '14px', fontWeight: '500', padding: '8px 16px', cursor: 'pointer' }}><span style={{ fontSize: '20px', fontWeight: '900', lineHeight: '1', position: 'relative', top: '-1px' }}>‹</span> Volver</div>
+        <h2 style={{ color: '#1A1A1E', margin: '0 auto', fontSize: '20px', fontWeight: '900' }}>Mi perfil</h2>
+        <Logo size={28} style={{ position: 'absolute', top: '16px', right: '16px' }} />
       </div>
 
       {cargando ? (
-        <p style={{ color: '#AAAAAA', textAlign: 'center', marginTop: '60px' }}>Cargando...</p>
+        <p style={{ color: '#6B7280', textAlign: 'center', marginTop: '60px' }}>Cargando...</p>
       ) : (
         <div style={{ padding: '24px 20px' }}>
           {/* Foto de perfil */}
@@ -115,49 +117,49 @@ function MiPerfil({ onVolver }) {
             <div style={{ width: '80px', height: '80px', borderRadius: '50%', background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '36px', overflow: 'hidden', marginBottom: '8px' }}>
               {fotoMostrar ? <img src={fotoMostrar} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : '👤'}
             </div>
-            <label style={{ cursor: 'pointer', background: '#1A1A1E', border: '1px solid #FF7A2F', borderRadius: '12px', padding: '8px 18px', color: '#FF7A2F', fontSize: '13px', fontWeight: 'bold' }}>
+            <label style={{ cursor: 'pointer', background: '#FFFFFF', border: '1px solid #FF7A2F', borderRadius: '12px', padding: '8px 18px', color: '#FF7A2F', fontSize: '13px', fontWeight: 'bold' }}>
               📸 Cambiar foto
               <input type="file" accept="image/*" onChange={elegirFoto} style={{ display: 'none' }} />
             </label>
           </div>
 
           {/* Nombre */}
-          <p style={{ color: '#555', fontSize: '11px', letterSpacing: '2px', margin: '0 0 6px' }}>NOMBRE</p>
-          <div style={{ background: '#1A1A1E', borderRadius: '16px', padding: '12px 16px', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <p style={{ color: '#6B7280', fontSize: '11px', letterSpacing: '2px', margin: '0 0 6px' }}>NOMBRE</p>
+          <div style={{ background: '#FFFFFF', border: '1.5px solid #ECECEF', borderRadius: '16px', padding: '12px 16px', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '12px' }}>
             <span style={{ fontSize: '20px' }}>👤</span>
             {editandoNombre ? (
-              <input value={nombre} onChange={e => { setNombre(e.target.value); setHayCambios(true); }} autoFocus placeholder="Tu nombre" style={{ background: 'none', border: 'none', outline: 'none', color: '#FFFFFF', fontSize: '16px', width: '100%' }} />
+              <input value={nombre} onChange={e => { setNombre(e.target.value); setHayCambios(true); }} autoFocus placeholder="Tu nombre" style={{ background: 'none', border: 'none', outline: 'none', color: '#1A1A1E', fontSize: '16px', width: '100%' }} />
             ) : (
-              <span style={{ color: '#FFFFFF', fontSize: '16px', flex: 1 }}>{nombre || 'Sin nombre'}</span>
+              <span style={{ color: '#1A1A1E', fontSize: '16px', flex: 1 }}>{nombre || 'Sin nombre'}</span>
             )}
-            <div onClick={() => setEditandoNombre(!editandoNombre)} style={{ display: 'flex', alignItems: 'center', gap: '4px', background: '#2A2A2E', borderRadius: '8px', padding: '6px 10px', cursor: 'pointer', flexShrink: 0 }}>
+            <div onClick={() => setEditandoNombre(!editandoNombre)} style={{ display: 'flex', alignItems: 'center', gap: '4px', background: '#ECECEF', borderRadius: '8px', padding: '6px 10px', cursor: 'pointer', flexShrink: 0 }}>
               <span style={{ fontSize: '13px' }}>✏️</span>
-              <span style={{ color: '#AAAAAA', fontSize: '12px', fontWeight: 'bold' }}>Editar</span>
+              <span style={{ color: '#6B7280', fontSize: '12px', fontWeight: 'bold' }}>Editar</span>
             </div>
           </div>
 
           {/* Teléfono */}
-          <p style={{ color: '#555', fontSize: '11px', letterSpacing: '2px', margin: '0 0 6px' }}>TELÉFONO</p>
-          <div style={{ background: '#1A1A1E', borderRadius: '16px', padding: '12px 16px', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <p style={{ color: '#6B7280', fontSize: '11px', letterSpacing: '2px', margin: '0 0 6px' }}>TELÉFONO</p>
+          <div style={{ background: '#FFFFFF', border: '1.5px solid #ECECEF', borderRadius: '16px', padding: '12px 16px', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '12px' }}>
             <span style={{ fontSize: '20px' }}>📞</span>
             {editandoTelefono ? (
-              <input value={telefono} onChange={e => { setTelefono(e.target.value); setHayCambios(true); }} autoFocus placeholder="Tu teléfono" type="tel" style={{ background: 'none', border: 'none', outline: 'none', color: '#FFFFFF', fontSize: '16px', width: '100%' }} />
+              <input value={telefono} onChange={e => { setTelefono(e.target.value); setHayCambios(true); }} autoFocus placeholder="Tu teléfono" type="tel" style={{ background: 'none', border: 'none', outline: 'none', color: '#1A1A1E', fontSize: '16px', width: '100%' }} />
             ) : (
-              <span style={{ color: '#FFFFFF', fontSize: '16px', flex: 1 }}>{telefono || 'Sin teléfono'}</span>
+              <span style={{ color: '#1A1A1E', fontSize: '16px', flex: 1 }}>{telefono || 'Sin teléfono'}</span>
             )}
-            <div onClick={() => setEditandoTelefono(!editandoTelefono)} style={{ display: 'flex', alignItems: 'center', gap: '4px', background: '#2A2A2E', borderRadius: '8px', padding: '6px 10px', cursor: 'pointer', flexShrink: 0 }}>
+            <div onClick={() => setEditandoTelefono(!editandoTelefono)} style={{ display: 'flex', alignItems: 'center', gap: '4px', background: '#ECECEF', borderRadius: '8px', padding: '6px 10px', cursor: 'pointer', flexShrink: 0 }}>
               <span style={{ fontSize: '13px' }}>✏️</span>
-              <span style={{ color: '#AAAAAA', fontSize: '12px', fontWeight: 'bold' }}>Editar</span>
+              <span style={{ color: '#6B7280', fontSize: '12px', fontWeight: 'bold' }}>Editar</span>
             </div>
           </div>
 {/* Calificaciones */}
           {calificacion !== null && (
-            <div style={{ background: 'linear-gradient(135deg, #1A1A1E, #2A2A2E)', borderRadius: '16px', padding: '14px 16px', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '12px', border: '1px solid #FFCF4D' }}>
+            <div style={{ background: '#FFFFFF', borderRadius: '16px', padding: '14px 16px', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '12px', border: '1.5px solid #1C8EF9' }}>
               <span style={{ fontSize: '24px' }}>⭐</span>
               <div style={{ flex: 1 }}>
                 <p style={{ color: '#555', fontSize: '10px', margin: '0', letterSpacing: '2px' }}>MI CALIFICACIÓN</p>
-                <p style={{ color: '#FFFFFF', fontSize: '16px', fontWeight: '900', margin: '2px 0 0' }}>
-                  <span style={{ color: '#FFCF4D', fontSize: '22px' }}>{calificacion}</span>
+                <p style={{ color: '#1A1A1E', fontSize: '16px', fontWeight: '900', margin: '2px 0 0' }}>
+                  <span style={{ color: '#FF7A2F', fontSize: '22px' }}>{calificacion}</span>
                   <span style={{ color: '#555', fontSize: '13px', fontWeight: '400' }}> · {totalCal} {totalCal === 1 ? 'calificación' : 'calificaciones'}</span>
                 </p>
               </div>
@@ -169,34 +171,34 @@ function MiPerfil({ onVolver }) {
             </div>
           )}
           {calificacion === null && (
-            <div style={{ background: '#1A1A1E', borderRadius: '16px', padding: '14px 16px', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '12px', border: '1px solid #2A2A2E' }}>
+            <div style={{ background: '#FFFFFF', borderRadius: '16px', padding: '14px 16px', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '12px', border: '1px solid #ECECEF' }}>
               <span style={{ fontSize: '24px' }}>⭐</span>
               <div>
-                <p style={{ color: '#555', fontSize: '10px', margin: '0', letterSpacing: '2px' }}>MI CALIFICACIÓN</p>
-                <p style={{ color: '#555', fontSize: '14px', margin: '2px 0 0' }}>Aún no tienes calificaciones</p>
+                <p style={{ color: '#6B7280', fontSize: '10px', margin: '0', letterSpacing: '2px' }}>MI CALIFICACIÓN</p>
+                <p style={{ color: '#6B7280', fontSize: '14px', margin: '2px 0 0' }}>Aún no tienes calificaciones</p>
               </div>
             </div>
           )}
           {/* Datos solo lectura del conductor */}
           {esConductor && (
             <>
-              <p style={{ color: '#555', fontSize: '11px', letterSpacing: '2px', margin: '12px 0 6px' }}>DATOS DEL VEHÍCULO (no editables)</p>
+              <p style={{ color: '#6B7280', fontSize: '11px', letterSpacing: '2px', margin: '12px 0 6px' }}>DATOS DEL VEHÍCULO (no editables)</p>
               {datos?.placa && (
-                <div style={{ background: '#141416', borderRadius: '12px', padding: '10px 14px', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '10px', border: '1px solid #2A2A2E' }}>
+                <div style={{ background: '#FFFFFF', borderRadius: '12px', padding: '10px 14px', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '10px', border: '1px solid #ECECEF' }}>
                   <span style={{ fontSize: '18px' }}>🚘</span>
-                  <div><p style={{ color: '#555', fontSize: '10px', margin: '0' }}>Placa</p><p style={{ color: '#FFCF4D', fontSize: '14px', fontWeight: 'bold', margin: '1px 0 0' }}>{datos.placa}</p></div>
+                  <div><p style={{ color: '#6B7280', fontSize: '10px', margin: '0' }}>Placa</p><p style={{ color: '#FF7A2F', fontSize: '14px', fontWeight: 'bold', margin: '1px 0 0' }}>{datos.placa}</p></div>
                 </div>
               )}
               {datos?.vehiculo && (
-                <div style={{ background: '#141416', borderRadius: '12px', padding: '10px 14px', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '10px', border: '1px solid #2A2A2E' }}>
+                <div style={{ background: '#FFFFFF', borderRadius: '12px', padding: '10px 14px', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '10px', border: '1px solid #ECECEF' }}>
                   <span style={{ fontSize: '18px' }}>🏷️</span>
-                  <div><p style={{ color: '#555', fontSize: '10px', margin: '0' }}>Vehículo</p><p style={{ color: '#FFFFFF', fontSize: '14px', margin: '1px 0 0' }}>{datos.vehiculo}{datos.color ? ` · ${datos.color}` : ''}</p></div>
+                  <div><p style={{ color: '#6B7280', fontSize: '10px', margin: '0' }}>Vehículo</p><p style={{ color: '#1A1A1E', fontSize: '14px', margin: '1px 0 0' }}>{datos.vehiculo}{datos.color ? ` · ${datos.color}` : ''}</p></div>
                 </div>
               )}
               {datos?.documento && (
-                <div style={{ background: '#141416', borderRadius: '12px', padding: '10px 14px', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '10px', border: '1px solid #2A2A2E' }}>
+                <div style={{ background: '#FFFFFF', borderRadius: '12px', padding: '10px 14px', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '10px', border: '1px solid #ECECEF' }}>
                   <span style={{ fontSize: '18px' }}>🪪</span>
-                  <div><p style={{ color: '#555', fontSize: '10px', margin: '0' }}>Documento</p><p style={{ color: '#FFFFFF', fontSize: '14px', margin: '1px 0 0' }}>{datos.documento}</p></div>
+                  <div><p style={{ color: '#6B7280', fontSize: '10px', margin: '0' }}>Documento</p><p style={{ color: '#1A1A1E', fontSize: '14px', margin: '1px 0 0' }}>{datos.documento}</p></div>
                 </div>
               )}
             </>
@@ -205,7 +207,7 @@ function MiPerfil({ onVolver }) {
           {error && <p style={{ color: '#FF4444', fontSize: '13px', textAlign: 'center', margin: '16px 0 0' }}>{error}</p>}
           {mensaje && <p style={{ color: '#2ECC71', fontSize: '14px', textAlign: 'center', margin: '16px 0 0', fontWeight: 'bold' }}>{mensaje}</p>}
 
-          <button onClick={guardar} disabled={guardando || !hayCambios} style={{ width: '100%', padding: '18px', marginTop: '24px', background: guardando || !hayCambios ? '#2A2A2E' : 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)', border: 'none', borderRadius: '16px', color: guardando || !hayCambios ? '#555' : '#141416', fontSize: '18px', fontWeight: '900', cursor: guardando || !hayCambios ? 'default' : 'pointer' }}>
+          <button onClick={guardar} disabled={guardando || !hayCambios} style={{ width: '100%', padding: '18px', marginTop: '24px', background: guardando || !hayCambios ? '#ECECEF' : 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)', border: 'none', borderRadius: '16px', color: guardando || !hayCambios ? '#6B7280' : '#FFFFFF', fontSize: '18px', fontWeight: '900', cursor: guardando || !hayCambios ? 'default' : 'pointer' }}>
             {guardando ? 'Guardando...' : 'Guardar cambios'}
           </button>
         </div>

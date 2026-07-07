@@ -94,8 +94,8 @@ function Anuncio({ tipoUsuario }) {
       <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)', zIndex: 99999, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px 28px', textAlign: 'center' }}>
         <span onClick={cerrarVentana} style={{ position: 'absolute', top: '20px', right: '20px', width: '40px', height: '40px', borderRadius: '50%', background: 'rgba(0,0,0,0.25)', color: '#FFFFFF', fontSize: '24px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', lineHeight: 1 }}>✕</span>
         <div style={{ fontSize: '72px', marginBottom: '20px' }}>📢</div>
-        <h1 style={{ color: '#141416', fontSize: '32px', fontWeight: '900', margin: '0 0 20px', lineHeight: '1.2' }}>{anuncio.titulo}</h1>
-        <p style={{ color: '#2A1500', fontSize: '18px', margin: '0 0 36px', lineHeight: '1.6', whiteSpace: 'pre-wrap', maxWidth: '440px', fontWeight: 'bold' }}>{anuncio.texto}</p>
+        <h1 style={{ color: '#FFFFFF', fontSize: '32px', fontWeight: '900', margin: '0 0 20px', lineHeight: '1.2' }}>{anuncio.titulo}</h1>
+        <p style={{ color: '#FFFFFF', fontSize: '18px', margin: '0 0 36px', lineHeight: '1.6', whiteSpace: 'pre-wrap', maxWidth: '440px', fontWeight: 'bold' }}>{anuncio.texto}</p>
         <button onClick={cerrarVentana} style={{ width: '100%', maxWidth: '340px', padding: '18px', background: '#141416', border: 'none', borderRadius: '16px', color: '#FFFFFF', fontSize: '18px', fontWeight: '900', cursor: 'pointer' }}>Entendido</button>
       </div>
     );
@@ -104,12 +104,12 @@ function Anuncio({ tipoUsuario }) {
   // 🪟 Ventana (modal) de solo texto, una sola vez
   return (
     <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
-      <div style={{ background: '#1A1A1E', borderRadius: '24px', padding: '32px 24px', width: '100%', maxWidth: '400px', border: '2px solid #FF7A2F', textAlign: 'center', position: 'relative' }}>
-        <span onClick={cerrarVentana} style={{ position: 'absolute', top: '16px', right: '20px', color: '#AAAAAA', fontSize: '26px', cursor: 'pointer', lineHeight: '1' }}>✕</span>
+      <div style={{ background: '#FFFFFF', borderRadius: '24px', padding: '32px 24px', width: '100%', maxWidth: '400px', border: '2px solid #FF7A2F', textAlign: 'center', position: 'relative' }}>
+        <span onClick={cerrarVentana} style={{ position: 'absolute', top: '16px', right: '20px', color: '#6B7280', fontSize: '26px', cursor: 'pointer', lineHeight: '1' }}>✕</span>
         <div style={{ fontSize: '54px', marginBottom: '12px' }}>📢</div>
-        <h2 style={{ color: '#FFFFFF', fontSize: '22px', fontWeight: '900', margin: '0 0 12px', lineHeight: '1.25' }}>{anuncio.titulo}</h2>
-        <p style={{ color: '#AAAAAA', fontSize: '15px', margin: '0 0 24px', lineHeight: '1.6', whiteSpace: 'pre-wrap' }}>{anuncio.texto}</p>
-        <button onClick={cerrarVentana} style={{ width: '100%', padding: '16px', background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)', border: 'none', borderRadius: '14px', color: '#141416', fontSize: '16px', fontWeight: '900', cursor: 'pointer' }}>Entendido</button>
+        <h2 style={{ color: '#1A1A1E', fontSize: '22px', fontWeight: '900', margin: '0 0 12px', lineHeight: '1.25' }}>{anuncio.titulo}</h2>
+        <p style={{ color: '#6B7280', fontSize: '15px', margin: '0 0 24px', lineHeight: '1.6', whiteSpace: 'pre-wrap' }}>{anuncio.texto}</p>
+        <button onClick={cerrarVentana} style={{ width: '100%', padding: '16px', background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)', border: 'none', borderRadius: '14px', color: '#FFFFFF', fontSize: '16px', fontWeight: '900', cursor: 'pointer' }}>Entendido</button>
       </div>
     </div>
   );
