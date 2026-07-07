@@ -1,129 +1,79 @@
 const { onDocumentCreated, onDocumentUpdated } = require("firebase-functions/v2/firestore");
-const { onCall } = require("firebase-functions/v2/https");
+const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
 
 admin.initializeApp();
 
+// Distancia en km entre dos coordenadas (Haversine)
+function distanciaKm(lat1, lng1, lat2, lng2) {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a = Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+// Tokens FCM de conductores activos DENTRO del radio (km) del pasajero.
+// Un conductor sin ubicación conocida se incluye igual (su app filtra la distancia).
+async function tokensConductoresCerca(pLat, pLng, radioKm) {
+  const snap = await admin.firestore().collection("conductores").where("activo", "==", true).get();
+  const tokens = [];
+  snap.forEach((doc) => {
+    const d = doc.data();
+    if (!d.fcmToken) return;
+    const u = d.ubicacion;
+    if (typeof pLat === "number" && typeof pLng === "number" &&
+        u && typeof u.lat === "number" && typeof u.lng === "number") {
+      if (distanciaKm(pLat, pLng, u.lat, u.lng) > (radioKm || 3)) return; // fuera del radio
+    }
+    tokens.push(d.fcmToken);
+  });
+  return tokens;
+}
+
 exports.notificarNuevoViaje = onDocumentCreated("viajes/{viajeId}", async (event) => {
   const viaje = event.data.data();
-  console.log("notificarNuevoViaje disparado, estado:", viaje?.estado);
-
-  if (!viaje || viaje.estado !== "esperando") {
-    console.log("Ignorado: estado no es esperando");
-    return null;
-  }
-
+  if (!viaje || viaje.estado !== "esperando") return null;
   try {
-    const snap = await admin.firestore()
-      .collection("conductores")
-      .where("activo", "==", true)
-      .get();
-
-    console.log("Conductores activos encontrados:", snap.size);
-
-    if (snap.empty) {
-      console.log("No hay conductores activos");
-      return null;
-    }
-
-    const tokens = [];
-    snap.forEach(doc => {
-      const d = doc.data();
-      console.log("Conductor:", doc.id, "tiene token:", !!d.fcmToken);
-      if (d.fcmToken) tokens.push(d.fcmToken);
-    });
-
-    console.log("Tokens FCM encontrados:", tokens.length);
-
-    if (tokens.length === 0) {
-      console.log("Ningún conductor tiene token FCM");
-      return null;
-    }
-
-    const resultado = await admin.messaging().sendEachForMulticast({
+    const tokens = await tokensConductoresCerca(viaje.pasajeroLat, viaje.pasajeroLng, viaje.radioBusqueda || 3);
+    console.log("notificarNuevoViaje: conductores en radio con token:", tokens.length);
+    if (tokens.length === 0) return null;
+    await admin.messaging().sendEachForMulticast({
       notification: {
         title: "🚖 Nuevo viaje disponible",
         body: (viaje.tipo || "Taxi") + " — " + (viaje.tarifa || "$0"),
       },
-      android: {
-        priority: "high",
-        notification: {
-          sound: "default",
-          channelId: "viajes",
-        },
-      },
-      apns: {
-        payload: {
-          aps: {
-            sound: "default",
-            badge: 1,
-            contentAvailable: true,
-          },
-        },
-        headers: {
-          "apns-priority": "10",
-        },
-      },
-      tokens: tokens,
+      android: { priority: "high", notification: { sound: "default", channelId: "viajes" } },
+      apns: { payload: { aps: { sound: "default", badge: 1, contentAvailable: true } }, headers: { "apns-priority": "10" } },
+      tokens,
     });
-
-    console.log("Notificaciones enviadas:", resultado.successCount, "exitosas,", resultado.failureCount, "fallidas");
-
-    resultado.responses.forEach((resp, i) => {
-      if (!resp.success) {
-        console.error("Error token", i, ":", resp.error?.message);
-      }
-    });
-
     return null;
-  } catch(e) {
-    console.error("Error general:", e.message);
+  } catch (e) {
+    console.error("Error notificarNuevoViaje:", e.message);
     return null;
   }
 });
 
-exports.notificarNuevaOferta = require("firebase-functions/v2/firestore").onDocumentUpdated("viajes/{viajeId}", async (event) => {
+exports.notificarNuevaOferta = onDocumentUpdated("viajes/{viajeId}", async (event) => {
   const antes = event.data.before.data();
   const despues = event.data.after.data();
-
   if (!despues || despues.estado !== "esperando") return null;
   if (antes.tarifaValor === despues.tarifaValor) return null;
-
-  console.log("notificarNuevaOferta: oferta subió de", antes.tarifaValor, "a", despues.tarifaValor);
-
   try {
-    const snap = await admin.firestore()
-      .collection("conductores")
-      .where("activo", "==", true)
-      .get();
-
-    const tokens = [];
-    snap.forEach(doc => {
-      const d = doc.data();
-      if (d.fcmToken) tokens.push(d.fcmToken);
-    });
-
+    const tokens = await tokensConductoresCerca(despues.pasajeroLat, despues.pasajeroLng, despues.radioBusqueda || 3);
     if (tokens.length === 0) return null;
-
     await admin.messaging().sendEachForMulticast({
       notification: {
         title: "⬆️ El pasajero subió su oferta",
         body: (despues.tipo || "Taxi") + " — " + (despues.tarifa || "$0"),
       },
-      android: {
-        priority: "high",
-        notification: { sound: "default", channelId: "viajes" },
-      },
-      apns: {
-        payload: { aps: { sound: "default", badge: 1 } },
-        headers: { "apns-priority": "10" },
-      },
-      tokens: tokens,
+      android: { priority: "high", notification: { sound: "default", channelId: "viajes" } },
+      apns: { payload: { aps: { sound: "default", badge: 1 } }, headers: { "apns-priority": "10" } },
+      tokens,
     });
-
-    console.log("Notificación nueva oferta enviada a", tokens.length, "conductores");
     return null;
-  } catch(e) {
+  } catch (e) {
     console.error("Error notificarNuevaOferta:", e.message);
     return null;
   }
@@ -265,6 +215,84 @@ exports.notificarClienteReserva = onDocumentUpdated("reservasTurismo/{id}", asyn
     return null;
   } catch (e) {
     console.error("Error notificarClienteReserva:", e.message);
+    return null;
+  }
+});
+
+// El PASAJERO confirma a un conductor: transacción atómica.
+// El primer pasajero que confirme al conductor lo gana; si ya está ocupado, devuelve motivo 'ocupado'.
+exports.confirmarConductor = onCall(async (request) => {
+  const { viajeId, conductorId } = request.data || {};
+  if (!viajeId || !conductorId) throw new HttpsError("invalid-argument", "Faltan datos");
+  const db = admin.firestore();
+  const viajeRef = db.collection("viajes").doc(viajeId);
+  const condRef = db.collection("conductores").doc(conductorId);
+  const ofertaRef = viajeRef.collection("contraofertas").doc(conductorId);
+  const usuarioRef = db.collection("usuarios").doc(conductorId);
+  const configRef = db.collection("config").doc("global");
+  try {
+    return await db.runTransaction(async (t) => {
+      const [viajeSnap, condSnap, ofertaSnap, usuarioSnap, configSnap] = await Promise.all([
+        t.get(viajeRef), t.get(condRef), t.get(ofertaRef), t.get(usuarioRef), t.get(configRef),
+      ]);
+      if (!viajeSnap.exists) return { ok: false, motivo: "viaje_no_existe" };
+      const viaje = viajeSnap.data();
+      if (viaje.estado !== "esperando") return { ok: false, motivo: "viaje_no_disponible" };
+      const cond = condSnap.exists ? condSnap.data() : {};
+      if (cond.enViajeId && cond.enViajeId !== viajeId) return { ok: false, motivo: "ocupado" };
+      if (!ofertaSnap.exists) return { ok: false, motivo: "sin_oferta" };
+      const of = ofertaSnap.data();
+      const cfg = configSnap.exists ? configSnap.data() : {};
+      const tipo = viaje.tipo || "Taxi";
+      const comision = tipo === "Mototaxi" ? (cfg.comisionMototaxi ?? 300)
+        : tipo === "Mensajería" ? (cfg.comisionDomicilio ?? 1000)
+          : (cfg.comisionTaxi ?? 800);
+      const creditosActuales = (usuarioSnap.exists ? usuarioSnap.data().creditos : 0) || 0;
+
+      t.update(viajeRef, {
+        estado: "aceptado",
+        conductorId,
+        conductorNombre: of.conductorNombre || "",
+        conductorTelefono: of.conductorTelefono || "",
+        conductorPlaca: of.conductorPlaca || "",
+        conductorVehiculo: of.conductorVehiculo || "",
+        conductorFoto: of.conductorFoto || null,
+        conductorColor: of.conductorColor || "",
+        tarifa: of.monto || viaje.tarifa,
+        tarifaValor: of.montoValor || viaje.tarifaValor,
+        fechaAceptacion: new Date().toISOString(),
+        comisionCobrada: comision,
+      });
+      t.set(condRef, { enViajeId: viajeId, ocupado: true }, { merge: true });
+      t.set(usuarioRef, { creditos: creditosActuales - comision }, { merge: true });
+      return { ok: true };
+    });
+  } catch (e) {
+    console.error("Error confirmarConductor:", e.message);
+    throw new HttpsError("internal", "No se pudo confirmar el conductor");
+  }
+});
+
+// Avisar al PASAJERO por push (aunque tenga la app cerrada) cuando un conductor deja una oferta/contraoferta
+exports.notificarPasajeroOferta = onDocumentCreated("viajes/{viajeId}/contraofertas/{conductorId}", async (event) => {
+  const of = event.data && event.data.data();
+  if (!of) return null;
+  try {
+    const viajeSnap = await admin.firestore().collection("viajes").doc(event.params.viajeId).get();
+    if (!viajeSnap.exists) return null;
+    const token = viajeSnap.data().pasajeroFcmToken;
+    if (!token) return null;
+    const cuerpo = (of.conductorNombre || "Un conductor") +
+      (of.tipoOferta === "acepta" ? " aceptó tu oferta" : " te ofrece " + (of.monto || ""));
+    await admin.messaging().send({
+      token,
+      notification: { title: "🚕 Tienes una oferta de un conductor", body: cuerpo },
+      android: { priority: "high", notification: { sound: "default", channelId: "viajes" } },
+      apns: { payload: { aps: { sound: "default", badge: 1 } }, headers: { "apns-priority": "10" } },
+    });
+    return null;
+  } catch (e) {
+    console.error("Error notificarPasajeroOferta:", e.message);
     return null;
   }
 });
