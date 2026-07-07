@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { auth } from './firebase';
 import { signOut } from 'firebase/auth';
 
-function MenuLateral({ nombre, foto, onIrPerfil, onIrCreditos, onIrViajes, onIrGanancias, onIrSeguridad, onIrAyuda, onIrConfig, onIrPromociones, onCerrarSesion }) {
+function MenuLateral({ nombre, foto, onIrPerfil, onIrCreditos, onIrViajes, onIrGanancias, onIrSeguridad, onIrAyuda, onIrConfig, onIrPromociones, onCerrarSesion, onCambiarNegocio }) {
   const [abierto, setAbierto] = useState(false);
 
   const cerrar = () => setAbierto(false);
@@ -52,6 +52,12 @@ function MenuLateral({ nombre, foto, onIrPerfil, onIrCreditos, onIrViajes, onIrG
             </div>
 
             <div style={{ flex: 1, padding: '16px 12px', overflowY: 'auto' }}>
+              {onCambiarNegocio && (
+                <div onClick={() => { cerrar(); onCambiarNegocio(); }} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px', borderRadius: '12px', cursor: 'pointer', marginBottom: '10px', background: 'linear-gradient(135deg, #EAF2FF, #FFF3EA)', border: '1.5px solid #1C8EF9' }}>
+                  <span style={{ fontSize: '20px' }}>🔄</span>
+                  <span style={{ color: '#1C8EF9', fontSize: '15px', fontWeight: '900' }}>Cambiar de negocio</span>
+                </div>
+              )}
               {opcion('👤', 'Mi perfil', () => { if (onIrPerfil) onIrPerfil(); else proximamente(); })}
               {opcion('🕐', 'Mis viajes', () => { if (onIrViajes) onIrViajes(); else proximamente(); })}
               {opcion('💰', 'Mis créditos', () => { if (onIrCreditos) onIrCreditos(); else proximamente(); })}

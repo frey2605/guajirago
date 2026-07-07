@@ -154,7 +154,7 @@ function guardarReciente(destino) {
   } catch(e) {}
 }
 
-function Home({ nombre, onCerrarSesion, onVolver }) {
+function Home({ nombre, onCerrarSesion, onVolver, onCambiarNegocio }) {
   const [pantalla, setPantalla] = useState('home');
   const [verPerfil, setVerPerfil] = useState(false);
   const [verSeguridad, setVerSeguridad] = useState(false);
@@ -291,7 +291,7 @@ function Home({ nombre, onCerrarSesion, onVolver }) {
       )}
 
       <div style={{ background: '#FFFFFF', padding: '24px 20px', position: 'relative' }}>
-        <MenuLateral nombre={nombre} foto={fotoUsuario} onIrPerfil={() => setVerPerfil(true)} onIrViajes={() => setPantalla('historial')} onIrCreditos={() => setVerCreditos(true)} onIrSeguridad={() => setVerSeguridad(true)} onIrAyuda={() => setVerAyuda(true)} onIrConfig={() => setVerConfig(true)} onIrPromociones={() => setVerPromociones(true)} onCerrarSesion={onCerrarSesion} />
+        <MenuLateral nombre={nombre} foto={fotoUsuario} onIrPerfil={() => setVerPerfil(true)} onIrViajes={() => setPantalla('historial')} onIrCreditos={() => setVerCreditos(true)} onIrSeguridad={() => setVerSeguridad(true)} onIrAyuda={() => setVerAyuda(true)} onIrConfig={() => setVerConfig(true)} onIrPromociones={() => setVerPromociones(true)} onCerrarSesion={onCerrarSesion} onCambiarNegocio={onCambiarNegocio} />
         <Logo size={34} style={{ position: 'absolute', top: '16px', right: '16px', zIndex: 5 }} />
         <div onClick={onVolver} style={{ position: 'absolute', top: '18px', left: '120px', display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(0,0,0,0.06)', borderRadius: '12px', color: '#1A1A1E', fontSize: '14px', fontWeight: '500', padding: '8px 16px', cursor: 'pointer', zIndex: 5 }}><span style={{ fontSize: '20px', fontWeight: '900', lineHeight: '1' }}>‹</span> Volver</div>
         <div style={{ marginTop: '48px' }}>

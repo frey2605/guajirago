@@ -213,10 +213,7 @@ function Login({ onEntrar }) {
   if (pantalla === 'inicio') {
     return (
       <div style={{ backgroundColor: '#FFFFFF', minHeight: '100vh', fontFamily: 'Arial, sans-serif', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px 24px' }}>
-        <Logo size={104} style={{ marginBottom: '18px' }} />
-        <h1 style={{ fontSize: '42px', color: '#1A1A1E', margin: '0', fontFamily: 'Arial Black, sans-serif', letterSpacing: '-1px', textAlign: 'center' }}>Guajira</h1>
-        <h1 style={{ fontSize: '56px', background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', margin: '0 0 12px', fontFamily: 'Arial Black, sans-serif', letterSpacing: '-2px' }}>GO</h1>
-        <p style={{ color: '#1C8EF9', fontSize: '12px', letterSpacing: '3px', margin: '0 0 48px', fontWeight: 'bold' }}>VIVE · DESCUBRE · CONECTA</p>
+        <img src="/logo-completo.svg" alt="GuajiraGo" style={{ width: '360px', maxWidth: '90vw', height: 'auto', marginBottom: '36px' }} />
         <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '12px' }}>
           <button onClick={() => { setError(''); setPantalla('registro'); }} style={btnPrimario}>Crear cuenta</button>
           <button onClick={() => { setError(''); setMensajeRecuperar(''); setPantalla('login'); }} style={{ width: '100%', padding: '18px', background: '#FFFFFF', border: '1.5px solid #1C8EF9', borderRadius: '16px', color: '#1C8EF9', fontSize: '18px', fontWeight: '900', cursor: 'pointer' }}>Ya tengo cuenta</button>

@@ -4,6 +4,7 @@ import Login from './Login';
 import Home from './Home';
 import SolicitarMensajeria from './SolicitarMensajeria';
 import Restaurantes from './Restaurantes';
+import Turismo from './Turismo';
 import AppConductor from './AppConductor';
 import MenuLateral from './MenuLateral';
 import MiPerfil from './MiPerfil';
@@ -54,7 +55,7 @@ function cargarLocal() {
 
 function PantallaModulos({ nombre, foto, onSeleccionar, onVolver, onCerrarSesion, onIrPerfil, onIrGanancias, onIrSeguridad, onIrViajes, onIrCreditos, onIrAyuda, onIrConfig, onIrPromociones }) {
   // NUEVO: interruptores de módulos desde config/global (Superadmin). Por defecto Transporte y Mensajería van prendidos.
-  const [modulos, setModulos] = useState({ moduloTransporte: true, moduloMensajeria: true, moduloRestaurantes: false });
+  const [modulos, setModulos] = useState({ moduloTransporte: true, moduloMensajeria: true, moduloRestaurantes: false, moduloTurismo: false });
   useEffect(() => {
     getDoc(doc(db, 'config', 'global')).then(snap => {
       if (snap.exists()) {
@@ -63,6 +64,7 @@ function PantallaModulos({ nombre, foto, onSeleccionar, onVolver, onCerrarSesion
           moduloTransporte: d.moduloTransporte !== false,
           moduloMensajeria: d.moduloMensajeria !== false,
           moduloRestaurantes: d.moduloRestaurantes === true,
+          moduloTurismo: d.moduloTurismo === true,
         });
       }
     }).catch(() => {});
@@ -101,6 +103,15 @@ function PantallaModulos({ nombre, foto, onSeleccionar, onVolver, onCerrarSesion
             <div>
               <p style={{ color: '#1A1A1E', fontWeight: '900', fontSize: '18px', margin: '0' }}>Restaurantes</p>
               <p style={{ color: '#6B7280', fontSize: '13px', margin: '4px 0 0' }}>Pide tu comida a domicilio</p>
+            </div>
+          </div>
+        )}
+        {modulos.moduloTurismo && (
+          <div onClick={() => onSeleccionar('turismo')} style={{ background: '#FFFFFF', borderRadius: '20px', padding: '24px', display: 'flex', alignItems: 'center', gap: '16px', cursor: 'pointer', border: '2px solid #1C8EF9' }}>
+            <span style={{ fontSize: '40px' }}>🧭</span>
+            <div>
+              <p style={{ color: '#1A1A1E', fontWeight: '900', fontSize: '18px', margin: '0' }}>Turismo</p>
+              <p style={{ color: '#6B7280', fontSize: '13px', margin: '4px 0 0' }}>Tours y alquileres en La Guajira</p>
             </div>
           </div>
         )}
@@ -145,10 +156,12 @@ function PantallaRol({ nombre, foto, onSeleccionar, onVolver, onCerrarSesion, on
   );
 }
 
-function PantallaMensajeria({ nombre, onEnviar, onDomiciliario, onVolver }) {
+function PantallaMensajeria({ nombre, foto, onEnviar, onDomiciliario, onVolver, onCerrarSesion, onIrPerfil, onIrCreditos, onIrViajes, onIrGanancias, onIrSeguridad, onIrAyuda, onIrConfig, onIrPromociones }) {
   return (
     <div style={{ backgroundColor: '#FFFFFF', minHeight: '100vh', fontFamily: 'Arial, sans-serif', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px 24px', position: 'relative' }}>
-      <div onClick={onVolver} style={{ position: 'absolute', top: '18px', left: '20px', display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(0,0,0,0.06)', borderRadius: '12px', color: '#1A1A1E', fontSize: '14px', fontWeight: '500', padding: '8px 16px', cursor: 'pointer', zIndex: 5 }}><span style={{ fontSize: '20px', fontWeight: '900', lineHeight: '1' }}>‹</span> Volver</div>
+      <MenuLateral nombre={nombre} foto={foto} onIrPerfil={onIrPerfil} onIrCreditos={onIrCreditos} onIrViajes={onIrViajes} onIrGanancias={onIrGanancias} onIrSeguridad={onIrSeguridad} onIrAyuda={onIrAyuda} onIrConfig={onIrConfig} onIrPromociones={onIrPromociones} onCerrarSesion={onCerrarSesion} />
+      <div onClick={onVolver} style={{ position: 'absolute', top: '18px', left: '120px', display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(0,0,0,0.06)', borderRadius: '12px', color: '#1A1A1E', fontSize: '14px', fontWeight: '500', padding: '8px 16px', cursor: 'pointer', zIndex: 5 }}><span style={{ fontSize: '20px', fontWeight: '900', lineHeight: '1' }}>‹</span> Volver</div>
+      <Logo size={34} style={{ position: 'absolute', top: '16px', right: '16px', zIndex: 5 }} />
       <span style={{ fontSize: '52px', marginBottom: '8px' }}>📦</span>
       <h2 style={{ color: '#1A1A1E', fontSize: '26px', fontWeight: '900', margin: '0 0 4px', textAlign: 'center' }}>Mensajería y Mandados</h2>
       <p style={{ color: '#6B7280', fontSize: '14px', letterSpacing: '2px', margin: '0 0 28px', textAlign: 'center' }}>¿QUÉ QUIERES HACER?</p>
@@ -513,6 +526,8 @@ function App() {
       setScreen('mensajeria');
     } else if (modulo === 'restaurantes') {
       setScreen('restaurantes');
+    } else if (modulo === 'turismo') {
+      setScreen('turismo');
     }
   };
 
@@ -580,9 +595,10 @@ function App() {
   if (screen === 'login') return <Login onEntrar={handleEntrar} />;
   if (screen === 'modulos') return <><PantallaModulos nombre={nombreUsuario} foto={fotoUsuario} onSeleccionar={handleSeleccionarModulo} onVolver={() => setScreen('login')} onCerrarSesion={handleCerrarSesion} onIrPerfil={() => setVerPerfil(true)} onIrGanancias={() => setVerGanancias(true)} onIrSeguridad={() => setVerSeguridad(true)} onIrViajes={() => setVerMisViajes(true)} onIrCreditos={() => setVerCreditos(true)} onIrAyuda={() => setVerAyuda(true)} onIrConfig={() => setVerConfig(true)} onIrPromociones={() => setVerPromociones(true)} /><Anuncio tipoUsuario={tipoUsuario} /></>;
   if (screen === 'rol') return <PantallaRol nombre={nombreUsuario} foto={fotoUsuario} onSeleccionar={handleSeleccionarRol} onVolver={() => setScreen('modulos')} onCerrarSesion={handleCerrarSesion} onIrPerfil={() => setVerPerfil(true)} onIrGanancias={() => setVerGanancias(true)} onIrSeguridad={() => setVerSeguridad(true)} onIrViajes={() => setVerMisViajes(true)} onIrCreditos={() => setVerCreditos(true)} onIrAyuda={() => setVerAyuda(true)} onIrConfig={() => setVerConfig(true)} onIrPromociones={() => setVerPromociones(true)} />;
-  if (screen === 'mensajeria') return <PantallaMensajeria nombre={nombreUsuario} onVolver={() => setScreen('modulos')} onEnviar={() => setScreen('enviar')} onDomiciliario={() => handleSeleccionarRol('conductor')} />;
+  if (screen === 'mensajeria') return <PantallaMensajeria nombre={nombreUsuario} foto={fotoUsuario} onVolver={() => setScreen('modulos')} onEnviar={() => setScreen('enviar')} onDomiciliario={() => handleSeleccionarRol('conductor')} onCerrarSesion={handleCerrarSesion} onIrPerfil={() => setVerPerfil(true)} onIrGanancias={() => setVerGanancias(true)} onIrSeguridad={() => setVerSeguridad(true)} onIrViajes={() => setVerMisViajes(true)} onIrCreditos={() => setVerCreditos(true)} onIrAyuda={() => setVerAyuda(true)} onIrConfig={() => setVerConfig(true)} onIrPromociones={() => setVerPromociones(true)} />;
   if (screen === 'enviar') return <SolicitarMensajeria onVolver={() => setScreen('mensajeria')} />;
-  if (screen === 'restaurantes') return <Restaurantes nombre={nombreUsuario} onVolver={() => setScreen('modulos')} />;
+  if (screen === 'restaurantes') return <Restaurantes nombre={nombreUsuario} foto={fotoUsuario} onVolver={() => setScreen('modulos')} onCerrarSesion={handleCerrarSesion} onIrPerfil={() => setVerPerfil(true)} onIrGanancias={() => setVerGanancias(true)} onIrSeguridad={() => setVerSeguridad(true)} onIrViajes={() => setVerMisViajes(true)} onIrCreditos={() => setVerCreditos(true)} onIrAyuda={() => setVerAyuda(true)} onIrConfig={() => setVerConfig(true)} onIrPromociones={() => setVerPromociones(true)} />;
+  if (screen === 'turismo') return <Turismo nombre={nombreUsuario} foto={fotoUsuario} onVolver={() => setScreen('modulos')} onCerrarSesion={handleCerrarSesion} onIrPerfil={() => setVerPerfil(true)} onIrGanancias={() => setVerGanancias(true)} onIrSeguridad={() => setVerSeguridad(true)} onIrViajes={() => setVerMisViajes(true)} onIrCreditos={() => setVerCreditos(true)} onIrAyuda={() => setVerAyuda(true)} onIrConfig={() => setVerConfig(true)} onIrPromociones={() => setVerPromociones(true)} />;
   if (screen === 'mantenimiento') return <PantallaMantenimiento mensaje={mensajeMantenimiento} onVolver={() => setScreen('rol')} />;
   if (screen === 'datos_conductor') return <PantallaDatosConductor nombre={nombreUsuario} foto={fotoUsuario} celular={telefonoUsuario} onGuardar={handleDatosConductor} onVolver={() => setScreen('rol')} onCerrarSesion={handleCerrarSesion} onIrPerfil={() => setVerPerfil(true)} onIrGanancias={() => setVerGanancias(true)} onIrSeguridad={() => setVerSeguridad(true)} onIrViajes={() => setVerMisViajes(true)} onIrCreditos={() => setVerCreditos(true)} onIrAyuda={() => setVerAyuda(true)} onIrConfig={() => setVerConfig(true)} />;
 
@@ -600,7 +616,7 @@ function App() {
         />
       );
     }
-    return <Home nombre={nombreUsuario} onCerrarSesion={handleCerrarSesion} onVolver={() => setScreen('rol')} />;
+    return <Home nombre={nombreUsuario} onCerrarSesion={handleCerrarSesion} onVolver={() => setScreen('rol')} onCambiarNegocio={() => setScreen('modulos')} />;
   }
 }
 

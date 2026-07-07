@@ -18,7 +18,7 @@ export default function Logo({ size = 40, variante = 'color', style }) {
       </defs>
       <g transform="translate(4,4)">
         <path fillRule="evenodd" fill={fill} d={`${OUTER} ${INNER}`} />
-        <rect x="44" y="51" width="10" height="10" transform="rotate(45 49 56)" fill={fill} />
+        <rect x="44" y="44" width="10" height="10" transform="rotate(45 49 49)" fill={fill} />
       </g>
     </svg>
   );

@@ -212,6 +212,7 @@ function MapaRecogida({ ubicacionInicial, onCambioPunto }) {
   const listenerRef = useRef(null);
   const ultimoPuntoRef = useRef(null);
   const [expandido, setExpandido] = useState(false);
+  const [ubicUsada, setUbicUsada] = useState(false);
 
   const resolverDireccion = useCallback((lat, lng) => {
     const clave = lat.toFixed(6) + ',' + lng.toFixed(6);
@@ -301,6 +302,7 @@ function MapaRecogida({ ubicacionInicial, onCambioPunto }) {
       (pos) => {
         mapaRef.current.setCenter({ lat: pos.coords.latitude, lng: pos.coords.longitude });
         mapaRef.current.setZoom(16);
+        setUbicUsada(true);
       },
       () => {},
       { enableHighAccuracy: true, timeout: 10000 }
@@ -324,13 +326,21 @@ function MapaRecogida({ ubicacionInicial, onCambioPunto }) {
       {!expandido && (
         <div style={{ position: 'absolute', top: '10px', left: '50%', transform: 'translateX(-50%)', background: 'rgba(255,255,255,0.9)', color: '#1A1A1E', fontSize: '12px', fontWeight: 'bold', padding: '6px 14px', borderRadius: '20px', whiteSpace: 'nowrap', pointerEvents: 'none', zIndex: 6 }}>👆 Mantén presionado para ajustar</div>
       )}
-      {!expandido && (
+      {!expandido && !ubicUsada && (
+        <button
+          onClick={usarMiUbicacion}
+          onTouchStart={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
+          style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', zIndex: 8, background: 'linear-gradient(135deg, #2ECC71, #27AE60)', border: 'none', borderRadius: '14px', padding: '14px 22px', color: '#FFFFFF', fontSize: '15px', fontWeight: '900', cursor: 'pointer', boxShadow: '0 4px 16px rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', gap: '8px', whiteSpace: 'nowrap' }}
+        >📍 Usar mi ubicación</button>
+      )}
+      {!expandido && ubicUsada && (
         <button
           onClick={usarMiUbicacion}
           onTouchStart={(e) => e.stopPropagation()}
           onMouseDown={(e) => e.stopPropagation()}
           style={{ position: 'absolute', bottom: '12px', right: '12px', zIndex: 7, background: 'linear-gradient(135deg, #2ECC71, #27AE60)', border: 'none', borderRadius: '12px', padding: '10px 14px', color: '#FFFFFF', fontSize: '13px', fontWeight: 'bold', cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.35)', display: 'flex', alignItems: 'center', gap: '6px' }}
-        >📍 Usar mi ubicación</button>
+        >📍 Mi ubicación</button>
       )}
     </div>
   );

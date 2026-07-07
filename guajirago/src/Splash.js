@@ -61,22 +61,9 @@ function Splash({ onFinish }) {
           transform: `scale(${escala})`, opacity: opacidad,
           transition: 'all 1s ease-in-out', textAlign: 'center',
         }}>
-          <img src="/logo192.png" alt="GuajiraGo" style={{
-            width: '100px', height: '100px',
-            borderRadius: '24px', marginBottom: '24px',
+          <img src="/logo-completo.svg" alt="GuajiraGo" style={{
+            width: '380px', maxWidth: '90vw', height: 'auto',
           }}/>
-          <h1 style={{ fontSize: '52px', color: '#1A1A1E', margin: '0', letterSpacing: '-1px' }}>
-            Guajira
-          </h1>
-          <h1 style={{
-            fontSize: '72px',
-            background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)',
-            WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
-            margin: '0', letterSpacing: '-2px',
-          }}>GO</h1>
-          <p style={{ color: '#1C8EF9', fontSize: '12px', letterSpacing: '4px', marginTop: '24px', fontWeight: 'bold' }}>
-            VIVE · DESCUBRE · CONECTA
-          </p>
         </div>
       </div>
     );
@@ -90,18 +77,9 @@ function Splash({ onFinish }) {
       flexDirection: 'column', alignItems: 'center',
       justifyContent: 'center', padding: '32px 24px',
     }}>
-      <img src="/logo192.png" alt="GuajiraGo" style={{
-        width: '100px', height: '100px',
-        borderRadius: '24px', marginBottom: '24px',
-        boxShadow: '0 8px 32px rgba(255, 122, 47, 0.35)',
+      <img src="/logo-completo.svg" alt="GuajiraGo" style={{
+        width: '300px', maxWidth: '82vw', height: 'auto', marginBottom: '12px',
       }}/>
-
-      <h1 style={{
-        fontSize: '32px',
-        background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)',
-        WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
-        margin: '0 0 8px', fontFamily: 'Arial Black, sans-serif',
-      }}>GuajiraGo</h1>
 
       <p style={{ color: '#1A1A1E', fontSize: '18px', fontWeight: '900', margin: '0 0 8px', textAlign: 'center' }}>
         ¡Instala la app gratis!
