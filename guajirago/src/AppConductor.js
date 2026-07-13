@@ -313,10 +313,12 @@ function HistorialConductor({ onVolver }) {
 function TarjetaSolicitud({ solicitud, nombre, telefono, placa, vehiculo, tipoVehiculo, fotoConductor, colorConductor, saldoCreditos, configApp, descartadosRef, agregarViajeEscuchando, onRechazar }) {
   const [tarifaModificada, setTarifaModificada] = useState(solicitud.tarifaValor || TARIFA_MINIMA);
   const [tarifaCambiada, setTarifaCambiada] = useState(false);
+  const [ofertaEnviada, setOfertaEnviada] = useState(null); // monto que ya oferté en este viaje (para poder ajustar)
 
   useEffect(() => {
     setTarifaModificada(solicitud.tarifaValor || TARIFA_MINIMA);
     setTarifaCambiada(false);
+    setOfertaEnviada(null); // el pasajero cambió su oferta → puedo volver a ofertar
   }, [solicitud.tarifaValor]);
 
   const subirTarifa = () => {
@@ -345,10 +347,9 @@ function TarjetaSolicitud({ solicitud, nombre, telefono, placa, vehiculo, tipoVe
     const idViaje = solicitud.id;
     const esContra = tarifaCambiada;
     const monto = esContra ? tarifaModificada : (solicitud.tarifaValor || 0);
-    descartadosRef.current[idViaje] = solicitud.nuevaOferta || solicitud.fechaSolicitud;
     agregarViajeEscuchando(idViaje);
     // Mi oferta va en la subcolección viajes/{id}/contraofertas/{miUid}: no pisa las de otros
-    // conductores y puedo ajustarla (mismo doc). El viaje sigue ABIERTO ('esperando').
+    // conductores y puedo AJUSTARLA (mismo doc). La tarjeta NO se descarta: el viaje sigue abierto.
     setDoc(doc(db, 'viajes', idViaje, 'contraofertas', user.uid), {
       conductorId: user.uid,
       conductorNombre: nombre || 'Conductor',
@@ -363,7 +364,7 @@ function TarjetaSolicitud({ solicitud, nombre, telefono, placa, vehiculo, tipoVe
       creado: new Date().toISOString(),
       vigente: true,
     }, { merge: true }).catch(() => {});
-    onRechazar(solicitud.id);
+    setOfertaEnviada(monto);
   };
 
   return (
@@ -400,10 +401,16 @@ function TarjetaSolicitud({ solicitud, nombre, telefono, placa, vehiculo, tipoVe
           <button onClick={subirTarifa} style={{ width: '52px', height: '52px', background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F)', border: 'none', borderRadius: '14px', color: '#FFFFFF', fontSize: '26px', fontWeight: '900', cursor: 'pointer' }}>+</button>
         </div>
       </div>
+      {ofertaEnviada != null && (
+        <div style={{ background: '#EAF9EF', border: '1px solid #2ECC71', borderRadius: '12px', padding: '10px 12px', marginBottom: '10px', textAlign: 'center' }}>
+          <p style={{ color: '#1B8A4A', fontSize: '13px', fontWeight: '900', margin: 0 }}>✅ Enviaste tu oferta: ${ofertaEnviada.toLocaleString()}</p>
+          <p style={{ color: '#1B8A4A', fontSize: '11px', margin: '2px 0 0' }}>Puedes ajustar el precio con − / + y volver a enviar.</p>
+        </div>
+      )}
       <div style={{ display: 'flex', gap: '10px' }}>
-        <button onClick={() => onRechazar(solicitud.id)} style={{ flex: 1, padding: '13px', background: '#FFFFFF', border: 'none', borderRadius: '13px', color: '#6B7280', fontSize: '13px', fontWeight: 'bold', cursor: 'pointer' }}>✗ Rechazar</button>
-        <button onClick={aceptarOEnviar} style={{ flex: 2, padding: '13px', background: tarifaCambiada ? 'linear-gradient(135deg, #FF7A2F, #D6357E)' : 'linear-gradient(135deg, #FFCF4D, #FF7A2F)', border: 'none', borderRadius: '13px', color: '#FFFFFF', fontSize: '13px', fontWeight: 'bold', cursor: 'pointer' }}>
-          {tarifaCambiada ? '💬 Enviar contraoferta' : '✅ Aceptar viaje'}
+        <button onClick={() => onRechazar(solicitud.id)} style={{ flex: 1, padding: '13px', background: '#FFFFFF', border: 'none', borderRadius: '13px', color: '#6B7280', fontSize: '13px', fontWeight: 'bold', cursor: 'pointer' }}>{ofertaEnviada != null ? '✗ Quitar' : '✗ Rechazar'}</button>
+        <button onClick={aceptarOEnviar} style={{ flex: 2, padding: '13px', background: ofertaEnviada != null ? 'linear-gradient(135deg, #1C8EF9, #39A6FF)' : (tarifaCambiada ? 'linear-gradient(135deg, #FF7A2F, #D6357E)' : 'linear-gradient(135deg, #FFCF4D, #FF7A2F)'), border: 'none', borderRadius: '13px', color: '#FFFFFF', fontSize: '13px', fontWeight: 'bold', cursor: 'pointer' }}>
+          {ofertaEnviada != null ? '🔄 Actualizar oferta' : (tarifaCambiada ? '💬 Enviar contraoferta' : '✅ Aceptar viaje')}
         </button>
       </div>
     </div>
