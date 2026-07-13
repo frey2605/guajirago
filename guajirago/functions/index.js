@@ -335,40 +335,32 @@ exports.subirTarifa = onCall(async (request) => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// LIMPIEZA AUTOMÁTICA — evita que la base "se llene".
-// La colección que más crece es `viajes` (cada viaje genera además las
-// subcolecciones `contraofertas` y `mensajes`). Cada día borramos:
-//   • Búsquedas fallidas ('vencido') de +2 días → basura sin valor.
-//   • Cualquier viaje de +60 días (ya finalizado/cancelado/etc.).
-// `recursiveDelete` borra el viaje Y sus subcolecciones (ofertas + chats) de un solo golpe.
-// NO afecta las Ganancias del conductor (solo muestran hoy/semana/mes) ni el historial reciente.
+// LIMPIEZA AUTOMÁTICA — control de crecimiento SIN tocar datos con valor.
+// SOLO borra "basura": búsquedas de viaje que NINGÚN conductor tomó ('vencido')
+// de más de 2 días. Nadie viajó en ellas → no tienen valor legal ni de seguridad.
+// Los viajes REALES (finalizado, cancelado, cancelado_conductor, etc.) se CONSERVAN
+// PARA SIEMPRE, con conductor, pasajero, teléfonos, ruta y código de seguridad, por si
+// se necesitan para un tema de seguridad/legal. Ganancias e historial no se tocan.
 exports.limpiezaDiaria = onSchedule(
   { schedule: "every day 03:00", timeZone: "America/Bogota", timeoutSeconds: 540, memory: "512MiB" },
   async () => {
     const db = admin.firestore();
     const ahora = Date.now();
-    const haceDias = (d) => new Date(ahora - d * 86400000).toISOString();
-    const hace2 = haceDias(2);
-    const hace60 = haceDias(60);
+    const hace2 = new Date(ahora - 2 * 86400000).toISOString();
     let borrados = 0;
 
     try {
-      // Procesamos los 300 viajes MÁS ANTIGUOS por tanda (bounded; al borrarlos, la ventana avanza).
-      const snap = await db.collection("viajes").orderBy("fechaSolicitud").limit(300).get();
+      // Solo las búsquedas fallidas ('vencido'); tanda acotada, el conjunto se reduce al borrarlas.
+      const snap = await db.collection("viajes").where("estado", "==", "vencido").limit(400).get();
       for (const docu of snap.docs) {
         const v = docu.data() || {};
         const f = v.fechaSolicitud || "";
-        const e = v.estado || "";
-        if (!f) continue;
-        let borrar = false;
-        if (f < hace60) borrar = true;                        // cualquier viaje de +60 días
-        else if (e === "vencido" && f < hace2) borrar = true; // búsqueda fallida de +2 días
-        if (borrar) {
-          await db.recursiveDelete(docu.ref); // borra el viaje + contraofertas + mensajes
+        if (f && f < hace2) {
+          await db.recursiveDelete(docu.ref); // borra la búsqueda fallida + sus subcolecciones
           borrados++;
         }
       }
-      console.log("limpiezaDiaria: viajes eliminados =", borrados);
+      console.log("limpiezaDiaria: búsquedas fallidas eliminadas =", borrados);
     } catch (err) {
       console.error("Error en limpiezaDiaria:", err.message);
     }
