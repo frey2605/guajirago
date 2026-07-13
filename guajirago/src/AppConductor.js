@@ -454,6 +454,7 @@ function AppConductor({ nombre, telefono, placa, vehiculo, tipoVehiculo, onCerra
   const celebrandoRef = useRef(false);
   const faseRef = useRef(null);
   const unsubsViajesRef = useRef({});
+  const misOfertasRef = useRef(new Set()); // ids de viajes donde dejé una oferta (para invalidarlas al ganar otro)
   const solicitudesIdsRef = useRef(new Set());
   const ubicacionRef = useRef(null);
   const [refrescoListener, setRefrescoListener] = useState(0);
@@ -619,7 +620,17 @@ function AppConductor({ nombre, telefono, placa, vehiculo, tipoVehiculo, onCerra
     } catch(e) {}
   }, []);
 
+  // Al GANAR un viaje, invalidar MIS ofertas en los OTROS viajes → desaparecen al instante de las listas de esos pasajeros.
+  const invalidarMisOtrasOfertas = useCallback((miId, ganadorId) => {
+    const ids = Array.from(misOfertasRef.current);
+    misOfertasRef.current.clear();
+    ids.forEach(vid => {
+      if (vid !== ganadorId && miId) updateDoc(doc(db, 'viajes', vid, 'contraofertas', miId), { vigente: false }).catch(() => {});
+    });
+  }, []);
+
   const agregarViajeEscuchando = useCallback((idViaje) => {
+    if (idViaje) misOfertasRef.current.add(idViaje); // registro que oferté en este viaje
     if (unsubsViajesRef.current[idViaje]) return;
     const miId = auth.currentUser?.uid;
     const unsubHolder = { fn: null };
@@ -642,6 +653,7 @@ function AppConductor({ nombre, telefono, placa, vehiculo, tipoVehiculo, onCerra
         const dataCopy = { id: idViaje, ...data };
         limpiarVigilantesMenos(idViaje);
         limpiarViajesOtrosConductor(miId, idViaje);
+        invalidarMisOtrasOfertas(miId, idViaje);
         setCelebrando(true);
         celebrandoRef.current = true;
         // La comisión y el marcar "ocupado" ya los aplica la Cloud Function confirmarConductor (atómico, sin doble cobro).
@@ -682,7 +694,7 @@ function AppConductor({ nombre, telefono, placa, vehiculo, tipoVehiculo, onCerra
       if (unsubsViajesRef.current[idViaje]) cerrarEsteVigilante();
     }, 180000);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [limpiarVigilantesMenos, limpiarViajesOtrosConductor]);
+  }, [limpiarVigilantesMenos, limpiarViajesOtrosConductor, invalidarMisOtrasOfertas]);
 
   // NUEVO: vigilante global. Escucha TODOS los viajes del conductor a la vez y detecta cuando un pasajero acepta,
   // sin importar cuántas contraofertas haya enviado (arregla que la 2ª contraoferta no le llegara la respuesta).
@@ -705,6 +717,7 @@ function AppConductor({ nombre, telefono, placa, vehiculo, tipoVehiculo, onCerra
       const data = { id: d.id, ...d.data() };
       limpiarTodosVigilantes();
       limpiarViajesOtrosConductor(miId, data.id);
+      invalidarMisOtrasOfertas(miId, data.id);
       setCelebrando(true);
       celebrandoRef.current = true;
       // La comisión y el marcar "ocupado" los aplica la Cloud Function confirmarConductor (atómico).
@@ -716,7 +729,7 @@ function AppConductor({ nombre, telefono, placa, vehiculo, tipoVehiculo, onCerra
     });
     return () => unsub();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [limpiarTodosVigilantes, limpiarViajesOtrosConductor, tipoVehiculo]);
+  }, [limpiarTodosVigilantes, limpiarViajesOtrosConductor, invalidarMisOtrasOfertas, tipoVehiculo]);
 
   const cerrarSesion = async () => {
     try {
