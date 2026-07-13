@@ -4,7 +4,8 @@ import Logo from './Logo';
 import { collection, addDoc, doc, onSnapshot, updateDoc, getDoc, query, orderBy } from 'firebase/firestore';
 import Calificacion from './Calificacion';
 import Llamada from './Llamada';
-import { alertarNuevoViaje, precargarAudio, activarAudioiOS } from './Notificaciones';
+import { alertarNuevoViaje, precargarAudio, activarAudioiOS, obtenerTokenFCM } from './Notificaciones';
+import { getFunctions, httpsCallable } from 'firebase/functions';
 
 const centroRiohacha = { lat: 11.5444, lng: -72.9072 };
 
@@ -105,31 +106,17 @@ function ModalCancelacion({ razones, onConfirmar, onCerrar }) {
   );
 }
 
-// Tarjeta de contraoferta con barra de tiempo
-function TarjetaContraoferta({ oferta, onAceptar, onRechazar, duracionMs }) {
-  const [progreso, setProgreso] = useState(100);
+// Tarjeta de contraoferta de un conductor
+function TarjetaContraoferta({ oferta, onAceptar, onRechazar }) {
+  const progreso = 100;
   const [fotoConductor, setFotoConductor] = useState(null);
 
   useEffect(() => {
     setFotoConductor(oferta.conductorFoto || null);
   }, [oferta.conductorFoto]);
 
-  useEffect(() => {
-    const inicio = Date.now();
-    const intervalo = setInterval(() => {
-      const transcurrido = Date.now() - inicio;
-      const restante = Math.max(0, 100 - (transcurrido / (duracionMs || 20000) * 100));
-      setProgreso(restante);
-      if (restante === 0) {
-        clearInterval(intervalo);
-        onRechazar();
-      }
-    }, 50);
-    return () => clearInterval(intervalo);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const colorBarra = progreso > 50 ? '#2ECC71' : progreso > 25 ? '#FFCF4D' : '#FF4444';
+  // Las ofertas ya NO expiran solas: viven hasta que el pasajero confirme o rechace.
+  const colorBarra = '#2ECC71';
 
   return (
     <div style={{ background: '#FFFFFF', borderRadius: '20px', padding: '16px', marginBottom: '10px', border: '1px solid #FF7A2F' }}>
@@ -456,6 +443,7 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
   const [ofertaModificada, setOfertaModificada] = useState(false);
   // Contraofertas múltiples: lista de { conductorId, conductorNombre, conductorPlaca, conductorVehiculo, contraoferta, contraofertaValor }
   const [contraofertas, setContraofertas] = useState([]);
+  const [avisoOcupado, setAvisoOcupado] = useState(''); // nombre del conductor ya ocupado (o '__error__')
   const contadorRef = useRef(null);
   const pantallaRef = useRef(pantalla);
   const intervaloRespaldoRef = useRef(null);
@@ -680,6 +668,39 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
     return () => { unsub(); clearInterval(intervaloRespaldoRef.current); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viajeId, celebrando, conductorEnPunto]);
+
+  // Ofertas de conductores EN TIEMPO REAL (subcolección) — fuente de verdad, hasta 5, mejor precio primero.
+  // Nada pisa a nada: cada conductor tiene su propio documento.
+  useEffect(() => {
+    if (!viajeId) return;
+    const unsub = onSnapshot(collection(db, 'viajes', viajeId, 'contraofertas'), (snap) => {
+      if (pantallaRef.current !== 'esperando') return;
+      const lista = snap.docs.map(d => d.data())
+        .filter(o => o && o.conductorId && o.vigente !== false)
+        .map(o => ({
+          conductorId: o.conductorId,
+          conductorNombre: o.conductorNombre,
+          conductorPlaca: o.conductorPlaca,
+          conductorVehiculo: o.conductorVehiculo,
+          conductorTelefono: o.conductorTelefono,
+          conductorFoto: o.conductorFoto || null,
+          contraoferta: o.monto,
+          contraofertaValor: o.montoValor,
+          tipoOferta: o.tipoOferta,
+          creado: o.creado,
+        }))
+        .sort((a, b) => (a.contraofertaValor || 0) - (b.contraofertaValor || 0) || String(a.creado || '').localeCompare(String(b.creado || '')))
+        .slice(0, 5);
+      lista.forEach(o => {
+        const key = o.conductorId + '_' + (o.contraofertaValor || '');
+        if (!contaofertasIdsRef.current.has(key)) { contaofertasIdsRef.current.add(key); alertarNuevoViaje(); }
+      });
+      setContraofertas(lista);
+    });
+    return () => unsub();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viajeId]);
+
   useEffect(() => {
     if (!viajeId) return;
     const unsub = onSnapshot(doc(db, 'llamadas', viajeId), (s) => {
@@ -917,8 +938,11 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
       // El viaje SIEMPRE se crea con la tarifa COMPLETA: es lo que el conductor ve y debe recibir.
       // El descuento al pasajero solo se CONSUME (se descuenta del saldo del pasajero y se acredita
       // al conductor) cuando el conductor presiona "Iniciar viaje" — no antes.
+      let pasajeroFcmToken = null;
+      try { pasajeroFcmToken = await obtenerTokenFCM(); } catch (e) {}
       const docRef = await addDoc(collection(db, 'viajes'), {
         pasajeroId: user.uid, pasajeroEmail: user.email,
+        ...(pasajeroFcmToken ? { pasajeroFcmToken } : {}),
         pasajeroNombre: nombrePasajero,
         codigoSeguridad: codigoSeguridad,
         pasajeroLat: coordsRecogida.lat, pasajeroLng: coordsRecogida.lng,
@@ -991,39 +1015,40 @@ const confirmarViaje = async () => {
     }
   };
   const aceptarContraoferta = async (oferta) => {
-    if (!viajeId) return;
-    setContraofertas([]);
-    contaofertasIdsRef.current.clear();
+    if (!viajeId || celebrando) return;
     setCelebrando(true);
     try {
-      await updateDoc(doc(db, 'viajes', viajeId), {
-        estado: 'aceptado',
-        conductorId: oferta.conductorId,
-        conductorNombre: oferta.conductorNombre,
-        conductorPlaca: oferta.conductorPlaca,
-        conductorVehiculo: oferta.conductorVehiculo,
-        conductorTelefono: oferta.conductorTelefono,
-        tarifa: oferta.contraoferta,
-        tarifaValor: oferta.contraofertaValor,
-      });
-    } catch (e) {}
-    setTimeout(() => {
+      // Confirmación ATÓMICA en el servidor: el primer pasajero gana; si el conductor ya está ocupado, avisa.
+      const fn = httpsCallable(getFunctions(), 'confirmarConductor');
+      const res = await fn({ viajeId, conductorId: oferta.conductorId });
+      const r = (res && res.data) || {};
+      if (r.ok) {
+        setContraofertas([]);
+        contaofertasIdsRef.current.clear();
+        setTimeout(() => {
+          setCelebrando(false);
+          setPantalla('fase1');
+          escucharConductor(oferta.conductorId);
+        }, 3000);
+        return;
+      }
       setCelebrando(false);
-      setPantalla('fase1');
-      escucharConductor(oferta.conductorId);
-    }, 3000);
+      if (r.motivo === 'ocupado') {
+        setAvisoOcupado(oferta.conductorNombre || 'Ese conductor');
+        setContraofertas(prev => prev.filter(c => c.conductorId !== oferta.conductorId));
+      } else {
+        setAvisoOcupado('__error__');
+      }
+    } catch (e) {
+      setCelebrando(false);
+      setAvisoOcupado('__error__');
+    }
   };
 
+  // Rechazar una oferta: la marca como NO vigente en la subcolección (desaparece de la lista en vivo).
   const rechazarContraoferta = async (conductorId) => {
-    // Quitar de la lista local
     setContraofertas(prev => prev.filter(c => c.conductorId !== conductorId));
-    // Si no quedan más contraofertas, volver el viaje a esperando
-    setContraofertas(prev => {
-      if (prev.filter(c => c.conductorId !== conductorId).length === 0 && viajeId) {
-        updateDoc(doc(db, 'viajes', viajeId), { estado: 'esperando' }).catch(() => {});
-      }
-      return prev.filter(c => c.conductorId !== conductorId);
-    });
+    if (viajeId) updateDoc(doc(db, 'viajes', viajeId, 'contraofertas', conductorId), { vigente: false }).catch(() => {});
   };
 const PanelEmergencia = () => (
     mostrarEmergencia ? (
@@ -1302,6 +1327,18 @@ const PanelEmergencia = () => (
           </div>
         )}
 
+        {/* Ventanita: conductor ya ocupado (otro pasajero lo tomó primero) */}
+        {avisoOcupado && (
+          <div onClick={() => setAvisoOcupado('')} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', zIndex: 10000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+            <div onClick={(e) => e.stopPropagation()} style={{ background: '#FFFFFF', borderRadius: '20px', padding: '28px 24px', width: '100%', maxWidth: '340px', textAlign: 'center' }}>
+              <div style={{ fontSize: '46px', marginBottom: '8px' }}>{avisoOcupado === '__error__' ? '⚠️' : '🚕'}</div>
+              <p style={{ color: '#1A1A1E', fontSize: '17px', fontWeight: '900', margin: '0 0 8px' }}>{avisoOcupado === '__error__' ? 'No se pudo confirmar' : 'Conductor ocupado'}</p>
+              <p style={{ color: '#6B7280', fontSize: '14px', margin: '0 0 20px' }}>{avisoOcupado === '__error__' ? 'Intenta de nuevo en un momento.' : `${avisoOcupado} ya tomó otro viaje. Escoge otra de las propuestas.`}</p>
+              <button onClick={() => setAvisoOcupado('')} style={{ width: '100%', padding: '14px', background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F)', border: 'none', borderRadius: '12px', color: '#FFF', fontSize: '15px', fontWeight: '900', cursor: 'pointer' }}>Entendido</button>
+            </div>
+          </div>
+        )}
+
         {/* Contraofertas múltiples */}
         {contraofertas.length > 0 && (
           <div style={{ width: '100%', marginBottom: '16px' }}>
@@ -1310,7 +1347,6 @@ const PanelEmergencia = () => (
               <TarjetaContraoferta
                 key={oferta.conductorId}
                 oferta={oferta}
-                duracionMs={configApp.duracionContraoferta * 1000}
                 onAceptar={() => aceptarContraoferta(oferta)}
                 onRechazar={() => rechazarContraoferta(oferta.conductorId)}
               />

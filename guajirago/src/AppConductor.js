@@ -341,36 +341,28 @@ function TarjetaSolicitud({ solicitud, nombre, telefono, placa, vehiculo, tipoVe
       return;
     }
     const user = auth.currentUser;
-    if (tarifaCambiada) {
-      const idViaje = solicitud.id;
-      const montoContra = tarifaModificada;
-      descartadosRef.current[idViaje] = solicitud.nuevaOferta || solicitud.fechaSolicitud;
-      agregarViajeEscuchando(idViaje);
-      updateDoc(doc(db, 'viajes', idViaje), {
-        estado: 'contraoferta',
-        conductorId: user.uid,
-        conductorNombre: nombre || 'Conductor',
-        conductorTelefono: telefono || '',
-        conductorPlaca: placa || '',
-        conductorVehiculo: vehiculo || '',
-        conductorFoto: fotoConductor || null,
-        conductorColor: colorConductor || '',
-        contraoferta: `$${montoContra.toLocaleString()}`,
-        contraofertaValor: montoContra,
-      }).catch(() => {});
-    } else {
-      agregarViajeEscuchando(solicitud.id);
-      updateDoc(doc(db, 'viajes', solicitud.id), {
-        estado: 'confirmando',
-        conductorId: user.uid,
-        conductorNombre: nombre || 'Conductor',
-        conductorTelefono: telefono || '',
-        conductorPlaca: placa || '',
-        conductorVehiculo: vehiculo || '',
-        conductorFoto: fotoConductor || null,
-        conductorColor: colorConductor || '',
-      }).catch(() => {});
-    }
+    if (!user) return;
+    const idViaje = solicitud.id;
+    const esContra = tarifaCambiada;
+    const monto = esContra ? tarifaModificada : (solicitud.tarifaValor || 0);
+    descartadosRef.current[idViaje] = solicitud.nuevaOferta || solicitud.fechaSolicitud;
+    agregarViajeEscuchando(idViaje);
+    // Mi oferta va en la subcolección viajes/{id}/contraofertas/{miUid}: no pisa las de otros
+    // conductores y puedo ajustarla (mismo doc). El viaje sigue ABIERTO ('esperando').
+    setDoc(doc(db, 'viajes', idViaje, 'contraofertas', user.uid), {
+      conductorId: user.uid,
+      conductorNombre: nombre || 'Conductor',
+      conductorTelefono: telefono || '',
+      conductorPlaca: placa || '',
+      conductorVehiculo: vehiculo || '',
+      conductorFoto: fotoConductor || null,
+      conductorColor: colorConductor || '',
+      tipoOferta: esContra ? 'contraoferta' : 'acepta',
+      monto: `$${monto.toLocaleString()}`,
+      montoValor: monto,
+      creado: new Date().toISOString(),
+      vigente: true,
+    }, { merge: true }).catch(() => {});
     onRechazar(solicitud.id);
   };
 
@@ -652,35 +644,7 @@ function AppConductor({ nombre, telefono, placa, vehiculo, tipoVehiculo, onCerra
         limpiarViajesOtrosConductor(miId, idViaje);
         setCelebrando(true);
         celebrandoRef.current = true;
-        // CAMBIO: marcar ocupado:true inmediatamente al celebrar, no 3 segundos después
-        if (miId) {
-          setDoc(doc(db, 'conductores', miId), { ocupado: true }, { merge: true }).catch(() => {});
-          (async () => {
-            try {
-              // Leer la comisión vigente directo de config/global en el momento del cobro
-              // (evita usar un valor "congelado" de configApp).
-              let comMoto = CONFIG_APP_DEFECTO.comisionMototaxi;
-              let comTaxi = CONFIG_APP_DEFECTO.comisionTaxi;
-              let comDom = CONFIG_APP_DEFECTO.comisionDomicilio;
-              try {
-                const snapCfg = await getDoc(doc(db, 'config', 'global'));
-                if (snapCfg.exists()) {
-                  comMoto = snapCfg.data().comisionMototaxi ?? comMoto;
-                  comTaxi = snapCfg.data().comisionTaxi ?? comTaxi;
-                  comDom = snapCfg.data().comisionDomicilio ?? comDom;
-                }
-              } catch (eCfg) {}
-              // Si el viaje es un mandado, cobra la comisión de domicilio (no la de mototaxi)
-              const comisionAplicable = data.tipo === 'Mensajería' ? comDom : (tipoVehiculo === 'Mototaxi' ? comMoto : comTaxi);
-
-              const snapU = await getDoc(doc(db, 'usuarios', miId));
-              const saldoU = snapU.exists() ? (snapU.data().creditos || 0) : 0;
-              const nuevoU = saldoU - comisionAplicable;
-              await setDoc(doc(db, 'usuarios', miId), { creditos: nuevoU }, { merge: true });
-              setSaldoCreditos(nuevoU);
-            } catch (e) {}
-          })();
-        }
+        // La comisión y el marcar "ocupado" ya los aplica la Cloud Function confirmarConductor (atómico, sin doble cobro).
         setTimeout(() => {
           setCelebrando(false);
           celebrandoRef.current = false;
@@ -742,29 +706,8 @@ function AppConductor({ nombre, telefono, placa, vehiculo, tipoVehiculo, onCerra
       limpiarTodosVigilantes();
       limpiarViajesOtrosConductor(miId, data.id);
       setCelebrando(true);
-      celebrandoRef.current = true; // se marca de inmediato para que no cobre doble
-      setDoc(doc(db, 'conductores', miId), { ocupado: true }, { merge: true }).catch(() => {});
-      (async () => {
-        try {
-          let comMoto = CONFIG_APP_DEFECTO.comisionMototaxi;
-          let comTaxi = CONFIG_APP_DEFECTO.comisionTaxi;
-          let comDom = CONFIG_APP_DEFECTO.comisionDomicilio;
-          try {
-            const snapCfg = await getDoc(doc(db, 'config', 'global'));
-            if (snapCfg.exists()) {
-              comMoto = snapCfg.data().comisionMototaxi ?? comMoto;
-              comTaxi = snapCfg.data().comisionTaxi ?? comTaxi;
-              comDom = snapCfg.data().comisionDomicilio ?? comDom;
-            }
-          } catch (eCfg) {}
-          // Si el viaje es un mandado, cobra la comisión de domicilio (no la de mototaxi)
-          const comisionAplicable = data.tipo === 'Mensajería' ? comDom : (tipoVehiculo === 'Mototaxi' ? comMoto : comTaxi);
-          const snapU = await getDoc(doc(db, 'usuarios', miId));
-          const saldoU = snapU.exists() ? (snapU.data().creditos || 0) : 0;
-          await setDoc(doc(db, 'usuarios', miId), { creditos: saldoU - comisionAplicable }, { merge: true });
-          setSaldoCreditos(saldoU - comisionAplicable);
-        } catch (e) {}
-      })();
+      celebrandoRef.current = true;
+      // La comisión y el marcar "ocupado" los aplica la Cloud Function confirmarConductor (atómico).
       setTimeout(() => {
         setCelebrando(false);
         celebrandoRef.current = false;
