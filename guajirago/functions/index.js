@@ -322,7 +322,7 @@ exports.onViajeCerrado = onDocumentUpdated("viajes/{viajeId}", async (event) => 
 // VENCER VIAJES COLGADOS — evita que el panel muestre "EN CURSO" para siempre.
 // Corre cada 30 min y cierra los viajes que quedaron a medias:
 //   • 'esperando' de +20 min (búsquedas que se colgaron con la app cerrada) → 'vencido'.
-//   • 'aceptado' de +3 h desde que lo tomó el conductor (viaje abandonado, nunca se
+//   • 'aceptado' de +1 h desde que lo tomó el conductor (viaje abandonado, nunca se
 //     marcó finalizado) → 'expirado'. Se CONSERVA el registro (tuvo conductor, valor legal);
 //     onViajeCerrado libera al conductor (enViajeId/ocupado) porque 'expirado' es terminal.
 exports.expirarViajesColgados = onSchedule(
@@ -332,7 +332,7 @@ exports.expirarViajesColgados = onSchedule(
     const ahora = Date.now();
     const haceMin = (m) => new Date(ahora - m * 60000).toISOString();
     const limiteEsperando = haceMin(20);   // 20 minutos
-    const limiteEnCurso = haceMin(180);     // 3 horas
+    const limiteEnCurso = haceMin(60);      // 1 hora
     let vencidos = 0, expirados = 0;
 
     // 1) Búsquedas colgadas ('esperando') → 'vencido'
