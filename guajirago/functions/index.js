@@ -304,7 +304,7 @@ exports.onViajeCerrado = onDocumentUpdated("viajes/{viajeId}", async (event) => 
   const antes = event.data.before.data();
   const despues = event.data.after.data();
   if (!antes || !despues) return null;
-  const terminales = ["finalizado", "cancelado", "cancelado_conductor", "vencido"];
+  const terminales = ["finalizado", "cancelado", "cancelado_conductor", "vencido", "expirado"];
   if (antes.estado === despues.estado) return null;
   if (!terminales.includes(despues.estado)) return null;
   const cid = despues.conductorId;
@@ -317,6 +317,50 @@ exports.onViajeCerrado = onDocumentUpdated("viajes/{viajeId}", async (event) => 
   }
   return null;
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// VENCER VIAJES COLGADOS — evita que el panel muestre "EN CURSO" para siempre.
+// Corre cada 30 min y cierra los viajes que quedaron a medias:
+//   • 'esperando' de +20 min (búsquedas que se colgaron con la app cerrada) → 'vencido'.
+//   • 'aceptado' de +3 h desde que lo tomó el conductor (viaje abandonado, nunca se
+//     marcó finalizado) → 'expirado'. Se CONSERVA el registro (tuvo conductor, valor legal);
+//     onViajeCerrado libera al conductor (enViajeId/ocupado) porque 'expirado' es terminal.
+exports.expirarViajesColgados = onSchedule(
+  { schedule: "every 30 minutes", timeZone: "America/Bogota", timeoutSeconds: 300 },
+  async () => {
+    const db = admin.firestore();
+    const ahora = Date.now();
+    const haceMin = (m) => new Date(ahora - m * 60000).toISOString();
+    const limiteEsperando = haceMin(20);   // 20 minutos
+    const limiteEnCurso = haceMin(180);     // 3 horas
+    let vencidos = 0, expirados = 0;
+
+    // 1) Búsquedas colgadas ('esperando') → 'vencido'
+    try {
+      const snap = await db.collection("viajes").where("estado", "==", "esperando").limit(400).get();
+      for (const d of snap.docs) {
+        const f = (d.data() || {}).fechaSolicitud || "";
+        if (f && f < limiteEsperando) { await d.ref.update({ estado: "vencido" }); vencidos++; }
+      }
+    } catch (e) { console.error("expirar esperando:", e.message); }
+
+    // 2) Viajes en curso abandonados ('aceptado' +3h) → 'expirado'
+    try {
+      const snap = await db.collection("viajes").where("estado", "==", "aceptado").limit(400).get();
+      for (const d of snap.docs) {
+        const v = d.data() || {};
+        const ref = v.fechaAceptacion || v.fechaSolicitud || "";
+        if (ref && ref < limiteEnCurso) {
+          await d.ref.update({ estado: "expirado", fechaExpiracion: new Date().toISOString(), expiradoPor: "sistema" });
+          expirados++;
+        }
+      }
+    } catch (e) { console.error("expirar en curso:", e.message); }
+
+    console.log("expirarViajesColgados: vencidos =", vencidos, "expirados =", expirados);
+    return null;
+  }
+);
 
 // Pasajero sube su tarifa mientras espera
 exports.subirTarifa = onCall(async (request) => {
