@@ -1,5 +1,6 @@
 const { onDocumentCreated, onDocumentUpdated } = require("firebase-functions/v2/firestore");
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
+const { onSchedule } = require("firebase-functions/v2/scheduler");
 const admin = require("firebase-admin");
 
 admin.initializeApp();
@@ -332,3 +333,45 @@ exports.subirTarifa = onCall(async (request) => {
   console.log("Tarifa subida a:", nuevaTarifa, "en viaje:", viajeId);
   return { ok: true };
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// LIMPIEZA AUTOMÁTICA — evita que la base "se llene".
+// La colección que más crece es `viajes` (cada viaje genera además las
+// subcolecciones `contraofertas` y `mensajes`). Cada día borramos:
+//   • Búsquedas fallidas ('vencido') de +2 días → basura sin valor.
+//   • Cualquier viaje de +60 días (ya finalizado/cancelado/etc.).
+// `recursiveDelete` borra el viaje Y sus subcolecciones (ofertas + chats) de un solo golpe.
+// NO afecta las Ganancias del conductor (solo muestran hoy/semana/mes) ni el historial reciente.
+exports.limpiezaDiaria = onSchedule(
+  { schedule: "every day 03:00", timeZone: "America/Bogota", timeoutSeconds: 540, memory: "512MiB" },
+  async () => {
+    const db = admin.firestore();
+    const ahora = Date.now();
+    const haceDias = (d) => new Date(ahora - d * 86400000).toISOString();
+    const hace2 = haceDias(2);
+    const hace60 = haceDias(60);
+    let borrados = 0;
+
+    try {
+      // Procesamos los 300 viajes MÁS ANTIGUOS por tanda (bounded; al borrarlos, la ventana avanza).
+      const snap = await db.collection("viajes").orderBy("fechaSolicitud").limit(300).get();
+      for (const docu of snap.docs) {
+        const v = docu.data() || {};
+        const f = v.fechaSolicitud || "";
+        const e = v.estado || "";
+        if (!f) continue;
+        let borrar = false;
+        if (f < hace60) borrar = true;                        // cualquier viaje de +60 días
+        else if (e === "vencido" && f < hace2) borrar = true; // búsqueda fallida de +2 días
+        if (borrar) {
+          await db.recursiveDelete(docu.ref); // borra el viaje + contraofertas + mensajes
+          borrados++;
+        }
+      }
+      console.log("limpiezaDiaria: viajes eliminados =", borrados);
+    } catch (err) {
+      console.error("Error en limpiezaDiaria:", err.message);
+    }
+    return null;
+  }
+);
