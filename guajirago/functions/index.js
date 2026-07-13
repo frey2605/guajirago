@@ -297,6 +297,26 @@ exports.notificarPasajeroOferta = onDocumentCreated("viajes/{viajeId}/contraofer
   }
 });
 
+// Liberar al conductor (enViajeId + ocupado) cuando el viaje llega a un estado terminal.
+// Imprescindible cuando el pasajero cancela (no puede escribir el doc del conductor por reglas) o si la app del conductor está cerrada.
+exports.onViajeCerrado = onDocumentUpdated("viajes/{viajeId}", async (event) => {
+  const antes = event.data.before.data();
+  const despues = event.data.after.data();
+  if (!antes || !despues) return null;
+  const terminales = ["finalizado", "cancelado", "cancelado_conductor", "vencido"];
+  if (antes.estado === despues.estado) return null;
+  if (!terminales.includes(despues.estado)) return null;
+  const cid = despues.conductorId;
+  if (!cid) return null;
+  try {
+    await admin.firestore().collection("conductores").doc(cid)
+      .set({ enViajeId: null, ocupado: false }, { merge: true });
+  } catch (e) {
+    console.error("Error onViajeCerrado:", e.message);
+  }
+  return null;
+});
+
 // Pasajero sube su tarifa mientras espera
 exports.subirTarifa = onCall(async (request) => {
   const { viajeId, nuevaTarifa } = request.data;

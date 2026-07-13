@@ -724,7 +724,7 @@ function AppConductor({ nombre, telefono, placa, vehiculo, tipoVehiculo, onCerra
         await updateDoc(doc(db, 'viajes', viajeActual.id), { estado: 'cancelado_conductor', canceladoPor: 'conductor', razonCancelacion: 'Conductor cerró sesión' });
       }
       const user = auth.currentUser;
-      if (user) await setDoc(doc(db, 'conductores', user.uid), { activo: false, ocupado: false }, { merge: true });
+      if (user) await setDoc(doc(db, 'conductores', user.uid), { activo: false, ocupado: false, enViajeId: null }, { merge: true });
     } catch(e) {}
     try { await signOut(auth); } catch(e) {}
     if (onCerrarSesion) onCerrarSesion(); else window.location.reload();
@@ -752,11 +752,18 @@ const cargarSaldo = useCallback(async (uid) => {
     } catch (e) { setSaldoCreditos(0); }
   }, []);
   useEffect(() => {
+    let unsubSaldo = null;
     const desuscribir = auth.onAuthStateChanged((user) => {
-      if (user) cargarSaldo(user.uid);
-      else setSaldoCreditos(0);
+      if (unsubSaldo) { unsubSaldo(); unsubSaldo = null; }
+      if (user) {
+        cargarSaldo(user.uid);
+        // Saldo en TIEMPO REAL: refleja al instante el cobro de comisión que hace la Cloud Function
+        unsubSaldo = onSnapshot(doc(db, 'usuarios', user.uid), (snap) => {
+          if (snap.exists()) setSaldoCreditos(snap.data().creditos || 0);
+        });
+      } else setSaldoCreditos(0);
     });
-    return () => desuscribir();
+    return () => { desuscribir(); if (unsubSaldo) unsubSaldo(); };
   }, [cargarSaldo]);
   const recibirMensajePasajero = useCallback((mensaje) => {
     if (!mensaje) return;
@@ -969,7 +976,7 @@ const cargarSaldo = useCallback(async (uid) => {
       await updateDoc(doc(db, 'viajes', viajeActual.id), { estado: 'cancelado_conductor', canceladoPor: 'conductor', razonCancelacion: razon });
     }
     const user = auth.currentUser;
-    if (user) setDoc(doc(db, 'conductores', user.uid), { ocupado: false }, { merge: true }).catch(() => {});
+    if (user) setDoc(doc(db, 'conductores', user.uid), { ocupado: false, enViajeId: null }, { merge: true }).catch(() => {});
     setMostrarCancelacion(false);
     setFase(null); faseRef.current = null;
     setViajeActual(null); setTiempoLlegada(null); setDistancia(null);
@@ -989,7 +996,7 @@ const cargarSaldo = useCallback(async (uid) => {
       } catch (err) {}
     }
     const user = auth.currentUser;
-    if (user) setDoc(doc(db, 'conductores', user.uid), { ocupado: false }, { merge: true }).catch(() => {});
+    if (user) setDoc(doc(db, 'conductores', user.uid), { ocupado: false, enViajeId: null }, { merge: true }).catch(() => {});
     setFase(null); faseRef.current = null;
     setViajeActual(null); setTiempoLlegada(null); setDistancia(null);
     setRespuestaPasajero(null); setMensajeGrande(null); ultimoMensajeRef.current = null;
@@ -1174,7 +1181,7 @@ useEffect(() => {
         <p style={{ color: '#6B7280', fontSize: '13px', margin: '0 0 32px', textAlign: 'center' }}>Puedes activarte para recibir nuevos viajes</p>
         <button onClick={() => {
           const user = auth.currentUser;
-          if (user) setDoc(doc(db, 'conductores', user.uid), { ocupado: false }, { merge: true }).catch(() => {});
+          if (user) setDoc(doc(db, 'conductores', user.uid), { ocupado: false, enViajeId: null }, { merge: true }).catch(() => {});
           setFase(null); faseRef.current = null; setViajeActual(null); setUbicacionPasajero(null); setDestinoCoords(null); setActivo(true);
         }} style={{ width: '100%', padding: '18px', background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)', border: 'none', borderRadius: '16px', color: '#FFFFFF', fontSize: '18px', fontWeight: '900', cursor: 'pointer' }}>Volver al inicio</button>
       </div>

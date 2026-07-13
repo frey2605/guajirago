@@ -950,11 +950,8 @@ function SolicitarMensajeria({ onVolver, destinoInicial }) {
       // El viaje SIEMPRE se crea con la tarifa COMPLETA: es lo que el conductor ve y debe recibir.
       // El descuento al pasajero solo se CONSUME (se descuenta del saldo del pasajero y se acredita
       // al conductor) cuando el conductor presiona "Iniciar viaje" — no antes.
-      let pasajeroFcmToken = null;
-      try { pasajeroFcmToken = await obtenerTokenFCM(); } catch (e) {}
       const docRef = await addDoc(collection(db, 'viajes'), {
         pasajeroId: user.uid, pasajeroEmail: user.email,
-        ...(pasajeroFcmToken ? { pasajeroFcmToken } : {}),
         pasajeroNombre: nombrePasajero,
         codigoSeguridad: codigoSeguridad,
         pasajeroLat: coordsRecogida.lat, pasajeroLng: coordsRecogida.lng,
@@ -966,6 +963,8 @@ function SolicitarMensajeria({ onVolver, destinoInicial }) {
         radioBusqueda: configApp.radioBusquedaInicial,
       });
       setViajeId(docRef.id);
+      // Token del pasajero SIN bloquear la creación del viaje (el permiso de notificación puede tardar).
+      obtenerTokenFCM().then((t) => { if (t) updateDoc(doc(db, 'viajes', docRef.id), { pasajeroFcmToken: t }).catch(() => {}); }).catch(() => {});
       setContraofertas([]);
       contaofertasIdsRef.current.clear();
       setBuscandoAgotado(false);
