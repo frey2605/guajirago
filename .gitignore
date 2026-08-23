@@ -76,3 +76,11 @@ guajirago/guajirago/
 # Sub-apps con su propio repositorio git (se guardan aparte)
 guajirago-admin/
 guajirago-aliados/
+
+# Papeles del guardian (scripts/guardian.cjs)
+# La FOTO es de cada sesion: no se guarda.
+.guardian-foto.json
+# El LIBRO DE EXCEPCIONES si se guarda: que el patron se vea es lo que impide
+# que el escape se vuelva costumbre. Va con "!" porque el "*.log" de arriba lo tapaba.
+!.guardian-excepciones.log
+# .guardian.json (el comando de pruebas) SI se guarda: es config del proyecto.
