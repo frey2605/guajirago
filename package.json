@@ -1,5 +1,11 @@
 {
+  "scripts": {
+    "test": "node pruebas/correr.cjs"
+  },
   "dependencies": {
     "firebase": "^12.15.0"
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "^5.0.2"
   }
 }
