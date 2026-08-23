@@ -110,11 +110,16 @@ las reglas de Firestore**. Lo que se blinde en las reglas hay que moverlo allí,
 
 > Esta sección se llena sola a medida que las trampas muerdan. Cada una con fecha.
 
-- **(23-ago-2026) Hay cuatro copias del repo del taxi en la máquina.** La buena es
-  `C:\Users\Windows 11\GuajiraGo` (rama `main`). La de `Dropbox\PROYECTOS\GuajiraGo` tiene
-  **99 archivos borrados** del árbol de trabajo — un `git commit -a` allí borra el proyecto.
-  Dentro de la copia buena hay **otro repo anidado** en `guajirago/` en la rama `v2.1`
-  (6-jul), que no contiene el trabajo de taxi de julio. No trabajar desde ninguna de esas.
+- **(23-ago-2026) Ya solo queda UNA copia de trabajo.** La buena y única es
+  `C:\Users\Windows 11\GuajiraGo` (rama `main`). La de `Dropbox\PROYECTOS\GuajiraGo` tenía
+  **99 archivos borrados** del árbol de trabajo — un `git commit -a` allí borraba el proyecto —
+  y **se borró el 23-ago-2026**, tras comprobar objeto por objeto que no contenía nada que no
+  estuviera ya en la copia buena. Su `git branch -vv` decía *"ahead 11"*: era **mentira**,
+  comparaba contra un `origin/main` viejo que nunca refrescó.
+- **(23-ago-2026) Dentro de la copia buena hay otro repo anidado** en `guajirago/`, rama `v2.1`
+  (HEAD `12a0de9`, 6-jul). No contiene el trabajo de taxi de julio: **no se trabaja desde ahí**.
+  Y ojo — ese HEAD y sus **3 stashes NO están en GitHub**: es lo único del proyecto que vive
+  solo en este disco.
 - **(23-ago-2026) Las reglas de Firestore no estaban en el repo.** Vivían solo en la consola,
   sin historial. La copia bajada del servidor quedó en `firestore.rules.LIVE`.
 - **(23-ago-2026) `firebase` no tiene comando para LEER reglas.** Se bajan con la API
