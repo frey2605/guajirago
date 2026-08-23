@@ -56,6 +56,14 @@ beforeEach(async () => {
     await setDoc(doc(db, 'usuarios/conductor1'), { nombre: 'Luis', rol: '', tipo: 'conductor' });
     await setDoc(doc(db, 'usuarios/eladmin'), { nombre: 'Admin', rol: 'admin' });
     await setDoc(doc(db, 'usuarios/eljefe'), { nombre: 'Jefe', rol: 'superadmin' });
+    // Un conductor castigado: es el que más ganas tiene de tocarse la ficha.
+    await setDoc(doc(db, 'usuarios/castigado'), {
+      nombre: 'Pedro', rol: '', tipo: 'conductor',
+      activo: false,
+      sancionHasta: '2026-12-31T00:00:00.000Z',
+      sanciones: [{ motivo: 'cobró de más', fecha: '2026-08-01' }],
+      creditos: 5000,
+    });
 
     // Lo que se va a intentar borrar
     await setDoc(doc(db, 'viajes/viaje1'), { pasajeroId: 'pasajero1', estado: 'esperando', tarifa: 12000 });
@@ -199,6 +207,171 @@ describe('REGLA 12 · lo que la app hace hoy sigue funcionando', () => {
     const { doc, setDoc } = FS;
     await RUT.assertSucceeds(
       setDoc(doc(como('pasajero1'), 'pedidosRestaurantes/ped2'), { total: 25000 })
+    );
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// REGLA 1 — LA LLAVE MAESTRA
+// Nadie puede escribir en SU PROPIA ficha los campos que dan poder.
+// Mientras esto estuvo abierto, las otras 12 reglas no protegían nada: preguntaban
+// "¿eres admin?" leyendo un campo que el atacante acababa de escribir.
+// ═══════════════════════════════════════════════════════════════════════════
+describe('REGLA 1 · nadie se da poder a sí mismo', () => {
+  it('un pasajero NO puede nombrarse superadmin', async () => {
+    const { doc, setDoc } = FS;
+    await RUT.assertFails(
+      setDoc(doc(como('pasajero1'), 'usuarios/pasajero1'), { rol: 'superadmin' }, { merge: true })
+    );
+  });
+
+  it('un pasajero NO puede nombrarse admin', async () => {
+    const { doc, updateDoc } = FS;
+    await RUT.assertFails(updateDoc(doc(como('pasajero1'), 'usuarios/pasajero1'), { rol: 'admin' }));
+  });
+
+  it('un usuario nuevo NO puede registrarse trayendo un rol dentro', async () => {
+    const { doc, setDoc } = FS;
+    await RUT.assertFails(
+      setDoc(doc(como('nuevo1'), 'usuarios/nuevo1'), { nombre: 'Listo', rol: 'superadmin' })
+    );
+  });
+
+  it('un conductor castigado NO puede levantarse la sanción', async () => {
+    const { doc, updateDoc } = FS;
+    await RUT.assertFails(updateDoc(doc(como('castigado'), 'usuarios/castigado'), { sancionHasta: null }));
+  });
+
+  it('un conductor castigado NO puede reactivarse solo', async () => {
+    const { doc, updateDoc } = FS;
+    await RUT.assertFails(updateDoc(doc(como('castigado'), 'usuarios/castigado'), { activo: true }));
+  });
+
+  it('un conductor castigado NO puede borrar su historial de faltas', async () => {
+    const { doc, updateDoc } = FS;
+    await RUT.assertFails(updateDoc(doc(como('castigado'), 'usuarios/castigado'), { sanciones: [] }));
+  });
+
+  it('nadie puede darle un rol a OTRA persona sin ser admin', async () => {
+    const { doc, updateDoc } = FS;
+    await RUT.assertFails(updateDoc(doc(como('pasajero1'), 'usuarios/conductor1'), { rol: 'admin' }));
+  });
+});
+
+describe('REGLA 1 · el panel de admin sigue pudiendo hacer su trabajo', () => {
+  it('el superadmin puede nombrar admin a alguien (Superadmin.js:599)', async () => {
+    const { doc, updateDoc } = FS;
+    await RUT.assertSucceeds(updateDoc(doc(como('eljefe'), 'usuarios/pasajero1'), { rol: 'admin' }));
+  });
+
+  it('el admin puede sancionar a un conductor (Conductores.js:299)', async () => {
+    const { doc, updateDoc } = FS;
+    await RUT.assertSucceeds(
+      updateDoc(doc(como('eladmin'), 'usuarios/conductor1'), {
+        activo: false,
+        sancionHasta: '2026-09-30T00:00:00.000Z',
+        sanciones: [{ motivo: 'no recogió', fecha: '2026-08-23' }],
+      })
+    );
+  });
+
+  it('el admin puede levantar la sanción (Conductores.js:307)', async () => {
+    const { doc, updateDoc } = FS;
+    await RUT.assertSucceeds(
+      updateDoc(doc(como('eladmin'), 'usuarios/castigado'), {
+        activo: true, sancionHasta: null, mensajesApelacion: [],
+      })
+    );
+  });
+});
+
+// Estas son las que de verdad dan miedo: todas estas pantallas se tragan los
+// errores en silencio (catch vacío). Si una regla las bloquea, el dueño no ve un
+// error: ve que "no guarda". Cada prueba lleva el archivo:línea que reproduce.
+describe('REGLA 1 · lo que la app hace hoy NO se rompe', () => {
+  it('el registro de un pasajero nuevo funciona igual (Login.js:145)', async () => {
+    const { doc, setDoc } = FS;
+    await RUT.assertSucceeds(
+      setDoc(doc(como('nuevo1'), 'usuarios/nuevo1'), {
+        nombre: 'Ana', email: 'ana@ejemplo.com', celular: '3001234567',
+        fechaNacimiento: '1995-04-12',
+        contactoConfianzaNombre: 'Mamá', contactoConfianzaNumero: '3007654321',
+        tipo: '', placa: '', vehiculo: '',
+        fechaRegistro: '2026-08-23T10:00:00.000Z', ipRegistro: '181.0.0.1',
+        descuentoPendiente: { promoId: 'BIENVENIDA', valorBeneficio: 8000 },
+      })
+    );
+  });
+
+  it('el alta de conductor funciona igual (App.js:247)', async () => {
+    const { doc, setDoc } = FS;
+    await RUT.assertSucceeds(
+      setDoc(doc(como('pasajero1'), 'usuarios/pasajero1'), {
+        tipo: 'conductor', tipoVehiculo: 'Taxi', placa: 'ABC123',
+        marca: 'Chevrolet', modelo: '2019', color: 'Amarillo',
+        documento: '1090123456', vehiculo: 'Taxi', telefono: '3001112233',
+        fotoConductor: 'https://x/f.jpg', fotoCedula: 'https://x/c.jpg',
+        creditos: 20000,
+      }, { merge: true })
+    );
+  });
+
+  it('guardar el perfil funciona igual (MiPerfil.js:86)', async () => {
+    const { doc, setDoc } = FS;
+    await RUT.assertSucceeds(
+      setDoc(doc(como('pasajero1'), 'usuarios/pasajero1'),
+        { nombre: 'Ana María', telefono: '3009998877', fotoConductor: 'https://x/n.jpg' },
+        { merge: true })
+    );
+  });
+
+  it('las preferencias de sonido funcionan igual (Configuracion.js:44)', async () => {
+    const { doc, setDoc } = FS;
+    await RUT.assertSucceeds(
+      setDoc(doc(como('pasajero1'), 'usuarios/pasajero1'), { configSonido: false }, { merge: true })
+    );
+  });
+
+  it('el chat de recargas funciona igual (Creditos.js:59)', async () => {
+    const { doc, updateDoc } = FS;
+    await RUT.assertSucceeds(
+      updateDoc(doc(como('conductor1'), 'usuarios/conductor1'), {
+        mensajesRecarga: [{ texto: 'ya transferí', autor: 'conductor' }],
+      })
+    );
+  });
+
+  it('marcar el aviso del admin como leído funciona igual (Home.js:197)', async () => {
+    const { doc, updateDoc } = FS;
+    await RUT.assertSucceeds(
+      updateDoc(doc(como('pasajero1'), 'usuarios/pasajero1'), { llamadoPendiente: null })
+    );
+  });
+
+  it('la apelación del conductor funciona igual (AppConductor.js:540)', async () => {
+    const { doc, updateDoc } = FS;
+    await RUT.assertSucceeds(
+      updateDoc(doc(como('castigado'), 'usuarios/castigado'), {
+        mensajesApelacion: [{ texto: 'no fue así', autor: 'conductor' }],
+      })
+    );
+  });
+
+  // OJO: estas dos SIGUEN abiertas a propósito. Son la REGLA 7 (el dinero), que
+  // necesita funciones de servidor. Si algún día se cierran, estas dos pruebas
+  // hay que cambiarlas — y eso solo se hace con permiso del dueño.
+  it('el canje de un código sigue pudiendo sumar créditos (Creditos.js:112) — REGLA 7 pendiente', async () => {
+    const { doc, setDoc } = FS;
+    await RUT.assertSucceeds(
+      setDoc(doc(como('conductor1'), 'usuarios/conductor1'), { creditos: 55000 }, { merge: true })
+    );
+  });
+
+  it('aplicar una promoción sigue pudiendo escribir el descuento (Promociones.js:101) — REGLA 7 pendiente', async () => {
+    const { doc, setDoc } = FS;
+    await RUT.assertSucceeds(
+      setDoc(doc(como('pasajero1'), 'usuarios/pasajero1'),
+        { descuentoPendiente: { promoId: 'X', valorBeneficio: 5000 } }, { merge: true })
     );
   });
 });

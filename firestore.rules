@@ -2,12 +2,39 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     match /usuarios/{userId} {
+      // ── REGLA 1 · LA LLAVE MAESTRA ──────────────────────────────────────────
+      // Hasta el 23-ago-2026 el dueño de una ficha podía escribir CUALQUIER campo
+      // de la suya, incluido 'rol'. Con eso cualquiera se nombraba superadmin en
+      // diez segundos. Y el remate: hay 12 reglas que preguntan "¿eres admin?"
+      // leyendo ese mismo campo — le preguntaban al carnet que rellena el visitante.
+      //
+      // Medido el 23-ago-2026: de las TRES apps, NINGUNA escribe estos cuatro
+      // campos sobre usuarios/{uid}. Las 3 escrituras de 'activo' de la app del
+      // conductor van a la colección 'conductores', que es otra. Por eso cerrar
+      // esto no rompe nada.
+      function camposDePoder() {
+        return ['rol', 'activo', 'sanciones', 'sancionHasta'];
+      }
+
       allow read: if request.auth != null;
+
+      // Caso 1 — el dueño escribe su propia ficha, menos los campos de poder.
+      // Va primero a propósito: no gasta la lectura que cuesta el get() de abajo.
+      allow create: if request.auth != null
+        && request.auth.uid == userId
+        && !request.resource.data.keys().hasAny(camposDePoder());
+      allow update: if request.auth != null
+        && request.auth.uid == userId
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(camposDePoder());
+
+      // Caso 2 — un admin o superadmin sí puede tocarlo todo, en cualquier ficha.
+      // Es la única vía para dar un rol (Superadmin.js:599) o sancionar
+      // (Conductores.js:299). Cuesta una lectura, por eso va después.
       allow create, update: if request.auth != null && (
-        request.auth.uid == userId ||
         get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.rol == 'admin' ||
         get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.rol == 'superadmin'
       );
+
       allow delete: if false;
     }
     match /viajes/{viajeId} {
