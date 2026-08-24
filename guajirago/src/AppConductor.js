@@ -5,6 +5,7 @@ import { registrarTokenFCM, alertarNuevoViaje, activarAudioiOS, precargarAudio, 
 import { signOut } from 'firebase/auth';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { COMISIONES_DEFECTO, comisionSegunTipo } from './comisiones';
+import { CONFIG_TARIFAS_DEFECTO, calcularTarifaMinima } from './tarifas';
 import { ESTADOS_MERCADO } from './estadosViaje';
 import Calificacion from './Calificacion';
 import Llamada from './Llamada';
@@ -21,22 +22,32 @@ const centroRiohacha = { lat: 11.5444, lng: -72.9072 };
 
 // Valores por defecto (respaldo). Se reemplazan por los de config/global cuando cargan.
 const CONFIG_APP_DEFECTO = {
-  tarifaMinimaDia: 8000,
-  tarifaMinimaNoche: 10000,
-  tarifaMinimaMototaxi: 3000,
-  horaInicioNoche: 18,
-  horaFinNoche: 6,
+  // Las tarifas mínimas salen de tarifas.js: una sola calculadora para toda la app.
+  ...CONFIG_TARIFAS_DEFECTO,
+  // ANOTADO, no arreglado hoy: incrementoTarifa sigue repetido a mano en las tres
+  // pantallas. No es tarifa mínima, así que no entra en este arreglo.
   incrementoTarifa: 1000,
   // Las comisiones salen de comisiones.js: una sola calculadora para toda la app.
   ...COMISIONES_DEFECTO,
   tiempoEsperaConductor: 240,
 };
 
-function calcularTarifaMinima(cfg = CONFIG_APP_DEFECTO) {
-  const hora = new Date().getHours();
-  return (hora >= cfg.horaInicioNoche || hora < cfg.horaFinNoche) ? cfg.tarifaMinimaNoche : cfg.tarifaMinimaDia;
-}
-const TARIFA_MINIMA = calcularTarifaMinima();
+// La tarifa mínima ya NO se calcula aquí: vive en tarifas.js (SEGUNDA LEY). Se importa arriba.
+//
+// ANOTADO, NO ARREGLADO EN ESTE CAMBIO — este respaldo tiene dos fallas viejas que
+// NO se tocan hoy porque cambiarlas cambiaría lo que ve el conductor:
+//   1. Se calcula UNA sola vez al abrir la app. Si el conductor la deja abierta
+//      desde las 5 de la tarde, a las 7 sigue creyendo que es de día.
+//   2. No mira el tipo de viaje ni la configuración del panel: un mototaxi sin
+//      tarifa saldría con el mínimo del taxi.
+// Hoy no hace daño: se midió el 23-ago-2026 y los 91 viajes traen su tarifa, así
+// que este respaldo no se ha usado nunca. Arreglarlo es un trabajo aparte.
+//
+// SE ESCRIBEN LOS DOS PARÁMETROS A PROPÓSITO, aunque sean los de por defecto: el
+// primero es el TIPO de viaje, no la config. Escribirlo así evita que alguien lo
+// "arregle" a calcularTarifaMinima(configApp) — que no daría error, pero metería
+// la config donde va el tipo y devolvería el paracaídas en vez del precio bueno.
+const TARIFA_MINIMA = calcularTarifaMinima(undefined, CONFIG_APP_DEFECTO);
 
 // La comisión ya NO se calcula aquí: vive en comisiones.js, que es el único sitio
 // donde se calcula para toda la app (SEGUNDA LEY). Se importa arriba.

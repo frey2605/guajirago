@@ -70,7 +70,10 @@ const r = spawnSync(
     '--project', 'demo-guajirago',
     // Va entre comillas a propósito: con shell, Windows lo partiría en trozos
     // y `firebase` creería que --test es una opción suya.
-    '"node --test pruebas/reglas.test.js"',
+    // tarifas.test.js no necesita el emulador (es aritmética), pero se corre aquí
+    // igual para que `npm test` sea UN solo comando: una prueba que hay que
+    // acordarse de correr aparte es una prueba que nadie corre.
+    '"node --test pruebas/reglas.test.js pruebas/tarifas.test.js"',
   ],
   { cwd: RAIZ, env: entorno, stdio: 'inherit', shell: true }
 );

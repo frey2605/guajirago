@@ -6,16 +6,16 @@ import Calificacion from './Calificacion';
 import Llamada from './Llamada';
 import { alertarNuevoViaje, precargarAudio, activarAudioiOS, obtenerTokenFCM } from './Notificaciones';
 import { getFunctions, httpsCallable } from 'firebase/functions';
+import { CONFIG_TARIFAS_DEFECTO, calcularTarifaMinima } from './tarifas';
 
 const centroRiohacha = { lat: 11.5444, lng: -72.9072 };
 
 // Valores por defecto (respaldo). Se reemplazan por los de config/global cuando cargan.
 const CONFIG_APP_DEFECTO = {
-  tarifaMinimaDia: 8000,
-  tarifaMinimaNoche: 10000,
-  tarifaMinimaMototaxi: 3000,
-  horaInicioNoche: 18,
-  horaFinNoche: 6,
+  // Las tarifas mínimas salen de tarifas.js: una sola calculadora para toda la app.
+  ...CONFIG_TARIFAS_DEFECTO,
+  // ANOTADO, no arreglado hoy: incrementoTarifa sigue repetido a mano en las tres
+  // pantallas. No es tarifa mínima, así que no entra en este arreglo.
   incrementoTarifa: 1000,
   radioBusquedaInicial: 3,
   radioBusquedaAmpliado: 7,
@@ -24,15 +24,8 @@ const CONFIG_APP_DEFECTO = {
   duracionContraoferta: 20,
 };
 
-// Calcula la tarifa mínima usando la config recibida (o los valores por defecto)
-function calcularTarifaMinima(tipo, cfg = CONFIG_APP_DEFECTO) {
-  if (tipo === 'Mototaxi') return cfg.tarifaMinimaMototaxi;
-  const hora = new Date().getHours();
-  const inicioNoche = cfg.horaInicioNoche;
-  const finNoche = cfg.horaFinNoche;
-  // Noche: desde horaInicioNoche hasta horaFinNoche → tarifa más alta
-  return (hora >= inicioNoche || hora < finNoche) ? cfg.tarifaMinimaNoche : cfg.tarifaMinimaDia;
-}
+// La tarifa mínima ya NO se calcula aquí: vive en tarifas.js, que es el único sitio
+// donde se calcula para toda la app (SEGUNDA LEY). Se importa arriba.
 const BOUNDS_RIOHACHA = { north: 11.7, south: 11.3, east: -72.6, west: -73.0 };
 
 const RESPUESTAS_RAPIDAS = [
