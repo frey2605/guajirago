@@ -71,6 +71,57 @@ Esta manda sobre todas las demás. Antes de cada cambio:
 
 ---
 
+## 🔶 LA SEGUNDA LEY — UNA SOLA FUENTE, PARA TODO EL PROYECTO
+
+> **Palabras del dueño (23-ago-2026):**
+> «No pueden vivir dos procesos en diferentes archivos.»
+> «No se pueden usar dos calculadoras para un mismo proceso.»
+> «La información que se supone deben compartir debe salir de los mismos archivos.»
+
+Manda sobre todo el proyecto, en las tres apps y en las funciones. Tiene tres caras:
+
+1. **Un proceso vive en UN archivo.** Si el mismo trabajo está escrito en dos sitios, uno
+   de los dos se queda viejo. No es una hipótesis: pasa siempre, y el que se queda viejo
+   es el que nadie mira.
+2. **Una sola calculadora por proceso.** Si un número —una comisión, una tarifa, un
+   descuento, un saldo— se calcula en dos sitios, tarde o temprano dan resultados
+   distintos. El dinero no admite dos respuestas. **La calculadora buena es la del
+   servidor**; el celular puede *enseñar* el número, nunca *decidirlo*.
+3. **Lo compartido sale del mismo sitio.** Si dos pantallas, dos apps o una función y una
+   app necesitan el mismo dato o la misma lista, salen del mismo archivo. Copiar y pegar
+   una lista de estados, un nombre de campo o una tarifa crea un contrato invisible que
+   nadie recuerda que existe.
+4. **Las conexiones entre el panel, la app y los restaurantes: ÚNICAS, ESTABLES y FUERTES.**
+   · **Únicas** — una sola vía por cada cosa que se comparte. Si el panel y la app de
+     aliados hablan del mismo negocio, hablan por un solo sitio. Dos copias del mismo dato
+     en dos colecciones no son una conexión: son dos versiones que se van a contradecir.
+   · **Estables** — un nombre de campo que cruza de una app a otra **no se cambia ni se
+     renombra** sin mirar las tres apps y las funciones. Aquí no hay API que avise: si una
+     app cambia un campo, la otra deja de funcionar **en silencio**.
+   · **Fuertes** — lo que cruza se comprueba en el servidor, no se supone. Una conexión que
+     se cae si el otro lado manda algo raro no es fuerte: es una casualidad que aguanta.
+
+**Cómo se cumple, en la práctica:**
+
+- **Antes de escribir algo nuevo se busca si ya existe.** Si existe parecido: se usa, o se
+  saca a un sitio común. No se hace una segunda versión.
+- **Si al arreglar aparece un gemelo, se ANOTA y se le dice al dueño.** No se unifica de
+  paso: eso es tocar código que funciona, y lo prohíbe la PRIMERA LEY. Unificar es un
+  trabajo aparte, con sus 10 pasos y su permiso.
+- **Un arreglo que hay que aplicar dos veces es la prueba de que la ley está rota ahí.**
+  Se hace el arreglo en los dos sitios —porque hay que dejarlo funcionando— y se anota el
+  gemelo como deuda, con nombre y archivo.
+
+**Deuda conocida el 23-ago-2026** (medida trabajando, no supuesta):
+
+| Gemelos | Dónde | Qué duplican |
+|---|---|---|
+| `Solicitar.js` y `SolicitarMensajeria.js` | app de pasajero | pantalla entera de pedir viaje: el mismo arreglo hubo que aplicarlo **dos veces** en las REGLAS 5, 6 y 11 |
+| La comisión del viaje | `functions/index.js` y `Ganancias.js` | el mismo número, calculado por **dos calculadoras** distintas |
+| El empleado de un negocio | `empleados/{uid}` y `restaurantes/{id}/empleados/{uid}` | **la misma ficha, escrita dos veces a mano** en cada alta, cada cambio y cada activación (`aliados/Empleados.js:75-76`, `:96-103`, `:126-127`). Se leen por separado: la lista sale de una y el permiso de entrar, de la otra. **Si una escritura falla, un empleado despedido sigue pudiendo entrar.** Medido el 23-ago-2026: 1 empleado, las dos copias coinciden — por casualidad, no por diseño |
+
+---
+
 ## Cómo se trabaja (leyes de siempre)
 
 1. **Un arreglo a la vez.** Un arreglo = un commit = una verificación.
