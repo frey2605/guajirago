@@ -73,6 +73,26 @@ describe('AMARRES · la app y el servidor miden la distancia IGUAL', () => {
   });
 });
 
+describe('AMARRES · los colores de aliados salen de flujoPedidos, no se reescriben', () => {
+  it('NINGUNA pantalla de aliados vuelve a definir a mano AZUL, AZUL_MEDIO, NARANJA o NARANJA_CLARO', () => {
+    // Hasta el 24-ago-2026, 18 pantallas redefinían estos colores aunque
+    // flujoPedidos.js ya los exportaba. Si una copia cambia de tono, esa
+    // pantalla queda de otro color y nadie se entera hasta verla.
+    const fs = require('node:fs');
+    const path = require('node:path');
+    const carpeta = path.resolve(__dirname, '..', 'guajirago-aliados', 'src');
+    const HUELLAS = ['const AZUL =', 'const AZUL_MEDIO =', 'const NARANJA =', 'const NARANJA_CLARO ='];
+    for (const archivo of fs.readdirSync(carpeta).filter((f) => f.endsWith('.js') && f !== 'flujoPedidos.js')) {
+      const fuente = fs.readFileSync(path.join(carpeta, archivo), 'utf8');
+      for (const huella of HUELLAS) {
+        assert.ok(!fuente.includes(huella),
+          'guajirago-aliados/src/' + archivo + ' volvió a definir «' + huella.slice(6, -2) + '» a mano. ' +
+          'Los colores compartidos viven en flujoPedidos.js (SEGUNDA LEY): se importan, no se copian.');
+      }
+    }
+  });
+});
+
 describe('AMARRES · el filtro anti-datos juzga IGUAL en la app y en el panel', () => {
   it('las dos copias dan el mismo veredicto con la misma batería de mensajes', () => {
     // La app filtra con filtroChat.js; el panel (Codigos.js, otro repo que no
