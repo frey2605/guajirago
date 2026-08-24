@@ -8,3 +8,12 @@
   3. pruebas/funciones.test.js — archivo NUEVO. Prueba que EJECUTA confirmarConductor contra el
      emulador: dueno del viaje / extrano / sin sesion.
 2026-08-24T00:28:12.659Z	firebase.json	NEGADO: fuera de la promesa "REGLA 2: confirmarConductor exige sesion y que quien llama sea el dueno del viaje; la oferta la firma su conductor; se retira subirTarifa"
+
+2026-08-24 REGLA 7 — "CODIGO MOVIDO" avisado por el guardian, con permiso EXPRESO del dueno.
+  El dueno aprobo la propuesta escrita: "Tres funciones nuevas en el servidor: canjear codigo,
+  reclamar promocion y creditos de bienvenida. La misma cuenta que hoy, pero corriendo donde
+  nadie la puede tocar. Las pantallas llaman a esas funciones en vez de escribir." Contesto "Ok".
+  Mover la cuenta de sitio ES el arreglo, no un efecto colateral: por eso el guardian ve el
+  codigo saltar de Creditos.js y Promociones.js a functions/index.js. Los cinco archivos
+  implicados estaban DECLARADOS en la foto. La cuenta se copio tal cual; lo unico que cambia a
+  proposito es que el tipo de cuenta se lee de la ficha y no de lo que mande el telefono.

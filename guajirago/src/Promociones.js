@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { db, auth } from './firebase';
-import { collection, getDocs, doc, getDoc, runTransaction } from 'firebase/firestore';
+// runTransaction salió con la REGLA 7: el reclamo lo hace el servidor.
+import { collection, getDocs, doc, getDoc } from 'firebase/firestore';
+import { getFunctions, httpsCallable } from 'firebase/functions';
 import Logo from './Logo';
 
 function CelebracionPromo({ codigo, textoValor, onCerrar }) {
@@ -40,7 +42,9 @@ const CATEGORIAS = [
 
 function Promociones({ onVolver }) {
   const [promos, setPromos] = useState([]);
-  const [tipoUsuario, setTipoUsuario] = useState('');
+  // El tipo de cuenta ya no se guarda aquí: solo servía para reclamar la
+  // promoción, y eso lo decide el servidor leyendo la ficha (REGLA 7). La lista
+  // de abajo sigue filtrándose con el 'tipo' que se lee al cargar.
   const [cargando, setCargando] = useState(true);
   const [codigo, setCodigo] = useState('');
   const [error, setError] = useState('');
@@ -65,8 +69,6 @@ function Promociones({ onVolver }) {
           }
         }
       }
-      setTipoUsuario(tipo);
-
       const snap = await getDocs(collection(db, 'promociones'));
       const ahora = new Date();
       const lista = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(p => {
@@ -96,52 +98,24 @@ function Promociones({ onVolver }) {
 
     setAplicando(true);
     try {
-      const refPromo = doc(db, 'promociones', cod);
-      const refUso = doc(db, 'promociones', cod, 'usos', user.uid);
-      const refUsuario = doc(db, 'usuarios', user.uid);
-
-      const resultado = await runTransaction(db, async (transaccion) => {
-        const snapPromo = await transaccion.get(refPromo);
-        if (!snapPromo.exists()) throw new Error('NO_EXISTE');
-        const datosPromo = snapPromo.data();
-        const ahora = new Date();
-        if (!datosPromo.activa) throw new Error('NO_ACTIVA');
-        if (new Date(datosPromo.fechaInicio + 'T00:00:00') > ahora || new Date(datosPromo.fechaFin + 'T23:59:59') < ahora) throw new Error('FUERA_VIGENCIA');
-        if (datosPromo.aplicaA === 'pasajeros' && tipoUsuario === 'conductor') throw new Error('NO_APLICA');
-        if (datosPromo.aplicaA === 'conductores' && tipoUsuario !== 'conductor') throw new Error('NO_APLICA');
-
-        const snapUso = await transaccion.get(refUso);
-        const usosPrevios = snapUso.exists() ? (snapUso.data().veces || 0) : 0;
-        if (datosPromo.limiteUsosPorPersona && usosPrevios >= datosPromo.limiteUsosPorPersona) {
-          throw new Error('LIMITE_ALCANZADO');
-        }
-
-        const codigoVerificacion = String(Math.floor(1000 + Math.random() * 9000));
-
-        // Guardar el descuento como pendiente, NO se aplica todavía
-        transaccion.set(refUsuario, {
-          descuentoPendiente: {
-            promoId: cod,
-            tipoBeneficio: datosPromo.tipoBeneficio, // 'credito' (monto fijo $) o 'descuento' (%)
-            valorBeneficio: datosPromo.valorBeneficio || 0,
-            fechaActivacion: new Date().toISOString(),
-            codigoVerificacion,
-          },
-        }, { merge: true });
-
-        return { tipo: datosPromo.tipoBeneficio, valor: datosPromo.valorBeneficio || 0, codigoVerificacion };
-      });
+      // REGLA 7 — el reclamo ya NO se hace aquí. Este teléfono comprobaba la
+      // vigencia y el tipo de cuenta (¡mandando él mismo su 'tipoUsuario'!) y se
+      // escribía el beneficio. Ahora lo hace el servidor
+      // (functions: reclamarPromocion), que lee el tipo de la FICHA.
+      const reclamar = httpsCallable(getFunctions(), 'reclamarPromocion');
+      const respuesta = await reclamar({ codigo: cod });
+      const resultado = respuesta.data;
 
       const textoValor = resultado.tipo === 'credito' ? `$${resultado.valor.toLocaleString()}` : `${resultado.valor}%`;
       setCelebrandoPromo({ codigo: resultado.codigoVerificacion, textoValor });
       setDescuentoActivo({ codigoVerificacion: resultado.codigoVerificacion, textoValor });
       setCodigo('');
     } catch (e) {
-      if (e.message === 'NO_EXISTE') setError('Ese código no existe. Verifícalo');
-      else if (e.message === 'NO_ACTIVA' || e.message === 'FUERA_VIGENCIA') setError('Esta promoción ya no está disponible');
-      else if (e.message === 'NO_APLICA') setError('Esta promoción no aplica para tu tipo de cuenta');
-      else if (e.message === 'LIMITE_ALCANZADO') setError('Ya usaste esta promoción el máximo de veces permitido');
-      else setError('Error al aplicar el código. Intenta de nuevo');
+      // El motivo lo explica ahora el servidor, con las mismas palabras de
+      // antes, y esos mensajes SIEMPRE llevan espacios. Si falla la red, la
+      // librería pone el código pelado ('internal'): eso no se enseña.
+      const delServidor = e && e.message && e.message.includes(' ');
+      setError(delServidor ? e.message : 'Error al aplicar el código. Intenta de nuevo');
     }
     setAplicando(false);
   };

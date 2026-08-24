@@ -21,6 +21,8 @@ import { auth, db, storage } from './firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+// REGLA 7: los créditos de bienvenida los da el servidor, no este teléfono.
+import { getFunctions, httpsCallable } from 'firebase/functions';
 const MARCAS_VEHICULO = [
   'AKT', 'Auteco', 'Bajaj', 'BMW', 'BYD', 'Chery', 'Chevrolet',
   'Citroen', 'Ford', 'Foton', 'Hero', 'Honda', 'Hyundai', 'JAC',
@@ -230,20 +232,12 @@ function PantallaDatosConductor({ nombre, foto, celular, onGuardar, onVolver, on
       const marcaFinal = marca === 'Otra' ? marcaOtra.trim() : marca;
       const vehiculo = `${marcaFinal} ${modelo}`;
 
-      // Créditos de bienvenida: solo si el usuario aún no tiene saldo (evita duplicar si edita sus datos)
-      // El monto depende del tipo de vehículo (mototaxi o taxi)
-      let creditosIniciales = null;
-      try {
-        const snapActual = await getDoc(doc(db, 'usuarios', user.uid));
-        const yaTieneCreditos = snapActual.exists() && (snapActual.data().creditos || 0) > 0;
-        if (!yaTieneCreditos) {
-          const snapCfg = await getDoc(doc(db, 'config', 'global'));
-          const d = snapCfg.exists() ? snapCfg.data() : {};
-          const monto = tipoVehiculo === 'Mototaxi' ? (d.incentivoNuevoMototaxi ?? 10000) : (d.incentivoNuevoTaxi ?? 20000);
-          if (monto > 0) creditosIniciales = monto;
-        }
-      } catch (e) {}
-
+      // REGLA 7 — los créditos de bienvenida ya NO los decide este teléfono.
+      // Antes, la app miraba la config, calculaba el monto según el vehículo y
+      // se lo escribía en su propia ficha: se podía escribir el número que
+      // quisiera. Ahora se piden al servidor DESPUÉS de guardar los datos
+      // (functions: creditosDeBienvenida), que hace la misma cuenta leyendo el
+      // tipo de vehículo de la ficha ya guardada, y solo la primera vez.
       await setDoc(doc(db, 'usuarios', user.uid), {
         tipo: 'conductor',
         tipoVehiculo,
@@ -256,8 +250,23 @@ function PantallaDatosConductor({ nombre, foto, celular, onGuardar, onVolver, on
         telefono,
         fotoConductor: urlFotoConductor,
         fotoCedula: urlFotoCedula,
-        ...(creditosIniciales !== null ? { creditos: creditosIniciales } : {}),
       }, { merge: true });
+
+      // Ya con la ficha guardada, el servidor decide si le tocan créditos de
+      // bienvenida y cuántos. Si falla, el registro NO se cae: el conductor
+      // queda dado de alta sin el incentivo.
+      // ANOTADO, NO ARREGLADO: hoy NINGUNA pantalla vuelve a pedirlo, así que
+      // ese conductor se quedaría sin su incentivo hasta que el dueño se lo
+      // ponga a mano desde el panel. Cerrarlo (reintentar al abrir la app) es
+      // trabajo aparte, con su foto.
+      let creditosIniciales = null;
+      try {
+        const pedir = httpsCallable(getFunctions(), 'creditosDeBienvenida');
+        const r = await pedir({});
+        const dados = (r && r.data && r.data.creditos) || 0;
+        if (dados > 0) creditosIniciales = dados;
+      } catch (e) {}
+
       onGuardar(placa.toUpperCase(), vehiculo, telefono, tipoVehiculo, creditosIniciales);
     } catch (e) { setError('Error al guardar. Revisa tu conexión e intenta de nuevo'); }
     setCargando(false);

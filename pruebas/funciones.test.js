@@ -235,3 +235,201 @@ describe('REGLA 2 · confirmarConductor pregunta quien llama', () => {
     assert.strictEqual(r.status, 404, 'la funcion retirada no debe responder');
   });
 });
+
+// ── REGLA 7 · LA PLATA LA DECIDE EL SERVIDOR ────────────────────────────────
+// Estas pruebas ENCIENDEN las tres funciones nuevas y miran el saldo de verdad
+// en la base, no lo que digan ellas.
+
+describe('REGLA 7 · canjearCodigoRecarga', () => {
+  beforeEach(async () => {
+    await sembrar('codigos/BUENO50', { valor: num(50000), usado: { booleanValue: false } });
+    await sembrar('codigos/YAUSADO', { valor: num(50000), usado: { booleanValue: true } });
+    await sembrar('codigos/SINVALOR', { valor: num(0), usado: { booleanValue: false } });
+    await sembrar('usuarios/elcond', { tipo: txt('conductor'), creditos: num(SALDO_INICIAL) });
+  });
+
+  test('SIN sesion no se canjea nada', async () => {
+    const r = await llamarA('canjearCodigoRecarga', null, { codigo: 'BUENO50' });
+    assert.strictEqual(r.cuerpo?.error?.status, 'UNAUTHENTICATED',
+      'un rechazo que no sabe por que rechaza no es un candado');
+    assert.strictEqual(await saldoDe('elcond'), SALDO_INICIAL, 'el saldo se movio sin sesion');
+    assert.strictEqual((await leer('codigos/BUENO50')).usado.booleanValue, false);
+  });
+
+  test('con sesion, el codigo bueno suma y queda marcado como usado', async () => {
+    const r = await llamarA('canjearCodigoRecarga', 'elcond', { codigo: 'BUENO50' });
+    assert.strictEqual(r.cuerpo?.result?.valor, 50000);
+    assert.strictEqual(await saldoDe('elcond'), SALDO_INICIAL + 50000);
+    const cod = await leer('codigos/BUENO50');
+    assert.strictEqual(cod.usado.booleanValue, true, 'el codigo no quedo marcado');
+    assert.strictEqual(cod.usadoPor.stringValue, 'elcond', 'no quedo dicho quien lo uso');
+  });
+
+  test('el MISMO codigo no se puede canjear dos veces (ni llamando 5 veces seguidas)', async () => {
+    await llamarA('canjearCodigoRecarga', 'elcond', { codigo: 'BUENO50' });
+    for (let i = 0; i < 5; i++) {
+      const r = await llamarA('canjearCodigoRecarga', 'elcond', { codigo: 'BUENO50' });
+      assert.strictEqual(r.cuerpo?.error?.status, 'ALREADY_EXISTS');
+    }
+    assert.strictEqual(await saldoDe('elcond'), SALDO_INICIAL + 50000, 'se sumo mas de una vez');
+  });
+
+  test('un codigo ya usado no suma', async () => {
+    const r = await llamarA('canjearCodigoRecarga', 'elcond', { codigo: 'YAUSADO' });
+    assert.strictEqual(r.cuerpo?.error?.status, 'ALREADY_EXISTS');
+    assert.strictEqual(await saldoDe('elcond'), SALDO_INICIAL);
+  });
+
+  test('un codigo que no existe no suma', async () => {
+    const r = await llamarA('canjearCodigoRecarga', 'elcond', { codigo: 'INVENTADO' });
+    assert.strictEqual(r.cuerpo?.error?.status, 'NOT_FOUND');
+    assert.strictEqual(await saldoDe('elcond'), SALDO_INICIAL);
+  });
+
+  test('un codigo de valor cero no suma', async () => {
+    const r = await llamarA('canjearCodigoRecarga', 'elcond', { codigo: 'SINVALOR' });
+    assert.strictEqual(r.cuerpo?.error?.status, 'INVALID_ARGUMENT');
+    assert.strictEqual(await saldoDe('elcond'), SALDO_INICIAL);
+  });
+
+  test('el codigo se lee en MAYUSCULAS y sin espacios, como lo teclea la gente', async () => {
+    const r = await llamarA('canjearCodigoRecarga', 'elcond', { codigo: '  bueno50  ' });
+    assert.strictEqual(r.cuerpo?.result?.valor, 50000, 'no acepto el codigo en minusculas');
+  });
+});
+
+describe('REGLA 7 · reclamarPromocion', () => {
+  const HOY = new Date().toISOString().slice(0, 10);
+  const AYER = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+  const MANANA = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+
+  beforeEach(async () => {
+    await sembrar('promociones/VIVA', {
+      activa: { booleanValue: true }, fechaInicio: txt(AYER), fechaFin: txt(MANANA),
+      tipoBeneficio: txt('credito'), valorBeneficio: num(8000), aplicaA: txt('todos'),
+    });
+    await sembrar('promociones/VENCIDA', {
+      activa: { booleanValue: true }, fechaInicio: txt(AYER), fechaFin: txt(AYER),
+      tipoBeneficio: txt('credito'), valorBeneficio: num(8000), aplicaA: txt('todos'),
+    });
+    await sembrar('promociones/SOLOCOND', {
+      activa: { booleanValue: true }, fechaInicio: txt(AYER), fechaFin: txt(MANANA),
+      tipoBeneficio: txt('credito'), valorBeneficio: num(8000), aplicaA: txt('conductores'),
+    });
+    await sembrar('usuarios/elpasa', { tipo: txt('') });
+    await sembrar('usuarios/elcond', { tipo: txt('conductor'), creditos: num(SALDO_INICIAL) });
+  });
+
+  test('SIN sesion no se reclama nada', async () => {
+    const r = await llamarA('reclamarPromocion', null, { codigo: 'VIVA' });
+    assert.strictEqual(r.cuerpo?.error?.status, 'UNAUTHENTICATED');
+    assert.strictEqual((await leer('usuarios/elpasa')).descuentoPendiente, undefined);
+  });
+
+  test('una promocion viva deja el descuento pendiente, con codigo de 4 cifras', async () => {
+    const r = await llamarA('reclamarPromocion', 'elpasa', { codigo: 'VIVA' });
+    assert.strictEqual(r.cuerpo?.result?.valor, 8000);
+    assert.match(String(r.cuerpo?.result?.codigoVerificacion), /^[1-9][0-9]{3}$/);
+    const u = await leer('usuarios/elpasa');
+    assert.ok(u.descuentoPendiente, 'no quedo el descuento en la ficha');
+  });
+
+  test('una promocion vencida no da nada', async () => {
+    const r = await llamarA('reclamarPromocion', 'elpasa', { codigo: 'VENCIDA' });
+    assert.strictEqual(r.cuerpo?.error?.status, 'FAILED_PRECONDITION');
+    assert.strictEqual((await leer('usuarios/elpasa')).descuentoPendiente, undefined);
+  });
+
+  test('el tipo de cuenta se lee de la FICHA, no de lo que mande el telefono', async () => {
+    // Antes el celular mandaba su propio 'tipoUsuario' y con eso pasaba el
+    // filtro. Aqui el pasajero pide una promo de conductores Y ADEMAS miente
+    // diciendo que es conductor: el servidor mira la ficha y lo rechaza igual.
+    const r = await llamarA('reclamarPromocion', 'elpasa', { codigo: 'SOLOCOND', tipoUsuario: 'conductor' });
+    assert.strictEqual(r.cuerpo?.error?.status, 'FAILED_PRECONDITION');
+    assert.strictEqual((await leer('usuarios/elpasa')).descuentoPendiente, undefined);
+    // Y al conductor de verdad si se la da.
+    const r2 = await llamarA('reclamarPromocion', 'elcond', { codigo: 'SOLOCOND' });
+    assert.strictEqual(r2.cuerpo?.result?.valor, 8000);
+  });
+
+  test('reclamar NO toca el saldo: el descuento se consume en el viaje, no antes', async () => {
+    await llamarA('reclamarPromocion', 'elcond', { codigo: 'VIVA' });
+    assert.strictEqual(await saldoDe('elcond'), SALDO_INICIAL, 'el reclamo movio el saldo');
+  });
+});
+
+describe('REGLA 7 · creditosDeBienvenida', () => {
+  beforeEach(async () => {
+    await sembrar('config/global', {
+      incentivoNuevoMototaxi: num(10000), incentivoNuevoTaxi: num(20000),
+      comisionTaxi: num(COMISION_TAXI),
+    });
+    await sembrar('usuarios/motero', { tipo: txt('conductor'), tipoVehiculo: txt('Mototaxi') });
+    await sembrar('usuarios/taxista', { tipo: txt('conductor'), tipoVehiculo: txt('Taxi') });
+    await sembrar('usuarios/conSaldo', { tipo: txt('conductor'), tipoVehiculo: txt('Taxi'), creditos: num(5000) });
+    await sembrar('usuarios/pasajero', { tipo: txt('') });
+  });
+
+  test('SIN sesion no se dan creditos', async () => {
+    const r = await llamarA('creditosDeBienvenida', null, {});
+    assert.strictEqual(r.cuerpo?.error?.status, 'UNAUTHENTICATED');
+    assert.strictEqual(await saldoDe('motero'), -1, 'aparecio saldo sin sesion');
+  });
+
+  test('el monto sale de la config y del vehiculo de la FICHA', async () => {
+    await llamarA('creditosDeBienvenida', 'motero', {});
+    assert.strictEqual(await saldoDe('motero'), 10000, 'al mototaxista no le toco lo suyo');
+    await llamarA('creditosDeBienvenida', 'taxista', {});
+    assert.strictEqual(await saldoDe('taxista'), 20000, 'al taxista no le toco lo suyo');
+  });
+
+  test('el telefono NO puede pedir el monto que quiera', async () => {
+    // Aunque mande 999999 y diga que es taxi, el servidor usa la ficha y la config.
+    await llamarA('creditosDeBienvenida', 'motero', { creditos: 999999, tipoVehiculo: 'Taxi', monto: 999999 });
+    assert.strictEqual(await saldoDe('motero'), 10000, 'se colo el monto que mando el telefono');
+  });
+
+  test('SOLO UNA VEZ: llamar cinco veces no multiplica el regalo', async () => {
+    for (let i = 0; i < 5; i++) await llamarA('creditosDeBienvenida', 'taxista', {});
+    assert.strictEqual(await saldoDe('taxista'), 20000, 'el regalo se dio mas de una vez');
+  });
+
+  test('a quien ya tiene saldo no le toca', async () => {
+    const r = await llamarA('creditosDeBienvenida', 'conSaldo', {});
+    assert.strictEqual(r.cuerpo?.result?.creditos, 0);
+    assert.strictEqual(r.cuerpo?.result?.motivo, 'ya_recibida');
+    assert.strictEqual(await saldoDe('conSaldo'), 5000);
+  });
+
+  test('PLATA INFINITA: gastar hasta CERO y volver a pedir el regalo NO funciona', async () => {
+    // El ataque de verdad, el que encontro la segunda opinion: esto ya no es
+    // una pantalla, es una puerta abierta. El conductor cobra su bienvenida,
+    // gasta hasta cero con las comisiones, y vuelve a llamar. Con el candado
+    // viejo ("¿tiene saldo?") le habria dado otros $20.000. Y otros. Y otros.
+    await llamarA('creditosDeBienvenida', 'taxista', {});
+    assert.strictEqual(await saldoDe('taxista'), 20000);
+
+    // Gasto todo. (sembrar reemplaza la ficha entera, asi que se vuelve a
+    // escribir con sus datos: si no, se perderia el tipo y el rechazo seria
+    // por otro motivo y la prueba mentiria en verde.)
+    await sembrar('usuarios/taxista', { tipo: txt('conductor'), tipoVehiculo: txt('Taxi'), creditos: num(0) });
+    const r = await llamarA('creditosDeBienvenida', 'taxista', {});
+    assert.strictEqual(r.cuerpo?.result?.motivo, 'ya_recibida');
+    assert.strictEqual(await saldoDe('taxista'), 0, 'le regalaron la bienvenida DOS VECES');
+  });
+
+  test('a un conductor ENDEUDADO no se le borra la deuda con un regalo', async () => {
+    // Peor que repetir el regalo: esto ESCRIBE el monto, no lo suma. Con el
+    // candado viejo, un saldo negativo pasaba el filtro y quedaba en +20.000.
+    await sembrar('usuarios/endeudado', { tipo: txt('conductor'), tipoVehiculo: txt('Taxi'), creditos: num(-3000) });
+    const r = await llamarA('creditosDeBienvenida', 'endeudado', {});
+    assert.strictEqual(r.cuerpo?.result?.motivo, 'ya_recibida');
+    assert.strictEqual(await saldoDe('endeudado'), -3000, 'se le borro la deuda');
+  });
+
+  test('a un pasajero no le tocan creditos de conductor', async () => {
+    const r = await llamarA('creditosDeBienvenida', 'pasajero', {});
+    assert.strictEqual(r.cuerpo?.result?.motivo, 'no_es_conductor');
+    assert.strictEqual(await saldoDe('pasajero'), -1);
+  });
+});

@@ -344,7 +344,10 @@ describe('REGLA 1 · lo que la app hace hoy NO se rompe', () => {
     );
   });
 
-  it('el alta de conductor funciona igual (App.js:247)', async () => {
+  it('el alta de conductor funciona igual (App.js:247) — ya SIN créditos dentro', async () => {
+    // Hasta el 24-ago-2026 esta escritura llevaba «creditos: 20000» y pasaba:
+    // el teléfono se ponía su propio saldo de bienvenida. Con la REGLA 7 el
+    // saldo lo da el servidor aparte, así que el alta va sin él y sigue pasando.
     const { doc, setDoc } = FS;
     await RUT.assertSucceeds(
       setDoc(doc(como('pasajero1'), 'usuarios/pasajero1'), {
@@ -352,7 +355,6 @@ describe('REGLA 1 · lo que la app hace hoy NO se rompe', () => {
         marca: 'Chevrolet', modelo: '2019', color: 'Amarillo',
         documento: '1090123456', vehiculo: 'Taxi', telefono: '3001112233',
         fotoConductor: 'https://x/f.jpg', fotoCedula: 'https://x/c.jpg',
-        creditos: 20000,
       }, { merge: true })
     );
   });
@@ -401,13 +403,26 @@ describe('REGLA 1 · lo que la app hace hoy NO se rompe', () => {
   // OJO: estas dos SIGUEN abiertas a propósito. Son la REGLA 7 (el dinero), que
   // necesita funciones de servidor. Si algún día se cierran, estas dos pruebas
   // hay que cambiarlas — y eso solo se hace con permiso del dueño.
-  it('el canje de un código sigue pudiendo sumar créditos (Creditos.js:112) — REGLA 7 pendiente', async () => {
+  it('el canje de un código YA NO lo hace el teléfono (Creditos.js) — REGLA 7 CERRADA', async () => {
+    // Esta prueba decía lo contrario hasta el 24-ago-2026: dejaba constancia de
+    // que el agujero seguía abierto. Ahora el canje lo hace el servidor
+    // (functions: canjearCodigoRecarga) y el teléfono ya no puede escribirse
+    // saldo. La prueba se da la vuelta: lo que antes DEBÍA pasar, ahora debe fallar.
     const { doc, setDoc } = FS;
-    await RUT.assertSucceeds(
+    await RUT.assertFails(
       setDoc(doc(como('conductor1'), 'usuarios/conductor1'), { creditos: 55000 }, { merge: true })
     );
   });
 
+  // OJO — ESTE AGUJERO SIGUE ABIERTO Y ES A PROPÓSITO. La REGLA 7 cerró el
+  // SALDO ('creditos'), no el descuento. Congelar 'descuentoPendiente' hoy
+  // rompería dos cosas: el registro (Login.js lo escribe al dar el crédito de
+  // bienvenida al pasajero nuevo) y, peor, el borrado que hace el propio
+  // pasajero cuando el conductor consume el descuento (Solicitar.js:551) — sin
+  // ese borrado el descuento se podría volver a usar en otro viaje.
+  // Cerrarlo es su propio trabajo, con su foto: mover a servidor el regalo de
+  // bienvenida Y el consumo (mejor, un disparador que lo limpie solo cuando el
+  // viaje marca 'consumido'). Mientras tanto, esta prueba deja constancia.
   it('aplicar una promoción sigue pudiendo escribir el descuento (Promociones.js:101) — REGLA 7 pendiente', async () => {
     const { doc, setDoc } = FS;
     await RUT.assertSucceeds(
@@ -518,6 +533,76 @@ describe('REGLA 1 · el correo se pone una vez y no se mueve', () => {
 // una oferta a nombre de un conductor cualquiera, confirma su propio viaje y el
 // servidor le descuenta la comisión a un conductor que nunca ofertó.
 // El viaje sembrado 'viaje1' es de 'pasajero1'.
+describe('REGLA 7 · la plata no la escribe el teléfono', () => {
+  it('un conductor NO puede subirse el saldo', async () => {
+    // Esto es lo gordo: medido el 24-ago-2026, $369.700 en 8 fichas, y la regla
+    // dejaba que cualquiera se escribiera su propio saldo. Ni siquiera hacía
+    // falta un código de recarga: bastaba con escribir el número.
+    const { doc, updateDoc } = FS;
+    await RUT.assertFails(updateDoc(doc(como('conductor1'), 'usuarios/conductor1'), { creditos: 999999 }));
+  });
+
+  it('un conductor NO puede subirse el saldo ni con setDoc + merge', async () => {
+    // La app usaba merge, que es la forma que de verdad se intentaría.
+    const { doc, setDoc } = FS;
+    await RUT.assertFails(
+      setDoc(doc(como('conductor1'), 'usuarios/conductor1'), { creditos: 50000 }, { merge: true })
+    );
+  });
+
+  it('un castigado NO puede recargarse aunque ya tenga saldo', async () => {
+    const { doc, updateDoc } = FS;
+    await RUT.assertFails(updateDoc(doc(como('castigado'), 'usuarios/castigado'), { creditos: 100000 }));
+  });
+
+  it('nadie puede tocarle el saldo a OTRO', async () => {
+    const { doc, updateDoc } = FS;
+    await RUT.assertFails(updateDoc(doc(como('pasajero1'), 'usuarios/conductor1'), { creditos: 0 }));
+  });
+
+  it('un usuario nuevo NO puede registrarse trayendo saldo dentro', async () => {
+    // Por eso el candado va TAMBIÉN en el create: si no, bastaba con borrarse la
+    // cuenta y volver a registrarse con el saldo que uno quisiera.
+    const { doc, setDoc } = FS;
+    await RUT.assertFails(
+      setDoc(doc(como('nuevo7'), 'usuarios/nuevo7'), { nombre: 'Vivo', creditos: 80000 })
+    );
+  });
+
+  it('el PANEL sí puede ajustar el saldo (Superadmin.js:347)', async () => {
+    // Es la vía legítima: el dueño regala o corrige créditos desde el panel.
+    const { doc, updateDoc } = FS;
+    await RUT.assertSucceeds(updateDoc(doc(como('eljefe'), 'usuarios/conductor1'), { creditos: 25000 }));
+    await RUT.assertSucceeds(updateDoc(doc(como('eladmin'), 'usuarios/conductor1'), { creditos: 30000 }));
+  });
+
+  it('lo que la app SÍ hace con su ficha sigue funcionando', async () => {
+    // Que el candado no se lleve por delante lo de todos los días: MiPerfil
+    // (nombre, teléfono, foto), Seguridad (contacto de confianza) y favoritos.
+    const { doc, updateDoc } = FS;
+    await RUT.assertSucceeds(updateDoc(doc(como('conductor1'), 'usuarios/conductor1'), {
+      nombre: 'Luis Pérez', telefono: '3001112233', fotoConductor: 'https://x/y.jpg',
+    }));
+    await RUT.assertSucceeds(updateDoc(doc(como('pasajero1'), 'usuarios/pasajero1'), {
+      contactoConfianzaNumero: '3009998877',
+      favoritos: [{ nombre: 'Casa', direccion: 'Calle 15', icono: '🏠' }],
+    }));
+  });
+
+  it('el alta de conductor (App.js) sigue pasando: ya NO manda créditos', async () => {
+    // Así queda la escritura del registro después del arreglo: los créditos de
+    // bienvenida los pide aparte al servidor. Si esta prueba se pusiera roja,
+    // ningún conductor podría darse de alta.
+    const { doc, setDoc } = FS;
+    await RUT.assertSucceeds(setDoc(doc(como('conductor1'), 'usuarios/conductor1'), {
+      tipo: 'conductor', tipoVehiculo: 'Mototaxi', placa: 'ABC12D',
+      marca: 'Bajaj', modelo: '2020', color: 'Rojo', documento: '123',
+      vehiculo: 'Bajaj 2020', telefono: '3001112233',
+      fotoConductor: 'https://x/c.jpg', fotoCedula: 'https://x/d.jpg',
+    }, { merge: true }));
+  });
+});
+
 describe('REGLA 2 · la oferta la firma su conductor', () => {
   it('un conductor SÍ puede dejar su propia oferta (AppConductor.js:353)', async () => {
     const { doc, setDoc } = FS;

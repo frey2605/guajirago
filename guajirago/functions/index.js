@@ -480,3 +480,180 @@ exports.limpiezaDiaria = onSchedule(
     return null;
   }
 );
+// ─────────────────────────────────────────────────────────────────────────────
+// REGLA 7 — LA PLATA NO LA DECIDE EL TELÉFONO
+//
+// Medido el 24-ago-2026: $369.700 en créditos repartidos en 8 fichas, y las
+// reglas de Firestore dejaban que CUALQUIERA escribiera su propio campo
+// 'creditos'. Se cerraron 'rol', 'email', 'activo'… pero el saldo quedó abierto.
+//
+// Había tres caminos que pasaban por el celular: canjear un código de recarga,
+// reclamar una promoción y los créditos de bienvenida del conductor nuevo. Los
+// tres hacían la cuenta EN EL TELÉFONO y escribían el resultado. Ahora la cuenta
+// vive aquí, donde nadie la puede tocar, y las reglas congelan los dos campos.
+//
+// La cuenta es LA MISMA que hacía la app: se mudó de sitio, no se cambió.
+// (Cobrar la comisión ya lo hacía el servidor desde el principio: eso estaba
+// bien hecho y no se toca.)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Canjea un código de recarga y suma el saldo. Antes: Creditos.js en el celular. */
+exports.canjearCodigoRecarga = onCall(async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Hay que iniciar sesión");
+  const codigo = String((request.data || {}).codigo || "").trim().toUpperCase();
+  if (!codigo) throw new HttpsError("invalid-argument", "Falta el código");
+
+  const db = admin.firestore();
+  const refCodigo = db.collection("codigos").doc(codigo);
+  const refUsuario = db.collection("usuarios").doc(request.auth.uid);
+
+  try {
+    return await db.runTransaction(async (t) => {
+      const snapCodigo = await t.get(refCodigo);
+      if (!snapCodigo.exists) throw new HttpsError("not-found", "Ese código no existe. Verifícalo");
+      const datos = snapCodigo.data() || {};
+      if (datos.usado === true) throw new HttpsError("already-exists", "Ese código ya fue usado");
+      const valor = datos.valor || 0;
+      if (valor <= 0) throw new HttpsError("invalid-argument", "Código inválido");
+
+      const snapUsuario = await t.get(refUsuario);
+      const saldoActual = snapUsuario.exists ? (snapUsuario.data().creditos || 0) : 0;
+
+      t.update(refCodigo, {
+        usado: true,
+        usadoPor: request.auth.uid,
+        fechaUso: new Date().toISOString(),
+      });
+      t.set(refUsuario, { creditos: saldoActual + valor }, { merge: true });
+      return { valor, saldo: saldoActual + valor };
+    });
+  } catch (e) {
+    if (e instanceof HttpsError) throw e;
+    console.error("Error canjearCodigoRecarga:", e.message);
+    throw new HttpsError("internal", "No se pudo canjear el código");
+  }
+});
+
+/** Reclama una promoción y deja el descuento pendiente. Antes: Promociones.js en el celular. */
+exports.reclamarPromocion = onCall(async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Hay que iniciar sesión");
+  const codigo = String((request.data || {}).codigo || "").trim().toUpperCase();
+  if (!codigo) throw new HttpsError("invalid-argument", "Falta el código");
+
+  const db = admin.firestore();
+  const refPromo = db.collection("promociones").doc(codigo);
+  const refUso = refPromo.collection("usos").doc(request.auth.uid);
+  const refUsuario = db.collection("usuarios").doc(request.auth.uid);
+
+  try {
+    return await db.runTransaction(async (t) => {
+      const snapPromo = await t.get(refPromo);
+      if (!snapPromo.exists) throw new HttpsError("not-found", "Ese código no existe. Verifícalo");
+      const promo = snapPromo.data() || {};
+      const ahora = new Date();
+      if (!promo.activa) throw new HttpsError("failed-precondition", "Esta promoción ya no está disponible");
+      if (new Date(promo.fechaInicio + "T00:00:00") > ahora || new Date(promo.fechaFin + "T23:59:59") < ahora) {
+        throw new HttpsError("failed-precondition", "Esta promoción ya no está disponible");
+      }
+
+      // El tipo de cuenta se lee de la FICHA, no de lo que diga el teléfono:
+      // antes el celular mandaba su propio 'tipoUsuario' para pasar este filtro.
+      const snapUsuario = await t.get(refUsuario);
+      const esConductor = snapUsuario.exists && snapUsuario.data().tipo === "conductor";
+      if (promo.aplicaA === "pasajeros" && esConductor) {
+        throw new HttpsError("failed-precondition", "Esta promoción no aplica para tu tipo de cuenta");
+      }
+      if (promo.aplicaA === "conductores" && !esConductor) {
+        throw new HttpsError("failed-precondition", "Esta promoción no aplica para tu tipo de cuenta");
+      }
+
+      // El tope por persona SÍ funciona, aunque el contador se escriba lejos de
+      // aquí: quien lo sube es AppConductor.js:1096, cuando el conductor
+      // verifica el código y el descuento se CONSUME de verdad. La misma ruta
+      // (promociones/{codigo}/usos/{uid}) que se lee aquí. O sea: cuenta los
+      // descuentos usados, no los reclamados — que es lo correcto.
+      const snapUso = await t.get(refUso);
+      const usosPrevios = snapUso.exists ? (snapUso.data().veces || 0) : 0;
+      if (promo.limiteUsosPorPersona && usosPrevios >= promo.limiteUsosPorPersona) {
+        throw new HttpsError("resource-exhausted", "Ya usaste esta promoción el máximo de veces permitido");
+      }
+
+      const codigoVerificacion = String(Math.floor(1000 + Math.random() * 9000));
+      t.set(refUsuario, {
+        descuentoPendiente: {
+          promoId: codigo,
+          tipoBeneficio: promo.tipoBeneficio,
+          valorBeneficio: promo.valorBeneficio || 0,
+          fechaActivacion: new Date().toISOString(),
+          codigoVerificacion,
+        },
+      }, { merge: true });
+
+      return { tipo: promo.tipoBeneficio, valor: promo.valorBeneficio || 0, codigoVerificacion };
+    });
+  } catch (e) {
+    if (e instanceof HttpsError) throw e;
+    console.error("Error reclamarPromocion:", e.message);
+    throw new HttpsError("internal", "Error al aplicar el código. Intenta de nuevo");
+  }
+});
+
+/**
+ * Créditos de bienvenida del conductor nuevo. Antes: App.js decidía el monto en
+ * el celular y se lo escribía. El monto sale de config/global, y el tipo de
+ * vehículo de la FICHA — no de lo que mande el teléfono.
+ * Devuelve { creditos: n } con lo que se acreditó (0 si no le tocaba).
+ */
+exports.creditosDeBienvenida = onCall(async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Hay que iniciar sesión");
+
+  const db = admin.firestore();
+  const refUsuario = db.collection("usuarios").doc(request.auth.uid);
+  const refConfig = db.collection("config").doc("global");
+
+  try {
+    return await db.runTransaction(async (t) => {
+      const snapUsuario = await t.get(refUsuario);
+      if (!snapUsuario.exists) throw new HttpsError("failed-precondition", "Primero hay que guardar los datos");
+      const u = snapUsuario.data() || {};
+
+      if (u.tipo !== "conductor") return { creditos: 0, motivo: "no_es_conductor" };
+
+      // SOLO UNA VEZ EN LA VIDA. Y el candado NO es "¿tiene saldo?" sino
+      // "¿existe el campo?" — la diferencia es la que evita un agujero de plata
+      // infinita, y la encontró la segunda opinión del 24-ago-2026:
+      //
+      // Dentro de la app, mirar el saldo bastaba porque aquí solo se llegaba
+      // desde el alta. Pero esto ahora es una PUERTA ABIERTA: cualquier
+      // conductor con sesión la llama cuando quiera. Y su saldo llega a cero
+      // solo, gastando comisiones. Con el candado del saldo, bastaba con
+      // gastarlo todo y volver a pedir el regalo. Otra vez. Y otra. Peor aún:
+      // como esto ESCRIBE el monto (no lo suma), a un conductor endeudado le
+      // habría borrado la deuda de paso.
+      //
+      // El campo, en cambio, no se borra nunca: quien lo tiene —aunque valga 0
+      // o esté en negativo— ya pasó por aquí y no vuelve a cobrar.
+      //
+      // Medido el 24-ago-2026 en los datos vivos: de 10 fichas, 8 tienen el
+      // campo y las 2 que no lo tienen NO son conductores. O sea: ni un solo
+      // conductor de hoy puede reclamarlo, y no hace falta migrar nada.
+      if (u.creditos !== undefined && u.creditos !== null) {
+        return { creditos: 0, motivo: "ya_recibida" };
+      }
+
+      const snapCfg = await t.get(refConfig);
+      const cfg = snapCfg.exists ? snapCfg.data() : {};
+      const monto = u.tipoVehiculo === "Mototaxi"
+        ? (cfg.incentivoNuevoMototaxi ?? 10000)
+        : (cfg.incentivoNuevoTaxi ?? 20000);
+      if (monto <= 0) return { creditos: 0, motivo: "sin_incentivo" };
+
+      t.set(refUsuario, { creditos: monto }, { merge: true });
+      return { creditos: monto };
+    });
+  } catch (e) {
+    if (e instanceof HttpsError) throw e;
+    console.error("Error creditosDeBienvenida:", e.message);
+    throw new HttpsError("internal", "No se pudieron dar los créditos de bienvenida");
+  }
+});

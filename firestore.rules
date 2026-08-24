@@ -46,6 +46,25 @@ service cloud.firestore {
         return ['email'];
       }
 
+      // ── REGLA 7 · LA PLATA NO LA ESCRIBE EL TELÉFONO ────────────────────────
+      // Medido el 24-ago-2026: $369.700 en créditos repartidos en 8 fichas, y
+      // esta regla dejaba que cualquiera se escribiera su propio saldo. Se
+      // habían cerrado 'rol', 'email' y 'activo'; el dinero se quedó abierto.
+      //
+      // Los tres caminos que lo escribían desde el celular —canjear un código
+      // de recarga, la promoción, y los créditos de bienvenida del conductor—
+      // se mudaron al servidor (functions: canjearCodigoRecarga,
+      // reclamarPromocion, creditosDeBienvenida), que se salta estas reglas.
+      // Cobrar la comisión ya lo hacía el servidor desde el principio.
+      //
+      // Va en lista propia y se bloquea TAMBIÉN en el create: medido, ninguna
+      // de las tres apps crea una ficha de usuario con saldo. (La app de
+      // aliados sí escribe 'creditos: 0' al registrar un negocio, pero eso es
+      // la colección 'restaurantes', que es otra y no pasa por aquí.)
+      function camposDePlata() {
+        return ['creditos'];
+      }
+
       // ── REGLA 6 · LA FICHA DE UNA PERSONA ES SUYA ────────────────────────────
       // Hasta el 23-ago-2026 cualquier usuario registrado leía TODAS las fichas.
       // Medido ese día: 10 fichas — 8 con teléfono, 8 con fecha de nacimiento,
@@ -66,11 +85,11 @@ service cloud.firestore {
       // Va primero a propósito: no gasta la lectura que cuesta el get() de abajo.
       allow create: if request.auth != null
         && request.auth.uid == userId
-        && !request.resource.data.keys().hasAny(camposDePoder());
+        && !request.resource.data.keys().hasAny(camposDePoder().concat(camposDePlata()));
       allow update: if request.auth != null
         && request.auth.uid == userId
         && !request.resource.data.diff(resource.data).affectedKeys()
-             .hasAny(camposDePoder().concat(camposCongelados()));
+             .hasAny(camposDePoder().concat(camposCongelados()).concat(camposDePlata()));
 
       // Caso 2 — un admin o superadmin sí puede tocarlo todo, en cualquier ficha.
       // Es la única vía para dar un rol (Superadmin.js:599) o sancionar

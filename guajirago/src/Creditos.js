@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { db, auth, storage } from './firebase';
 import Logo from './Logo';
-import { doc, getDoc, updateDoc, runTransaction, onSnapshot } from 'firebase/firestore';
+// runTransaction salió con la REGLA 7: el canje del código lo hace el servidor.
+import { doc, getDoc, updateDoc, onSnapshot } from 'firebase/firestore';
+import { getFunctions, httpsCallable } from 'firebase/functions';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 // El filtro anti-datos vive en filtroChat.js: un solo sitio para todos los
 // chats de la app (SEGUNDA LEY), amarrado por prueba a la copia del panel.
@@ -100,50 +102,27 @@ function Creditos({ onVolver }) {
     if (!user) { setError('Error de sesión. Vuelve a iniciar sesión'); setCargando(false); return; }
 
     try {
-      const refCodigo = doc(db, 'codigos', cod);
-      const refUsuario = doc(db, 'usuarios', user.uid);
-
-      // Transacción: verifica y aplica el código de forma atómica (a prueba de doble uso)
-      const valorRecargado = await runTransaction(db, async (transaccion) => {
-        const snapCodigo = await transaccion.get(refCodigo);
-        if (!snapCodigo.exists()) {
-          throw new Error('CODIGO_NO_EXISTE');
-        }
-        const datosCodigo = snapCodigo.data();
-        if (datosCodigo.usado === true) {
-          throw new Error('CODIGO_USADO');
-        }
-        const valor = datosCodigo.valor || 0;
-        if (valor <= 0) {
-          throw new Error('CODIGO_INVALIDO');
-        }
-
-        const snapUsuario = await transaccion.get(refUsuario);
-        const saldoActual = snapUsuario.exists() ? (snapUsuario.data().creditos || 0) : 0;
-        const nuevoSaldo = saldoActual + valor;
-
-        // Marcar el código como usado
-        transaccion.update(refCodigo, {
-          usado: true,
-          usadoPor: user.uid,
-          fechaUso: new Date().toISOString(),
-        });
-        // Sumar los créditos al conductor
-        transaccion.set(refUsuario, { creditos: nuevoSaldo }, { merge: true });
-
-        return valor;
-      });
+      // REGLA 7 — el canje ya NO se hace aquí. Hasta el 24-ago-2026 este
+      // teléfono comprobaba el código y SE SUMABA EL SALDO él mismo; las reglas
+      // dejaban escribir 'creditos' a cualquiera, así que ni siquiera hacía
+      // falta un código para recargarse. Ahora lo hace el servidor
+      // (functions: canjearCodigoRecarga) y la regla congela el campo.
+      const canjear = httpsCallable(getFunctions(), 'canjearCodigoRecarga');
+      const respuesta = await canjear({ codigo: cod });
+      const valorRecargado = (respuesta && respuesta.data && respuesta.data.valor) || 0;
 
       // Recargar saldo en pantalla
-      const snap = await getDoc(refUsuario);
+      const snap = await getDoc(doc(db, 'usuarios', user.uid));
       setSaldo(snap.exists() ? (snap.data().creditos || 0) : 0);
       setCodigo('');
       setMensaje(`¡Recargaste $${valorRecargado.toLocaleString()} en créditos! 🎉`);
     } catch (e) {
-      if (e.message === 'CODIGO_NO_EXISTE') setError('Ese código no existe. Verifícalo');
-      else if (e.message === 'CODIGO_USADO') setError('Ese código ya fue usado');
-      else if (e.message === 'CODIGO_INVALIDO') setError('Código inválido');
-      else setError('Error al recargar. Revisa tu conexión e intenta de nuevo');
+      // El motivo lo explica ahora el servidor ("Ese código ya fue usado", etc.)
+      // y esos mensajes SIEMPRE llevan espacios. Cuando falla la red, la
+      // librería de Firebase pone de mensaje el código pelado ('internal',
+      // 'deadline-exceeded'): eso no se le enseña a nadie.
+      const delServidor = e && e.message && e.message.includes(' ');
+      setError(delServidor ? e.message : 'Error al recargar. Revisa tu conexión e intenta de nuevo');
     }
     setCargando(false);
   };
