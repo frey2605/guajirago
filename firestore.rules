@@ -32,11 +32,19 @@ service cloud.firestore {
     //
     // El exists() va ANTES del get() a propósito: preguntar por una ficha que no
     // existe da error, y un error aquí tumbaría la condición entera.
+    //
+    // Y mira 'activo' (añadido el 24-ago-2026). Antes quien lo miraba era la APP
+    // —o sea el lado de fuera, el que el atacante controla—, así que al empleado
+    // despedido no se le caía la llave: seguía leyendo y cambiando los pedidos
+    // del negocio sin pasar por la app. Medido: la única ficha real (JUAN) tiene
+    // activo:true, así que esto no le quita nada a nadie que trabaje hoy. El
+    // valor por defecto es 'true' para que una ficha vieja sin el campo entre.
     function esDelNegocio(negocioId) {
       return request.auth != null && (
         request.auth.uid == negocioId ||
         (exists(/databases/$(database)/documents/empleados/$(request.auth.uid)) &&
-         get(/databases/$(database)/documents/empleados/$(request.auth.uid)).data.get('restauranteId', '') == negocioId)
+         get(/databases/$(database)/documents/empleados/$(request.auth.uid)).data.get('restauranteId', '') == negocioId &&
+         get(/databases/$(database)/documents/empleados/$(request.auth.uid)).data.get('activo', true) == true)
       );
     }
 
@@ -365,9 +373,80 @@ service cloud.firestore {
       allow create, update: if request.auth != null;
       allow delete: if false;
     }
+    // ── REGLA 9 · LA FICHA DE EMPLEADO YA NO SE LA ESCRIBE CUALQUIERA ───────
+    // Esto decía «allow create, update: if request.auth != null». O sea: quien
+    // tuviera una cuenta se escribía su PROPIA ficha de empleado poniéndole el
+    // negocio que quisiera. Con eso conseguía DOS cosas:
+    //
+    //   · Entrar a la app de aliados como personal de un negocio ajeno
+    //     —aliados/App.js:73 le abre la sesión leyendo justo esta ficha—, ver
+    //     el menú, las mesas y los pedidos, y ponerse a tomar pedidos.
+    //   · Y desde el 24-ago-2026, además, burlar la regla de los pedidos: la
+    //     pregunta esDelNegocio() le pregunta a ESTA ficha quién es empleado de
+    //     quién. El candado de arriba se apoyaba en una llave falsificable.
+    //
+    // Es el mismo molde exacto de la REGLA 1: se le preguntaba al carnet que
+    // rellena el visitante. No se supuso — se ejecutó contra el emulador y los
+    // cuatro pasos del ataque pasaron, incluido leer teléfono y dirección.
+    //
+    // Quién las escribe DE VERDAD: solo el dueño, desde su pantalla de equipo
+    // (aliados/Empleados.js:102 al crear, :79 al editar, :126 al activar o
+    // desactivar). Esa pantalla ya está cerrada con llave —aliados/App.js:399
+    // solo la abre si efDueno— y el dueño escribe con su propia sesión, así que
+    // su uid ES el restauranteId que lleva la ficha. Medido el 24-ago-2026: 1
+    // empleado real (JUAN, activo, del restaurante TWjNDorw...). Ninguna otra
+    // app ni función las toca.
     match /empleados/{empleadoId} {
-      allow read: if request.auth != null;
-      allow create, update: if request.auth != null;
+      // Cada quien lee la SUYA, y es lo primero que hace la app al entrar: sirve
+      // para saber si quien llega es dueño o empleado (aliados/Login.js:88 y
+      // aliados/App.js:73). Va primero porque no cuesta ninguna lectura.
+      allow get: if request.auth != null && (
+        request.auth.uid == empleadoId ||
+        esDelNegocio(resource.data.restauranteId) ||
+        esAdmin()
+      );
+
+      // La lista, solo la de su propio equipo (aliados/Empleados.js:46 y
+      // aliados/PedidosDomicilio.js:92 — las dos ya filtran por restauranteId).
+      allow list: if esAdmin() || esDelNegocio(resource.data.restauranteId);
+
+      // Nombrar y editar: SOLO el dueño del negocio. Ojo, aquí se pregunta por
+      // el dueño y no por esDelNegocio(): si valiera cualquiera del negocio, un
+      // empleado se subiría los permisos a sí mismo o se reactivaría después de
+      // que lo despidan, y volveríamos al carnet que rellena el visitante.
+      allow create: if esAdmin() || (
+        request.auth != null &&
+        request.auth.uid == request.resource.data.get('restauranteId', '')
+      );
+
+      // Y la ficha no puede mudarse de negocio: sin esto, el dueño de un negocio
+      // cualquiera crea una ficha suya y luego la apunta al negocio de al lado.
+      //
+      // El .get('restauranteId','') no es adorno: con acceso directo, una ficha a
+      // la que le faltara el campo daría ERROR aquí, y un error niega a TODOS —
+      // incluido el panel. Como borrar está prohibido (REGLA 12), esa ficha se
+      // quedaría congelada para siempre y sin forma de repararla.
+      //
+      // La segunda mitad es la que salva los AVISOS del empleado: su propio
+      // teléfono guarda el token del aviso push en SU ficha al entrar
+      // (aliados/Notificaciones.js:22), y esa escritura sale con la sesión del
+      // empleado, no con la del dueño. Sin este permiso se le apagaría el aviso
+      // de «pedido nuevo» EN SILENCIO: ese catch solo escribe en la consola, así
+      // que nadie se enteraría hasta que el restaurante empezara a perder pedidos.
+      // Quien lee el token son las funciones del servidor (functions/index.js:95
+      // y :172). Se le deja UN campo y nada más: con hasOnly no puede colar de
+      // paso ni sus permisos ni el activo.
+      allow update: if ((esAdmin() || (
+          request.auth != null &&
+          request.auth.uid == resource.data.get('restauranteId', '')
+        )) &&
+        request.resource.data.get('restauranteId', '') == resource.data.get('restauranteId', '')
+      ) || (
+        request.auth != null &&
+        request.auth.uid == empleadoId &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['fcmToken'])
+      );
+
       allow delete: if false;
     }
     match /visitasDiarias/{docId} {

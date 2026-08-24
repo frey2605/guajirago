@@ -1184,3 +1184,194 @@ describe('REGLA 9 · las reservas de turismo, igual (y aquí nace limpio)', () =
     await RUT.assertFails(updateDoc(doc(como('pasajero1'), 'reservasTurismo/resA1'), { clienteId: 'otroCliente' }));
   });
 });
+
+// ───────────────────────────────────────────────────────────────────────────
+// REGLA 9 (2/2) · LA FICHA DE EMPLEADO ERA LA LLAVE FALSIFICABLE
+// ───────────────────────────────────────────────────────────────────────────
+// El candado de arriba pregunta «¿eres de este negocio?» y se fía de la ficha
+// 'empleados/{uid}'. Pero ese bloque decía «allow create, update: if
+// request.auth != null»: cualquiera con cuenta se escribía su propia ficha y se
+// nombraba empleado del negocio que quisiera. Un revisor independiente lo
+// ejecutó contra el emulador el 24-ago-2026 y los cuatro pasos pasaron —
+// incluido sacar el teléfono y la dirección de un cliente.
+//
+// Y había una segunda puerta en la misma pared: quien miraba si el empleado
+// seguía 'activo' era la APP, o sea el lado de fuera. Al despedido no se le
+// caía la llave.
+//
+// La primera prueba de este bloque es EL ATAQUE ENTERO, de principio a fin.
+// Antes de este arreglo se ponía verde, que es justo lo que la hace valer.
+
+describe('REGLA 9 · la ficha de empleado ya no se la escribe cualquiera', () => {
+  const sembrarMundo = async () => {
+    await entorno.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      const { doc, setDoc } = FS;
+      await setDoc(doc(db, 'pedidosRestaurantes/pedR1cliente'), {
+        restauranteId: 'r1', clienteId: 'pasajero1', tipo: 'domicilio',
+        estado: 'nuevo', telefono: '+573001112233', direccion: 'Calle 1 #2-3', total: 30000,
+      });
+      // Un empleado al que ya despidieron.
+      await setDoc(doc(db, 'empleados/despedido'), {
+        restauranteId: 'r1', nombre: 'PEDRO', rol: 'empleado', activo: false,
+      });
+    });
+  };
+
+  // ── EL ATAQUE, ENTERO ────────────────────────────────────────────────────
+  it('EL ATAQUE · un cliente cualquiera NO puede nombrarse empleado de un negocio', async () => {
+    const { doc, setDoc } = FS;
+    await RUT.assertFails(setDoc(doc(como('pasajero1'), 'empleados/pasajero1'), { restauranteId: 'r1' }));
+  });
+
+  it('EL ATAQUE · y por eso ya no puede leer los pedidos de ese negocio', async () => {
+    await sembrarMundo();
+    const { doc, setDoc, collection, query, where, getDocs } = FS;
+    // Paso 1: intenta hacerse el carnet. Se le niega.
+    await RUT.assertFails(setDoc(doc(como('pasajero1'), 'empleados/pasajero1'), { restauranteId: 'r1' }));
+    // Paso 2: sin carnet, la lista con los teléfonos le sigue cerrada.
+    await RUT.assertFails(getDocs(query(
+      collection(como('pasajero1'), 'pedidosRestaurantes'), where('restauranteId', '==', 'r1')
+    )));
+  });
+
+  // El nombre de antes prometía algo que la regla NO comprueba, y daba seguridad
+  // falsa: escribir la ficha de OTRA cuenta sí se puede, y hace falta — cuando el
+  // dueño contrata, la cuenta del empleado es nueva y su id no es el del dueño.
+  // Lo que de verdad da poder es a QUÉ negocio apunta la ficha, y eso es lo único
+  // que hay que cerrar. Es lo que se prueba aquí, por los dos lados.
+  it('la ficha solo puede apuntar a TU negocio, tenga el id que tenga', async () => {
+    const { doc, setDoc } = FS;
+    await RUT.assertFails(setDoc(doc(como('pasajero1'), 'empleados/comparsa'), { restauranteId: 'r1' }));
+    await RUT.assertFails(setDoc(doc(como('pasajero1'), 'empleados/pasajero1'), { restauranteId: 'r2' }));
+  });
+
+  // ── LOS AVISOS DEL EMPLEADO ──────────────────────────────────────────────
+  // Esto es lo que este arreglo estuvo a punto de romper, y en silencio.
+  it('EL AVISO · el empleado guarda su token en SU ficha (aliados/Notificaciones.js:22)', async () => {
+    await sembrarMundo();
+    const { doc, setDoc } = FS;
+    await RUT.assertSucceeds(setDoc(doc(como('emp1'), 'empleados/emp1'), { fcmToken: 'tok123' }, { merge: true }));
+  });
+
+  it('EL AVISO · pero SOLO el token: no cuela otro campo de paso', async () => {
+    await sembrarMundo();
+    const { doc, setDoc } = FS;
+    await RUT.assertFails(setDoc(doc(como('emp1'), 'empleados/emp1'),
+      { fcmToken: 'tok123', roles: { administrador: true } }, { merge: true }));
+    await RUT.assertFails(setDoc(doc(como('despedido'), 'empleados/despedido'),
+      { fcmToken: 'tok123', activo: true }, { merge: true }));
+  });
+
+  it('EL AVISO · ni el token de un compañero', async () => {
+    await sembrarMundo();
+    const { doc, setDoc } = FS;
+    await RUT.assertFails(setDoc(doc(como('emp1'), 'empleados/despedido'), { fcmToken: 'tok123' }, { merge: true }));
+  });
+
+  it('una ficha SIN restaurante no se queda congelada para siempre', async () => {
+    await entorno.withSecurityRulesDisabled(async (ctx) => {
+      const { doc, setDoc } = FS;
+      await setDoc(doc(ctx.firestore(), 'empleados/rota'), { nombre: 'SIN NEGOCIO' });
+    });
+    // Con acceso directo esto daba «Null value error» y negaba a todos, hasta al
+    // panel — y borrarla está prohibido. Con el defecto, el panel puede repararla.
+    const { doc, updateDoc } = FS;
+    await RUT.assertSucceeds(updateDoc(doc(como('eladmin'), 'empleados/rota'), { activo: false }));
+  });
+
+  // ── EL DESPEDIDO ─────────────────────────────────────────────────────────
+  it('EL DESPEDIDO · con la ficha desactivada ya no ve los pedidos del negocio', async () => {
+    await sembrarMundo();
+    const { collection, query, where, getDocs } = FS;
+    await RUT.assertFails(getDocs(query(
+      collection(como('despedido'), 'pedidosRestaurantes'), where('restauranteId', '==', 'r1')
+    )));
+  });
+
+  it('EL DESPEDIDO · y no puede reactivarse él solo', async () => {
+    await sembrarMundo();
+    const { doc, updateDoc } = FS;
+    await RUT.assertFails(updateDoc(doc(como('despedido'), 'empleados/despedido'), { activo: true }));
+  });
+
+  it('una ficha SIN el campo activo sigue valiendo — las viejas no se quedan fuera', async () => {
+    await sembrarMundo();
+    // 'emp1' se siembra arriba sin 'activo'. Debe seguir entrando.
+    const { collection, query, where, getDocs } = FS;
+    await RUT.assertSucceeds(getDocs(query(
+      collection(como('emp1'), 'pedidosRestaurantes'), where('restauranteId', '==', 'r1')
+    )));
+  });
+
+  // ── LO QUE EL DUEÑO TIENE QUE PODER SEGUIR HACIENDO ──────────────────────
+  it('el DUEÑO sigue nombrando a su gente (aliados/Empleados.js:102)', async () => {
+    const { doc, setDoc } = FS;
+    await RUT.assertSucceeds(setDoc(doc(como('r1'), 'empleados/nuevoEmp'), {
+      restauranteId: 'r1', nombre: 'MARIA', email: 'maria@ejemplo.com',
+      roles: { mesero: true }, rol: 'empleado', activo: true,
+    }));
+  });
+
+  it('pero NO puede nombrar gente en el negocio de al lado', async () => {
+    const { doc, setDoc } = FS;
+    await RUT.assertFails(setDoc(doc(como('r1'), 'empleados/coladoEnR2'), {
+      restauranteId: 'r2', nombre: 'MARIA', rol: 'empleado', activo: true,
+    }));
+  });
+
+  it('el dueño sigue editando y desactivando a los suyos (Empleados.js:79 y :126)', async () => {
+    await sembrarMundo();
+    const { doc, updateDoc } = FS;
+    await RUT.assertSucceeds(updateDoc(doc(como('r1'), 'empleados/emp1'), { nombre: 'JUANITO' }));
+    await RUT.assertSucceeds(updateDoc(doc(como('r1'), 'empleados/despedido'), { activo: true }));
+  });
+
+  it('el empleado sigue leyendo SU ficha para poder entrar (aliados/Login.js:88)', async () => {
+    await sembrarMundo();
+    const { doc, getDoc } = FS;
+    await RUT.assertSucceeds(getDoc(doc(como('emp1'), 'empleados/emp1')));
+  });
+
+  it('el dueño sigue pidiendo la lista de SU equipo (Empleados.js:46)', async () => {
+    await sembrarMundo();
+    const { collection, query, where, getDocs } = FS;
+    await RUT.assertSucceeds(getDocs(query(
+      collection(como('r1'), 'empleados'), where('restauranteId', '==', 'r1')
+    )));
+  });
+
+  // ── LO QUE SE CIERRA ─────────────────────────────────────────────────────
+  it('un empleado NO puede subirse los permisos a sí mismo', async () => {
+    await sembrarMundo();
+    const { doc, updateDoc } = FS;
+    await RUT.assertFails(updateDoc(doc(como('emp1'), 'empleados/emp1'), {
+      roles: { administrador: true },
+    }));
+  });
+
+  it('un cualquiera NO puede pedir la LISTA de empleados', async () => {
+    await sembrarMundo();
+    const { collection, getDocs } = FS;
+    await RUT.assertFails(getDocs(collection(como('pasajero1'), 'empleados')));
+  });
+
+  it('un extraño NO puede leer la ficha de un empleado ajeno', async () => {
+    await sembrarMundo();
+    const { doc, getDoc } = FS;
+    await RUT.assertFails(getDoc(doc(como('pasajero1'), 'empleados/emp1')));
+  });
+
+  it('una ficha NO puede mudarse a otro negocio', async () => {
+    await sembrarMundo();
+    const { doc, updateDoc } = FS;
+    await RUT.assertFails(updateDoc(doc(como('r1'), 'empleados/emp1'), { restauranteId: 'r2' }));
+  });
+
+  it('el panel sigue pudiendo mirar los empleados', async () => {
+    await sembrarMundo();
+    const { doc, getDoc, collection, getDocs } = FS;
+    await RUT.assertSucceeds(getDoc(doc(como('eladmin'), 'empleados/emp1')));
+    await RUT.assertSucceeds(getDocs(collection(como('eljefe'), 'empleados')));
+  });
+});
