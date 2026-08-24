@@ -13,6 +13,33 @@ service cloud.firestore {
       );
     }
 
+    // ── REGLA 9 · ¿ESTE NEGOCIO ES EL SUYO? ─────────────────────────────────
+    // En un restaurante o una agencia trabajan DOS clases de personas, y entran
+    // con cuentas DISTINTAS:
+    //   · el dueño    — su cuenta ES el negocio: request.auth.uid == el id.
+    //   · el empleado — tiene cuenta aparte, y su uid NO se parece en nada al
+    //     del negocio. Quien dice a qué negocio pertenece es su ficha en
+    //     'empleados/{uid}'. Medido el 24-ago-2026: hay 1 empleado real (JUAN,
+    //     del restaurante TWjNDorw...), así que la trampa no es hipotética.
+    //
+    // Si esto se contestara solo con "¿tu cuenta es el negocio?", el mesero
+    // dejaría de poder tomar pedidos EN SILENCIO: la app no enseña el error de
+    // permisos, simplemente se queda la pantalla vacía y nadie sabe por qué.
+    //
+    // Vive aquí arriba, suelta, porque la contestan DOS bloques —los pedidos y
+    // las reservas— y la SEGUNDA LEY prohíbe dos calculadoras del mismo proceso:
+    // si se escribiera en los dos sitios, uno se quedaría viejo.
+    //
+    // El exists() va ANTES del get() a propósito: preguntar por una ficha que no
+    // existe da error, y un error aquí tumbaría la condición entera.
+    function esDelNegocio(negocioId) {
+      return request.auth != null && (
+        request.auth.uid == negocioId ||
+        (exists(/databases/$(database)/documents/empleados/$(request.auth.uid)) &&
+         get(/databases/$(database)/documents/empleados/$(request.auth.uid)).data.get('restauranteId', '') == negocioId)
+      );
+    }
+
     match /usuarios/{userId} {
       // ── REGLA 1 · LA LLAVE MAESTRA ──────────────────────────────────────────
       // Hasta el 23-ago-2026 el dueño de una ficha podía escribir CUALQUIER campo
@@ -279,9 +306,58 @@ service cloud.firestore {
       );
       allow delete: if false;
     }
+    // ── REGLA 9 · CADA PEDIDO ES DE SU CLIENTE Y DE SU RESTAURANTE ──────────
+    // Hasta el 24-ago-2026 esto decía «allow read: if request.auth != null», o
+    // sea: CUALQUIERA con una cuenta podía pedir la lista completa de pedidos.
+    // Medido ese día: 29 pedidos, 17 con TELÉFONO Y DIRECCIÓN de personas
+    // reales, $1.200.000 en total. No hacía falta ser listo: era una consulta.
+    //
+    // 'read' se parte en dos porque son dos permisos que no se parecen:
+    //   · get  — mirar UN pedido del que ya sabes el número.
+    //   · list — pedirlos MUCHOS de una. La fuga estaba aquí.
+    //
+    // Quién puede LISTAR: el negocio dueño de esos pedidos, y el panel. Las
+    // cinco pantallas de aliados ya preguntan where('restauranteId','==', el
+    // suyo), así que encajan sin tocarlas. El panel pide la colección entera
+    // sin filtro: por eso esAdmin() va PRIMERO, para que la condición se pueda
+    // resolver sin mirar los pedidos uno por uno.
+    //
+    // Quién puede mirar UNO: además, su cliente. El cliente encuentra el suyo
+    // por el número que guarda en su propio teléfono; desde hoy los pedidos
+    // NUEVOS llevan 'clienteId' y por ahí se le reconoce.
+    //
+    // Los 29 VIEJOS no tienen dueño y no se les puede inventar uno. Medido: 0
+    // están activos (20 cerrados, 7 cancelados, 2 entregados), así que ningún
+    // cliente está mirando uno ahora mismo. Se quedan visibles para su
+    // restaurante y para el panel, que son quienes los necesitan. No se borran.
     match /pedidosRestaurantes/{pedidoId} {
-      allow read: if request.auth != null;
-      allow create, update: if request.auth != null;
+      allow get: if request.auth != null && (
+        resource.data.get('clienteId', '') == request.auth.uid ||
+        esDelNegocio(resource.data.restauranteId) ||
+        esAdmin()
+      );
+      allow list: if esAdmin() || esDelNegocio(resource.data.restauranteId);
+
+      // Al crearlo, el pedido se FIRMA. Dos firmas valen, y son los dos únicos
+      // sitios de todo el proyecto que crean pedidos:
+      //   · el cliente de la app (Restaurantes.js) — pone su propio clienteId.
+      //   · el restaurante tomando una mesa (Mesero.js) — es del negocio.
+      allow create: if esAdmin() ||
+        esDelNegocio(request.resource.data.restauranteId) ||
+        (request.auth != null &&
+         request.resource.data.get('clienteId', '') == request.auth.uid);
+
+      // Al cambiarlo: su cliente, su restaurante o el panel. Y el pedido NO
+      // puede cambiar de dueño ni de restaurante por el camino: si pudiera, la
+      // firma de arriba no valdría nada — bastaría crear uno propio y después
+      // apuntarlo al negocio ajeno para colarse dentro.
+      allow update: if (esAdmin() ||
+          esDelNegocio(resource.data.restauranteId) ||
+          (request.auth != null &&
+           resource.data.get('clienteId', '') == request.auth.uid)) &&
+        request.resource.data.restauranteId == resource.data.restauranteId &&
+        request.resource.data.get('clienteId', '') == resource.data.get('clienteId', '');
+
       allow delete: if false;
     }
     match /restaurantes/{restauranteId}/empleados/{empleadoId} {
@@ -306,9 +382,30 @@ service cloud.firestore {
     }
 
     // ===== NUEVAS (agregadas) =====
+    // ── REGLA 9 · CADA RESERVA ES DE SU CLIENTE Y DE SU AGENCIA ─────────────
+    // El mismo agujero que los pedidos, y se tapa igual. Con una diferencia que
+    // lo hace gratis: medido el 24-ago-2026 hay CERO reservas. No hay nada
+    // viejo que se quede sin dueño, así que aquí la regla nace estricta.
     match /reservasTurismo/{reservaId} {
-      allow read: if request.auth != null;
-      allow create, update: if request.auth != null;
+      allow get: if request.auth != null && (
+        resource.data.get('clienteId', '') == request.auth.uid ||
+        esDelNegocio(resource.data.agenciaId) ||
+        esAdmin()
+      );
+      allow list: if esAdmin() || esDelNegocio(resource.data.agenciaId);
+
+      allow create: if esAdmin() ||
+        esDelNegocio(request.resource.data.agenciaId) ||
+        (request.auth != null &&
+         request.resource.data.get('clienteId', '') == request.auth.uid);
+
+      allow update: if (esAdmin() ||
+          esDelNegocio(resource.data.agenciaId) ||
+          (request.auth != null &&
+           resource.data.get('clienteId', '') == request.auth.uid)) &&
+        request.resource.data.agenciaId == resource.data.agenciaId &&
+        request.resource.data.get('clienteId', '') == resource.data.get('clienteId', '');
+
       allow delete: if false;
     }
     match /comprasInsumos/{compraId} {

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { db } from './firebase';
+import { auth, db } from './firebase';
 // El formateador de pesos vive en moneda.js: un solo sitio (SEGUNDA LEY).
 import { cop } from './moneda';
 import { collection, query, where, getDocs, getDoc, addDoc, doc } from 'firebase/firestore';
@@ -76,6 +76,10 @@ function Turismo({ nombre, foto, onVolver, onCerrarSesion, onIrPerfil, onIrGanan
       const clienteFcmToken = await obtenerTokenFCM();
       const ref = await addDoc(collection(db, 'reservasTurismo'), {
         agenciaId: agenciaActiva.id,
+        // REGLA 9 - LA FIRMA: aqui se apunta QUIEN lo pide. Sin esta firma el
+        // servidor no tiene forma de saber de quien es, y hasta el 24-ago-2026
+        // por eso los dejaba mirar a CUALQUIERA que tuviera una cuenta.
+        clienteId: auth.currentUser ? auth.currentUser.uid : null,
         agenciaNombre: agenciaActiva.nombre || '',
         tourId: tourReserva.id,
         tipo: tourReserva.tipo || 'tour',

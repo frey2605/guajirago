@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { db, storage } from './firebase';
+import { auth, db, storage } from './firebase';
 // El formateador de pesos vive en moneda.js: un solo sitio (SEGUNDA LEY).
 import { cop } from './moneda';
 // Y el filtro anti-datos de los chats, en filtroChat.js — amarrado al panel.
@@ -321,6 +321,10 @@ function Restaurantes({ nombre, onVolver, foto, onCerrarSesion, onIrPerfil, onIr
       const clienteFcmToken = await obtenerTokenFCM();
       const ref = await addDoc(collection(db, 'pedidosRestaurantes'), {
         restauranteId: restauranteActivo.id,
+        // REGLA 9 - LA FIRMA: aqui se apunta QUIEN lo pide. Sin esta firma el
+        // servidor no tiene forma de saber de quien es, y hasta el 24-ago-2026
+        // por eso los dejaba mirar a CUALQUIERA que tuviera una cuenta.
+        clienteId: auth.currentUser ? auth.currentUser.uid : null,
         restauranteNombre: restauranteActivo.nombre,
         cliente: nombre || 'Cliente GuajiraGo',
         telefono: tel,

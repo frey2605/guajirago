@@ -244,10 +244,14 @@ describe('REGLA 12 · lo que la app hace hoy sigue funcionando', () => {
     );
   });
 
+  // Corregida el 24-ago-2026 (REGLA 9): decia { total: 25000 } y nada mas. Eso NO
+  // es lo que hace la app — Restaurantes.js:322 escribe 15 campos y SIEMPRE el
+  // restaurante. Un pedido sin restaurante no lo puede atender nadie ni reclamar
+  // nadie: la prueba estaba dando por bueno un pedido huerfano.
   it('un restaurante sigue pudiendo recibir un pedido', async () => {
     const { doc, setDoc } = FS;
     await RUT.assertSucceeds(
-      setDoc(doc(como('pasajero1'), 'pedidosRestaurantes/ped2'), { total: 25000 })
+      setDoc(doc(como('pasajero1'), 'pedidosRestaurantes/ped2'), { restauranteId: 'r1', clienteId: 'pasajero1', total: 25000 })
     );
   });
 });
@@ -894,5 +898,289 @@ describe('REGLA 6 · cada quien ve lo suyo', () => {
     await RUT.assertSucceeds(
       setDoc(doc(como('conductor1'), 'viajes/viaje1/mensajes/m3'), { texto: 'voy llegando', autor: 'conductor' })
     );
+  });
+});
+
+// ───────────────────────────────────────────────────────────────────────────
+// REGLA 9 · CADA PEDIDO Y CADA RESERVA SON DE ALGUIEN
+// ───────────────────────────────────────────────────────────────────────────
+// Hasta el 24-ago-2026 las dos colecciones decían «if request.auth != null»:
+// con una cuenta cualquiera se pedía la lista entera. Medido ese día en el
+// servidor de verdad: 29 pedidos, 17 con TELÉFONO Y DIRECCIÓN de gente real.
+//
+// La trampa que casi se me pasa: en un restaurante NO trabaja solo el dueño.
+// El empleado entra con SU cuenta —medido: JUAN, 1 empleado real— y su uid no
+// se parece en nada al del restaurante. Una regla que preguntara solo «¿tu
+// cuenta es el restaurante?» habría dejado al mesero sin poder tomar pedidos,
+// y en silencio: la pantalla se queda vacía y nadie sabe por qué. Por eso hay
+// dos pruebas del mesero, y son las que más importan de todas estas.
+
+describe('REGLA 9 · los pedidos dejan de ser públicos entre usuarios', () => {
+  /** El mundo de dos restaurantes, un empleado y cuatro pedidos. */
+  const sembrarPedidos = async () => {
+    await entorno.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      const { doc, setDoc } = FS;
+      // 'emp1' ya viene sembrado arriba como empleado del restaurante 'r1'.
+      await setDoc(doc(db, 'pedidosRestaurantes/pedR1cliente'), {
+        restauranteId: 'r1', clienteId: 'pasajero1', tipo: 'domicilio',
+        estado: 'nuevo', cliente: 'Ana', telefono: '+573001112233',
+        direccion: 'Calle 1 #2-3', total: 30000,
+      });
+      await setDoc(doc(db, 'pedidosRestaurantes/pedR1mesa'), {
+        restauranteId: 'r1', tipo: 'local', mesa: 4, estado: 'tomado', total: 18000,
+      });
+      await setDoc(doc(db, 'pedidosRestaurantes/pedR2'), {
+        restauranteId: 'r2', clienteId: 'otroCliente', tipo: 'domicilio',
+        estado: 'nuevo', telefono: '+573009998877', direccion: 'Calle 9', total: 25000,
+      });
+      // Uno de los 29 VIEJOS: tiene restaurante, pero NO tiene dueño.
+      await setDoc(doc(db, 'pedidosRestaurantes/pedViejo'), {
+        restauranteId: 'r1', tipo: 'domicilio', estado: 'cerrado',
+        telefono: '+573005554433', direccion: 'Calle 15', total: 42000,
+      });
+    });
+  };
+
+  // ── LA FUGA QUE SE CIERRA ────────────────────────────────────────────────
+  it('un cualquiera YA NO puede pedir la LISTA de pedidos — ahí estaban los 17 teléfonos', async () => {
+    await sembrarPedidos();
+    const { collection, getDocs } = FS;
+    await RUT.assertFails(getDocs(collection(como('pasajero1'), 'pedidosRestaurantes')));
+  });
+
+  it('ni filtrando por un restaurante que no es suyo', async () => {
+    await sembrarPedidos();
+    const { collection, query, where, getDocs } = FS;
+    await RUT.assertFails(getDocs(query(
+      collection(como('pasajero1'), 'pedidosRestaurantes'), where('restauranteId', '==', 'r1')
+    )));
+  });
+
+  it('un cualquiera NO puede mirar UN pedido ajeno aunque sepa el número', async () => {
+    await sembrarPedidos();
+    const { doc, getDoc } = FS;
+    await RUT.assertFails(getDoc(doc(como('pasajero1'), 'pedidosRestaurantes/pedR2')));
+  });
+
+  // ── LO QUE TIENE QUE SEGUIR FUNCIONANDO ──────────────────────────────────
+  it('el DUEÑO del restaurante sigue viendo sus pedidos (App.js:116, PedidosDomicilio.js:101)', async () => {
+    await sembrarPedidos();
+    const { collection, query, where, getDocs } = FS;
+    await RUT.assertSucceeds(getDocs(query(
+      collection(como('r1'), 'pedidosRestaurantes'), where('restauranteId', '==', 'r1')
+    )));
+  });
+
+  it('LA TRAMPA · el EMPLEADO también los ve, aunque su cuenta no sea el restaurante (Mesero.js:90)', async () => {
+    await sembrarPedidos();
+    const { collection, query, where, getDocs } = FS;
+    await RUT.assertSucceeds(getDocs(query(
+      collection(como('emp1'), 'pedidosRestaurantes'), where('restauranteId', '==', 'r1')
+    )));
+  });
+
+  it('LA TRAMPA · pero el empleado NO ve los del restaurante de al lado', async () => {
+    await sembrarPedidos();
+    const { collection, query, where, getDocs } = FS;
+    await RUT.assertFails(getDocs(query(
+      collection(como('emp1'), 'pedidosRestaurantes'), where('restauranteId', '==', 'r2')
+    )));
+  });
+
+  it('el panel sigue pidiendo la colección ENTERA sin filtro (admin/Restaurantes.js:31)', async () => {
+    await sembrarPedidos();
+    const { collection, getDocs } = FS;
+    await RUT.assertSucceeds(getDocs(collection(como('eladmin'), 'pedidosRestaurantes')));
+  });
+
+  it('el cliente sigue mirando SU pedido por el número que guarda su teléfono (Restaurantes.js:138)', async () => {
+    await sembrarPedidos();
+    const { doc, getDoc } = FS;
+    await RUT.assertSucceeds(getDoc(doc(como('pasajero1'), 'pedidosRestaurantes/pedR1cliente')));
+  });
+
+  it('los 29 VIEJOS sin dueño los sigue viendo su restaurante y el panel', async () => {
+    await sembrarPedidos();
+    const { doc, getDoc } = FS;
+    await RUT.assertSucceeds(getDoc(doc(como('r1'), 'pedidosRestaurantes/pedViejo')));
+    await RUT.assertSucceeds(getDoc(doc(como('eladmin'), 'pedidosRestaurantes/pedViejo')));
+  });
+
+  it('pero un extraño NO se cuela en un pedido viejo por no tener dueño', async () => {
+    await sembrarPedidos();
+    const { doc, getDoc } = FS;
+    await RUT.assertFails(getDoc(doc(como('pasajero1'), 'pedidosRestaurantes/pedViejo')));
+  });
+
+  // ── CREAR: EL PEDIDO SE FIRMA ────────────────────────────────────────────
+  it('el cliente crea su pedido FIRMÁNDOLO (Restaurantes.js:322)', async () => {
+    const { collection, addDoc } = FS;
+    await RUT.assertSucceeds(addDoc(collection(como('pasajero1'), 'pedidosRestaurantes'), {
+      restauranteId: 'r1', clienteId: 'pasajero1', tipo: 'domicilio', estado: 'nuevo', total: 30000,
+    }));
+  });
+
+  it('pero NO puede firmarlo con el nombre de otro', async () => {
+    const { collection, addDoc } = FS;
+    await RUT.assertFails(addDoc(collection(como('pasajero1'), 'pedidosRestaurantes'), {
+      restauranteId: 'r1', clienteId: 'otroCliente', tipo: 'domicilio', estado: 'nuevo', total: 30000,
+    }));
+  });
+
+  it('ni puede crear uno SIN firma para colarse en un restaurante ajeno', async () => {
+    const { collection, addDoc } = FS;
+    await RUT.assertFails(addDoc(collection(como('pasajero1'), 'pedidosRestaurantes'), {
+      restauranteId: 'r1', tipo: 'local', mesa: 9, estado: 'tomado', total: 5000,
+    }));
+  });
+
+  it('LA TRAMPA · el MESERO sí crea pedidos de mesa sin cliente (Mesero.js:289)', async () => {
+    const { collection, addDoc } = FS;
+    await RUT.assertSucceeds(addDoc(collection(como('emp1'), 'pedidosRestaurantes'), {
+      restauranteId: 'r1', tipo: 'local', mesa: 4, estado: 'tomado', total: 18000,
+    }));
+  });
+
+  // ── CAMBIAR ──────────────────────────────────────────────────────────────
+  it('el cliente sigue pudiendo cancelar SU pedido (Restaurantes.js:366)', async () => {
+    await sembrarPedidos();
+    const { doc, updateDoc } = FS;
+    await RUT.assertSucceeds(updateDoc(doc(como('pasajero1'), 'pedidosRestaurantes/pedR1cliente'), {
+      estado: 'cancelado', canceladoPor: 'cliente',
+    }));
+  });
+
+  it('el restaurante sigue moviendo el estado de sus pedidos (PedidosDomicilio.js:138)', async () => {
+    await sembrarPedidos();
+    const { doc, updateDoc } = FS;
+    await RUT.assertSucceeds(updateDoc(doc(como('r1'), 'pedidosRestaurantes/pedR1cliente'), { estado: 'preparando' }));
+  });
+
+  it('y el empleado también (es el que está en la cocina)', async () => {
+    await sembrarPedidos();
+    const { doc, updateDoc } = FS;
+    await RUT.assertSucceeds(updateDoc(doc(como('emp1'), 'pedidosRestaurantes/pedR1mesa'), { estado: 'cerrado' }));
+  });
+
+  it('un extraño NO puede tocar el pedido de otro', async () => {
+    await sembrarPedidos();
+    const { doc, updateDoc } = FS;
+    await RUT.assertFails(updateDoc(doc(como('pasajero1'), 'pedidosRestaurantes/pedR2'), { estado: 'cancelado' }));
+  });
+
+  it('NADIE puede mudar un pedido a otro restaurante — si se pudiera, la firma no valdría nada', async () => {
+    await sembrarPedidos();
+    const { doc, updateDoc } = FS;
+    await RUT.assertFails(updateDoc(doc(como('pasajero1'), 'pedidosRestaurantes/pedR1cliente'), { restauranteId: 'r2' }));
+    await RUT.assertFails(updateDoc(doc(como('r1'), 'pedidosRestaurantes/pedR1cliente'), { restauranteId: 'r2' }));
+  });
+
+  it('NADIE puede cambiarle el dueño a un pedido', async () => {
+    await sembrarPedidos();
+    const { doc, updateDoc } = FS;
+    await RUT.assertFails(updateDoc(doc(como('pasajero1'), 'pedidosRestaurantes/pedR1cliente'), { clienteId: 'otroCliente' }));
+    await RUT.assertFails(updateDoc(doc(como('r1'), 'pedidosRestaurantes/pedR1cliente'), { clienteId: 'r1' }));
+  });
+
+  // Esta mira el CONGELADO, no al portero. Antes se probaba con un extraño y NO
+  // servía de nada: al extraño ya lo para el portero, así que el congelado ni se
+  // llegaba a mirar y la prueba pasaba sola — aunque se quitara el congelado
+  // entero. Con 'r1' es distinto: el portero SÍ lo deja pasar, es su restaurante.
+  // Lo único que puede negarlo es que el dueño esté congelado, que es lo que se
+  // quiere probar.
+  it('ni el propio restaurante puede REGALARLE un pedido viejo a alguien', async () => {
+    await sembrarPedidos();
+    const { doc, updateDoc } = FS;
+    await RUT.assertFails(updateDoc(doc(como('r1'), 'pedidosRestaurantes/pedViejo'), { clienteId: 'pasajero1' }));
+  });
+});
+
+describe('REGLA 9 · las reservas de turismo, igual (y aquí nace limpio)', () => {
+  const sembrarReservas = async () => {
+    await entorno.withSecurityRulesDisabled(async (ctx) => {
+      const { doc, setDoc } = FS;
+      await setDoc(doc(ctx.firestore(), 'reservasTurismo/resA1'), {
+        agenciaId: 'a1', clienteId: 'pasajero1', estado: 'nueva',
+        cliente: 'Ana', telefono: '+573001112233', personas: 2, total: 200000,
+      });
+      await setDoc(doc(ctx.firestore(), 'reservasTurismo/resA2'), {
+        agenciaId: 'a2', clienteId: 'otroCliente', estado: 'nueva',
+        telefono: '+573009998877', total: 350000,
+      });
+    });
+  };
+
+  it('un cualquiera YA NO puede pedir la LISTA de reservas', async () => {
+    await sembrarReservas();
+    const { collection, getDocs } = FS;
+    await RUT.assertFails(getDocs(collection(como('pasajero1'), 'reservasTurismo')));
+  });
+
+  it('un cualquiera NO puede mirar la reserva de otro', async () => {
+    await sembrarReservas();
+    const { doc, getDoc } = FS;
+    await RUT.assertFails(getDoc(doc(como('pasajero1'), 'reservasTurismo/resA2')));
+  });
+
+  it('la AGENCIA sigue viendo las suyas (ReservasTurismo.js:26)', async () => {
+    await sembrarReservas();
+    const { collection, query, where, getDocs } = FS;
+    await RUT.assertSucceeds(getDocs(query(
+      collection(como('a1'), 'reservasTurismo'), where('agenciaId', '==', 'a1')
+    )));
+  });
+
+  it('pero NO las de la agencia de al lado', async () => {
+    await sembrarReservas();
+    const { collection, query, where, getDocs } = FS;
+    await RUT.assertFails(getDocs(query(
+      collection(como('a1'), 'reservasTurismo'), where('agenciaId', '==', 'a2')
+    )));
+  });
+
+  it('el panel sigue pidiéndolas todas (admin/Turismo.js:31)', async () => {
+    await sembrarReservas();
+    const { collection, getDocs } = FS;
+    await RUT.assertSucceeds(getDocs(collection(como('eladmin'), 'reservasTurismo')));
+  });
+
+  it('el cliente sigue mirando SU reserva por el número guardado (Turismo.js:110)', async () => {
+    await sembrarReservas();
+    const { doc, getDoc } = FS;
+    await RUT.assertSucceeds(getDoc(doc(como('pasajero1'), 'reservasTurismo/resA1')));
+  });
+
+  it('el cliente crea su reserva FIRMÁNDOLA (Turismo.js:77)', async () => {
+    const { collection, addDoc } = FS;
+    await RUT.assertSucceeds(addDoc(collection(como('pasajero1'), 'reservasTurismo'), {
+      agenciaId: 'a1', clienteId: 'pasajero1', estado: 'nueva', personas: 2, total: 200000,
+    }));
+  });
+
+  it('pero NO con el nombre de otro', async () => {
+    const { collection, addDoc } = FS;
+    await RUT.assertFails(addDoc(collection(como('pasajero1'), 'reservasTurismo'), {
+      agenciaId: 'a1', clienteId: 'otroCliente', estado: 'nueva', total: 200000,
+    }));
+  });
+
+  it('la agencia sigue confirmando y cancelando las suyas (ReservasTurismo.js:37 y :54)', async () => {
+    await sembrarReservas();
+    const { doc, updateDoc } = FS;
+    await RUT.assertSucceeds(updateDoc(doc(como('a1'), 'reservasTurismo/resA1'), { estado: 'confirmada' }));
+  });
+
+  it('una agencia NO puede tocar la reserva de otra agencia', async () => {
+    await sembrarReservas();
+    const { doc, updateDoc } = FS;
+    await RUT.assertFails(updateDoc(doc(como('a1'), 'reservasTurismo/resA2'), { estado: 'cancelada' }));
+  });
+
+  it('NADIE puede mudar una reserva a otra agencia ni cambiarle el dueño', async () => {
+    await sembrarReservas();
+    const { doc, updateDoc } = FS;
+    await RUT.assertFails(updateDoc(doc(como('a1'), 'reservasTurismo/resA1'), { agenciaId: 'a2' }));
+    await RUT.assertFails(updateDoc(doc(como('pasajero1'), 'reservasTurismo/resA1'), { clienteId: 'otroCliente' }));
   });
 });

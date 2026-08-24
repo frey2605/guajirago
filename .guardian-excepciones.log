@@ -23,3 +23,11 @@
   AppConductor.js al servidor ES el arreglo: el conductor comparaba el codigo contra el que el
   mismo podia leer en el viaje, se acreditaba los creditos y apuntaba el uso de la promocion.
   Los tres archivos estaban DECLARADOS en la foto de la parte 2.
+
+2026-08-24 REGLA 9-A — corregida pruebas/reglas.test.js:247, que estaba FUERA de la foto
+  (la foto declaraba pruebas/reglas.test.js:REGLA9). Con permiso EXPRESO del dueno
+  ("corrigelo"). La prueba creaba un pedido con SOLO { total: 25000 } — sin restaurante y
+  sin cliente. La app nunca hace eso (Restaurantes.js:322 escribe 15 campos, siempre con
+  restauranteId; medido: 29 de 29 pedidos del servidor lo tienen). Estaba dando por bueno
+  un pedido huerfano que nadie puede atender ni reclamar. Mismo caso que la correccion de
+  la REGLA 2 del 23-ago. Se le anadieron restauranteId y clienteId: un renglon.
