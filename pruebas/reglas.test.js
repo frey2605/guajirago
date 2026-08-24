@@ -1661,3 +1661,136 @@ describe('REGLA 9 · un negocio no se aprueba a sí mismo', () => {
     await RUT.assertSucceeds(getDocs(collection(como('pasajero1'), 'restaurantes')));
   });
 });
+
+// ───────────────────────────────────────────────────────────────────────────
+// REGLA 9 · EL CUARTO DE ATRÁS DE CADA NEGOCIO
+// ───────────────────────────────────────────────────────────────────────────
+// El documento del negocio es el ESCAPARATE: la app del pasajero se descarga la
+// colección entera para enseñar dónde pedir. Medido el 24-ago-2026: dentro de
+// ese escaparate viajaban el NOMBRE, el TELÉFONO y el CORREO del dueño de los 3
+// negocios, más sus créditos. A cualquiera que se registrara le llegaban solos.
+//
+// Aquí vive lo que no es para el escaparate. El id del documento es el mismo que
+// el del negocio, así que «¿es tuyo?» se contesta sin leer nada de nadie.
+
+describe('REGLA 9 · el cuarto de atrás de cada negocio', () => {
+  const sembrarCuartos = async () => {
+    await entorno.withSecurityRulesDisabled(async (ctx) => {
+      const { doc, setDoc } = FS;
+      await setDoc(doc(ctx.firestore(), 'restaurantesPrivado/r1'), {
+        duenoNombre: 'MECHE', duenoTelefono: '+573001112233',
+        email: 'meche@ejemplo.com', creditos: 0,
+      });
+      await setDoc(doc(ctx.firestore(), 'restaurantesPrivado/r2'), {
+        duenoNombre: 'EL OTRO', duenoTelefono: '+573009998877',
+        email: 'otro@ejemplo.com', creditos: 50000,
+      });
+    });
+  };
+
+  // ── LO QUE SE CIERRA ─────────────────────────────────────────────────────
+  it('LA FUGA · un cliente cualquiera NO puede leer los datos del dueño', async () => {
+    await sembrarCuartos();
+    const { doc, getDoc } = FS;
+    await RUT.assertFails(getDoc(doc(como('pasajero1'), 'restaurantesPrivado/r1')));
+  });
+
+  it('LA FUGA · ni pedir la lista entera, que era como llegaban solos', async () => {
+    await sembrarCuartos();
+    const { collection, getDocs } = FS;
+    await RUT.assertFails(getDocs(collection(como('pasajero1'), 'restaurantesPrivado')));
+  });
+
+  it('un negocio NO puede mirar el cuarto del negocio de al lado', async () => {
+    await sembrarCuartos();
+    const { doc, getDoc } = FS;
+    await RUT.assertFails(getDoc(doc(como('r1'), 'restaurantesPrivado/r2')));
+  });
+
+  it('ni escribir en él', async () => {
+    await sembrarCuartos();
+    const { doc, updateDoc } = FS;
+    await RUT.assertFails(updateDoc(doc(como('r1'), 'restaurantesPrivado/r2'), { duenoTelefono: '+570000000000' }));
+  });
+
+  it('ni crearle uno a un negocio que no es suyo', async () => {
+    const { doc, setDoc } = FS;
+    await RUT.assertFails(setDoc(doc(como('r1'), 'restaurantesPrivado/r9'), { duenoNombre: 'ROBADO' }));
+  });
+
+  // ── LA PLATA ─────────────────────────────────────────────────────────────
+  it('LA PLATA · el negocio ve su saldo pero NO se lo escribe', async () => {
+    await sembrarCuartos();
+    const { doc, getDoc, updateDoc } = FS;
+    await RUT.assertSucceeds(getDoc(doc(como('r1'), 'restaurantesPrivado/r1')));
+    await RUT.assertFails(updateDoc(doc(como('r1'), 'restaurantesPrivado/r1'), { creditos: 900000 }));
+  });
+
+  it('LA PLATA · ni nace con plata en el bolsillo', async () => {
+    const { doc, setDoc } = FS;
+    await RUT.assertFails(setDoc(doc(como('nuevo9'), 'restaurantesPrivado/nuevo9'), {
+      duenoNombre: 'TRAMPOSO', creditos: 900000,
+    }));
+  });
+
+  it('LA PLATA · pero el panel SÍ se la puede poner', async () => {
+    await sembrarCuartos();
+    const { doc, updateDoc } = FS;
+    await RUT.assertSucceeds(updateDoc(doc(como('eladmin'), 'restaurantesPrivado/r1'), { creditos: 50000 }));
+  });
+
+  // ── LO QUE TIENE QUE FUNCIONAR ───────────────────────────────────────────
+  it('el REGISTRO crea el cuarto del negocio (aliados/Login.js)', async () => {
+    const { doc, setDoc } = FS;
+    await RUT.assertSucceeds(setDoc(doc(como('nuevo8'), 'restaurantesPrivado/nuevo8'), {
+      duenoNombre: 'ANA', duenoTelefono: '+573001112233',
+      email: 'ana@ejemplo.com', creditos: 0,
+    }));
+  });
+
+  // LAS DOS DE ABAJO DEFIENDEN LO QUE VIENE, NO LO QUE HAY. Hoy el token se
+  // escribe en el escaparate (aliados/Notificaciones.js:22 usa la colección
+  // 'restaurantes'); la tanda 2 lo muda aquí. Se dejan puestas porque son las
+  // que justifican que el create tolere que falte 'creditos' — pero conviene
+  // saber que hoy ningún código recorre este camino.
+  it('EL TOKEN · el dueño guarda su token aunque el cuarto no exista todavía', async () => {
+    // El caso que obliga a que el create tolere que falte 'creditos': el cuarto
+    // nace con UN solo campo.
+    const { doc, setDoc } = FS;
+    await RUT.assertSucceeds(setDoc(doc(como('nuevo7'), 'restaurantesPrivado/nuevo7'), { fcmToken: 'tok1' }, { merge: true }));
+  });
+
+  it('EL TOKEN · y lo actualiza cuando ya existe', async () => {
+    await sembrarCuartos();
+    const { doc, setDoc } = FS;
+    await RUT.assertSucceeds(setDoc(doc(como('r1'), 'restaurantesPrivado/r1'), { fcmToken: 'tok2' }, { merge: true }));
+  });
+
+  it('el dueño sigue pudiendo corregir su nombre y su teléfono', async () => {
+    await sembrarCuartos();
+    const { doc, updateDoc } = FS;
+    await RUT.assertSucceeds(updateDoc(doc(como('r1'), 'restaurantesPrivado/r1'), {
+      duenoNombre: 'MERCEDES', duenoTelefono: '+573004445566',
+    }));
+  });
+
+  it('el PANEL lee el de cualquiera y puede pedir la lista (la necesita para buscar)', async () => {
+    await sembrarCuartos();
+    const { doc, getDoc, collection, getDocs } = FS;
+    await RUT.assertSucceeds(getDoc(doc(como('eladmin'), 'restaurantesPrivado/r1')));
+    await RUT.assertSucceeds(getDocs(collection(como('eljefe'), 'restaurantesPrivado')));
+  });
+
+  it('nadie borra un cuarto, ni su dueño (REGLA 12)', async () => {
+    await sembrarCuartos();
+    const { doc, deleteDoc } = FS;
+    await RUT.assertFails(deleteDoc(doc(como('r1'), 'restaurantesPrivado/r1')));
+    await RUT.assertFails(deleteDoc(doc(como('eladmin'), 'restaurantesPrivado/r1')));
+  });
+
+  it('y sin sesión no se entra de ninguna forma', async () => {
+    await sembrarCuartos();
+    const { doc, getDoc } = FS;
+    await RUT.assertFails(getDoc(doc(sinCuenta(), 'restaurantesPrivado/r1')));
+  });
+});

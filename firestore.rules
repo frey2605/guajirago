@@ -377,6 +377,65 @@ service cloud.firestore {
 
       allow delete: if false;
     }
+    // ── REGLA 9 · EL CUARTO DE ATRÁS DE CADA NEGOCIO ────────────────────────
+    // El documento `restaurantes/{id}` es el ESCAPARATE: la app del pasajero se
+    // descarga la colección entera para enseñar dónde pedir, y eso está bien.
+    // Lo que no estaba bien es lo que viajaba dentro. Medido el 24-ago-2026 en el
+    // servidor: los 3 negocios llevaban el NOMBRE, el TELÉFONO y el CORREO de su
+    // dueño, más sus créditos. A cualquiera que se registrara le llegaban solos.
+    //
+    // Aquí vive lo que no es para el escaparate. El id del documento es el MISMO
+    // que el del negocio, así que «¿es tuyo?» se contesta sin leer nada.
+    // Qué campos son privados lo decide UN solo archivo,
+    // `guajirago-aliados/src/negocioPrivado.js`, y hay una prueba que carea ese
+    // archivo con estas reglas (pruebas/amarres.test.js).
+    match /restaurantesPrivado/{negocioId} {
+      // El dinero lo decide el panel, igual que en `restaurantes` y que en las
+      // fichas de personas (REGLA 7). El negocio ve su saldo, no lo escribe.
+      function camposDelPanel() {
+        return ['creditos'];
+      }
+
+      allow read: if request.auth != null && (
+        request.auth.uid == negocioId || esAdmin()
+      );
+
+      // OJO AL DEFECTO, que aquí SÍ vale y en el create de `restaurantes` NO:
+      //
+      // Allí, `.get('aprobado', false)` era un agujero — un negocio que se
+      // registraba SIN el campo conseguía lo mismo que aprobándose solo, porque
+      // «campo ausente» significaba VISIBLE para el cliente e INVISIBLE en la
+      // bandeja de pendientes. El defecto tapaba un estado peligroso.
+      //
+      // Aquí es al revés: «sin créditos» es que no hay dinero, que es el estado
+      // seguro. Y hace falta ser tolerante porque este documento va a poder nacer
+      // con un solo campo, cuando el teléfono del dueño guarde ahí su token de
+      // avisos.
+      //
+      // OJO, ESO TODAVÍA NO PASA (24-ago-2026): hoy el token se escribe en el
+      // ESCAPARATE — aliados/Notificaciones.js:22 usa la colección 'restaurantes'
+      // — aunque negocioPrivado.js ya lo declare privado. Es deuda de la tanda 2,
+      // que muda a los lectores y a ese escritor. Se anota aquí para que nadie
+      // busque un código que aún no existe: la tolerancia está puesta para lo que
+      // viene, no para lo que hay.
+      //
+      // La regla que se saca de los dos casos: un defecto vale cuando el estado
+      // por defecto es el SEGURO, y es un agujero cuando el estado por defecto
+      // es el que el atacante quería.
+      allow create: if esAdmin() || (
+        request.auth != null &&
+        request.auth.uid == negocioId &&
+        request.resource.data.get('creditos', 0) == 0
+      );
+
+      allow update: if esAdmin() || (
+        request.auth != null &&
+        request.auth.uid == negocioId &&
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny(camposDelPanel())
+      );
+
+      allow delete: if false;
+    }
     // ── REGLA 9 · CADA PEDIDO ES DE SU CLIENTE Y DE SU RESTAURANTE ──────────
     // Hasta el 24-ago-2026 esto decía «allow read: if request.auth != null», o
     // sea: CUALQUIERA con una cuenta podía pedir la lista completa de pedidos.

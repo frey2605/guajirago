@@ -301,3 +301,118 @@ describe('AMARRES · el panel y la app dicen lo mismo', () => {
     );
   });
 });
+
+// ── SEGUNDA LEY · QUÉ ES PRIVADO DE UN NEGOCIO, UNA SOLA LISTA ──────────────
+// «No se pueden usar dos calculadoras para un mismo proceso.»
+//
+// Qué campos son privados lo tienen que saber CUATRO sitios que no pueden
+// compartir un archivo entre ellos: el registro de aliados, el panel de admin,
+// las funciones del servidor y firestore.rules (que ni siquiera es JavaScript).
+//
+// Si esa lista se escribe cuatro veces, tres se quedan viejas. Y el fallo NO
+// avisa: alguien añade un campo nuevo al registro de un negocio, se olvida de
+// una copia, y ese dato acaba en el escaparate que se descarga cualquier
+// cliente. Nadie ve un error — simplemente se publica.
+//
+// Estas pruebas EJECUTAN el archivo bueno y lo carean contra los otros lados.
+
+describe('SEGUNDA LEY · el cuarto privado del negocio, una sola lista', () => {
+  const modulo = () => cargarDeLaApp('guajirago-aliados/src/negocioPrivado.js');
+
+  it('la colección que dice el archivo es la que protegen las reglas', () => {
+    const { COLECCION_PRIVADA } = modulo();
+    const reglas = leer('firestore.rules');
+    assert.ok(reglas.includes('match /' + COLECCION_PRIVADA + '/'),
+      'negocioPrivado.js dice que lo privado vive en «' + COLECCION_PRIVADA + '», pero ' +
+      'firestore.rules no tiene bloque para esa colección. Firestore niega por defecto lo que ' +
+      'no está escrito, así que el registro de un negocio nuevo fallaría ENTERO.');
+  });
+
+  // La lista se compara EXACTA, no con «incluye». Y es a propósito, aunque
+  // obligue a tocar esta prueba cada vez que se añada un campo — precisamente
+  // por eso: es una lista de verificación con acuse de recibo.
+  //
+  // Antes esto usaba includes(), y con eso el archivo negocioPrivado.js le
+  // estaba MINTIENDO al programador nuevo: le dice «añade el campo, corre las
+  // pruebas, y si falta un sitio se pondrá roja». No se ponía. Se podía añadir
+  // 'cuentaBancaria' a la lista, ver todo verde, y publicarla en el escaparate
+  // que se descarga cualquier cliente. Lo cazó la segunda opinión del
+  // 24-ago-2026 plantando ese mutante exacto.
+  it('la lista de campos privados es EXACTAMENTE esta', () => {
+    const { CAMPOS_PRIVADOS } = modulo();
+    // Medidos en el servidor el 24-ago-2026 dentro del documento público.
+    assert.deepStrictEqual([...CAMPOS_PRIVADOS].sort(), [
+      'creditos', 'duenoNombre', 'duenoTelefono', 'email', 'fcmToken',
+    ], [
+      'La lista de campos privados cambió.',
+      '',
+      'Si QUITASTE uno: ese campo vuelve al escaparate y se lo lleva cualquier',
+      'cliente registrado. Casi seguro que es un error.',
+      '',
+      'Si AÑADISTE uno a propósito, esta prueba es tu lista de verificación.',
+      'Antes de añadirlo aquí, comprueba los otros lados:',
+      '  · firestore.rules — ¿hay que congelarlo también?',
+      '  · guajirago-admin — ¿alguna pantalla lo lee del documento público?',
+      '  · guajirago/functions/index.js — ¿lo lee el servidor?',
+      'Cuando estén los cuatro, añádelo aquí y esta prueba vuelve a verde.',
+    ].join('\n'));
+  });
+
+  it('el dinero lo protegen los DOS lados: la lista y las reglas', () => {
+    const { COLECCION_PRIVADA } = modulo();
+    const reglas = leer('firestore.rules');
+    const desde = reglas.split('match /' + COLECCION_PRIVADA + '/')[1];
+    assert.ok(desde, 'no está el bloque de ' + COLECCION_PRIVADA + ' en las reglas');
+    const bloque = desde.split('match /')[0];
+    // Mirar el bloque entero NO vale: la palabra sale tambien en un comentario y
+    // en la comprobacion del create, asi que la prueba pasaba aunque los creditos
+    // se cayeran de la lista congelada. Lo cazo un mutante. Hay que mirar DENTRO
+    // de camposDelPanel(), que es la lista que de verdad los protege.
+    const lista = (bloque.split('camposDelPanel()')[1] || '').split('}')[0];
+    assert.ok(lista.includes("'creditos'"),
+      'Las reglas del cuarto privado ya no congelan «creditos». El negocio podría escribirse ' +
+      'su propio saldo — que es justo lo que la REGLA 7 cerró para las personas.');
+  });
+
+  it('repartir los datos no pierde ni duplica ningún campo', () => {
+    const { soloLoPrivado, sinLoPrivado } = modulo();
+    const datos = {
+      nombre: 'X', duenoNombre: 'Y', duenoTelefono: '1', email: 'a@b',
+      creditos: 0, fcmToken: 't', menu: [], aprobado: false, rol: 'dueno',
+    };
+    const privado = soloLoPrivado(datos);
+    const publico = sinLoPrivado(datos);
+    assert.deepStrictEqual(
+      [...Object.keys(privado), ...Object.keys(publico)].sort(),
+      Object.keys(datos).sort(),
+      'repartir el negocio pierde o duplica campos');
+    Object.keys(privado).forEach((campo) => {
+      assert.ok(!(campo in publico), '«' + campo + '» sale por los dos lados');
+    });
+  });
+
+  it('lo privado NO se queda en el reparto público, campo por campo', () => {
+    const { CAMPOS_PRIVADOS, sinLoPrivado } = modulo();
+    const todos = {};
+    CAMPOS_PRIVADOS.forEach((c) => { todos[c] = 'algo'; });
+    todos.nombre = 'EL NEGOCIO';
+    assert.deepStrictEqual(Object.keys(sinLoPrivado(todos)), ['nombre']);
+  });
+
+  // Se mira el archivo SIN COMENTARIOS y se busca la escritura ENTERA. Con la
+  // cadena suelta, comentar la línea dejaba la prueba verde —el texto seguía en
+  // el archivo— y el negocio nuevo nacía sin cuarto sin que nada avisara. Es la
+  // misma trampa de buscar una palabra que aparece en un comentario, mudada de
+  // firestore.rules a Login.js. La cazó la segunda opinión del 24-ago-2026.
+  it('el registro de aliados ESCRIBE el cuarto usando esa lista, no una copia', () => {
+    const vivo = leer('guajirago-aliados/src/Login.js').replace(/\/\/.*$/gm, '');
+    assert.ok(vivo.includes("from './negocioPrivado'"),
+      'aliados/Login.js dejó de importar negocioPrivado.js: o hizo su propia copia de la ' +
+      'lista, o dejó de escribir el cuarto privado.');
+    assert.ok(vivo.includes('COLECCION_PRIVADA, uid), soloLoPrivado(datos)'),
+      'aliados/Login.js ya no escribe el cuarto privado con la lista compartida. O se ' +
+      'comentó la línea, o se cambió la colección, o alguien repartió los campos a mano. ' +
+      'El negocio nuevo nacería sin cuarto — y la tanda 2, que vacía el escaparate, le ' +
+      'borraría los datos del dueño sin tenerlos guardados en ningún sitio.');
+  });
+});
