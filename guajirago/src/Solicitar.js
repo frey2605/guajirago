@@ -1,13 +1,16 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { db, auth } from './firebase';
 import Logo from './Logo';
-import { collection, addDoc, doc, setDoc, onSnapshot, updateDoc, getDoc, query, orderBy } from 'firebase/firestore';
+// setDoc salió con la extracción del código de seguridad: el único que escribía
+// con él era el cajón privado, y eso ahora lo hace codigoSeguridad.js.
+import { collection, addDoc, doc, onSnapshot, updateDoc, getDoc, query, orderBy } from 'firebase/firestore';
 import Calificacion from './Calificacion';
 import Llamada from './Llamada';
 import { alertarNuevoViaje, precargarAudio, activarAudioiOS, obtenerTokenFCM } from './Notificaciones';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { CONFIG_TARIFAS_DEFECTO, calcularTarifaMinima } from './tarifas';
 import { aplicarDescuento, armarDescuentoInfo, tarifaParaPasajero } from './descuentos';
+import { generarCodigoSeguridad, guardarCodigoDeViaje, cargarCodigoDeViaje } from './codigoSeguridad';
 
 const centroRiohacha = { lat: 11.5444, lng: -72.9072 };
 
@@ -551,9 +554,7 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
 
     // REGLAS 5 y 11 — si la app se cerró y se volvió a abrir con un viaje en curso,
     // el código no está en memoria: se trae del cajón privado del viaje.
-    getDoc(doc(db, 'viajes', viajeId, 'privado', 'seguridad'))
-      .then((s) => { if (s.exists()) setCodigoSeguridad(s.data().codigo || ''); })
-      .catch(() => {});
+    cargarCodigoDeViaje(viajeId).then((c) => { if (c) setCodigoSeguridad(c); });
 
     const unsub = onSnapshot(doc(db, 'viajes', viajeId), (snap) => {
       if (!snap.exists()) return;
@@ -905,7 +906,7 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
       // la pasajera: el mismo en todos sus viajes, para siempre, y a la vista de
       // cualquiera que mirase el mercado. Ahora son cuatro cifras al azar, distintas
       // en cada viaje, y se guardan en el cajón privado del viaje.
-      const codigoSeguridad = String(Math.floor(1000 + Math.random() * 9000));
+      const codigoSeguridad = generarCodigoSeguridad();
       try {
         const snapU = await getDoc(doc(db, 'usuarios', user.uid));
         if (snapU.exists()) nombrePasajero = snapU.data().nombre || '';
@@ -933,7 +934,7 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
       setViajeId(docRef.id);
       // El código, al cajón privado del viaje: ahí solo lo ve ella.
       setCodigoSeguridad(codigoSeguridad);
-      setDoc(doc(db, 'viajes', docRef.id, 'privado', 'seguridad'), { codigo: codigoSeguridad }).catch(() => {});
+      guardarCodigoDeViaje(docRef.id, codigoSeguridad);
       // Token del pasajero SIN bloquear la creación del viaje (el permiso de notificación puede tardar).
       obtenerTokenFCM().then((t) => { if (t) updateDoc(doc(db, 'viajes', docRef.id), { pasajeroFcmToken: t }).catch(() => {}); }).catch(() => {});
       setContraofertas([]);
