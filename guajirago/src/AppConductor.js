@@ -4,6 +4,7 @@ import { collection, query, where, limit, onSnapshot, doc, updateDoc, setDoc, ge
 import { registrarTokenFCM, alertarNuevoViaje, activarAudioiOS, precargarAudio, setDebugCallback } from './Notificaciones';
 import { signOut } from 'firebase/auth';
 import { getFunctions, httpsCallable } from 'firebase/functions';
+import { COMISIONES_DEFECTO, comisionSegunTipo } from './comisiones';
 import Calificacion from './Calificacion';
 import Llamada from './Llamada';
 import Creditos from './Creditos';
@@ -25,9 +26,8 @@ const CONFIG_APP_DEFECTO = {
   horaInicioNoche: 18,
   horaFinNoche: 6,
   incrementoTarifa: 1000,
-  comisionMototaxi: 300,
-  comisionTaxi: 800,
-  comisionDomicilio: 1000,
+  // Las comisiones salen de comisiones.js: una sola calculadora para toda la app.
+  ...COMISIONES_DEFECTO,
   tiempoEsperaConductor: 240,
 };
 
@@ -37,12 +37,8 @@ function calcularTarifaMinima(cfg = CONFIG_APP_DEFECTO) {
 }
 const TARIFA_MINIMA = calcularTarifaMinima();
 
-// Devuelve la comisión según el tipo de vehículo, usando la config recibida
-function comisionSegunTipo(tipoVehiculo, cfg = CONFIG_APP_DEFECTO, tipoViaje) {
-  // Un mandado (Mensajería) cobra la comisión de domicilio, aunque lo haga un mototaxista
-  if (tipoViaje === 'Mensajería') return cfg.comisionDomicilio ?? 1000;
-  return tipoVehiculo === 'Mototaxi' ? cfg.comisionMototaxi : cfg.comisionTaxi;
-}
+// La comisión ya NO se calcula aquí: vive en comisiones.js, que es el único sitio
+// donde se calcula para toda la app (SEGUNDA LEY). Se importa arriba.
 // Calcula la distancia en kilómetros entre dos puntos del mapa (fórmula Haversine)
 function calcularDistanciaKm(lat1, lng1, lat2, lng2) {
   const R = 6371; // radio de la Tierra en km

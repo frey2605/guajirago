@@ -2,9 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { db, auth } from './firebase';
 import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
 import Logo from './Logo';
-
-const COMISION_DEFECTO_MOTO = 300;
-const COMISION_DEFECTO_TAXI = 800;
+import { COMISIONES_DEFECTO, comisionDeViaje } from './comisiones';
 
 function Ganancias({ onVolver }) {
   const [cargando, setCargando] = useState(true);
@@ -18,15 +16,12 @@ function Ganancias({ onVolver }) {
         const user = auth.currentUser;
         if (!user) { setCargando(false); return; }
 
-        // Leer las comisiones vigentes desde la configuración global
-        let comMoto = COMISION_DEFECTO_MOTO;
-        let comTaxi = COMISION_DEFECTO_TAXI;
+        // Las comisiones vigentes, por si algún viaje es tan viejo que no guarda
+        // lo que se le cobró. La fuente buena es config/global.
+        let cfgComisiones = COMISIONES_DEFECTO;
         try {
           const snapCfg = await getDoc(doc(db, 'config', 'global'));
-          if (snapCfg.exists()) {
-            comMoto = snapCfg.data().comisionMototaxi ?? comMoto;
-            comTaxi = snapCfg.data().comisionTaxi ?? comTaxi;
-          }
+          if (snapCfg.exists()) cfgComisiones = { ...COMISIONES_DEFECTO, ...snapCfg.data() };
         } catch (eCfg) {}
 
         const q = query(collection(db, 'viajes'),
@@ -42,8 +37,11 @@ function Ganancias({ onVolver }) {
         inicioSemana.setDate(inicioHoy.getDate() - inicioHoy.getDay());
         const inicioMes = new Date(ahora.getFullYear(), ahora.getMonth(), 1);
 
-        // La comisión depende del tipo de cada viaje (mototaxi o taxi)
-        const comisionDe = (v) => (v.tipo === 'Mototaxi' ? comMoto : comTaxi);
+        // SEGUNDA LEY — una sola calculadora, la de comisiones.js. Manda lo que el
+        // viaje GUARDA que se le cobró; solo si no lo trae se calcula. Antes esta
+        // pantalla tenía su propia cuenta y NO conocía la mensajería: le cobraba
+        // comisión de taxi a los mandados, $200 de menos en cada uno.
+        const comisionDe = (v) => comisionDeViaje(v, cfgComisiones);
 
         const calcular = (lista) => {
           const total = lista.reduce((acc, v) => acc + (v.tarifaValor || 0), 0);
