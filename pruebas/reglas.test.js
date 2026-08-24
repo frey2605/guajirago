@@ -172,10 +172,13 @@ describe('REGLA 12 · lo que la app hace hoy sigue funcionando', () => {
     );
   });
 
+  // Corregida el 23-ago-2026 (REGLA 2): decía contraofertas/conductor2 firmado por
+  // conductor1. Eso NO es lo que hace la app — AppConductor.js:353 firma con el uid
+  // del propio conductor. La prueba estaba dando por buena la puerta del ataque.
   it('un conductor sigue pudiendo ofertar en un viaje', async () => {
     const { doc, setDoc } = FS;
     await RUT.assertSucceeds(
-      setDoc(doc(como('conductor1'), 'viajes/viaje1/contraofertas/conductor2'), { monto: 10500 })
+      setDoc(doc(como('conductor1'), 'viajes/viaje1/contraofertas/conductor1'), { monto: 10500 })
     );
   });
 
@@ -469,5 +472,66 @@ describe('REGLA 1 · el correo se pone una vez y no se mueve', () => {
       setDoc(doc(como('recien5'), 'usuarios/recien5'),
         { nombre: 'Ana', email: 'ana@ejemplo.com', rol: 'superadmin' })
     );
+  });
+});
+
+// ── REGLA 2 · LA OFERTA LA FIRMA SU CONDUCTOR ───────────────────────────────
+// Sin esto, cerrar confirmarConductor no basta: el atacante crea SU viaje, escribe
+// una oferta a nombre de un conductor cualquiera, confirma su propio viaje y el
+// servidor le descuenta la comisión a un conductor que nunca ofertó.
+// El viaje sembrado 'viaje1' es de 'pasajero1'.
+describe('REGLA 2 · la oferta la firma su conductor', () => {
+  it('un conductor SÍ puede dejar su propia oferta (AppConductor.js:353)', async () => {
+    const { doc, setDoc } = FS;
+    await RUT.assertSucceeds(
+      setDoc(doc(como('conductor2'), 'viajes/viaje1/contraofertas/conductor2'),
+        { monto: 10500, conductorNombre: 'Luis' })
+    );
+  });
+
+  it('NO puede firmar una oferta a nombre de OTRO conductor', async () => {
+    const { doc, setDoc } = FS;
+    await RUT.assertFails(
+      setDoc(doc(como('ladron2'), 'viajes/viaje1/contraofertas/conductor2'),
+        { monto: 10500, conductorNombre: 'Luis' })
+    );
+  });
+
+  it('el pasajero del viaje TAMPOCO puede inventar ofertas de conductores', async () => {
+    const { doc, setDoc } = FS;
+    await RUT.assertFails(
+      setDoc(doc(como('pasajero1'), 'viajes/viaje1/contraofertas/conductor2'), { monto: 1 })
+    );
+  });
+
+  it('el dueño del viaje SÍ puede descartar una oferta (Solicitar.js:1050)', async () => {
+    const { doc, updateDoc } = FS;
+    await RUT.assertSucceeds(
+      updateDoc(doc(como('pasajero1'), 'viajes/viaje1/contraofertas/conductor1'), { vigente: false })
+    );
+  });
+
+  it('el conductor SÍ puede retirar su propia oferta (AppConductor.js:635)', async () => {
+    const { doc, updateDoc } = FS;
+    await RUT.assertSucceeds(
+      updateDoc(doc(como('conductor1'), 'viajes/viaje1/contraofertas/conductor1'), { vigente: false })
+    );
+  });
+
+  it('un tercero NO puede tocar la oferta de nadie', async () => {
+    const { doc, updateDoc } = FS;
+    await RUT.assertFails(
+      updateDoc(doc(como('castigado'), 'viajes/viaje1/contraofertas/conductor1'), { monto: 99999 })
+    );
+  });
+
+  it('el pasajero sigue viendo las ofertas que le llegan (Solicitar.js:676)', async () => {
+    const { doc, getDoc } = FS;
+    await RUT.assertSucceeds(getDoc(doc(como('pasajero1'), 'viajes/viaje1/contraofertas/conductor1')));
+  });
+
+  it('el conductor sigue viendo la suya', async () => {
+    const { doc, getDoc } = FS;
+    await RUT.assertSucceeds(getDoc(doc(como('conductor1'), 'viajes/viaje1/contraofertas/conductor1')));
   });
 });

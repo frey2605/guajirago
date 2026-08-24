@@ -225,6 +225,11 @@ exports.notificarClienteReserva = onDocumentUpdated("reservasTurismo/{id}", asyn
 exports.confirmarConductor = onCall(async (request) => {
   const { viajeId, conductorId } = request.data || {};
   if (!viajeId || !conductorId) throw new HttpsError("invalid-argument", "Faltan datos");
+  // REGLA 2 — esta función COBRA la comisión al conductor. Hasta el 23-ago-2026 no
+  // preguntaba quién llamaba: cualquiera, incluso sin cuenta, podía confirmar el
+  // viaje de otro y descontarle $800 a un conductor. Medido: 7 conductores con
+  // $291.700 en créditos; el mayor, $74.800 = 93 llamadas para vaciarlo.
+  if (!request.auth) throw new HttpsError("unauthenticated", "Hay que iniciar sesión");
   const db = admin.firestore();
   const viajeRef = db.collection("viajes").doc(viajeId);
   const condRef = db.collection("conductores").doc(conductorId);
@@ -238,6 +243,13 @@ exports.confirmarConductor = onCall(async (request) => {
       ]);
       if (!viajeSnap.exists) return { ok: false, motivo: "viaje_no_existe" };
       const viaje = viajeSnap.data();
+      // Solo el DUEÑO del viaje confirma. Va dentro de la transacción a propósito:
+      // fuera, alguien podría cambiar el pasajeroId entre la lectura y el cobro.
+      // Medido el 23-ago-2026: los 91 viajes de la base tienen pasajeroId. Ni una
+      // excepción, así que esto no deja a nadie fuera.
+      if (viaje.pasajeroId !== request.auth.uid) {
+        throw new HttpsError("permission-denied", "Este viaje no es tuyo");
+      }
       if (viaje.estado !== "esperando") return { ok: false, motivo: "viaje_no_disponible" };
       const cond = condSnap.exists ? condSnap.data() : {};
       if (cond.enViajeId && cond.enViajeId !== viajeId) return { ok: false, motivo: "ocupado" };
@@ -269,6 +281,9 @@ exports.confirmarConductor = onCall(async (request) => {
       return { ok: true };
     });
   } catch (e) {
+    // Un rechazo de seguridad se devuelve tal cual. Si se disfraza de "internal",
+    // el registro miente y nadie se entera de que alguien intentó colarse.
+    if (e instanceof HttpsError) throw e;
     console.error("Error confirmarConductor:", e.message);
     throw new HttpsError("internal", "No se pudo confirmar el conductor");
   }
@@ -362,21 +377,14 @@ exports.expirarViajesColgados = onSchedule(
   }
 );
 
-// Pasajero sube su tarifa mientras espera
-exports.subirTarifa = onCall(async (request) => {
-  const { viajeId, nuevaTarifa } = request.data;
-  if (!viajeId || !nuevaTarifa) throw new Error("Faltan datos");
-
-  await admin.firestore().collection("viajes").doc(viajeId).update({
-    tarifa: "$" + nuevaTarifa.toLocaleString(),
-    tarifaValor: nuevaTarifa,
-    nuevaOferta: new Date().toISOString(),
-    estado: "esperando",
-  });
-
-  console.log("Tarifa subida a:", nuevaTarifa, "en viaje:", viajeId);
-  return { ok: true };
-});
+// REGLA 2 — subirTarifa RETIRADA el 23-ago-2026.
+// Estaba desplegada y no preguntaba quién llamaba: permitía reescribir el precio de
+// CUALQUIER viaje al valor que fuera y devolverlo a "esperando". Medido: ninguna de
+// las tres apps la llamaba. El botón "+" de subir tarifa que ve el pasajero es una
+// función LOCAL de la pantalla (Solicitar.js:876 y SolicitarMensajeria.js:881), que
+// escribe el viaje directamente — nunca pasó por aquí.
+// No se le pone candado a una puerta que no lleva a ningún sitio: se quita la puerta.
+// Su código queda en el historial de git (commit 9404aba y anteriores) por si vuelve.
 
 // ─────────────────────────────────────────────────────────────────────────────
 // LIMPIEZA AUTOMÁTICA — control de crecimiento SIN tocar datos con valor.

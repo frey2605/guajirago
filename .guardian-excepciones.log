@@ -1,0 +1,10 @@
+2026-08-23 REGLA 2 — tres archivos fuera de la foto, con permiso EXPRESO del dueno ("Dale a las 3"):
+  1. pruebas/reglas.test.js:178 (bloque REGLA 12) — la prueba daba por BUENA la puerta que se
+     cierra: conductor1 firmando una oferta como conductor2. Se corrige a conductor1, que es lo
+     que hace la app (AppConductor.js:353). Sin esto la suite queda en rojo.
+  2. firebase.json — anadir la seccion "functions" y el puerto del emulador de funciones. Sin
+     esto el banco de pruebas no puede encender la funcion y confirmarConductor iria al
+     servidor probado solo de vista. Es la funcion que mueve la plata.
+  3. pruebas/funciones.test.js — archivo NUEVO. Prueba que EJECUTA confirmarConductor contra el
+     emulador: dueno del viaje / extrano / sin sesion.
+2026-08-24T00:28:12.659Z	firebase.json	NEGADO: fuera de la promesa "REGLA 2: confirmarConductor exige sesion y que quien llama sea el dueno del viaje; la oferta la firma su conductor; se retira subirTarifa"

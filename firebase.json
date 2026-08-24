@@ -16,8 +16,12 @@
   "firestore": {
     "rules": "firestore.rules"
   },
+  "functions": {
+    "source": "guajirago/functions"
+  },
   "emulators": {
     "firestore": { "port": 8085 },
+    "functions": { "port": 5001 },
     "ui": { "enabled": false }
   }
 }
