@@ -46,7 +46,21 @@ service cloud.firestore {
         return ['email'];
       }
 
-      allow read: if request.auth != null;
+      // ── REGLA 6 · LA FICHA DE UNA PERSONA ES SUYA ────────────────────────────
+      // Hasta el 23-ago-2026 cualquier usuario registrado leía TODAS las fichas.
+      // Medido ese día: 10 fichas — 8 con teléfono, 8 con fecha de nacimiento,
+      // 7 con FOTO DE LA CÉDULA y 8 con el contacto de emergencia.
+      //
+      // Lo que tenía atascado este candado: el registro pedía la LISTA entera para
+      // ver si el celular estaba repetido (Login.js:106). Esa pregunta se mudó al
+      // servidor (functions: celularDisponible), que contesta sí o no sin enseñar
+      // nada. Comprobado: era la ÚNICA consulta de lista de las tres apps.
+      //
+      // 'get' = pedir UNA ficha. Cada quien la suya (App.js:237, MiPerfil.js:29,
+      // Creditos.js:32, y las demás: todas usan user.uid).
+      // 'list' = pedir el montón. Solo el panel.
+      allow get: if request.auth != null && (request.auth.uid == userId || esAdmin());
+      allow list: if esAdmin();
 
       // Caso 1 — el dueño escribe su propia ficha, menos los campos de poder.
       // Va primero a propósito: no gasta la lectura que cuesta el get() de abajo.

@@ -377,6 +377,30 @@ exports.expirarViajesColgados = onSchedule(
   }
 );
 
+// ─────────────────────────────────────────────────────────────────────────────
+// REGLA 6 — ¿ESTE CELULAR YA ESTÁ REGISTRADO?
+//
+// El registro comprueba que el celular no esté repetido, para proteger el crédito
+// de bienvenida (Login.js). Antes lo hacía pidiendo la LISTA de fichas desde el
+// celular, y por eso la lista tenía que estar abierta a cualquiera: ahí se veían
+// los teléfonos, las fechas de nacimiento y las fotos de cédula de todo el mundo.
+//
+// Ahora la pregunta se hace aquí. El servidor mira la lista y devuelve UN SÍ O UN
+// NO. Nunca devuelve de quién es el celular, ni ningún otro dato: quien pregunta
+// solo se entera de lo que ya sabía — el número que él mismo escribió.
+exports.celularDisponible = onCall(async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Hay que iniciar sesión");
+  const celular = String((request.data || {}).celular || "").trim();
+  if (!celular) throw new HttpsError("invalid-argument", "Falta el celular");
+
+  const snap = await admin.firestore()
+    .collection("usuarios").where("celular", "==", celular).limit(2).get();
+
+  // Su propia ficha no cuenta: si vuelve a intentarlo, no se bloquea a sí mismo.
+  const deOtro = snap.docs.some((d) => d.id !== request.auth.uid);
+  return { disponible: !deOtro };
+});
+
 // REGLA 2 — subirTarifa RETIRADA el 23-ago-2026.
 // Estaba desplegada y no preguntaba quién llamaba: permitía reescribir el precio de
 // CUALQUIER viaje al valor que fuera y devolverlo a "esperando". Medido: ninguna de

@@ -61,6 +61,17 @@ function carnet(uid) {
   return b64(cabecera) + '.' + b64(cuerpo) + '.';
 }
 
+/** Llama a CUALQUIER funcion del emulador. Si uid es null, llama SIN sesion. */
+async function llamarA(nombre, uid, datos) {
+  const cabeceras = { 'Content-Type': 'application/json' };
+  if (uid) cabeceras.Authorization = 'Bearer ' + carnet(uid);
+  const r = await fetch('http://127.0.0.1:5001/' + PROYECTO + '/us-central1/' + nombre,
+    { method: 'POST', headers: cabeceras, body: JSON.stringify({ data: datos }) });
+  let cuerpo = null;
+  try { cuerpo = await r.json(); } catch (e) { cuerpo = null; }
+  return { http: r.status, cuerpo };
+}
+
 /** Llama a confirmarConductor. Si uid es null, llama SIN sesion. */
 async function llamar(uid, datos) {
   const cabeceras = { 'Content-Type': 'application/json' };
@@ -132,6 +143,49 @@ describe('REGLA 2 · confirmarConductor pregunta quien llama', () => {
     for (let i = 0; i < 5; i++) await llamar('unExtrano', { viajeId: 'v1', conductorId: 'cond1' });
     assert.strictEqual(await saldoDe('cond1'), SALDO_INICIAL,
       'cinco intentos seguidos y el saldo sigue intacto');
+  });
+
+  // ── REGLA 6 · la pregunta del celular repetido, ahora en el servidor ──
+  // Antes el registro pedia la LISTA de fichas desde el celular, y por eso la lista
+  // tenia que estar abierta a cualquiera. Ahora pregunta aqui y solo recibe si o no.
+  test('SIN sesion no se puede ni preguntar', async () => {
+    const r = await llamarA('celularDisponible', null, { celular: '3001112233' });
+    assert.strictEqual(r.cuerpo && r.cuerpo.error && r.cuerpo.error.status, 'UNAUTHENTICATED');
+  });
+
+  test('un celular libre: dice que SI se puede', async () => {
+    const r = await llamarA('celularDisponible', 'alguien', { celular: '3009999999' });
+    assert.strictEqual(r.http, 200, JSON.stringify(r.cuerpo));
+    assert.strictEqual(r.cuerpo.result.disponible, true);
+  });
+
+  test('un celular que YA es de otro: dice que NO', async () => {
+    await sembrar('usuarios/yaRegistrado', { celular: txt('3001112233'), nombre: txt('Ana') });
+    const r = await llamarA('celularDisponible', 'alguien', { celular: '3001112233' });
+    assert.strictEqual(r.http, 200, JSON.stringify(r.cuerpo));
+    assert.strictEqual(r.cuerpo.result.disponible, false);
+  });
+
+  // Numero propio y distinto: las pruebas de arriba siembran fichas y esta base no
+  // se limpia entre pruebas, asi que reusar el mismo numero las mezclaria.
+  test('su PROPIO celular no lo bloquea a el mismo', async () => {
+    await sembrar('usuarios/yoMismo', { celular: txt('3007778888'), nombre: txt('Ana') });
+    const r = await llamarA('celularDisponible', 'yoMismo', { celular: '3007778888' });
+    assert.strictEqual(r.http, 200, JSON.stringify(r.cuerpo));
+    assert.strictEqual(r.cuerpo.result.disponible, true,
+      'si su propia ficha lo bloqueara, nadie podria reintentar su registro');
+  });
+
+  test('la respuesta NO trae datos de nadie: solo si o no', async () => {
+    await sembrar('usuarios/yaRegistrado', { celular: txt('3001112233'), nombre: txt('Ana'),
+      fotoCedula: txt('https://x/cedula.jpg'), fechaNacimiento: txt('12/04/1995') });
+    const r = await llamarA('celularDisponible', 'alguien', { celular: '3001112233' });
+    assert.deepStrictEqual(Object.keys(r.cuerpo.result), ['disponible'],
+      'no puede devolver nada mas que la respuesta');
+    const texto = JSON.stringify(r.cuerpo);
+    for (const dato of ['Ana', 'cedula', '1995', 'yaRegistrado']) {
+      assert.ok(!texto.includes(dato), 'se filtro un dato: ' + dato);
+    }
   });
 
   test('subirTarifa ya no existe en el servidor', async () => {

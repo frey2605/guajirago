@@ -1,7 +1,10 @@
 import React, { useState } from 'react';
 import { auth, db } from './firebase';
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, sendEmailVerification } from 'firebase/auth';
-import { doc, setDoc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
+// collection/query/where/getDocs salieron con la REGLA 6: la unica consulta de
+// LISTA que hacia esta pantalla se mudo al servidor (functions: celularDisponible).
+import { doc, setDoc, getDoc } from 'firebase/firestore';
+import { getFunctions, httpsCallable } from 'firebase/functions';
 import TerminosCondiciones from './TerminosCondiciones';
 import PoliticaPrivacidad from './PoliticaPrivacidad';
 import Logo from './Logo';
@@ -102,9 +105,14 @@ function Login({ onEntrar }) {
       const cuentaCreada = await createUserWithEmailAndPassword(auth, email.trim().toLowerCase(), password);
 
       // Verificar que el celular no esté ya usado por otra cuenta (protege el beneficio de bienvenida)
+      // REGLA 6 — antes esto pedía la LISTA de fichas desde el celular, y por eso la
+      // lista tenía que estar abierta a cualquiera: ahí quedaban a la vista los
+      // teléfonos, las fechas de nacimiento y las fotos de cédula de todo el mundo.
+      // Ahora lo pregunta el servidor y contesta solo sí o no (functions: celularDisponible).
       const celularLimpio = celular.trim();
-      const snapCelular = await getDocs(query(collection(db, 'usuarios'), where('celular', '==', celularLimpio)));
-      if (!snapCelular.empty) {
+      const preguntar = httpsCallable(getFunctions(), 'celularDisponible');
+      const respuesta = await preguntar({ celular: celularLimpio });
+      if (!(respuesta && respuesta.data && respuesta.data.disponible)) {
         try { await cuentaCreada.user.delete(); } catch (eDel) {}
         try { await auth.signOut(); } catch (eSignOut) {}
         setError('Ese número de celular ya está registrado en otra cuenta');

@@ -571,6 +571,39 @@ describe('REGLA 6 · cada quien ve lo suyo', () => {
     await RUT.assertSucceeds(getDocs(collection(como('eladmin'), 'codigos')));
   });
 
+  // ── las fichas de personas ──
+  it('cada quien SIGUE leyendo su propia ficha (MiPerfil.js:29)', async () => {
+    const { doc, getDoc } = FS;
+    await RUT.assertSucceeds(getDoc(doc(como('pasajero1'), 'usuarios/pasajero1')));
+  });
+
+  it('NO puede leer la ficha de OTRA persona', async () => {
+    const { doc, getDoc } = FS;
+    await RUT.assertFails(getDoc(doc(como('pasajero1'), 'usuarios/conductor1')));
+  });
+
+  it('NO puede pedir la LISTA de fichas — ahí estaban las 7 fotos de cédula', async () => {
+    const { collection, getDocs } = FS;
+    await RUT.assertFails(getDocs(collection(como('pasajero1'), 'usuarios')));
+  });
+
+  it('ni buscando por celular, que era el agujero (Login.js:106)', async () => {
+    const { collection, query, where, getDocs } = FS;
+    await RUT.assertFails(getDocs(query(
+      collection(como('pasajero1'), 'usuarios'), where('celular', '==', '3001234567')
+    )));
+  });
+
+  it('el panel SÍ puede leer cualquier ficha (Codigos.js:139)', async () => {
+    const { doc, getDoc } = FS;
+    await RUT.assertSucceeds(getDoc(doc(como('eladmin'), 'usuarios/pasajero1')));
+  });
+
+  it('el panel SÍ puede pedir la lista de fichas (App.js:437)', async () => {
+    const { collection, getDocs } = FS;
+    await RUT.assertSucceeds(getDocs(collection(como('eljefe'), 'usuarios')));
+  });
+
   // ── los viajes ──
   it('el pasajero sigue viendo SU viaje (Solicitar.js:542)', async () => {
     const { doc, getDoc } = FS;
