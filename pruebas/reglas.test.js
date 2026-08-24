@@ -375,3 +375,99 @@ describe('REGLA 1 · lo que la app hace hoy NO se rompe', () => {
     );
   });
 });
+
+// ── EL CORREO SE PONE UNA VEZ Y NO SE MUEVE ─────────────────────────────────
+// Por qué importa: el panel busca POR CORREO a quién dar poder (Superadmin.js:581)
+// o créditos (Superadmin.js:302) y se queda con el PRIMER resultado sin avisar de
+// duplicados. Quien se copiara en su ficha el correo de un jefe podía quedarse con
+// el ascenso ajeno. Medido el 23-ago-2026: 3 fichas ya comparten correo.
+//
+// Estas pruebas no tocan los personajes sembrados: se registran las suyas.
+describe('REGLA 1 · el correo se pone una vez y no se mueve', () => {
+  it('registrarse CON correo funciona — es la única vez que se escribe (Login.js:146)', async () => {
+    const { doc, setDoc } = FS;
+    await RUT.assertSucceeds(
+      setDoc(doc(como('recien1'), 'usuarios/recien1'), {
+        nombre: 'Ana', email: 'ana@ejemplo.com', celular: '3001234567',
+      })
+    );
+  });
+
+  it('ya registrado, NO puede cambiarse el correo desde el celular', async () => {
+    const { doc, setDoc, updateDoc } = FS;
+    await RUT.assertSucceeds(
+      setDoc(doc(como('recien2'), 'usuarios/recien2'), { nombre: 'Ana', email: 'ana@ejemplo.com' })
+    );
+    await RUT.assertFails(
+      updateDoc(doc(como('recien2'), 'usuarios/recien2'), { email: 'otro@ejemplo.com' })
+    );
+  });
+
+  it('NO puede copiarse el correo de un jefe para robarle el ascenso', async () => {
+    const { doc, setDoc, updateDoc } = FS;
+    await RUT.assertSucceeds(
+      setDoc(doc(como('ladron'), 'usuarios/ladron'), { nombre: 'Pedro', email: 'pedro@ejemplo.com' })
+    );
+    await RUT.assertFails(
+      updateDoc(doc(como('ladron'), 'usuarios/ladron'), { email: 'jefe@guajirago.com' })
+    );
+  });
+
+  it('NO puede AÑADIR un correo a una ficha que no lo tenía', async () => {
+    const { doc, updateDoc } = FS;
+    await RUT.assertFails(
+      updateDoc(doc(como('pasajero1'), 'usuarios/pasajero1'), { email: 'jefe@guajirago.com' })
+    );
+  });
+
+  it('NO puede cambiarle el correo a OTRA persona', async () => {
+    const { doc, updateDoc } = FS;
+    await RUT.assertFails(
+      updateDoc(doc(como('pasajero1'), 'usuarios/conductor1'), { email: 'robado@ejemplo.com' })
+    );
+  });
+
+  it('el superadmin SÍ puede cambiarle el correo a alguien (lo que pidió el dueño)', async () => {
+    const { doc, updateDoc } = FS;
+    await RUT.assertSucceeds(
+      updateDoc(doc(como('eljefe'), 'usuarios/pasajero1'), { email: 'nuevo@ejemplo.com' })
+    );
+  });
+
+  it('el admin SÍ puede corregir un correo mal escrito', async () => {
+    const { doc, updateDoc } = FS;
+    await RUT.assertSucceeds(
+      updateDoc(doc(como('eladmin'), 'usuarios/conductor1'), { email: 'luis@ejemplo.com' })
+    );
+  });
+
+  it('con correo puesto, guardar el perfil SIGUE funcionando (MiPerfil.js:86)', async () => {
+    const { doc, setDoc } = FS;
+    await RUT.assertSucceeds(
+      setDoc(doc(como('recien3'), 'usuarios/recien3'), { nombre: 'Ana', email: 'ana@ejemplo.com' })
+    );
+    await RUT.assertSucceeds(
+      setDoc(doc(como('recien3'), 'usuarios/recien3'),
+        { nombre: 'Ana María', telefono: '3009998877' }, { merge: true })
+    );
+  });
+
+  it('reenviar el MISMO correo sin cambiarlo no molesta a nadie', async () => {
+    const { doc, setDoc } = FS;
+    await RUT.assertSucceeds(
+      setDoc(doc(como('recien4'), 'usuarios/recien4'), { nombre: 'Ana', email: 'ana@ejemplo.com' })
+    );
+    await RUT.assertSucceeds(
+      setDoc(doc(como('recien4'), 'usuarios/recien4'),
+        { nombre: 'Ana', email: 'ana@ejemplo.com', telefono: '3001112233' }, { merge: true })
+    );
+  });
+
+  it('y el rol sigue cerrado: no se cuela poder junto con el correo', async () => {
+    const { doc, setDoc } = FS;
+    await RUT.assertFails(
+      setDoc(doc(como('recien5'), 'usuarios/recien5'),
+        { nombre: 'Ana', email: 'ana@ejemplo.com', rol: 'superadmin' })
+    );
+  });
+});

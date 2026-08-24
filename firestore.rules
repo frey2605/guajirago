@@ -16,6 +16,24 @@ service cloud.firestore {
         return ['rol', 'activo', 'sanciones', 'sancionHasta'];
       }
 
+      // ── EL CORREO SE PONE UNA VEZ Y NO SE MUEVE ─────────────────────────────
+      // El correo de la ficha se escribe al registrarse (Login.js:146) y nunca más.
+      // Medido el 23-ago-2026: NINGUNA pantalla de las tres apps lo cambia después
+      // (MiPerfil solo nombre/teléfono/foto, Configuración solo sonido y avisos,
+      // Seguridad solo el contacto de confianza, el alta de conductor no lo toca).
+      //
+      // Se congela porque el panel busca POR CORREO a quién dar poder o créditos y
+      // se queda con el primer resultado sin avisar de duplicados (Superadmin.js:581
+      // y :302). Quien se copiara en su ficha el correo de un jefe podía quedarse
+      // con el ascenso ajeno. Medido: 3 fichas ya comparten correo — de pruebas, sin
+      // rol, pero la puerta funcionaba.
+      //
+      // Va en lista APARTE de camposDePoder porque en el CREATE sí hay que dejarlo
+      // escribir: si no, nadie puede volver a registrarse.
+      function camposCongelados() {
+        return ['email'];
+      }
+
       allow read: if request.auth != null;
 
       // Caso 1 — el dueño escribe su propia ficha, menos los campos de poder.
@@ -25,7 +43,8 @@ service cloud.firestore {
         && !request.resource.data.keys().hasAny(camposDePoder());
       allow update: if request.auth != null
         && request.auth.uid == userId
-        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(camposDePoder());
+        && !request.resource.data.diff(resource.data).affectedKeys()
+             .hasAny(camposDePoder().concat(camposCongelados()));
 
       // Caso 2 — un admin o superadmin sí puede tocarlo todo, en cualquier ficha.
       // Es la única vía para dar un rol (Superadmin.js:599) o sancionar
