@@ -9,6 +9,7 @@ import { CONFIG_TARIFAS_DEFECTO, calcularTarifaMinima } from './tarifas';
 import { ESTADOS_MERCADO } from './estadosViaje';
 // Los datos que comparten las pantallas salen de archivos únicos (SEGUNDA LEY).
 import { centroRiohacha } from './riohacha';
+import { calcularDistanciaKm } from './distancia';
 import { RAZONES_CANCELACION_CONDUCTOR } from './textosViaje';
 import Calificacion from './Calificacion';
 import Llamada from './Llamada';
@@ -53,16 +54,8 @@ const TARIFA_MINIMA = calcularTarifaMinima(undefined, CONFIG_APP_DEFECTO);
 
 // La comisión ya NO se calcula aquí: vive en comisiones.js, que es el único sitio
 // donde se calcula para toda la app (SEGUNDA LEY). Se importa arriba.
-// Calcula la distancia en kilómetros entre dos puntos del mapa (fórmula Haversine)
-function calcularDistanciaKm(lat1, lng1, lat2, lng2) {
-  const R = 6371; // radio de la Tierra en km
-  const dLat = (lat2 - lat1) * Math.PI / 180;
-  const dLng = (lng2 - lng1) * Math.PI / 180;
-  const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-    Math.sin(dLng / 2) * Math.sin(dLng / 2);
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
+// La distancia tampoco: vive en distancia.js, amarrada por prueba a la copia
+// del servidor (que no puede importar archivos de la app). Se importa arriba.
 
 // Las razones de cancelación viven en textosViaje.js (SEGUNDA LEY). Se importan arriba.
 
