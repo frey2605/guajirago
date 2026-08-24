@@ -1375,3 +1375,289 @@ describe('REGLA 9 · la ficha de empleado ya no se la escribe cualquiera', () =>
     await RUT.assertSucceeds(getDocs(collection(como('eljefe'), 'empleados')));
   });
 });
+
+// ───────────────────────────────────────────────────────────────────────────
+// REGLA 9 (C) · UN NEGOCIO NO SE APRUEBA A SÍ MISMO
+// ───────────────────────────────────────────────────────────────────────────
+// El alta está bien: nace con `aprobado: false`. El agujero era lo de después —
+// la regla dejaba al negocio escribir cualquier campo del suyo, así que se
+// aprobaba solo con una escritura y salía en la app del cliente. Y encima
+// desaparecía de la bandeja de pendientes del dueño, que solo enseña los que
+// tienen `aprobado === false`: se colaba sin que nadie lo viera pasar.
+//
+// En el mismo documento vive `creditos`, que es dinero y que el panel enseña.
+// También se lo escribía el propio negocio.
+
+describe('REGLA 9 · un negocio no se aprueba a sí mismo', () => {
+  const sembrarNegocios = async () => {
+    await entorno.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      const { doc, setDoc } = FS;
+      await setDoc(doc(db, 'restaurantes/r1'), {
+        nombre: 'DONDE MECHE', duenoNombre: 'MECHE', duenoTelefono: '+573001112233',
+        email: 'meche@ejemplo.com', rol: 'dueno', activo: true,
+        aprobado: false, estadoAprobacion: 'pendiente', creditos: 0,
+        menu: [], abierto: true, perfilCompleto: true,
+      });
+      await setDoc(doc(db, 'restaurantes/r2'), {
+        nombre: 'EL OTRO', rol: 'dueno', activo: true,
+        aprobado: true, estadoAprobacion: 'aprobado', creditos: 50000, menu: [],
+      });
+    });
+  };
+
+  // ── EL ATAQUE ────────────────────────────────────────────────────────────
+  it('EL ATAQUE · el negocio NO puede ponerse aprobado él solo', async () => {
+    await sembrarNegocios();
+    const { doc, updateDoc } = FS;
+    await RUT.assertFails(updateDoc(doc(como('r1'), 'restaurantes/r1'), { aprobado: true }));
+  });
+
+  it('EL ATAQUE · ni colándolo de paso junto a un cambio legítimo', async () => {
+    await sembrarNegocios();
+    const { doc, updateDoc } = FS;
+    await RUT.assertFails(updateDoc(doc(como('r1'), 'restaurantes/r1'), {
+      nombre: 'DONDE MECHE 2', aprobado: true,
+    }));
+  });
+
+  it('EL ATAQUE · ni por la puerta de al lado, cambiando estadoAprobacion', async () => {
+    await sembrarNegocios();
+    const { doc, updateDoc } = FS;
+    await RUT.assertFails(updateDoc(doc(como('r1'), 'restaurantes/r1'), { estadoAprobacion: 'aprobado' }));
+  });
+
+  it('LA PLATA · el negocio NO puede escribirse créditos (lo que la REGLA 7 cerró para las personas)', async () => {
+    await sembrarNegocios();
+    const { doc, updateDoc } = FS;
+    await RUT.assertFails(updateDoc(doc(como('r1'), 'restaurantes/r1'), { creditos: 900000 }));
+  });
+
+  it('tampoco activo, rol ni las fechas de aprobación', async () => {
+    await sembrarNegocios();
+    const { doc, updateDoc } = FS;
+    await RUT.assertFails(updateDoc(doc(como('r1'), 'restaurantes/r1'), { activo: false }));
+    await RUT.assertFails(updateDoc(doc(como('r1'), 'restaurantes/r1'), { rol: 'admin' }));
+    await RUT.assertFails(updateDoc(doc(como('r1'), 'restaurantes/r1'), { fechaAprobacion: '2026-01-01' }));
+  });
+
+  // ── EL ALTA, QUE NO SE PUEDE ROMPER ──────────────────────────────────────
+  it('el alta de un negocio sigue funcionando tal cual (aliados/Login.js:49)', async () => {
+    const { doc, setDoc } = FS;
+    await RUT.assertSucceeds(setDoc(doc(como('nuevo1'), 'restaurantes/nuevo1'), {
+      nombre: 'NUEVO', duenoNombre: 'ANA', duenoTelefono: '+573009998877',
+      email: 'ana@ejemplo.com', rol: 'dueno', tipoNegocio: 'restaurante',
+      activo: true, aprobado: false, estadoAprobacion: 'pendiente', creditos: 0,
+      menu: [], tours: [], fechaCreacion: '2026-08-24T00:00:00.000Z',
+    }));
+  });
+
+  // Ojo con esta: antes ponia DOS sellos a la vez (aprobado y estadoAprobacion).
+  // La cazeria de mutantes lo delato — al quitar el candado de aprobado, la
+  // prueba seguia verde porque la negaba el OTRO candado. Aqui va el sello solo,
+  // con el estado en pendiente, para que lo unico que pueda negarla sea el
+  // candado que dice probar.
+  it('pero NO puede nacer ya aprobado', async () => {
+    const { doc, setDoc } = FS;
+    await RUT.assertFails(setDoc(doc(como('nuevo2'), 'restaurantes/nuevo2'), {
+      nombre: 'TRAMPOSO', rol: 'dueno', activo: true,
+      aprobado: true, estadoAprobacion: 'pendiente', creditos: 0,
+    }));
+  });
+
+  it('ni nacer con plata en el bolsillo', async () => {
+    const { doc, setDoc } = FS;
+    await RUT.assertFails(setDoc(doc(como('nuevo3'), 'restaurantes/nuevo3'), {
+      nombre: 'TRAMPOSO', rol: 'dueno', activo: true,
+      aprobado: false, estadoAprobacion: 'pendiente', creditos: 900000,
+    }));
+  });
+
+  it('ni con el sello de aprobado puesto por otro lado', async () => {
+    const { doc, setDoc } = FS;
+    await RUT.assertFails(setDoc(doc(como('nuevo4'), 'restaurantes/nuevo4'), {
+      nombre: 'TRAMPOSO', rol: 'dueno', aprobado: false, estadoAprobacion: 'aprobado',
+    }));
+  });
+
+  // Antes NO sembraba, así que 'r1' no existía y esto no era una suplantación:
+  // era un alta en un id libre. Ahora el negocio existe de verdad.
+  it('y nadie puede registrarse con el id de otro', async () => {
+    await sembrarNegocios();
+    const { doc, setDoc } = FS;
+    await RUT.assertFails(setDoc(doc(como('nuevo5'), 'restaurantes/r1'), {
+      nombre: 'SUPLANTADOR', rol: 'dueno', aprobado: false,
+    }));
+  });
+
+  // ── EL ATAQUE POR OMISIÓN ────────────────────────────────────────────────
+  // El que casi se cuela. No se trata de poner `aprobado: true`, sino de NO PONER
+  // el campo. Antes pasaba, y el resultado era idéntico: el cliente lo enseña
+  // (filtra `aprobado !== false`, y «no existe» no es «false») y la bandeja de
+  // pendientes del panel no lo ve (busca `aprobado == false`, y un campo ausente
+  // no cuadra). Las cinco pruebas de alta que había mandaban SIEMPRE los campos,
+  // así que ninguna tocaba esta rama: probaban solo lo que no podía fallar.
+  it('EL ATAQUE POR OMISIÓN · no puede registrarse SIN el campo aprobado', async () => {
+    const { doc, setDoc } = FS;
+    await RUT.assertFails(setDoc(doc(como('fantasma1'), 'restaurantes/fantasma1'), {
+      nombre: 'FANTASMA', tipoNegocio: 'restaurante', rol: 'dueno',
+      perfilCompleto: true, menu: [], estadoAprobacion: 'pendiente', creditos: 0,
+    }));
+  });
+
+  it('EL ATAQUE POR OMISIÓN · ni sin estadoAprobacion, ni sin creditos, ni sin rol', async () => {
+    const { doc, setDoc } = FS;
+    const base = { nombre: 'FANTASMA', rol: 'dueno', aprobado: false, estadoAprobacion: 'pendiente', creditos: 0 };
+    const sin = (campo) => { const c = { ...base }; delete c[campo]; return c; };
+    await RUT.assertFails(setDoc(doc(como('fantasma2'), 'restaurantes/fantasma2'), sin('estadoAprobacion')));
+    await RUT.assertFails(setDoc(doc(como('fantasma3'), 'restaurantes/fantasma3'), sin('creditos')));
+    await RUT.assertFails(setDoc(doc(como('fantasma4'), 'restaurantes/fantasma4'), sin('rol')));
+  });
+
+  it('EL ATAQUE POR OMISIÓN · un negocio VACÍO del todo tampoco entra', async () => {
+    const { doc, setDoc } = FS;
+    await RUT.assertFails(setDoc(doc(como('fantasma5'), 'restaurantes/fantasma5'), { nombre: 'FANTASMA' }));
+  });
+
+  it('ni puede nacer nombrándose admin, ni con la fecha de aprobación puesta', async () => {
+    const { doc, setDoc } = FS;
+    const base = { nombre: 'X', aprobado: false, estadoAprobacion: 'pendiente', creditos: 0 };
+    await RUT.assertFails(setDoc(doc(como('fant6'), 'restaurantes/fant6'), { ...base, rol: 'admin' }));
+    await RUT.assertFails(setDoc(doc(como('fant7'), 'restaurantes/fant7'), { ...base, rol: 'dueno', fechaAprobacion: '2026-01-01' }));
+  });
+
+  it('y el sello de texto no cuela: aprobado "true" no es aprobado false', async () => {
+    const { doc, setDoc } = FS;
+    await RUT.assertFails(setDoc(doc(como('fant8'), 'restaurantes/fant8'), {
+      nombre: 'X', rol: 'dueno', aprobado: 'true', estadoAprobacion: 'pendiente', creditos: 0,
+    }));
+  });
+
+  // ── EL MISMO VALOR NO CUENTA COMO CAMBIO ─────────────────────────────────
+  // Firestore solo mira los campos que CAMBIAN de valor. Reenviar un congelado
+  // con el valor que ya tenía NO cuenta como tocarlo — comprobado. Importa
+  // porque una pantalla que lea el negocio y lo reescriba entero seguiría
+  // funcionando: no se rompe nada por reenviar de más.
+  it('reenviar un campo congelado con SU MISMO valor no rompe nada', async () => {
+    await sembrarNegocios();
+    const { doc, updateDoc } = FS;
+    await RUT.assertSucceeds(updateDoc(doc(como('r1'), 'restaurantes/r1'), {
+      nombre: 'OTRO NOMBRE', aprobado: false, creditos: 0, rol: 'dueno',
+    }));
+  });
+
+  it('pero cambiarlo aunque sea un poco, sí', async () => {
+    await sembrarNegocios();
+    const { doc, updateDoc } = FS;
+    await RUT.assertFails(updateDoc(doc(como('r1'), 'restaurantes/r1'), {
+      nombre: 'OTRO NOMBRE', aprobado: false, creditos: 1, rol: 'dueno',
+    }));
+  });
+
+  // ── LO QUE EL NEGOCIO TIENE QUE SEGUIR PUDIENDO HACER ────────────────────
+  it('el negocio sigue mandando en LO SUYO: menú, horario, logo, nombre', async () => {
+    await sembrarNegocios();
+    const { doc, updateDoc } = FS;
+    await RUT.assertSucceeds(updateDoc(doc(como('r1'), 'restaurantes/r1'), {
+      menu: [{ id: 1, nombre: 'Arepa', precio: 5000 }],
+      nombre: 'DONDE MECHE', horarioApertura: '08:00', logo: 'x.png',
+    }));
+  });
+
+  it('y sigue abriendo, cerrando y poniendo la demora (aliados/App.js:171 y :179)', async () => {
+    await sembrarNegocios();
+    const { doc, updateDoc } = FS;
+    await RUT.assertSucceeds(updateDoc(doc(como('r1'), 'restaurantes/r1'), { abierto: false }));
+    await RUT.assertSucceeds(updateDoc(doc(como('r1'), 'restaurantes/r1'), { demoraMin: 30 }));
+  });
+
+  it('la agencia sigue guardando sus tours (aliados/Tours.js:88)', async () => {
+    await sembrarNegocios();
+    const { doc, updateDoc } = FS;
+    await RUT.assertSucceeds(updateDoc(doc(como('r1'), 'restaurantes/r1'), {
+      tours: [{ id: 1, nombre: 'Cabo de la Vela', precio: 150000 }],
+    }));
+  });
+
+  // ── EL PANEL, QUE ES QUIEN DECIDE ────────────────────────────────────────
+  it('el PANEL sigue aprobando (admin/Restaurantes.js:53 y admin/AliadosPendientes.js:26)', async () => {
+    await sembrarNegocios();
+    const { doc, updateDoc } = FS;
+    await RUT.assertSucceeds(updateDoc(doc(como('eladmin'), 'restaurantes/r1'), {
+      aprobado: true, estadoAprobacion: 'aprobado', activo: true, fechaAprobacion: '2026-08-24',
+    }));
+  });
+
+  it('el PANEL sigue suspendiendo y rechazando (admin/Restaurantes.js:58 y :63)', async () => {
+    await sembrarNegocios();
+    const { doc, updateDoc } = FS;
+    await RUT.assertSucceeds(updateDoc(doc(como('eljefe'), 'restaurantes/r2'), {
+      aprobado: false, estadoAprobacion: 'suspendido',
+    }));
+    await RUT.assertSucceeds(updateDoc(doc(como('eladmin'), 'restaurantes/r2'), {
+      aprobado: false, estadoAprobacion: 'rechazado', fechaRechazo: '2026-08-24',
+    }));
+  });
+
+  // AMARRE · el guardado del perfil es el que más campos manda de una sola vez (12).
+  // Se repite aquí TAL CUAL lo escribe la pantalla, campo por campo: si algún día
+  // alguien mete en ese guardado un campo del panel, esta prueba se pone roja antes
+  // de que el dueño del negocio se quede sin poder guardar su propio perfil.
+  it('EL PERFIL ENTERO se sigue guardando igual (aliados/PerfilRestaurante.js:150)', async () => {
+    await sembrarNegocios();
+    const { doc, updateDoc } = FS;
+    await RUT.assertSucceeds(updateDoc(doc(como('r1'), 'restaurantes/r1'), {
+      descripcion: 'Comida guajira', direccion: 'Cl. 40, Riohacha', ubicacion: null,
+      categoria: 'Comida rápida', horarioApertura: 8, horarioCierre: 22,
+      pedidoMinimo: 10000, costoDomicilio: 3000, tiempoEntrega: 30,
+      logo: 'logo.png', perfilCompleto: true, abierto: true,
+    }));
+  });
+
+  it('y el de la agencia también (aliados/PerfilAgencia.js:90)', async () => {
+    await sembrarNegocios();
+    const { doc, updateDoc } = FS;
+    await RUT.assertSucceeds(updateDoc(doc(como('r1'), 'restaurantes/r1'), {
+      descripcion: 'Tours por La Guajira', direccion: 'Riohacha', ubicacion: null,
+      telefono: '+573001112233', horarioApertura: 6, horarioCierre: 20,
+      categorias: ['tours'], logo: 'logo.png', perfilCompleto: true, abierto: true,
+    }));
+  });
+
+  it('y el dueño sigue guardando su token de avisos (aliados/Notificaciones.js:22)', async () => {
+    await sembrarNegocios();
+    const { doc, setDoc } = FS;
+    await RUT.assertSucceeds(setDoc(doc(como('r1'), 'restaurantes/r1'), { fcmToken: 'tok9' }, { merge: true }));
+  });
+
+  // OJO: esta NO prueba nada del panel. `allow read` sigue abierto a cualquiera
+  // con cuenta, así que pasa con cualquier sesión y seguiría verde aunque
+  // esAdmin() se rompiera entero. Se deja porque documenta el estado REAL de la
+  // lectura — que sigue abierta, y es la deuda de sacar de aquí el teléfono, el
+  // correo y los créditos del dueño. El nombre dice lo que de verdad hace.
+  it('la lista de negocios la sigue viendo CUALQUIERA con cuenta (deuda: la lectura sigue abierta)', async () => {
+    await sembrarNegocios();
+    const { collection, getDocs } = FS;
+    await RUT.assertSucceeds(getDocs(collection(como('eladmin'), 'restaurantes')));
+  });
+
+  // ── LOS EXTRAÑOS ─────────────────────────────────────────────────────────
+  it('un negocio NO puede tocar el de al lado', async () => {
+    await sembrarNegocios();
+    const { doc, updateDoc } = FS;
+    await RUT.assertFails(updateDoc(doc(como('r1'), 'restaurantes/r2'), { nombre: 'ROBADO' }));
+    await RUT.assertFails(updateDoc(doc(como('r1'), 'restaurantes/r2'), { aprobado: false }));
+  });
+
+  it('y un cliente cualquiera tampoco', async () => {
+    await sembrarNegocios();
+    const { doc, updateDoc } = FS;
+    await RUT.assertFails(updateDoc(doc(como('pasajero1'), 'restaurantes/r1'), { aprobado: true }));
+  });
+
+  it('el cliente SIGUE viendo la lista para escoger dónde pedir (Restaurantes.js:102)', async () => {
+    await sembrarNegocios();
+    const { collection, getDocs } = FS;
+    await RUT.assertSucceeds(getDocs(collection(como('pasajero1'), 'restaurantes')));
+  });
+});

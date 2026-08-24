@@ -305,13 +305,76 @@ service cloud.firestore {
       allow create: if request.auth != null;
       allow update, delete: if false;
     }
+    // ── REGLA 9 · UN NEGOCIO NO SE APRUEBA A SÍ MISMO ───────────────────────
+    // El alta está bien hecha: aliados/Login.js:49 crea el negocio con
+    // `aprobado: false` y `estadoAprobacion: 'pendiente'`. Nace sin aprobar, como
+    // debe ser. El agujero estaba en lo de DESPUÉS: la regla dejaba al negocio
+    // escribir CUALQUIER campo de su propio documento, así que se aprobaba solo
+    // con una sola escritura —`aprobado: true`— y aparecía en la app del cliente.
+    //
+    // Y lo peor no era que apareciera, sino que DESAPARECÍA de la bandeja del
+    // dueño: el panel enseña como pendientes solo los que tienen
+    // `aprobado === false` (admin/Restaurantes.js:86). El que se aprueba solo
+    // nunca le sale al dueño para revisarlo. Se colaba sin que nadie lo viera.
+    //
+    // En el mismo documento vive `creditos`, que es DINERO —el panel lo enseña
+    // como «💰 Créditos» (admin/Restaurantes.js:107 y :136)— y también se lo
+    // escribía el propio negocio. Es exactamente lo que la REGLA 7 cerró para
+    // las personas; a los negocios se les quedó abierto.
     match /restaurantes/{restauranteId} {
+      // Lo que decide el PANEL y nadie más. Medido el 24-ago-2026: TODAS las
+      // escrituras de estos campos posteriores al alta salen del panel —
+      // admin/Restaurantes.js:53, :58 y :63, admin/Turismo.js:50, :55 y :60, y
+      // admin/AliadosPendientes.js:26 y :31. Ninguna pantalla de aliados los
+      // toca después de crear el negocio, así que congelarlos no le quita nada
+      // a nadie. Lo que el negocio SÍ cambia —el menú, los tours, las mesas, el
+      // horario, el logo, `abierto`, `demoraMin`— se queda como estaba.
+      function camposDelPanel() {
+        return ['aprobado', 'estadoAprobacion', 'activo', 'creditos', 'rol',
+                'fechaAprobacion', 'fechaRechazo'];
+      }
+
       allow read: if request.auth != null;
-      allow create, update: if request.auth != null && (
-        request.auth.uid == restauranteId ||
-        get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.rol == 'admin' ||
-        get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.rol == 'superadmin'
+
+      // En el ALTA sí hay que dejarlos escribir: si se prohibieran aquí, nadie
+      // podría volver a registrar un negocio. Lo que se exige es que ESTÉN y que
+      // valgan lo seguro.
+      //
+      // OJO AL DETALLE QUE CASI SE CUELA (lo cazó el revisor el 24-ago-2026,
+      // ejecutándolo): esto decía `.get('aprobado', false) == false`, o sea «si
+      // viene, que sea false». Y un campo que NO VIENE también pasaba. Con eso el
+      // negocio se registraba SIN el campo y conseguía exactamente lo mismo que
+      // aprobándose a sí mismo:
+      //   · el cliente lo ENSEÑA, porque filtra `aprobado !== false` y «no existe»
+      //     no es «false» (guajirago/src/Restaurantes.js:104, Turismo.js:44);
+      //   · y la bandeja de pendientes del panel NO lo ve, porque busca
+      //     `aprobado == false` y un campo ausente no cuadra con esa consulta
+      //     (admin/AliadosPendientes.js:15, admin/Restaurantes.js:86) — es más:
+      //     el panel lo pinta como «APROBADO».
+      // El mismo agujero por la otra puerta. Por eso ahora se exige que el campo
+      // ESTÉ, no solo que «si está valga lo seguro».
+      //
+      // Medido: aliados/Login.js:49 ya manda los cinco, así que al alta legítima
+      // no le cuesta nada. Y exigir el valor exacto cierra de paso los tipos: un
+      // `aprobado: 'true'` de texto no es igual a false, así que se niega — y se
+      // niega a propósito, no por un error de evaluación.
+      allow create: if esAdmin() || (
+        request.auth != null &&
+        request.auth.uid == restauranteId &&
+        request.resource.data.aprobado == false &&
+        request.resource.data.estadoAprobacion == 'pendiente' &&
+        request.resource.data.creditos == 0 &&
+        request.resource.data.rol == 'dueno' &&
+        !request.resource.data.keys().hasAny(['fechaAprobacion', 'fechaRechazo'])
       );
+
+      // Al cambiarlo: el negocio manda en lo suyo, pero no en lo del panel.
+      allow update: if esAdmin() || (
+        request.auth != null &&
+        request.auth.uid == restauranteId &&
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny(camposDelPanel())
+      );
+
       allow delete: if false;
     }
     // ── REGLA 9 · CADA PEDIDO ES DE SU CLIENTE Y DE SU RESTAURANTE ──────────
