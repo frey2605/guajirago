@@ -7,6 +7,7 @@ import Llamada from './Llamada';
 import { alertarNuevoViaje, precargarAudio, activarAudioiOS, obtenerTokenFCM } from './Notificaciones';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { CONFIG_TARIFAS_DEFECTO, calcularTarifaMinima } from './tarifas';
+import { aplicarDescuento, armarDescuentoInfo, tarifaParaPasajero } from './descuentos';
 
 const centroRiohacha = { lat: 11.5444, lng: -72.9072 };
 
@@ -496,22 +497,9 @@ function SolicitarMensajeria({ onVolver, destinoInicial }) {
     cargarFavoritos();
   }, []);
 
-  const calcularTarifaConDescuento = (tarifaBase) => {
-    if (!descuentoPendiente) return tarifaBase;
-    if (descuentoPendiente.tipoBeneficio === 'credito') {
-      return Math.max(0, tarifaBase - descuentoPendiente.valorBeneficio);
-    }
-    // descuento en %
-    return Math.round(tarifaBase * (1 - descuentoPendiente.valorBeneficio / 100));
-  };
-
-  // Tarifa que realmente debe pagar el pasajero (con descuento si el viaje lo tiene aplicado)
-  const tarifaParaPasajero = (v) => {
-    if (v?.descuentoInfo?.tarifaPasajeroPaga != null) {
-      return `$${v.descuentoInfo.tarifaPasajeroPaga.toLocaleString()}`;
-    }
-    return v?.tarifa;
-  };
+  // La cuenta del descuento ya NO vive aquí: está en descuentos.js, el único
+  // sitio donde se calcula (SEGUNDA LEY). Esto solo le pasa el descuento cargado.
+  const calcularTarifaConDescuento = (tarifaBase) => aplicarDescuento(tarifaBase, descuentoPendiente);
 
   useEffect(() => {
     if (!navigator.geolocation) return;
@@ -933,17 +921,8 @@ function SolicitarMensajeria({ onVolver, destinoInicial }) {
         const snapU = await getDoc(doc(db, 'usuarios', user.uid));
         if (snapU.exists()) nombrePasajero = snapU.data().nombre || '';
       } catch (e) {}
-      const tarifaConDescuento = calcularTarifaConDescuento(tarifa);
-      const datosDescuento = descuentoPendiente ? {
-        tarifaOriginal: tarifa,
-        tarifaPasajeroPaga: tarifaConDescuento,
-        descuentoAplicado: tarifa - tarifaConDescuento,
-        promoId: descuentoPendiente.promoId,
-        tipoBeneficio: descuentoPendiente.tipoBeneficio,
-        valorBeneficio: descuentoPendiente.valorBeneficio,
-        codigoVerificacion: descuentoPendiente.codigoVerificacion,
-        consumido: false,
-      } : null;
+      // La ficha del descuento la arma descuentos.js: una sola calculadora (SEGUNDA LEY).
+      const datosDescuento = armarDescuentoInfo(tarifa, descuentoPendiente);
 
       // El viaje SIEMPRE se crea con la tarifa COMPLETA: es lo que el conductor ve y debe recibir.
       // El descuento al pasajero solo se CONSUME (se descuenta del saldo del pasajero y se acredita
