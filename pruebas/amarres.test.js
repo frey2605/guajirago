@@ -17,27 +17,8 @@
  */
 const { describe, it } = require('node:test');
 const assert = require('node:assert');
-const fs = require('node:fs');
-const path = require('node:path');
-
-const RAIZ = path.resolve(__dirname, '..');
-
-function leer(rutaRelativa) {
-  const ruta = path.join(RAIZ, rutaRelativa);
-  assert.ok(fs.existsSync(ruta),
-    'No está «' + rutaRelativa + '» en el disco. Los amarres necesitan los tres repos ' +
-    'juntos en la carpeta raíz; sin el otro lado del contrato no se puede comprobar nada.');
-  return fs.readFileSync(ruta, 'utf8');
-}
-
-/** Carga un archivo de la app (import/export) y devuelve lo que exporta. */
-function cargarDeLaApp(rutaRelativa) {
-  const fuente = leer(rutaRelativa);
-  const nombres = [...fuente.matchAll(/^export\s+(?:const|function)\s+([A-Za-z0-9_]+)/gm)].map((m) => m[1]);
-  assert.ok(nombres.length > 0, 'no se encontró nada exportado en ' + rutaRelativa);
-  // eslint-disable-next-line no-new-func
-  return new Function(fuente.replace(/^export\s+/gm, '') + '\nreturn { ' + nombres.join(', ') + ' };')();
-}
+// El cargador vive en cargar.cjs: un solo sitio para todas las pruebas (SEGUNDA LEY).
+const { leer, cargarDeLaApp } = require('./cargar.cjs');
 
 describe('AMARRES · la app y el servidor miden la distancia IGUAL', () => {
   it('las dos calculadoras dan los mismos kilómetros en los mismos puntos', () => {

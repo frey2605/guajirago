@@ -17,17 +17,8 @@ const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const RAIZ = path.resolve(__dirname, '..');
-
-/** Carga un archivo de la app (import/export) y devuelve lo que exporta. */
-function cargarDeLaApp(rutaRelativa) {
-  const fuente = fs.readFileSync(path.join(RAIZ, rutaRelativa), 'utf8');
-  const nombres = [...fuente.matchAll(/^export\s+(?:const|function)\s+([A-Za-z0-9_]+)/gm)].map((m) => m[1]);
-  assert.ok(nombres.length > 0, 'no se encontró nada exportado en ' + rutaRelativa);
-  const sinExport = fuente.replace(/^export\s+/gm, '');
-  // eslint-disable-next-line no-new-func
-  return new Function(sinExport + '\nreturn { ' + nombres.join(', ') + ' };')();
-}
+// El cargador vive en cargar.cjs: un solo sitio para todas las pruebas (SEGUNDA LEY).
+const { RAIZ, cargarDeLaApp } = require('./cargar.cjs');
 
 const { CONFIG_TARIFAS_DEFECTO, calcularTarifaMinima } = cargarDeLaApp('guajirago/src/tarifas.js');
 
