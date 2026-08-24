@@ -11,6 +11,7 @@ import { getFunctions, httpsCallable } from 'firebase/functions';
 import { CONFIG_TARIFAS_DEFECTO, calcularTarifaMinima } from './tarifas';
 import { aplicarDescuento, armarDescuentoInfo, tarifaParaPasajero } from './descuentos';
 import { generarCodigoSeguridad, guardarCodigoDeViaje, cargarCodigoDeViaje } from './codigoSeguridad';
+import { armarViajeNuevo } from './viajeNuevo';
 
 const centroRiohacha = { lat: 11.5444, lng: -72.9072 };
 
@@ -914,23 +915,15 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
       // La ficha del descuento la arma descuentos.js: una sola calculadora (SEGUNDA LEY).
       const datosDescuento = armarDescuentoInfo(tarifa, descuentoPendiente);
 
-      // El viaje SIEMPRE se crea con la tarifa COMPLETA: es lo que el conductor ve y debe recibir.
-      // El descuento al pasajero solo se CONSUME (se descuenta del saldo del pasajero y se acredita
-      // al conductor) cuando el conductor presiona "Iniciar viaje" — no antes.
-      const docRef = await addDoc(collection(db, 'viajes'), {
-        pasajeroId: user.uid, pasajeroEmail: user.email,
-        pasajeroNombre: nombrePasajero,
-        // El código YA NO va aquí: dentro del viaje lo leía cualquiera. Aquí solo
-        // queda el aviso de que hay código, para que el conductor sepa que ha de
-        // pedirlo (AppConductor.js).
-        tieneCodigo: true,
-        pasajeroLat: coordsRecogida.lat, pasajeroLng: coordsRecogida.lng,
-        tipo, origen, destino, estado: 'esperando',
-        tarifa: `$${tarifa.toLocaleString()}`, tarifaValor: tarifa,
-        ...(datosDescuento ? { descuentoInfo: datosDescuento } : {}),
-        fechaSolicitud: new Date().toISOString(),
+      // El documento del viaje se arma en viajeNuevo.js: un solo sitio para el
+      // contrato de campos que leen el conductor, las reglas y el servidor.
+      const docRef = await addDoc(collection(db, 'viajes'), armarViajeNuevo({
+        user, nombrePasajero,
+        coords: coordsRecogida,
+        tipo, origen, destino, tarifa,
+        datosDescuento,
         radioBusqueda: configApp.radioBusquedaInicial,
-      });
+      }));
       setViajeId(docRef.id);
       // El código, al cajón privado del viaje: ahí solo lo ve ella.
       setCodigoSeguridad(codigoSeguridad);
