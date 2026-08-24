@@ -112,13 +112,22 @@ Manda sobre todo el proyecto, en las tres apps y en las funciones. Tiene tres ca
   Se hace el arreglo en los dos sitios —porque hay que dejarlo funcionando— y se anota el
   gemelo como deuda, con nombre y archivo.
 
-**Deuda conocida el 23-ago-2026** (medida trabajando, no supuesta):
+**Deuda VIVA al 24-ago-2026** (medida trabajando, no supuesta). Lo que se cerró el
+23/24-ago — la comisión, el empleado, la tarifa mínima, el descuento, el código de
+seguridad, el documento del viaje, los datos compartidos, la distancia, los respaldos de
+config, `cop()`, el filtro anti-datos — ya NO está aquí: vive en `guajirago/src/*.js`
+(un archivo por proceso) y en `pruebas/amarres.test.js`, que lee/ejecuta los dos lados de
+cada contrato entre repos y se pone roja si se separan.
 
-| Gemelos | Dónde | Qué duplican |
+| Deuda | Dónde | Qué pasa |
 |---|---|---|
-| `Solicitar.js` y `SolicitarMensajeria.js` | app de pasajero | pantalla entera de pedir viaje: el mismo arreglo hubo que aplicarlo **dos veces** en las REGLAS 5, 6 y 11 |
-| La comisión del viaje | `functions/index.js` y `Ganancias.js` | el mismo número, calculado por **dos calculadoras** distintas |
-| El empleado de un negocio | `empleados/{uid}` y `restaurantes/{id}/empleados/{uid}` | **la misma ficha, escrita dos veces a mano** en cada alta, cada cambio y cada activación (`aliados/Empleados.js:75-76`, `:96-103`, `:126-127`). Se leen por separado: la lista sale de una y el permiso de entrar, de la otra. **Si una escritura falla, un empleado despedido sigue pudiendo entrar.** Medido el 23-ago-2026: 1 empleado, las dos copias coinciden — por casualidad, no por diseño |
+| Los gemelos: píxeles y plomería | `Solicitar.js` / `SolicitarMensajeria.js` | la LÓGICA ya es de fuente única (5 extracciones); quedan ~390 renglones de componentes idénticos y las funciones amarradas a la pantalla. Moverlos = reestructurar la pantalla del cliente sin pruebas de UI |
+| El total del pedido lo decide el teléfono | `Restaurantes.js:328-331` ↔ `aliados/PedidosDomicilio.js:172-174` | el cliente escribe items CON SUS PRECIOS y el restaurante recalcula con esos mismos precios. Va con las REGLAS 7 y 9 |
+| La paleta muerta | `guajirago/src/theme.js` | nadie la importa; los colores a mano ~1.800 veces en 3 repos; 18 pantallas de aliados redefinen lo que `flujoPedidos.js` ya exporta |
+| Las fechas del reloj del teléfono | 74 sitios con `new Date().toISOString()` | las funciones expiran viajes según `fechaSolicitud` escrita por el celular del cliente: hora corrida = viaje que nace vencido o no expira nunca |
+| El conteo «en curso» de mensajería | `admin/Mensajeria.js:34` | cuenta con `'en_viaje'` (estado que NO existe, es una fase) y SIN `'en_negociacion'`: los mandados en negociación no se cuentan |
+| package-lock desincronizados | `guajirago/`, `guajirago-admin/` | declaran firebase pero el lock no lo trae: `npm ci` falla hasta el próximo `npm install` (su lock se commitea aparte) |
+| Copia huérfana del empleado | `restaurantes/{id}/empleados/JUAN` | inofensiva; borrar registros está prohibido (REGLA 12 / lápidas) |
 
 ---
 
