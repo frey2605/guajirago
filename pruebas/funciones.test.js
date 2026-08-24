@@ -433,3 +433,173 @@ describe('REGLA 7 · creditosDeBienvenida', () => {
     assert.strictEqual(await saldoDe('pasajero'), -1);
   });
 });
+
+describe('REGLA 7 · consumirDescuentoViaje', () => {
+  const DESCUENTO = 8000;
+
+  beforeEach(async () => {
+    await sembrar('usuarios/condA', { tipo: txt('conductor'), creditos: num(SALDO_INICIAL) });
+    await sembrar('usuarios/condB', { tipo: txt('conductor'), creditos: num(SALDO_INICIAL) });
+    await sembrar('promociones/PROMO1', {
+      usosTotales: num(4), inversionTotal: num(32000), activa: { booleanValue: true },
+    });
+    await sembrar('viajes/vd1', {
+      pasajeroId: txt('elpasa'), conductorId: txt('condA'), estado: txt('aceptado'),
+      descuentoInfo: { mapValue: { fields: {
+        promoId: txt('PROMO1'), descuentoAplicado: num(DESCUENTO),
+        codigoVerificacion: txt('7391'), consumido: { booleanValue: false },
+      } } },
+    });
+  });
+
+  const consumido = async () => {
+    const v = await leer('viajes/vd1');
+    return v?.descuentoInfo?.mapValue?.fields?.consumido?.booleanValue;
+  };
+
+  test('SIN sesion no se cobra nada', async () => {
+    const r = await llamarA('consumirDescuentoViaje', null, { viajeId: 'vd1', codigo: '7391' });
+    assert.strictEqual(r.cuerpo?.error?.status, 'UNAUTHENTICATED');
+    assert.strictEqual(await saldoDe('condA'), SALDO_INICIAL);
+    assert.strictEqual(await consumido(), false);
+  });
+
+  test('OTRO conductor NO puede cobrar el descuento de este viaje', async () => {
+    const r = await llamarA('consumirDescuentoViaje', 'condB', { viajeId: 'vd1', codigo: '7391' });
+    assert.strictEqual(r.cuerpo?.error?.status, 'PERMISSION_DENIED');
+    assert.strictEqual(await saldoDe('condB'), SALDO_INICIAL, 'cobro el descuento de un viaje ajeno');
+    assert.strictEqual(await saldoDe('condA'), SALDO_INICIAL);
+    assert.strictEqual(await consumido(), false);
+  });
+
+  test('con el codigo MALO no se cobra, y el descuento sigue vivo', async () => {
+    const r = await llamarA('consumirDescuentoViaje', 'condA', { viajeId: 'vd1', codigo: '0000' });
+    assert.strictEqual(r.cuerpo?.error?.status, 'PERMISSION_DENIED');
+    assert.strictEqual(await saldoDe('condA'), SALDO_INICIAL);
+    assert.strictEqual(await consumido(), false, 'se quemo el descuento con un codigo malo');
+  });
+
+  test('el conductor del viaje, con el codigo bueno: cobra, se marca y se apunta', async () => {
+    const r = await llamarA('consumirDescuentoViaje', 'condA', { viajeId: 'vd1', codigo: '7391' });
+    assert.strictEqual(r.cuerpo?.result?.monto, DESCUENTO);
+    assert.strictEqual(await saldoDe('condA'), SALDO_INICIAL + DESCUENTO);
+    assert.strictEqual(await consumido(), true);
+    // El contador por persona: es el que hace de verdad el tope de las promos.
+    const uso = await leer('promociones/PROMO1/usos/elpasa');
+    assert.strictEqual(Number(uso.veces.integerValue), 1);
+    // Y la analitica del panel.
+    const promo = await leer('promociones/PROMO1');
+    assert.strictEqual(Number(promo.usosTotales.integerValue), 5);
+    assert.strictEqual(Number(promo.inversionTotal.integerValue), 32000 + DESCUENTO);
+  });
+
+  test('el MISMO descuento no se cobra dos veces (ni llamando 5 veces)', async () => {
+    await llamarA('consumirDescuentoViaje', 'condA', { viajeId: 'vd1', codigo: '7391' });
+    for (let i = 0; i < 5; i++) {
+      const r = await llamarA('consumirDescuentoViaje', 'condA', { viajeId: 'vd1', codigo: '7391' });
+      assert.strictEqual(r.cuerpo?.error?.status, 'ALREADY_EXISTS');
+    }
+    assert.strictEqual(await saldoDe('condA'), SALDO_INICIAL + DESCUENTO, 'cobro el descuento mas de una vez');
+    const promo = await leer('promociones/PROMO1');
+    assert.strictEqual(Number(promo.usosTotales.integerValue), 5, 'la analitica conto de mas');
+  });
+
+  test('el codigo se compara solo por sus cifras, como hacia la app', async () => {
+    const r = await llamarA('consumirDescuentoViaje', 'condA', { viajeId: 'vd1', codigo: ' 73-91 ' });
+    assert.strictEqual(r.cuerpo?.result?.monto, DESCUENTO);
+  });
+
+  test('un conductor NO puede ser su propio pasajero y cobrarse el descuento', async () => {
+    // El fraude barato: fabricarse un viaje donde uno es las dos partes. Hoy
+    // las reglas dejan escribir cualquier viaje (eso es la REGLA 9), asi que
+    // este freno vive en el servidor.
+    await sembrar('viajes/vyo', {
+      pasajeroId: txt('condA'), conductorId: txt('condA'), estado: txt('aceptado'),
+      descuentoInfo: { mapValue: { fields: {
+        promoId: txt('PROMO1'), descuentoAplicado: num(999999),
+        codigoVerificacion: txt('1111'), consumido: { booleanValue: false },
+      } } },
+    });
+    const r = await llamarA('consumirDescuentoViaje', 'condA', { viajeId: 'vyo', codigo: '1111' });
+    assert.strictEqual(r.cuerpo?.error?.status, 'PERMISSION_DENIED');
+    assert.strictEqual(await saldoDe('condA'), SALDO_INICIAL, 'se cobro un descuento que se invento el solo');
+  });
+
+  test('el descuento SIN promoId tambien se cobra (el de bienvenida no tiene promo)', async () => {
+    await sembrar('viajes/vbien', {
+      pasajeroId: txt('elpasa'), conductorId: txt('condA'), estado: txt('aceptado'),
+      descuentoInfo: { mapValue: { fields: {
+        descuentoAplicado: num(3000), codigoVerificacion: txt('5555'),
+        consumido: { booleanValue: false },
+      } } },
+    });
+    const r = await llamarA('consumirDescuentoViaje', 'condA', { viajeId: 'vbien', codigo: '5555' });
+    assert.strictEqual(r.cuerpo?.result?.monto, 3000);
+    assert.strictEqual(await saldoDe('condA'), SALDO_INICIAL + 3000);
+  });
+
+  test('una promo que no existe no estorba: se cobra y se cuenta igual', async () => {
+    await sembrar('viajes/vsp', {
+      pasajeroId: txt('elpasa'), conductorId: txt('condA'), estado: txt('aceptado'),
+      descuentoInfo: { mapValue: { fields: {
+        promoId: txt('FANTASMA'), descuentoAplicado: num(4000),
+        codigoVerificacion: txt('2222'), consumido: { booleanValue: false },
+      } } },
+    });
+    const r = await llamarA('consumirDescuentoViaje', 'condA', { viajeId: 'vsp', codigo: '2222' });
+    assert.strictEqual(r.cuerpo?.result?.monto, 4000);
+    assert.strictEqual(await saldoDe('condA'), SALDO_INICIAL + 4000);
+    // El contador por persona SI se escribe aunque la promo no exista: es el
+    // que hace el tope, y va DENTRO de la transaccion del cobro.
+    const uso = await leer('promociones/FANTASMA/usos/elpasa');
+    assert.strictEqual(Number(uso.veces.integerValue), 1);
+  });
+
+  test('un promoId ROTO no le cuesta la plata al conductor', async () => {
+    // Esta prueba encontro un fallo de verdad el 24-ago-2026: un promoId con
+    // una barra dentro hace invalida la ruta del documento, la excepcion
+    // saltaba DENTRO de la transaccion del cobro y se llevaba por delante el
+    // pago del conductor. Y ese dato viene del viaje, que hoy puede escribir
+    // cualquiera (REGLA 9). Ahora un id raro solo cuesta el apunte del uso.
+    //
+    // (El otro peligro — que la lista historialUsos llene el documento de la
+    // promo, 1 MB — no se puede simular aqui; lo cubre que la analitica viva
+    // FUERA de la transaccion, con su propio try. Comprobado con un mutante:
+    // quitando el filtro del id, la analitica revienta y el cobro sobrevive.)
+    await sembrar('viajes/vrota', {
+      pasajeroId: txt('elpasa'), conductorId: txt('condA'), estado: txt('aceptado'),
+      descuentoInfo: { mapValue: { fields: {
+        promoId: txt('PRO/MO'), descuentoAplicado: num(6000),
+        codigoVerificacion: txt('3333'), consumido: { booleanValue: false },
+      } } },
+    });
+    const r = await llamarA('consumirDescuentoViaje', 'condA', { viajeId: 'vrota', codigo: '3333' });
+    assert.strictEqual(r.cuerpo?.result?.monto, 6000, 'la analitica tumbo el cobro del conductor');
+    assert.strictEqual(await saldoDe('condA'), SALDO_INICIAL + 6000);
+  });
+
+  test('un viaje SIN descuento no da plata', async () => {
+    await sembrar('viajes/vsin', { pasajeroId: txt('elpasa'), conductorId: txt('condA'), estado: txt('aceptado') });
+    const r = await llamarA('consumirDescuentoViaje', 'condA', { viajeId: 'vsin', codigo: '7391' });
+    assert.strictEqual(r.cuerpo?.error?.status, 'FAILED_PRECONDITION');
+    assert.strictEqual(await saldoDe('condA'), SALDO_INICIAL);
+  });
+
+  test('si algo falla, NO queda a medias: ni cobro ni marca', async () => {
+    // Un viaje cuyo descuento apunta a una promo que no existe. Todo va en una
+    // sola transaccion, asi que o cuadra entero o no cuadra: el conductor debe
+    // cobrar igual (la promo que falta no es su culpa) y quedar todo marcado.
+    await sembrar('viajes/vd2', {
+      pasajeroId: txt('elpasa'), conductorId: txt('condA'), estado: txt('aceptado'),
+      descuentoInfo: { mapValue: { fields: {
+        promoId: txt('NOEXISTE'), descuentoAplicado: num(5000),
+        codigoVerificacion: txt('1234'), consumido: { booleanValue: false },
+      } } },
+    });
+    const r = await llamarA('consumirDescuentoViaje', 'condA', { viajeId: 'vd2', codigo: '1234' });
+    assert.strictEqual(r.cuerpo?.result?.monto, 5000);
+    assert.strictEqual(await saldoDe('condA'), SALDO_INICIAL + 5000);
+    const v = await leer('viajes/vd2');
+    assert.strictEqual(v?.descuentoInfo?.mapValue?.fields?.consumido?.booleanValue, true);
+  });
+});

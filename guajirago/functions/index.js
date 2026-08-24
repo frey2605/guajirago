@@ -657,3 +657,142 @@ exports.creditosDeBienvenida = onCall(async (request) => {
     throw new HttpsError("internal", "No se pudieron dar los créditos de bienvenida");
   }
 });
+
+/**
+ * REGLA 7 (parte 2) — CONSUMIR EL DESCUENTO DE UN VIAJE.
+ *
+ * Lo que hacía el teléfono del conductor (AppConductor.js, hasta el
+ * 24-ago-2026), en cuatro pasos sueltos: comparaba el código, marcaba el
+ * descuento como consumido, SE ACREDITABA los créditos a sí mismo (el
+ * comentario decía «siempre permitido por las reglas», y esa suposición es la
+ * que cierra la REGLA 7) y apuntaba el uso de la promoción.
+ *
+ * Ahora el cobro ocurre aquí, de una pieza: o se marca Y se cobra, o no pasa
+ * nada. Quien cobra es el conductor ASIGNADO al viaje, no quien llame.
+ *
+ * ⚠ LO QUE ESTO **NO** ARREGLA — Y HAY QUE DECIRLO CLARO:
+ *
+ * 1. El monto sale de `descuentoInfo.descuentoAplicado`, que vive DENTRO del
+ *    viaje… y hoy `firestore.rules` deja que cualquiera con sesión escriba
+ *    CUALQUIER viaje («allow create, update: if request.auth != null»). O sea:
+ *    un conductor puede fabricarse un viaje con el descuento que quiera y
+ *    cobrarlo. Esta función pone dos frenos baratos (que el viaje sea suyo y
+ *    que no sea su propio pasajero), pero la raíz es la REGLA 9 — los viajes y
+ *    pedidos sin dueño — y se cierra allí, no aquí.
+ *
+ * 2. El código del descuento NO es secreto para el conductor: viaja dentro del
+ *    viaje, que él puede leer. Mover la comparación al servidor evita que se
+ *    salte el paso, pero no le esconde el número. El patrón bueno ya existe en
+ *    el proyecto: el código de seguridad del viaje vive en `viajes/{id}/privado`
+ *    justo para eso (REGLAS 5 y 11). Mudar este código ahí es su propio trabajo.
+ */
+exports.consumirDescuentoViaje = onCall(async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Hay que iniciar sesión");
+  const { viajeId, codigo } = request.data || {};
+  if (!viajeId || !codigo) throw new HttpsError("invalid-argument", "Faltan datos");
+
+  const db = admin.firestore();
+  const refViaje = db.collection("viajes").doc(viajeId);
+  const refConductor = db.collection("usuarios").doc(request.auth.uid);
+
+  let resultado;
+  try {
+    resultado = await db.runTransaction(async (t) => {
+      const snapViaje = await t.get(refViaje);
+      if (!snapViaje.exists) throw new HttpsError("not-found", "Ese viaje no existe");
+      const viaje = snapViaje.data() || {};
+
+      // Solo el conductor ASIGNADO. Si no, cualquiera podría cobrar el
+      // descuento del viaje de otro.
+      if (viaje.conductorId !== request.auth.uid) {
+        throw new HttpsError("permission-denied", "Este viaje no es tuyo");
+      }
+      // Y no puede ser su propio pasajero: sin esto, un conductor se fabrica un
+      // viaje donde él es las dos partes y se cobra el descuento que quiera.
+      // Medido el 24-ago-2026: de los 20 viajes con descuento, en NINGUNO
+      // coinciden pasajero y conductor. (Ojo: esto tapa lo barato, no la raíz —
+      // ver la nota de arriba sobre la REGLA 9.)
+      if (viaje.pasajeroId === request.auth.uid) {
+        throw new HttpsError("permission-denied", "Un viaje no puede ser tuyo por los dos lados");
+      }
+
+      const info = viaje.descuentoInfo;
+      if (!info) throw new HttpsError("failed-precondition", "Este viaje no tiene descuento");
+      if (info.consumido === true) {
+        throw new HttpsError("already-exists", "Ese descuento ya se cobró");
+      }
+
+      // Mismo trato del código que hacía la app: solo las cifras.
+      const guardado = String(info.codigoVerificacion || "").trim().replace(/\D/g, "");
+      const escrito = String(codigo).trim().replace(/\D/g, "");
+      if (!guardado || guardado !== escrito) {
+        throw new HttpsError("permission-denied", "Código incorrecto. Verifícalo con el pasajero");
+      }
+
+      const monto = info.descuentoAplicado || 0;
+
+      // Todas las lecturas ANTES de escribir: lo exige la transacción.
+      const snapConductor = await t.get(refConductor);
+      const saldoActual = snapConductor.exists ? (snapConductor.data().creditos || 0) : 0;
+
+      // El promoId y el pasajeroId salen del viaje, y hoy el viaje lo puede
+      // escribir cualquiera (REGLA 9). Un id con una barra dentro revienta la
+      // ruta del documento — y si eso pasara aquí, se llevaría por delante el
+      // COBRO del conductor. Lo cazó una prueba el 24-ago-2026. Si el id viene
+      // raro, no se cuenta el uso, pero el conductor cobra igual.
+      const idSano = (v) => typeof v === "string" && v.length > 0 && !v.includes("/");
+      let refUso = null; let usosPrevios = 0;
+      if (idSano(info.promoId) && idSano(viaje.pasajeroId)) {
+        refUso = db.collection("promociones").doc(info.promoId).collection("usos").doc(viaje.pasajeroId);
+        const snapUso = await t.get(refUso);
+        usosPrevios = snapUso.exists ? (snapUso.data().veces || 0) : 0;
+      }
+
+      const fechaUso = new Date().toISOString();
+
+      t.update(refViaje, { "descuentoInfo.consumido": true });
+      t.set(refConductor, { creditos: saldoActual + monto }, { merge: true });
+
+      if (refUso) {
+        // Este contador es el que hace de verdad el tope por persona: lo lee
+        // reclamarPromocion. Cuenta descuentos USADOS, no reclamados.
+        t.set(refUso, { veces: usosPrevios + 1, ultimaFecha: fechaUso }, { merge: true });
+      }
+
+      return { monto, saldo: saldoActual + monto, promoId: refUso ? info.promoId : null, pasajeroId: viaje.pasajeroId, fechaUso };
+    });
+  } catch (e) {
+    if (e instanceof HttpsError) throw e;
+    console.error("Error consumirDescuentoViaje:", e.message);
+    throw new HttpsError("internal", "Error al verificar. Intenta de nuevo");
+  }
+
+  // La ANALÍTICA del panel va APARTE y no bloquea el cobro — igual que hacía la
+  // app, y por una razón que encontró la segunda opinión del 24-ago-2026:
+  // 'historialUsos' es una lista que crece dentro del documento de la promoción,
+  // y Firestore corta cualquier documento en 1 MB. A unos 120 bytes por apunte,
+  // sobre los 8.000 usos ese documento revienta. Si esto viviera dentro de la
+  // transacción, a partir de ahí NINGÚN conductor de esa promoción volvería a
+  // cobrar — con el pasajero delante. La plata va primero; el informe, después.
+  // (La lista sin tope es deuda vieja: guajirago-admin/Promociones.js:228.)
+  if (resultado.promoId && resultado.pasajeroId) {
+    try {
+      const refPromo = db.collection("promociones").doc(resultado.promoId);
+      await db.runTransaction(async (t) => {
+        const snapPromo = await t.get(refPromo);
+        if (!snapPromo.exists) return;
+        const promo = snapPromo.data() || {};
+        t.update(refPromo, {
+          usosTotales: (promo.usosTotales || 0) + 1,
+          inversionTotal: (promo.inversionTotal || 0) + resultado.monto,
+          historialUsos: [...(promo.historialUsos || []),
+            { usuarioId: resultado.pasajeroId, fecha: resultado.fechaUso, valor: resultado.monto }],
+        });
+      });
+    } catch (ePromo) {
+      console.error("consumirDescuentoViaje: el cobro SI se hizo, falló solo la analítica:", ePromo.message);
+    }
+  }
+
+  return { monto: resultado.monto, saldo: resultado.saldo };
+});

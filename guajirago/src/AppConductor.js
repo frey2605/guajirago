@@ -1060,53 +1060,18 @@ const cargarSaldo = useCallback(async (uid) => {
   const verificarCodigoDescuento = async () => {
     if (!viajeActual) return;
     try {
-      const info = viajeActual.descuentoInfo;
-      const codigoGuardado = String(info?.codigoVerificacion || '').trim().replace(/\D/g, '');
-      const codigoEscrito = codigoDescuentoIngresado.trim().replace(/\D/g, '');
-      if (!info || !codigoGuardado || codigoGuardado !== codigoEscrito) {
-        setErrorCodigoDescuento('Código incorrecto. Verifícalo con el pasajero');
-        return;
-      }
-
-      const montoDescuento = info.descuentoAplicado || 0;
-
-      // 1) Marcar el descuento como consumido en el VIAJE (el conductor sí puede escribir su propio viaje).
-      //    El pasajero, al ver consumido:true en su listener del viaje, borra él mismo su descuentoPendiente.
-      await updateDoc(doc(db, 'viajes', viajeActual.id), { 'descuentoInfo.consumido': true });
-
-      // 2) Acreditar el saldo al conductor en SU PROPIO documento (siempre permitido por las reglas).
-      const userConductor = auth.currentUser;
-      if (userConductor) {
-        const snapUC = await getDoc(doc(db, 'usuarios', userConductor.uid));
-        const saldoActual = snapUC.exists() ? (snapUC.data().creditos || 0) : 0;
-        const nuevoSaldo = saldoActual + montoDescuento;
-        await setDoc(doc(db, 'usuarios', userConductor.uid), { creditos: nuevoSaldo }, { merge: true });
-        setSaldoCreditos(nuevoSaldo);
-        setSaldoVirtualRecibido(montoDescuento);
-      }
-
-      // 3) Registro de uso de la promoción (analítica para el admin). Va en su PROPIO try
-      //    para que, si las reglas de Firestore no lo permiten, NO bloquee el cierre del viaje
-      //    ni el saldo ya acreditado al conductor.
-      try {
-        const refPromo = doc(db, 'promociones', info.promoId);
-        const refUso = doc(db, 'promociones', info.promoId, 'usos', viajeActual.pasajeroId);
-        const snapUso = await getDoc(refUso);
-        const usosPrevios = snapUso.exists() ? (snapUso.data().veces || 0) : 0;
-        const fechaUso = new Date().toISOString();
-        await setDoc(refUso, { veces: usosPrevios + 1, ultimaFecha: fechaUso }, { merge: true });
-
-        const snapPromo = await getDoc(refPromo);
-        if (snapPromo.exists()) {
-          const dPromo = snapPromo.data();
-          const historialPrevio = dPromo.historialUsos || [];
-          await updateDoc(refPromo, {
-            usosTotales: (dPromo.usosTotales || 0) + 1,
-            inversionTotal: (dPromo.inversionTotal || 0) + montoDescuento,
-            historialUsos: [...historialPrevio, { usuarioId: viajeActual.pasajeroId, fecha: fechaUso, valor: montoDescuento }],
-          });
-        }
-      } catch (ePromo) {}
+      // REGLA 7 — esto ya NO se hace aquí. Hasta el 24-ago-2026 este teléfono
+      // comparaba el código, marcaba el descuento como consumido y SE ACREDITABA
+      // los créditos a sí mismo. Ahora lo hace el servidor de una pieza
+      // (functions: consumirDescuentoViaje): o se marca y se cobra, o no pasa nada.
+      // OJO: el código sigue viajando dentro del viaje, que el conductor puede
+      // leer — esconderlo (como el código de seguridad, en viajes/{id}/privado)
+      // es trabajo aparte, anotado en la función del servidor.
+      const consumir = httpsCallable(getFunctions(), 'consumirDescuentoViaje');
+      const respuesta = await consumir({ viajeId: viajeActual.id, codigo: codigoDescuentoIngresado });
+      const montoDescuento = (respuesta && respuesta.data && respuesta.data.monto) || 0;
+      const nuevoSaldo = respuesta && respuesta.data && respuesta.data.saldo;
+      if (typeof nuevoSaldo === 'number') setSaldoCreditos(nuevoSaldo);
 
       // Cerrar el modal del código y mostrar la pantalla de celebración.
       // El cierre real del viaje (y el paso a calificación) ocurre cuando el
@@ -1116,7 +1081,11 @@ const cargarSaldo = useCallback(async (uid) => {
       setErrorCodigoDescuento('');
       setSaldoVirtualRecibido(montoDescuento);
     } catch (e) {
-      setErrorCodigoDescuento('Error al verificar. Intenta de nuevo');
+      // El motivo lo explica el servidor ("Código incorrecto. Verifícalo con el
+      // pasajero", "Ese descuento ya se cobró"…) y esos mensajes llevan
+      // espacios; si falla la red, la librería pone el código pelado.
+      const delServidor = e && e.message && e.message.includes(' ');
+      setErrorCodigoDescuento(delServidor ? e.message : 'Error al verificar. Intenta de nuevo');
     }
   };
 

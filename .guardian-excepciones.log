@@ -17,3 +17,9 @@
   codigo saltar de Creditos.js y Promociones.js a functions/index.js. Los cinco archivos
   implicados estaban DECLARADOS en la foto. La cuenta se copio tal cual; lo unico que cambia a
   proposito es que el tipo de cuenta se lee de la ficha y no de lo que mande el telefono.
+
+2026-08-24 REGLA 7 parte 2 — "CODIGO MOVIDO" avisado por el guardian, con permiso EXPRESO del
+  dueno ("Extiende y despliega para terminar los 10 pasos"). Mover el consumo del descuento de
+  AppConductor.js al servidor ES el arreglo: el conductor comparaba el codigo contra el que el
+  mismo podia leer en el viaje, se acreditaba los creditos y apuntaba el uso de la promocion.
+  Los tres archivos estaban DECLARADOS en la foto de la parte 2.
