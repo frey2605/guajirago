@@ -1,6 +1,18 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    // ── ¿QUIEN ES DEL PANEL? ──────────────────────────────────────────────────
+    // Se pregunta por el campo 'rol' de la ficha de quien llama. Desde la REGLA 1
+    // ese campo ya no lo puede escribir el dueño de la ficha, así que la respuesta
+    // es de fiar. Usa .get('rol','') a propósito: medido el 23-ago-2026, 8 de las
+    // 10 fichas NO tienen el campo, y preguntar por un campo que no existe da error.
+    function esAdmin() {
+      return request.auth != null && (
+        get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.get('rol', '') == 'admin' ||
+        get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.get('rol', '') == 'superadmin'
+      );
+    }
+
     match /usuarios/{userId} {
       // ── REGLA 1 · LA LLAVE MAESTRA ──────────────────────────────────────────
       // Hasta el 23-ago-2026 el dueño de una ficha podía escribir CUALQUIER campo
@@ -57,7 +69,38 @@ service cloud.firestore {
       allow delete: if false;
     }
     match /viajes/{viajeId} {
-      allow read: if request.auth != null;
+      // ── REGLA 6 · UN VIAJE ES DE QUIEN VIAJA ─────────────────────────────────
+      // Hasta el 23-ago-2026 cualquier usuario registrado leía LOS 91 viajes.
+      // Medido ese día, los 91 llevan dentro: nombre y correo del pasajero, su
+      // código de seguridad, la dirección de recogida, la de destino y sus
+      // coordenadas exactas. 78 llevan además el teléfono del conductor.
+      //
+      // Se usa .get(campo, '') porque 13 viajes no tienen conductorId todavía, y
+      // preguntar por un campo que no existe da error.
+      function esMio() {
+        return resource.data.get('pasajeroId', '') == request.auth.uid
+            || resource.data.get('conductorId', '') == request.auth.uid;
+      }
+      // El MERCADO: los que están buscando taxi. El conductor TIENE que verlos —
+      // es el negocio (AppConductor.js:847). Los 82 terminados o cancelados no
+      // están aquí: esos dejan de verse.
+      function enElMercado() {
+        return resource.data.get('estado', '') in
+          ['esperando', 'en_negociacion', 'confirmando', 'contraoferta'];
+      }
+      // El conductor que DEJÓ UNA OFERTA sigue viendo el viaje aunque lo pierda.
+      // Sin esto, en cuanto el pasajero elige a otro, la app del que perdió deja de
+      // poder mirar el viaje y la tarjeta se le queda pegada en la pantalla
+      // (AppConductor.js:654 vigila el viaje justo para enterarse de que perdió).
+      // OJO CON EL ORDEN: esta pregunta necesita un viaje CONCRETO. Cuando el panel
+      // pide la LISTA entera no hay uno concreto y la comprobación revienta, así que
+      // va la ÚLTIMA — para entonces el panel ya salió por esAdmin(). Comprobado: si
+      // se pone antes, el panel se queda ciego.
+      function dejoUnaOferta() {
+        return exists(/databases/$(database)/documents/viajes/$(viajeId)/contraofertas/$(request.auth.uid));
+      }
+      allow read: if request.auth != null
+        && (esMio() || enElMercado() || esAdmin() || dejoUnaOferta());
       allow create, update: if request.auth != null;
       allow delete: if false;
       match /contraofertas/{conductorId} {
@@ -80,8 +123,20 @@ service cloud.firestore {
         allow delete: if false;
       }
       match /mensajes/{mensajeId} {
-        allow read: if request.auth != null;
-        allow create, update: if request.auth != null;
+        // ── REGLA 6 · EL CHAT ES DE LOS DOS QUE VIAJAN ──────────────────────
+        // Hasta el 23-ago-2026 cualquier usuario registrado podía LEER el chat de
+        // cualquier viaje, y además ESCRIBIR dentro haciéndose pasar por el
+        // conductor o por la pasajera. Solo lo usan esos dos (Solicitar.js:740 y
+        // :752, SolicitarMensajeria.js:745 y :757, AppConductor.js:1106 y :1118).
+        function elViaje() {
+          return get(/databases/$(database)/documents/viajes/$(viajeId)).data;
+        }
+        function vaEnEsteViaje() {
+          return elViaje().get('pasajeroId', '') == request.auth.uid
+              || elViaje().get('conductorId', '') == request.auth.uid;
+        }
+        allow read: if request.auth != null && (vaEnEsteViaje() || esAdmin());
+        allow create, update: if request.auth != null && (vaEnEsteViaje() || esAdmin());
         allow delete: if false;
       }
     }
@@ -105,7 +160,16 @@ service cloud.firestore {
       allow delete: if false;
     }
     match /codigos/{codigoId} {
-      allow read: if request.auth != null;
+      // ── REGLA 6 · LOS CODIGOS DE RECARGA NO SE LISTAN ────────────────────────
+      // Hasta el 23-ago-2026 cualquier usuario registrado podía pedir la LISTA
+      // entera y ver cuáles seguían sin usar. Medido ese día: 8 códigos, 3 sin
+      // usar, por $100.800 de verdad.
+      //
+      // 'get' = pedir UN código por su nombre. Es lo que hace el canje
+      // (Creditos.js:111), y sigue permitido: hay que saberse el código.
+      // 'list' = pedir el montón. Solo el panel (App.js:367, Codigos.js:158).
+      allow get: if request.auth != null;
+      allow list: if esAdmin();
       allow create, update: if request.auth != null;
       allow delete: if false;
     }

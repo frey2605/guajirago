@@ -535,3 +535,155 @@ describe('REGLA 2 · la oferta la firma su conductor', () => {
     await RUT.assertSucceeds(getDoc(doc(como('conductor1'), 'viajes/viaje1/contraofertas/conductor1')));
   });
 });
+
+// ── REGLA 6 · CADA QUIEN VE LO SUYO ─────────────────────────────────────────
+// Medido el 23-ago-2026: cualquier usuario registrado leía los 91 viajes (con
+// nombre, correo, código de seguridad, direcciones y coordenadas del pasajero),
+// el chat de cualquier viaje, y la lista entera de códigos de recarga — 3 sin
+// usar por $100.800.
+describe('REGLA 6 · cada quien ve lo suyo', () => {
+  /** Un viaje YA TERMINADO, que no es de nadie de la prueba. */
+  const sembrarTerminado = async () => {
+    await entorno.withSecurityRulesDisabled(async (ctx) => {
+      const { doc, setDoc } = FS;
+      await setDoc(doc(ctx.firestore(), 'viajes/terminado1'), {
+        pasajeroId: 'otraPersona', conductorId: 'otroConductor', estado: 'finalizado',
+        pasajeroNombre: 'Ana', pasajeroEmail: 'ana@ejemplo.com',
+        codigoSeguridad: '1204', origen: 'Calle 1 #2-3', destino: 'Calle 9',
+        pasajeroLat: 11.5, pasajeroLng: -72.9,
+      });
+    });
+  };
+
+  // ── los códigos de recarga ──
+  it('el conductor sigue pudiendo canjear UN código (Creditos.js:111)', async () => {
+    const { doc, getDoc } = FS;
+    await RUT.assertSucceeds(getDoc(doc(como('conductor1'), 'codigos/cod1')));
+  });
+
+  it('un cualquiera NO puede pedir la LISTA de códigos', async () => {
+    const { collection, getDocs } = FS;
+    await RUT.assertFails(getDocs(collection(como('pasajero1'), 'codigos')));
+  });
+
+  it('el panel SÍ puede pedir la lista de códigos (Codigos.js:158)', async () => {
+    const { collection, getDocs } = FS;
+    await RUT.assertSucceeds(getDocs(collection(como('eladmin'), 'codigos')));
+  });
+
+  // ── los viajes ──
+  it('el pasajero sigue viendo SU viaje (Solicitar.js:542)', async () => {
+    const { doc, getDoc } = FS;
+    await RUT.assertSucceeds(getDoc(doc(como('pasajero1'), 'viajes/viaje1')));
+  });
+
+  it('un extraño NO puede ver un viaje TERMINADO ajeno', async () => {
+    await sembrarTerminado();
+    const { doc, getDoc } = FS;
+    await RUT.assertFails(getDoc(doc(como('pasajero1'), 'viajes/terminado1')));
+  });
+
+  it('un extraño NO puede pedir la lista de TODOS los viajes', async () => {
+    await sembrarTerminado();
+    const { collection, getDocs } = FS;
+    await RUT.assertFails(getDocs(collection(como('pasajero1'), 'viajes')));
+  });
+
+  it('el conductor SIGUE viendo el mercado, que es el negocio (AppConductor.js:847)', async () => {
+    const { collection, query, where, getDocs } = FS;
+    await RUT.assertSucceeds(getDocs(query(
+      collection(como('conductor1'), 'viajes'),
+      where('estado', 'in', ['esperando', 'en_negociacion', 'confirmando', 'contraoferta'])
+    )));
+  });
+
+  it('el conductor SIGUE viendo sus propios viajes (AppConductor.js:235)', async () => {
+    const { collection, query, where, getDocs } = FS;
+    await RUT.assertSucceeds(getDocs(query(
+      collection(como('conductor1'), 'viajes'), where('conductorId', '==', 'conductor1')
+    )));
+  });
+
+  it('el pasajero SIGUE viendo su historial (MisViajes.js:17)', async () => {
+    const { collection, query, where, getDocs } = FS;
+    await RUT.assertSucceeds(getDocs(query(
+      collection(como('pasajero1'), 'viajes'), where('pasajeroId', '==', 'pasajero1')
+    )));
+  });
+
+  it('el conductor SIGUE viendo sus ganancias (Ganancias.js:32)', async () => {
+    const { collection, query, where, getDocs } = FS;
+    await RUT.assertSucceeds(getDocs(query(
+      collection(como('conductor1'), 'viajes'),
+      where('conductorId', '==', 'conductor1'), where('estado', '==', 'finalizado')
+    )));
+  });
+
+  it('el panel SIGUE viendo todos los viajes (Viajes.js:27)', async () => {
+    await sembrarTerminado();
+    const { collection, getDocs } = FS;
+    await RUT.assertSucceeds(getDocs(collection(como('eladmin'), 'viajes')));
+  });
+
+  // El caso que casi se me escapa: el conductor que oferta y PIERDE. Su app vigila
+  // el viaje justo para enterarse de que perdió (AppConductor.js:654). Si al perder
+  // dejara de poder mirarlo, la tarjeta se le quedaría pegada en la pantalla.
+  it('el conductor que ofertó y PERDIÓ sigue pudiendo mirar el viaje', async () => {
+    await entorno.withSecurityRulesDisabled(async (ctx) => {
+      const { doc, setDoc } = FS;
+      await setDoc(doc(ctx.firestore(), 'viajes/viaje1'),
+        { pasajeroId: 'pasajero1', conductorId: 'otroQueGano', estado: 'aceptado' });
+      await setDoc(doc(ctx.firestore(), 'viajes/viaje1/contraofertas/conductor1'), { monto: 11000 });
+    });
+    const { doc, getDoc } = FS;
+    await RUT.assertSucceeds(getDoc(doc(como('conductor1'), 'viajes/viaje1')));
+  });
+
+  it('pero un conductor que NUNCA ofertó no puede mirarlo', async () => {
+    await entorno.withSecurityRulesDisabled(async (ctx) => {
+      const { doc, setDoc } = FS;
+      await setDoc(doc(ctx.firestore(), 'viajes/viaje1'),
+        { pasajeroId: 'pasajero1', conductorId: 'otroQueGano', estado: 'aceptado' });
+    });
+    const { doc, getDoc } = FS;
+    await RUT.assertFails(getDoc(doc(como('castigado'), 'viajes/viaje1')));
+  });
+
+  // ── el chat del viaje ──
+  it('el pasajero SIGUE leyendo su chat (Solicitar.js:740)', async () => {
+    const { doc, getDoc } = FS;
+    await RUT.assertSucceeds(getDoc(doc(como('pasajero1'), 'viajes/viaje1/mensajes/m1')));
+  });
+
+  it('un extraño NO puede leer el chat de un viaje ajeno', async () => {
+    const { doc, getDoc } = FS;
+    await RUT.assertFails(getDoc(doc(como('castigado'), 'viajes/viaje1/mensajes/m1')));
+  });
+
+  it('un extraño NO puede ESCRIBIR en el chat haciéndose pasar por otro', async () => {
+    const { doc, setDoc } = FS;
+    await RUT.assertFails(
+      setDoc(doc(como('castigado'), 'viajes/viaje1/mensajes/falso'),
+        { texto: 'soy tu conductor, sal a la calle', autor: 'conductor' })
+    );
+  });
+
+  it('el pasajero SIGUE pudiendo escribir en su chat (Solicitar.js:752)', async () => {
+    const { doc, setDoc } = FS;
+    await RUT.assertSucceeds(
+      setDoc(doc(como('pasajero1'), 'viajes/viaje1/mensajes/m2'), { texto: 'ya bajo', autor: 'pasajero' })
+    );
+  });
+
+  it('el conductor asignado SIGUE pudiendo escribir (AppConductor.js:1118)', async () => {
+    await entorno.withSecurityRulesDisabled(async (ctx) => {
+      const { doc, setDoc } = FS;
+      await setDoc(doc(ctx.firestore(), 'viajes/viaje1'),
+        { pasajeroId: 'pasajero1', conductorId: 'conductor1', estado: 'aceptado' });
+    });
+    const { doc, setDoc } = FS;
+    await RUT.assertSucceeds(
+      setDoc(doc(como('conductor1'), 'viajes/viaje1/mensajes/m3'), { texto: 'voy llegando', autor: 'conductor' })
+    );
+  });
+});
