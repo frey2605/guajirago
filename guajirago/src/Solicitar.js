@@ -12,8 +12,9 @@ import { CONFIG_TARIFAS_DEFECTO, calcularTarifaMinima } from './tarifas';
 import { aplicarDescuento, armarDescuentoInfo, tarifaParaPasajero } from './descuentos';
 import { generarCodigoSeguridad, guardarCodigoDeViaje, cargarCodigoDeViaje } from './codigoSeguridad';
 import { armarViajeNuevo } from './viajeNuevo';
-
-const centroRiohacha = { lat: 11.5444, lng: -72.9072 };
+// Los datos que comparten las pantallas salen de archivos únicos (SEGUNDA LEY).
+import { centroRiohacha, BOUNDS_RIOHACHA } from './riohacha';
+import { RESPUESTAS_RAPIDAS, RAZONES_CANCELACION_PASAJERO } from './textosViaje';
 
 // Valores por defecto (respaldo). Se reemplazan por los de config/global cuando cargan.
 const CONFIG_APP_DEFECTO = {
@@ -31,24 +32,8 @@ const CONFIG_APP_DEFECTO = {
 
 // La tarifa mínima ya NO se calcula aquí: vive en tarifas.js, que es el único sitio
 // donde se calcula para toda la app (SEGUNDA LEY). Se importa arriba.
-const BOUNDS_RIOHACHA = { north: 11.7, south: 11.3, east: -72.6, west: -73.0 };
-
-const RESPUESTAS_RAPIDAS = [
-  '🏃 Ya voy saliendo',
-  '⏳ Dame un momento',
-  '👀 No te veo, ¿dónde estás?',
-  '📍 Estoy en la entrada',
-  '✅ Ya estoy afuera',
-];
-
-const RAZONES_CANCELACION_PASAJERO = [
-  'Me equivoqué de dirección',
-  'El conductor tarda mucho',
-  'Conseguí otro transporte',
-  'Emergencia personal',
-  'Otro motivo',
-];
-
+// El centro y el marco de Riohacha, las respuestas rápidas y las razones de
+// cancelación tampoco: viven en riohacha.js y textosViaje.js. Se importan arriba.
 
 function Celebracion() {
   return (

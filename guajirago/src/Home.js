@@ -11,10 +11,10 @@ import Promociones from './Promociones';
 import Logo from './Logo';
 import { auth, db } from './firebase';
 import { collection, query, where, limit, getDocs, doc, getDoc, onSnapshot, updateDoc } from 'firebase/firestore';
+// El marco de Riohacha vive en riohacha.js (SEGUNDA LEY): un solo sitio para la geografía.
+import { BOUNDS_RIOHACHA } from './riohacha';
 
 const ICONOS_FAVORITOS = ['🏠', '💼', '❤️', '⭐', '🏥', '🏫', '🛒', '🏖️', '⛪', '🏋️'];
-
-const BOUNDS_RIOHACHA = { north: 11.7, south: 11.3, east: -72.6, west: -73.0 };
 
 function ModalFavorito({ onGuardar, onCerrar }) {
   const [nombre, setNombre] = useState('');

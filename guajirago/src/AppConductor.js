@@ -7,6 +7,9 @@ import { getFunctions, httpsCallable } from 'firebase/functions';
 import { COMISIONES_DEFECTO, comisionSegunTipo } from './comisiones';
 import { CONFIG_TARIFAS_DEFECTO, calcularTarifaMinima } from './tarifas';
 import { ESTADOS_MERCADO } from './estadosViaje';
+// Los datos que comparten las pantallas salen de archivos únicos (SEGUNDA LEY).
+import { centroRiohacha } from './riohacha';
+import { RAZONES_CANCELACION_CONDUCTOR } from './textosViaje';
 import Calificacion from './Calificacion';
 import Llamada from './Llamada';
 import Creditos from './Creditos';
@@ -18,7 +21,6 @@ import Configuracion from './Configuracion';
 import Promociones from './Promociones';
 import MenuLateral from './MenuLateral';
 import Logo from './Logo';
-const centroRiohacha = { lat: 11.5444, lng: -72.9072 };
 
 // Valores por defecto (respaldo). Se reemplazan por los de config/global cuando cargan.
 const CONFIG_APP_DEFECTO = {
@@ -62,13 +64,7 @@ function calcularDistanciaKm(lat1, lng1, lat2, lng2) {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-const RAZONES_CANCELACION_CONDUCTOR = [
-  'El pasajero no aparece',
-  'Dirección incorrecta o no la encuentro',
-  'El pasajero solicitó algo diferente',
-  'Problema con el vehículo',
-  'Otro motivo',
-];
+// Las razones de cancelación viven en textosViaje.js (SEGUNDA LEY). Se importan arriba.
 
 function Celebracion() {
   return (
