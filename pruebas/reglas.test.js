@@ -12,6 +12,7 @@
  * el borrado en los otros 19 bloques no rompe nada.
  */
 const { describe, it, before, after, beforeEach } = require('node:test');
+const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
 
@@ -83,6 +84,43 @@ beforeEach(async () => {
 // ───────────────────────────────────────────────────────────────────────────
 // LO QUE ESTE ARREGLO CIERRA — el borrado desde el celular
 // ───────────────────────────────────────────────────────────────────────────
+// ── SEGUNDA LEY · LO COMPARTIDO SALE DEL MISMO SITIO ────────────────────────
+// «La información que se supone deben compartir debe salir de los mismos archivos.»
+//
+// La lista de estados del MERCADO tiene que decir lo mismo en dos sitios que NO
+// pueden compartir un archivo: la app (JavaScript) y firestore.rules (que no es
+// JavaScript y no puede importar nada).
+//
+// Si se separan no salta ningún error: al conductor le sale el mercado VACÍO y
+// nadie sabe por qué. Esta prueba es el único amarre posible — y es de verdad:
+// se pone roja antes de que nada llegue al servidor.
+describe('SEGUNDA LEY · la app y las reglas dicen lo mismo', () => {
+  /** Saca la lista de estados de un texto, en el orden en que aparece. */
+  const listaDe = (texto, desde) => {
+    const trozo = texto.slice(texto.indexOf(desde));
+    const entre = trozo.slice(trozo.indexOf('['), trozo.indexOf(']') + 1);
+    return entre.replace(/[[\]'"\s]/g, '').split(',').filter(Boolean);
+  };
+
+  it('los estados del MERCADO son los mismos en la app y en las reglas', () => {
+    const app = fs.readFileSync(path.join(RAIZ, 'guajirago/src/estadosViaje.js'), 'utf8');
+    const reglas = fs.readFileSync(path.join(RAIZ, 'firestore.rules'), 'utf8');
+
+    const deLaApp = listaDe(app, 'ESTADOS_MERCADO');
+    const deLasReglas = listaDe(reglas, 'function enElMercado()');
+
+    assert.ok(deLaApp.length > 0, 'no se encontró la lista en estadosViaje.js');
+    assert.ok(deLasReglas.length > 0, 'no se encontró la lista en enElMercado() de firestore.rules');
+    assert.deepStrictEqual(
+      [...deLaApp].sort(), [...deLasReglas].sort(),
+      'La app pide unos estados y las reglas dejan ver otros.\n' +
+      '  app (estadosViaje.js) : ' + deLaApp.join(', ') + '\n' +
+      '  reglas (enElMercado)  : ' + deLasReglas.join(', ') + '\n' +
+      '  Si se separan, al conductor le sale el mercado VACÍO y sin ningún error.'
+    );
+  });
+});
+
 describe('REGLA 12 · borrar desde el celular queda PROHIBIDO', () => {
   const noSePuedeBorrar = [
     ['un viaje (la prueba legal de que ocurrió)', 'viajes/viaje1'],

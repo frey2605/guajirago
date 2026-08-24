@@ -5,6 +5,7 @@ import { registrarTokenFCM, alertarNuevoViaje, activarAudioiOS, precargarAudio, 
 import { signOut } from 'firebase/auth';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { COMISIONES_DEFECTO, comisionSegunTipo } from './comisiones';
+import { ESTADOS_MERCADO } from './estadosViaje';
 import Calificacion from './Calificacion';
 import Llamada from './Llamada';
 import Creditos from './Creditos';
@@ -841,7 +842,9 @@ const cargarSaldo = useCallback(async (uid) => {
   useEffect(() => {
     if (!activo) { setSolicitudes([]); solicitudesIdsRef.current.clear(); return; }
     const VENTANA_MS = 2 * 60 * 1000;
-    const q = query(collection(db, 'viajes'), where('estado', 'in', ['esperando', 'en_negociacion', 'confirmando', 'contraoferta']));
+    // SEGUNDA LEY — la lista vive en estadosViaje.js, y una prueba la ata a
+    // firestore.rules para que no puedan separarse en silencio.
+    const q = query(collection(db, 'viajes'), where('estado', 'in', ESTADOS_MERCADO));
     const unsub = onSnapshot(q, (snap) => {
       const ahora = Date.now();
       const tsDe = (v) => new Date(v.nuevaOferta || v.fechaSolicitud).getTime();
