@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { db, storage } from './firebase';
 // El formateador de pesos vive en moneda.js: un solo sitio (SEGUNDA LEY).
 import { cop } from './moneda';
+// Y el filtro anti-datos de los chats, en filtroChat.js — amarrado al panel.
+import { contieneInfoSensible } from './filtroChat';
 import {
   collection,
   onSnapshot,
@@ -209,17 +211,9 @@ function Restaurantes({ nombre, onVolver, foto, onCerrarSesion, onIrPerfil, onIr
     );
   };
 
-  // Detecta teléfonos, correos o menciones a redes/WhatsApp en el chat,
-  // para que el pago se coordine siempre dentro de la app.
-  const contieneInfoSensible = (texto) => {
-    const limpio = texto.toLowerCase();
-    const patronTelefono = /(\+?\d[\s.-]?){7,}/;
-    const patronCorreo = /[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/i;
-    const palabrasProhibidas = ['whatsapp', 'wasap', 'wapp', 'instagram', 'facebook', 'telegram', 'llamame', 'llámame', 'numero', 'número'];
-    if (patronTelefono.test(texto)) return true;
-    if (patronCorreo.test(texto)) return true;
-    return palabrasProhibidas.some((p) => limpio.includes(p));
-  };
+  // El filtro anti-datos ya NO vive aquí: está en filtroChat.js, el único
+  // sitio para todos los chats (SEGUNDA LEY). Esta era la copia FLOJA: dejaba
+  // pasar gmail, correo, celular, tiktok... Ahora bloquea lo mismo que todos.
 
   // ---------- Carrito ----------
   const nuevaLineaId = () => 'l_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);

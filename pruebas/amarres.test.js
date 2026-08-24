@@ -73,6 +73,36 @@ describe('AMARRES · la app y el servidor miden la distancia IGUAL', () => {
   });
 });
 
+describe('AMARRES · el filtro anti-datos juzga IGUAL en la app y en el panel', () => {
+  it('las dos copias dan el mismo veredicto con la misma batería de mensajes', () => {
+    // La app filtra con filtroChat.js; el panel (Codigos.js, otro repo que no
+    // puede importarla) tiene su propia copia. Si divergen, lo que un chat
+    // bloquea el otro lo deja pasar — ya pasó: la copia del restaurante dejaba
+    // pasar «gmail» y «celular» hasta el 24-ago-2026. Aquí se EJECUTAN las dos.
+    const { contieneInfoSensible } = cargarDeLaApp('guajirago/src/filtroChat.js');
+
+    const panel = leer('guajirago-admin/src/Codigos.js');
+    const trozo = panel.match(/function contieneInfoSensibleAdmin\([\s\S]*?\n\}/);
+    assert.ok(trozo, 'el panel ya no tiene contieneInfoSensibleAdmin en Codigos.js');
+    // eslint-disable-next-line no-new-func
+    const delPanel = new Function(trozo[0] + '\nreturn contieneInfoSensibleAdmin;')();
+
+    const BATERIA = [
+      'llámame al 3001234567', '300 123 4567', '3+0+0+1+2+3+4+5+6+7', 'juan@correo.com',
+      'whatsapp', 'whats app', 'wasap', 'wapp', 'instagram', 'facebook',
+      'telegram', 'tiktok', 'correo', 'email', 'gmail', 'hotmail',
+      'dame tu celular', 'tu numero', 'tu número', 'llamame', 'llámame',
+      'ya salió tu pedido', 'la casa de rejas blancas', 'recargué 20 mil', 'el código es 1234',
+    ];
+    for (const mensaje of BATERIA) {
+      assert.strictEqual(contieneInfoSensible(mensaje), delPanel(mensaje),
+        'Con «' + mensaje + '» la app dice ' + contieneInfoSensible(mensaje) + ' y el panel ' +
+        delPanel(mensaje) + '. Las dos listas se separaron: se cambian LOS DOS lados ' +
+        '(filtroChat.js y Codigos.js).');
+    }
+  });
+});
+
 describe('AMARRES · el formateador de pesos escribe IGUAL en las dos apps', () => {
   it('las dos moneda.js (app y aliados) formatean idéntico, incluido el dato vacío', () => {
     // Son gemelas a propósito: los repos no pueden compartir archivo. Este

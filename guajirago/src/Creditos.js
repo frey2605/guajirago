@@ -3,17 +3,9 @@ import { db, auth, storage } from './firebase';
 import Logo from './Logo';
 import { doc, getDoc, updateDoc, runTransaction, onSnapshot } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-
-function contieneInfoSensible(texto) {
-  const limpio = texto.toLowerCase();
-  // Secuencias de 7+ dígitos seguidos (posible teléfono)
-  if (/\d{7,}/.test(texto.replace(/[\s.-]/g, ''))) return true;
-  // Correos electrónicos
-  if (/[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/i.test(texto)) return true;
-  // Menciones a redes o apps de contacto externo
-  const palabrasBloqueadas = ['whatsapp', 'whats app', 'wasap', 'instagram', 'facebook', 'telegram', 'tiktok', 'correo', 'email', 'gmail', 'hotmail', 'llamame', 'llámame', 'celular', 'numero', 'número'];
-  return palabrasBloqueadas.some(p => limpio.includes(p));
-}
+// El filtro anti-datos vive en filtroChat.js: un solo sitio para todos los
+// chats de la app (SEGUNDA LEY), amarrado por prueba a la copia del panel.
+import { contieneInfoSensible } from './filtroChat';
 
 function Creditos({ onVolver }) {
   const [saldo, setSaldo] = useState(null);
