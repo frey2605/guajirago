@@ -682,6 +682,59 @@ describe('REGLA 6 · cada quien ve lo suyo', () => {
     await RUT.assertFails(getDoc(doc(como('castigado'), 'viajes/viaje1')));
   });
 
+  // ── el cajón privado: el código de seguridad (REGLAS 5 y 11) ──
+  const sembrarCodigo = async () => {
+    await entorno.withSecurityRulesDisabled(async (ctx) => {
+      const { doc, setDoc } = FS;
+      await setDoc(doc(ctx.firestore(), 'viajes/viaje1/privado/seguridad'), { codigo: '4821' });
+    });
+  };
+
+  it('la pasajera SÍ ve su código, que es quien se lo dice al conductor', async () => {
+    await sembrarCodigo();
+    const { doc, getDoc } = FS;
+    await RUT.assertSucceeds(getDoc(doc(como('pasajero1'), 'viajes/viaje1/privado/seguridad')));
+  });
+
+  it('NI SIQUIERA el conductor asignado puede LEER el código', async () => {
+    await sembrarCodigo();
+    await entorno.withSecurityRulesDisabled(async (ctx) => {
+      const { doc, setDoc } = FS;
+      await setDoc(doc(ctx.firestore(), 'viajes/viaje1'),
+        { pasajeroId: 'pasajero1', conductorId: 'conductor1', estado: 'aceptado' });
+    });
+    const { doc, getDoc } = FS;
+    await RUT.assertFails(getDoc(doc(como('conductor1'), 'viajes/viaje1/privado/seguridad')));
+  });
+
+  it('un conductor cualquiera del mercado TAMPOCO lo ve — era el agujero', async () => {
+    await sembrarCodigo();
+    const { doc, getDoc } = FS;
+    await RUT.assertFails(getDoc(doc(como('castigado'), 'viajes/viaje1/privado/seguridad')));
+  });
+
+  it('la pasajera puede guardar su código al pedir el viaje (Solicitar.js:964)', async () => {
+    const { doc, setDoc } = FS;
+    await RUT.assertSucceeds(
+      setDoc(doc(como('pasajero1'), 'viajes/viaje1/privado/seguridad'), { codigo: '1234' })
+    );
+  });
+
+  it('nadie puede poner un código en el viaje de otra persona', async () => {
+    const { doc, setDoc } = FS;
+    await RUT.assertFails(
+      setDoc(doc(como('castigado'), 'viajes/viaje1/privado/seguridad'), { codigo: '0000' })
+    );
+  });
+
+  it('el código no se puede CAMBIAR una vez puesto, ni por la dueña', async () => {
+    await sembrarCodigo();
+    const { doc, updateDoc } = FS;
+    await RUT.assertFails(
+      updateDoc(doc(como('pasajero1'), 'viajes/viaje1/privado/seguridad'), { codigo: '0000' })
+    );
+  });
+
   // ── el chat del viaje ──
   it('el pasajero SIGUE leyendo su chat (Solicitar.js:740)', async () => {
     const { doc, getDoc } = FS;

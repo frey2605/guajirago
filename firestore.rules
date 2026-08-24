@@ -117,6 +117,25 @@ service cloud.firestore {
         && (esMio() || enElMercado() || esAdmin() || dejoUnaOferta());
       allow create, update: if request.auth != null;
       allow delete: if false;
+      // ── REGLAS 5 y 11 · EL CAJON PRIVADO DEL VIAJE ─────────────────────────
+      // Aquí vive el código de seguridad. SOLO lo ve la pasajera que lo va a decir.
+      // El conductor NO puede leerlo: pregunta si el que le dijeron es el bueno, y
+      // esa comparación la hace el servidor (functions: verificarCodigoViaje).
+      // Antes el código iba dentro del viaje y lo leía cualquiera que mirase el
+      // mercado — o sea, no protegía de nada.
+      match /privado/{docPrivado} {
+        function elViaje() {
+          return get(/databases/$(database)/documents/viajes/$(viajeId)).data;
+        }
+        allow read: if request.auth != null
+          && (elViaje().get('pasajeroId', '') == request.auth.uid || esAdmin());
+        // Se escribe UNA vez, al pedir el viaje, y no se vuelve a tocar: si se
+        // pudiera cambiar, el impostor pondría el suyo.
+        allow create: if request.auth != null
+          && elViaje().get('pasajeroId', '') == request.auth.uid;
+        allow update, delete: if false;
+      }
+
       match /contraofertas/{conductorId} {
         // ── REGLA 2 · LA OFERTA LA FIRMA SU CONDUCTOR ────────────────────────
         // Hasta el 23-ago-2026 cualquiera podía escribir una oferta a nombre de

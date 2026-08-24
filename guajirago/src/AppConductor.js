@@ -3,6 +3,7 @@ import { db, auth } from './firebase';
 import { collection, query, where, limit, onSnapshot, doc, updateDoc, setDoc, getDoc, getDocs, addDoc, orderBy } from 'firebase/firestore';
 import { registrarTokenFCM, alertarNuevoViaje, activarAudioiOS, precargarAudio, setDebugCallback } from './Notificaciones';
 import { signOut } from 'firebase/auth';
+import { getFunctions, httpsCallable } from 'firebase/functions';
 import Calificacion from './Calificacion';
 import Llamada from './Llamada';
 import Creditos from './Creditos';
@@ -970,7 +971,10 @@ const cargarSaldo = useCallback(async (uid) => {
   const intentarIniciar = () => {
     if (!viajeActual) return;
     // Si el viaje tiene código de seguridad, pedirlo. Si no (pasajero registrado antes), iniciar directo.
-    if (viajeActual.codigoSeguridad) {
+    // REGLAS 5 y 11 — el código ya no viene dentro del viaje: aquí solo llega el
+    // aviso de que lo hay. El código vive en el cajón privado, que esta app NO
+    // puede abrir. Los viajes viejos traen 'codigoSeguridad' y siguen valiendo.
+    if (viajeActual.tieneCodigo || viajeActual.codigoSeguridad) {
       setCodigoIngresado('');
       setErrorCodigo('');
       setMostrarCodigo(true);
@@ -979,14 +983,31 @@ const cargarSaldo = useCallback(async (uid) => {
     }
   };
 
-  const verificarCodigo = () => {
-    if (codigoIngresado.trim() === String(viajeActual.codigoSeguridad).trim()) {
+  // REGLAS 5 y 11 — antes se comparaba AQUI, en el celular del conductor, lo que
+  // obligaba a que el código viniera dentro del viaje... donde lo leía cualquiera
+  // que mirase el mercado. Ahora la comparación la hace el servidor y esta app
+  // nunca ve el código: solo pregunta si el que le dijeron es el bueno.
+  // Los viajes viejos, que traen el código dentro, se siguen comparando como antes.
+  const verificarCodigo = async () => {
+    setErrorCodigo('');
+    const acertar = () => {
       setMostrarCodigo(false);
       setCodigoIngresado('');
       setErrorCodigo('');
       iniciarViaje();
-    } else {
-      setErrorCodigo('Código incorrecto. Verifícalo con el pasajero');
+    };
+    if (!viajeActual.tieneCodigo && viajeActual.codigoSeguridad) {
+      if (codigoIngresado.trim() === String(viajeActual.codigoSeguridad).trim()) acertar();
+      else setErrorCodigo('Código incorrecto. Verifícalo con el pasajero');
+      return;
+    }
+    try {
+      const preguntar = httpsCallable(getFunctions(), 'verificarCodigoViaje');
+      const res = await preguntar({ viajeId: viajeActual.id, codigo: codigoIngresado.trim() });
+      if (res && res.data && res.data.ok) acertar();
+      else setErrorCodigo('Código incorrecto. Verifícalo con el pasajero');
+    } catch (e) {
+      setErrorCodigo('No se pudo comprobar el código. Revisa tu conexión');
     }
   };
 

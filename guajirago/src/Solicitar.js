@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { db, auth } from './firebase';
 import Logo from './Logo';
-import { collection, addDoc, doc, onSnapshot, updateDoc, getDoc, query, orderBy } from 'firebase/firestore';
+import { collection, addDoc, doc, setDoc, onSnapshot, updateDoc, getDoc, query, orderBy } from 'firebase/firestore';
 import Calificacion from './Calificacion';
 import Llamada from './Llamada';
 import { alertarNuevoViaje, precargarAudio, activarAudioiOS, obtenerTokenFCM } from './Notificaciones';
@@ -404,6 +404,9 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
   const [pantalla, setPantalla] = useState('solicitar');
   const [cargando, setCargando] = useState(false);
   const [viajeId, setViajeId] = useState(null);
+  // REGLAS 5 y 11 — el código ya no viaja dentro del viaje: se lee del cajón
+  // privado, que solo puede abrir la pasajera.
+  const [codigoSeguridad, setCodigoSeguridad] = useState('');
   const [viaje, setViaje] = useState(null);
   const [error, setError] = useState('');
   const [configApp, setConfigApp] = useState(CONFIG_APP_DEFECTO);
@@ -564,6 +567,12 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
         }
       } catch (e) {}
     }, 5000);
+
+    // REGLAS 5 y 11 — si la app se cerró y se volvió a abrir con un viaje en curso,
+    // el código no está en memoria: se trae del cajón privado del viaje.
+    getDoc(doc(db, 'viajes', viajeId, 'privado', 'seguridad'))
+      .then((s) => { if (s.exists()) setCodigoSeguridad(s.data().codigo || ''); })
+      .catch(() => {});
 
     const unsub = onSnapshot(doc(db, 'viajes', viajeId), (snap) => {
       if (!snap.exists()) return;
@@ -911,17 +920,14 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
       const user = auth.currentUser;
       // Traer el nombre del pasajero guardado en su registro
       let nombrePasajero = '';
-      let codigoSeguridad = '';
+      // REGLAS 5 y 11 — el código de seguridad era el DÍA y el MES de nacimiento de
+      // la pasajera: el mismo en todos sus viajes, para siempre, y a la vista de
+      // cualquiera que mirase el mercado. Ahora son cuatro cifras al azar, distintas
+      // en cada viaje, y se guardan en el cajón privado del viaje.
+      const codigoSeguridad = String(Math.floor(1000 + Math.random() * 9000));
       try {
         const snapU = await getDoc(doc(db, 'usuarios', user.uid));
-        if (snapU.exists()) {
-          nombrePasajero = snapU.data().nombre || '';
-          const fechaNac = snapU.data().fechaNacimiento || '';
-          const partes = fechaNac.split('/');
-          if (partes.length >= 2 && partes[0] && partes[1]) {
-            codigoSeguridad = partes[0].padStart(2, '0') + partes[1].padStart(2, '0');
-          }
-        }
+        if (snapU.exists()) nombrePasajero = snapU.data().nombre || '';
       } catch (e) {}
       const tarifaConDescuento = calcularTarifaConDescuento(tarifa);
       const datosDescuento = descuentoPendiente ? {
@@ -941,7 +947,10 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
       const docRef = await addDoc(collection(db, 'viajes'), {
         pasajeroId: user.uid, pasajeroEmail: user.email,
         pasajeroNombre: nombrePasajero,
-        codigoSeguridad: codigoSeguridad,
+        // El código YA NO va aquí: dentro del viaje lo leía cualquiera. Aquí solo
+        // queda el aviso de que hay código, para que el conductor sepa que ha de
+        // pedirlo (AppConductor.js).
+        tieneCodigo: true,
         pasajeroLat: coordsRecogida.lat, pasajeroLng: coordsRecogida.lng,
         tipo, origen, destino, estado: 'esperando',
         tarifa: `$${tarifa.toLocaleString()}`, tarifaValor: tarifa,
@@ -950,6 +959,9 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
         radioBusqueda: configApp.radioBusquedaInicial,
       });
       setViajeId(docRef.id);
+      // El código, al cajón privado del viaje: ahí solo lo ve ella.
+      setCodigoSeguridad(codigoSeguridad);
+      setDoc(doc(db, 'viajes', docRef.id, 'privado', 'seguridad'), { codigo: codigoSeguridad }).catch(() => {});
       // Token del pasajero SIN bloquear la creación del viaje (el permiso de notificación puede tardar).
       obtenerTokenFCM().then((t) => { if (t) updateDoc(doc(db, 'viajes', docRef.id), { pasajeroFcmToken: t }).catch(() => {}); }).catch(() => {});
       setContraofertas([]);
@@ -1153,10 +1165,10 @@ const PanelEmergencia = () => (
         {conductorEnPunto && (
           <div style={{ position: 'absolute', top: '90px', left: '16px', right: '16px', zIndex: 10, background: 'rgba(255,255,255,0.97)', borderRadius: '20px', padding: '20px', border: '2px solid #2ECC71' }}>
             <p style={{ color: '#2ECC71', fontSize: '16px', fontWeight: '900', margin: '0 0 4px', textAlign: 'center' }}>📍 ¡Tu conductor llegó!</p>
-            {viaje?.codigoSeguridad && (
+            {codigoSeguridad && (
               <div style={{ background: 'linear-gradient(135deg, #1A1A1E, #2A2A2E)', borderRadius: '16px', padding: '16px', marginBottom: '12px', border: '2px solid #FFCF4D', textAlign: 'center' }}>
                 <p style={{ color: '#FF7A2F', fontSize: '11px', margin: '0 0 6px', letterSpacing: '2px', fontWeight: 'bold' }}>🔐 CÓDIGO DE SEGURIDAD</p>
-                <p style={{ color: '#FFFFFF', fontSize: '40px', fontWeight: '900', margin: '0', letterSpacing: '8px' }}>{viaje.codigoSeguridad}</p>
+                <p style={{ color: '#FFFFFF', fontSize: '40px', fontWeight: '900', margin: '0', letterSpacing: '8px' }}>{codigoSeguridad}</p>
                 <p style={{ color: '#6B7280', fontSize: '12px', margin: '6px 0 0' }}>Dáselo al conductor al subir</p>
               </div>
             )}
@@ -1190,10 +1202,10 @@ const PanelEmergencia = () => (
                 <div style={{ textAlign: 'right' }}><p style={{ color: '#6B7280', fontSize: '10px', margin: '0' }}>TARIFA</p><p style={{ color: '#2ECC71', fontSize: '18px', fontWeight: '900', margin: '2px 0 0' }}>{tarifaParaPasajero(viaje)}</p></div>
               </div>
             </div>
-            {viaje?.codigoSeguridad && (
+            {codigoSeguridad && (
               <div style={{ background: 'linear-gradient(135deg, #1A1A1E, #2A2A2E)', borderRadius: '16px', padding: '16px', marginTop: '12px', border: '2px solid #FFCF4D', textAlign: 'center' }}>
                 <p style={{ color: '#FF7A2F', fontSize: '11px', margin: '0 0 6px', letterSpacing: '2px', fontWeight: 'bold' }}>🔐 CÓDIGO DE SEGURIDAD</p>
-                <p style={{ color: '#FFFFFF', fontSize: '40px', fontWeight: '900', margin: '0', letterSpacing: '8px' }}>{viaje.codigoSeguridad}</p>
+                <p style={{ color: '#FFFFFF', fontSize: '40px', fontWeight: '900', margin: '0', letterSpacing: '8px' }}>{codigoSeguridad}</p>
                 <p style={{ color: '#6B7280', fontSize: '12px', margin: '6px 0 0' }}>Dáselo al conductor cuando subas</p>
               </div>
             )}

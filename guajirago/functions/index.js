@@ -378,6 +378,43 @@ exports.expirarViajesColgados = onSchedule(
 );
 
 // ─────────────────────────────────────────────────────────────────────────────
+// REGLAS 5 y 11 — VERIFICAR EL CODIGO DE SEGURIDAD, EN EL SERVIDOR
+//
+// El código que la pasajera le dice al conductor al subirse servía para comprobar
+// que ese es SU conductor. Hasta el 23-ago-2026 tenía dos fallos graves:
+//   1. NO era un código: era el día y el mes de nacimiento de la pasajera
+//      (Solicitar.js). El mismo en todos sus viajes, para siempre.
+//   2. Viajaba DENTRO del viaje, y cualquiera que mirase el mercado lo leía. Un
+//      impostor podía leerlo, plantarse y decirlo. El código no protegía de nada.
+//
+// Ahora el código es distinto en cada viaje, vive aparte (viajes/{id}/privado/
+// seguridad) donde SOLO lo ve la pasajera, y la comparación se hace AQUI. Ni
+// siquiera el conductor que va asignado puede leerlo: solo puede preguntar si el
+// que le dijeron es el bueno.
+exports.verificarCodigoViaje = onCall(async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Hay que iniciar sesión");
+  const { viajeId, codigo } = request.data || {};
+  if (!viajeId || !codigo) throw new HttpsError("invalid-argument", "Faltan datos");
+
+  const db = admin.firestore();
+  const viajeSnap = await db.collection("viajes").doc(viajeId).get();
+  if (!viajeSnap.exists) throw new HttpsError("not-found", "Ese viaje no existe");
+
+  // Solo el conductor ASIGNADO pregunta. Si no, cualquiera podría probar códigos
+  // uno por uno hasta acertar, en el viaje de quien fuera.
+  if (viajeSnap.data().conductorId !== request.auth.uid) {
+    throw new HttpsError("permission-denied", "Este viaje no es tuyo");
+  }
+
+  const secreto = await db.collection("viajes").doc(viajeId)
+    .collection("privado").doc("seguridad").get();
+  if (!secreto.exists) return { ok: true, motivo: "sin_codigo" };
+
+  const acierta = String(secreto.data().codigo || "").trim() === String(codigo).trim();
+  return { ok: acierta };
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // REGLA 6 — ¿ESTE CELULAR YA ESTÁ REGISTRADO?
 //
 // El registro comprueba que el celular no esté repetido, para proteger el crédito

@@ -188,6 +188,45 @@ describe('REGLA 2 · confirmarConductor pregunta quien llama', () => {
     }
   });
 
+  // ── REGLAS 5 y 11 · la comprobacion del codigo, en el servidor ──
+  const sembrarViajeConCodigo = async () => {
+    await sembrar('viajes/v9', { pasajeroId: txt('laPasajera'), conductorId: txt('elConductor'),
+      estado: txt('aceptado'), tieneCodigo: { booleanValue: true } });
+    await sembrar('viajes/v9/privado/seguridad', { codigo: txt('4821') });
+  };
+
+  test('el conductor asignado acierta el codigo: adelante', async () => {
+    await sembrarViajeConCodigo();
+    const r = await llamarA('verificarCodigoViaje', 'elConductor', { viajeId: 'v9', codigo: '4821' });
+    assert.strictEqual(r.http, 200, JSON.stringify(r.cuerpo));
+    assert.strictEqual(r.cuerpo.result.ok, true);
+  });
+
+  test('el conductor asignado falla el codigo: no pasa', async () => {
+    await sembrarViajeConCodigo();
+    const r = await llamarA('verificarCodigoViaje', 'elConductor', { viajeId: 'v9', codigo: '0000' });
+    assert.strictEqual(r.cuerpo.result.ok, false);
+  });
+
+  test('un conductor que NO es el asignado no puede ni probar', async () => {
+    await sembrarViajeConCodigo();
+    const r = await llamarA('verificarCodigoViaje', 'otroCualquiera', { viajeId: 'v9', codigo: '4821' });
+    assert.strictEqual(r.cuerpo && r.cuerpo.error && r.cuerpo.error.status, 'PERMISSION_DENIED',
+      'si no, se prueban los 10.000 codigos uno por uno');
+  });
+
+  test('SIN sesion tampoco', async () => {
+    await sembrarViajeConCodigo();
+    const r = await llamarA('verificarCodigoViaje', null, { viajeId: 'v9', codigo: '4821' });
+    assert.strictEqual(r.cuerpo && r.cuerpo.error && r.cuerpo.error.status, 'UNAUTHENTICATED');
+  });
+
+  test('la respuesta NUNCA trae el codigo dentro', async () => {
+    await sembrarViajeConCodigo();
+    const r = await llamarA('verificarCodigoViaje', 'elConductor', { viajeId: 'v9', codigo: '0000' });
+    assert.ok(!JSON.stringify(r.cuerpo).includes('4821'), 'se filtro el codigo en la respuesta');
+  });
+
   test('subirTarifa ya no existe en el servidor', async () => {
     const r = await fetch('http://127.0.0.1:5001/' + PROYECTO + '/us-central1/subirTarifa', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
