@@ -6,6 +6,7 @@ import { signOut } from 'firebase/auth';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { COMISIONES_DEFECTO, comisionSegunTipo } from './comisiones';
 import { CONFIG_TARIFAS_DEFECTO, calcularTarifaMinima } from './tarifas';
+import { CONFIG_COMPARTIDA } from './configApp';
 import { ESTADOS_MERCADO } from './estadosViaje';
 // Los datos que comparten las pantallas salen de archivos únicos (SEGUNDA LEY).
 import { centroRiohacha } from './riohacha';
@@ -27,12 +28,13 @@ import Logo from './Logo';
 const CONFIG_APP_DEFECTO = {
   // Las tarifas mínimas salen de tarifas.js: una sola calculadora para toda la app.
   ...CONFIG_TARIFAS_DEFECTO,
-  // ANOTADO, no arreglado hoy: incrementoTarifa sigue repetido a mano en las tres
-  // pantallas. No es tarifa mínima, así que no entra en este arreglo.
-  incrementoTarifa: 1000,
+  // Los números de respaldo (radios, tiempos, favoritos, incremento) de
+  // configApp.js: un solo sitio, amarrado por prueba a la copia del panel.
+  // Trae claves que esta pantalla no usa (radios, favoritos): son inertes,
+  // nadie las recorre ni las escribe — igual que ya pasaba con las tarifas.
+  ...CONFIG_COMPARTIDA,
   // Las comisiones salen de comisiones.js: una sola calculadora para toda la app.
   ...COMISIONES_DEFECTO,
-  tiempoEsperaConductor: 240,
 };
 
 // La tarifa mínima ya NO se calcula aquí: vive en tarifas.js (SEGUNDA LEY). Se importa arriba.

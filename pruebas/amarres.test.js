@@ -92,6 +92,55 @@ describe('AMARRES · la app y el servidor miden la distancia IGUAL', () => {
   });
 });
 
+describe('AMARRES · el respaldo del panel y el de la app son el MISMO número a número', () => {
+  it('cada número que ambos conocen vale lo mismo en los dos lados', () => {
+    // El panel (Superadmin.js, CONFIG_POR_DEFECTO) tiene su propia copia del
+    // respaldo y NO puede importar los archivos de la app: es otro repositorio.
+    // Su copia pesa más que ninguna: si config/global no existiera, el panel la
+    // ESCRIBE ENTERA como configuración inicial (Superadmin.js ~192). Un número
+    // distinto ahí se convertiría en la configuración real del negocio.
+    const { CONFIG_TARIFAS_DEFECTO } = cargarDeLaApp('guajirago/src/tarifas.js');
+    const { COMISIONES_DEFECTO } = cargarDeLaApp('guajirago/src/comisiones.js');
+    const { CONFIG_COMPARTIDA } = cargarDeLaApp('guajirago/src/configApp.js');
+    const delaApp = { ...CONFIG_TARIFAS_DEFECTO, ...COMISIONES_DEFECTO, ...CONFIG_COMPARTIDA };
+
+    const panel = leer('guajirago-admin/src/Superadmin.js');
+    const bloque = panel.match(/const CONFIG_POR_DEFECTO = \{[\s\S]*?\n\};/);
+    assert.ok(bloque, 'el panel ya no tiene CONFIG_POR_DEFECTO en Superadmin.js');
+    // Es un objeto de puros números y verdadero/falso: se puede ejecutar tal cual.
+    // eslint-disable-next-line no-new-func
+    const delPanel = new Function(bloque[0] + '\nreturn CONFIG_POR_DEFECTO;')();
+
+    const comunes = Object.keys(delaApp).filter((k) => k in delPanel);
+    // EXACTAMENTE 15: si baja, alguien renombró una clave (y salió de la
+    // comparación en silencio); si sube, ambos lados ganaron una clave común y
+    // este número se sube A PROPÓSITO, mirando que valga lo mismo en los dos.
+    assert.strictEqual(comunes.length, 15,
+      'hay ' + comunes.length + ' números en común entre panel y app, y deben ser 15. ' +
+      'Si se renombró o añadió una clave compartida, se actualizan los dos lados y este número.');
+    for (const k of comunes) {
+      assert.strictEqual(delPanel[k], delaApp[k],
+        'El respaldo de «' + k + '» vale ' + delPanel[k] + ' en el panel y ' + delaApp[k] +
+        ' en la app. Dos paracaídas distintos = dos verdades el día que la config no cargue. ' +
+        'Se cambia en LOS DOS lados: Superadmin.js y el archivo de la app (tarifas.js / ' +
+        'comisiones.js / configApp.js).');
+    }
+  });
+
+  it('NINGUNA pantalla de la app vuelve a escribir esos números a mano', () => {
+    const PANTALLAS = ['guajirago/src/Solicitar.js', 'guajirago/src/SolicitarMensajeria.js', 'guajirago/src/AppConductor.js'];
+    const HUELLAS = ['incrementoTarifa:', 'radioBusquedaInicial:', 'radioBusquedaAmpliado:', 'maximoFavoritos:', 'tiempoEsperaConductor:', 'duracionContraoferta:'];
+    for (const pantalla of PANTALLAS) {
+      const fuente = leer(pantalla);
+      for (const huella of HUELLAS) {
+        assert.ok(!fuente.includes(huella),
+          pantalla + ' volvió a escribir «' + huella.slice(0, -1) + '» a mano. ' +
+          'Ese respaldo vive en configApp.js (SEGUNDA LEY).');
+      }
+    }
+  });
+});
+
 describe('AMARRES · el panel y la app dicen lo mismo', () => {
   it('la lista de VIAJES EN CURSO del panel contiene TODO el mercado de la app, y nada inventado', () => {
     // El panel enseña "viajes activos" con una lista escrita a mano en

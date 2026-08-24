@@ -9,6 +9,7 @@ import Llamada from './Llamada';
 import { alertarNuevoViaje, precargarAudio, activarAudioiOS, obtenerTokenFCM } from './Notificaciones';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { CONFIG_TARIFAS_DEFECTO, calcularTarifaMinima } from './tarifas';
+import { CONFIG_COMPARTIDA } from './configApp';
 import { aplicarDescuento, armarDescuentoInfo, tarifaParaPasajero } from './descuentos';
 import { generarCodigoSeguridad, guardarCodigoDeViaje, cargarCodigoDeViaje } from './codigoSeguridad';
 import { armarViajeNuevo } from './viajeNuevo';
@@ -20,14 +21,9 @@ import { RESPUESTAS_RAPIDAS, RAZONES_CANCELACION_PASAJERO } from './textosViaje'
 const CONFIG_APP_DEFECTO = {
   // Las tarifas mínimas salen de tarifas.js: una sola calculadora para toda la app.
   ...CONFIG_TARIFAS_DEFECTO,
-  // ANOTADO, no arreglado hoy: incrementoTarifa sigue repetido a mano en las tres
-  // pantallas. No es tarifa mínima, así que no entra en este arreglo.
-  incrementoTarifa: 1000,
-  radioBusquedaInicial: 3,
-  radioBusquedaAmpliado: 7,
-  maximoFavoritos: 3,
-  tiempoEsperaConductor: 240,
-  duracionContraoferta: 20,
+  // Y los números de respaldo (radios, tiempos, favoritos, incremento) de
+  // configApp.js: un solo sitio, amarrado por prueba a la copia del panel.
+  ...CONFIG_COMPARTIDA,
 };
 
 // La tarifa mínima ya NO se calcula aquí: vive en tarifas.js, que es el único sitio
