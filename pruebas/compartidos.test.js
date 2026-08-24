@@ -53,9 +53,8 @@ describe('SEGUNDA LEY · los datos compartidos salen del mismo sitio', () => {
   });
 
   it('NINGUNA pantalla viva vuelve a escribir estos datos a mano', () => {
-    // Conductor.js NO está en la lista a propósito: es un archivo muerto (nadie
-    // lo importa) y conserva su copia vieja. Está anotado para el dueño; si un
-    // día se revive, primero pasa por aquí.
+    // (Conductor.js, el archivo muerto que conservaba su copia vieja, se borró
+    // el 23-ago-2026 con permiso del dueño.)
     const PANTALLAS = [
       'guajirago/src/Solicitar.js',
       'guajirago/src/SolicitarMensajeria.js',

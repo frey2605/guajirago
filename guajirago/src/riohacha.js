@@ -7,8 +7,9 @@
  * uno y no los demás, cada pantalla centra su mapa en un sitio distinto — y no
  * hay error que lo delate.
  *
- * (Queda una quinta copia en Conductor.js, que es un archivo MUERTO: nadie lo
- * importa. No se toca aquí — borrarlo es trabajo aparte, anotado para el dueño.)
+ * (Había una quinta copia en Conductor.js, un archivo muerto que nadie
+ * importaba: se borró el 23-ago-2026 con permiso del dueño. Vive en el
+ * historial de git por si alguna vez hace falta mirarlo.)
  */
 
 /** El centro de Riohacha: donde arranca todo mapa mientras llega el GPS. */
