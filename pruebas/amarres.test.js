@@ -73,6 +73,25 @@ describe('AMARRES · la app y el servidor miden la distancia IGUAL', () => {
   });
 });
 
+describe('AMARRES · el formateador de pesos escribe IGUAL en las dos apps', () => {
+  it('las dos moneda.js (app y aliados) formatean idéntico, incluido el dato vacío', () => {
+    // Son gemelas a propósito: los repos no pueden compartir archivo. Este
+    // amarre EJECUTA las dos. Si un día una escribe «$ 8.000» y la otra
+    // «COP 8.000», el cliente y el restaurante verían la misma plata escrita
+    // distinto.
+    const app = cargarDeLaApp('guajirago/src/moneda.js').cop;
+    const aliados = cargarDeLaApp('guajirago-aliados/src/moneda.js').cop;
+    for (const n of [0, 1, 999, 8000, 125500, 1000000, null, undefined]) {
+      assert.strictEqual(app(n), aliados(n),
+        'con ' + String(n) + ' la app escribe «' + app(n) + '» y aliados «' + aliados(n) + '»');
+    }
+    // Y el dato vacío se enseña como $ 0, jamás como $ NaN (la mitad de las 13
+    // copias viejas escribía NaN en pantalla).
+    assert.ok(!app(undefined).includes('NaN'), 'la app volvió a escribir NaN en pantalla');
+    assert.ok(app(0).includes('0'));
+  });
+});
+
 describe('AMARRES · la comisión: el paracaídas del servidor y el de la app son el mismo', () => {
   it('los tres números de respaldo (mototaxi, taxi, domicilio) coinciden con el servidor', () => {
     // El servidor (functions/index.js) es QUIEN COBRA, y si config/global no

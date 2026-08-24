@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { db, storage } from './firebase';
+// El formateador de pesos vive en moneda.js: un solo sitio (SEGUNDA LEY).
+import { cop } from './moneda';
 import {
   collection,
   onSnapshot,
@@ -218,13 +220,6 @@ function Restaurantes({ nombre, onVolver, foto, onCerrarSesion, onIrPerfil, onIr
     if (patronCorreo.test(texto)) return true;
     return palabrasProhibidas.some((p) => limpio.includes(p));
   };
-
-  const cop = (n) =>
-    new Intl.NumberFormat('es-CO', {
-      style: 'currency',
-      currency: 'COP',
-      maximumFractionDigits: 0,
-    }).format(n);
 
   // ---------- Carrito ----------
   const nuevaLineaId = () => 'l_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
