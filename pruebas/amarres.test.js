@@ -92,6 +92,88 @@ describe('AMARRES · la app y el servidor miden la distancia IGUAL', () => {
   });
 });
 
+describe('AMARRES · la comisión: el paracaídas del servidor y el de la app son el mismo', () => {
+  it('los tres números de respaldo (mototaxi, taxi, domicilio) coinciden con el servidor', () => {
+    // El servidor (functions/index.js) es QUIEN COBRA, y si config/global no
+    // carga usa sus paracaídas «?? 300/800/1000». La app enseña la comisión con
+    // comisiones.js, que tiene los suyos. Las funciones se despliegan con su
+    // propia carpeta y no pueden importar comisiones.js — si los números se
+    // separan, el conductor vería una comisión y pagaría otra.
+    const { COMISIONES_DEFECTO } = cargarDeLaApp('guajirago/src/comisiones.js');
+    const servidor = leer('guajirago/functions/index.js');
+    const saca = (clave) => {
+      const m = servidor.match(new RegExp('cfg\\.' + clave + ' \\?\\? (\\d+)'));
+      assert.ok(m, 'el servidor ya no tiene el paracaídas «cfg.' + clave + ' ?? número» en functions/index.js');
+      return Number(m[1]);
+    };
+    assert.strictEqual(saca('comisionMototaxi'), COMISIONES_DEFECTO.comisionMototaxi,
+      'el paracaídas de mototaxi del servidor y el de la app se separaron');
+    assert.strictEqual(saca('comisionTaxi'), COMISIONES_DEFECTO.comisionTaxi,
+      'el paracaídas de taxi del servidor y el de la app se separaron');
+    assert.strictEqual(saca('comisionDomicilio'), COMISIONES_DEFECTO.comisionDomicilio,
+      'el paracaídas de domicilio del servidor y el de la app se separaron');
+  });
+});
+
+describe('AMARRES · los estados del PEDIDO de restaurante entre la app del cliente y aliados', () => {
+  it('la línea de tiempo del cliente solo usa estados que aliados conoce, y en el mismo orden', () => {
+    // Aliados tiene su fuente única (flujoPedidos.js: ORDEN_ESTADOS) — bien
+    // hecho. Pero la app del CLIENTE es otro repo y escribe su línea de tiempo
+    // a mano en Restaurantes.js. El cliente puede SIMPLIFICAR (no enseña
+    // 'empacado' ni 'cerrado': son cocina interna y caja), pero no puede
+    // inventar estados ni desordenarlos: un estado inventado jamás se
+    // encendería y el cliente vería su pedido congelado para siempre.
+    const { ORDEN_ESTADOS } = cargarDeLaApp('guajirago-aliados/src/flujoPedidos.js');
+    const CONOCIDOS = ['nuevo', ...ORDEN_ESTADOS];
+
+    const cliente = leer('guajirago/src/Restaurantes.js');
+    const bloque = cliente.match(/const ESTADOS = \[[\s\S]*?\];/);
+    assert.ok(bloque, 'la app del cliente ya no tiene su línea de tiempo ESTADOS en Restaurantes.js');
+    const delCliente = [...bloque[0].matchAll(/id: '([a-z_]+)'/g)].map((m) => m[1]);
+    assert.ok(delCliente.length >= 4, 'la línea de tiempo del cliente quedó rara: ' + delCliente.join(', '));
+
+    for (const e of delCliente) {
+      assert.ok(CONOCIDOS.includes(e),
+        'La app del cliente enseña el estado «' + e + '», que aliados NO conoce ' +
+        '(flujoPedidos.js: ' + CONOCIDOS.join(', ') + '). Ese paso jamás se encendería.');
+    }
+    // El orden relativo es el del flujo: si el cliente pone 'en_camino' antes
+    // que 'preparando', la línea de tiempo mentiría.
+    const posiciones = delCliente.map((e) => CONOCIDOS.indexOf(e));
+    for (let i = 1; i < posiciones.length; i++) {
+      assert.ok(posiciones[i] > posiciones[i - 1],
+        'La línea de tiempo del cliente va en OTRO ORDEN que el flujo de aliados: ' +
+        delCliente.join(' → ') + ' contra ' + CONOCIDOS.join(' → '));
+    }
+  });
+});
+
+describe('AMARRES · los estados de la RESERVA de turismo entre la app y aliados', () => {
+  it('los dos lados conocen exactamente los mismos cuatro estados', () => {
+    // La app (Turismo.js) le pone nombre y color a cada estado; aliados
+    // (ReservasTurismo.js) los usa de filtros y los escribe. Un estado que un
+    // lado escriba y el otro no conozca se enseña sin nombre y sin color — o
+    // la reserva desaparece de todos los filtros de la agencia.
+    const app = leer('guajirago/src/Turismo.js');
+    const mapa = app.match(/const estadoTxt = \(e\) => \(\{([\s\S]*?)\}\[e\]/);
+    assert.ok(mapa, 'la app ya no tiene el mapa estadoTxt en Turismo.js');
+    const delaApp = [...mapa[1].matchAll(/([a-z_]+):/g)].map((m) => m[1]);
+
+    const aliados = leer('guajirago-aliados/src/ReservasTurismo.js');
+    const filtros = aliados.match(/const FILTROS = \[[\s\S]*?\];/);
+    assert.ok(filtros, 'aliados ya no tiene los FILTROS en ReservasTurismo.js');
+    // eslint-disable-next-line no-new-func
+    const FILTROS = new Function(filtros[0] + '\nreturn FILTROS;')();
+    const deAliados = FILTROS.flatMap((f) => f[2]);
+
+    assert.deepStrictEqual([...delaApp].sort(), [...deAliados].sort(),
+      'La app y aliados conocen estados DISTINTOS de la reserva.\n' +
+      '   app (Turismo.js):              ' + [...delaApp].sort().join(', ') + '\n' +
+      '   aliados (ReservasTurismo.js):  ' + [...deAliados].sort().join(', ') + '\n' +
+      'Se cambian LOS DOS lados a la vez.');
+  });
+});
+
 describe('AMARRES · el respaldo del panel y el de la app son el MISMO número a número', () => {
   it('cada número que ambos conocen vale lo mismo en los dos lados', () => {
     // El panel (Superadmin.js, CONFIG_POR_DEFECTO) tiene su propia copia del
