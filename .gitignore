@@ -84,3 +84,9 @@ guajirago-aliados/
 # que el escape se vuelva costumbre. Va con "!" porque el "*.log" de arriba lo tapaba.
 !.guardian-excepciones.log
 # .guardian.json (el comando de pruebas) SI se guarda: es config del proyecto.
+
+# Cache de despliegue de Firebase. Lo reescribe SOLO cada vez que se publica, asi
+# que estando rastreado el repo aparecia sucio despues de cada despliegue — y el
+# guardian se fia de ese estado para saber que se toco. No es codigo: es una lista
+# de huellas de los archivos ya subidos.
+.firebase/
