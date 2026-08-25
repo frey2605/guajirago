@@ -237,11 +237,24 @@ describe('REGLA 12 · lo que la app hace hoy sigue funcionando', () => {
     await RUT.assertSucceeds(updateDoc(doc(como('pasajero1'), 'usuarios/pasajero1'), { nombre: 'Ana María' }));
   });
 
-  it('se sigue pudiendo calificar', async () => {
+  // ESTA PRUEBA DABA SEGURIDAD FALSA. Escribía `{ estrellas: 5, deQuien: ... }`,
+  // que NO es lo que escribe ninguna de las dos pantallas de calificar: ni lleva
+  // firma, ni viaje, ni pedido, y `deQuien` no existe en el proyecto. Así que
+  // decía «se sigue pudiendo calificar» sin ejercitar el camino de verdad.
+  // Se cambia por las dos formas REALES, y viven ahora en su propio bloque más
+  // abajo (REGLA 10 · una calificación la firma quien la escribe).
+  it('se sigue pudiendo calificar un viaje, como lo hace la app', async () => {
+    await entorno.withSecurityRulesDisabled(async (ctx) => {
+      const { doc, setDoc } = FS;
+      await setDoc(doc(ctx.firestore(), 'viajes/vcal'), {
+        pasajeroId: 'pasajero1', conductorId: 'conductor1', estado: 'finalizado',
+      });
+    });
     const { doc, setDoc } = FS;
-    await RUT.assertSucceeds(
-      setDoc(doc(como('pasajero1'), 'calificaciones/cal2'), { estrellas: 5, deQuien: 'conductor1' })
-    );
+    await RUT.assertSucceeds(setDoc(doc(como('pasajero1'), 'calificaciones/cal2'), {
+      viajeId: 'vcal', quienCalifica: 'pasajero',
+      calificadoId: 'conductor1', estrellas: 5, comentario: '', fecha: '2026-08-25T00:00:00.000Z',
+    }));
   });
 
   // Corregida el 24-ago-2026 (REGLA 9): decia { total: 25000 } y nada mas. Eso NO
@@ -2355,5 +2368,326 @@ describe('REGLA 10 · un viaje no lo toca cualquiera', () => {
     await sembrarViajes();
     const { doc, deleteDoc } = FS;
     await RUT.assertFails(deleteDoc(doc(como('pasajero1'), 'viajes/va')));
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// REGLA 10 · UNA CALIFICACIÓN LA ESCRIBE QUIEN ESTUVO AHÍ
+// ═══════════════════════════════════════════════════════════════════════════
+// LO QUE ATA ESTO ES EL PAR, no una firma. La primera versión de este arreglo
+// añadía un campo `autorId` a la app y comprobaba que fuera de quien escribía. La
+// segunda opinión demostró EJECUTANDO que no cerraba nada: comprobaba que el
+// autor estuviera en ALGÚN viaje, pero nunca miraba a quién se le ponían las
+// estrellas. Con UN viaje propio se le colgaban calificaciones a cualquiera.
+//
+// Las pruebas de aquí abajo son esos ataques, uno por uno.
+describe('REGLA 10 · una calificación la escribe quien estuvo ahí', () => {
+  const sembrar = async () => {
+    await entorno.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      const { doc, setDoc } = FS;
+      await setDoc(doc(db, 'viajes/vc1'), {
+        pasajeroId: 'pasajero1', conductorId: 'conductor1', estado: 'finalizado',
+      });
+      await setDoc(doc(db, 'pedidosRestaurantes/pc1'), {
+        clienteId: 'pasajero1', restauranteId: 'r1', total: 30000, estado: 'entregado',
+      });
+      await setDoc(doc(db, 'calificaciones/hecha'), {
+        pedidoId: 'pc1', restauranteId: 'r1', calificadoId: 'r1',
+        quienCalifica: 'cliente', estrellas: 1, comentario: 'INSULTO',
+      });
+    });
+  };
+  const delViaje = (extra) => Object.assign({
+    viajeId: 'vc1', quienCalifica: 'pasajero', calificadoId: 'conductor1',
+    estrellas: 5, comentario: '', fecha: '2026-08-25T00:00:00.000Z',
+  }, extra || {});
+  const delRestaurante = (extra) => Object.assign({
+    pedidoId: 'pc1', restauranteId: 'r1', quienCalifica: 'cliente', calificadoId: 'r1',
+    estrellas: 4, comentario: '', fecha: '2026-08-25T00:00:00.000Z',
+  }, extra || {});
+
+  // ── LAS DOS FORMAS TIENEN QUE SEGUIR FUNCIONANDO ─────────────────────────
+  it('el PASAJERO califica a SU conductor (Calificacion.js)', async () => {
+    await sembrar();
+    const { doc, setDoc } = FS;
+    await RUT.assertSucceeds(setDoc(doc(como('pasajero1'), 'calificaciones/n1'), delViaje()));
+  });
+
+  it('y el CONDUCTOR a SU pasajero — la mitad que se cae si se olvida', async () => {
+    await sembrar();
+    const { doc, setDoc } = FS;
+    await RUT.assertSucceeds(setDoc(doc(como('conductor1'), 'calificaciones/n2'), delViaje({
+      quienCalifica: 'conductor', calificadoId: 'pasajero1',
+    })));
+  });
+
+  it('el CLIENTE califica SU restaurante (Restaurantes.js)', async () => {
+    await sembrar();
+    const { doc, setDoc } = FS;
+    await RUT.assertSucceeds(setDoc(doc(como('pasajero1'), 'calificaciones/n3'), delRestaurante()));
+  });
+
+  // ── LOS ATAQUES QUE LA PRIMERA VERSIÓN DEJABA PASAR ──────────────────────
+  it('EL ATAQUE · con MI viaje, NO puedo calificar a un conductor con el que no fui', async () => {
+    await sembrar();
+    const { doc, setDoc } = FS;
+    await RUT.assertFails(setDoc(doc(como('pasajero1'), 'calificaciones/a1'), delViaje({
+      calificadoId: 'conductor2', estrellas: 1,
+    })), 'Colgando la calificación de un viaje propio se le hundía la media a cualquiera.');
+  });
+
+  it('EL ATAQUE · ni a un restaurante rival colgándolo de mi viaje de taxi', async () => {
+    await sembrar();
+    const { doc, setDoc } = FS;
+    await RUT.assertFails(setDoc(doc(como('pasajero1'), 'calificaciones/a2'), delViaje({
+      calificadoId: 'r1', estrellas: 1,
+    })));
+  });
+
+  it('EL ATAQUE · ni ponerme cinco estrellas a MÍ MISMO en mi propio viaje', async () => {
+    await sembrar();
+    const { doc, setDoc } = FS;
+    await RUT.assertFails(setDoc(doc(como('pasajero1'), 'calificaciones/a5'), delViaje({
+      calificadoId: 'pasajero1',
+    })));
+  });
+
+  // Mandando LAS DOS claves se entraba por la rama más floja: pedido propio,
+  // viaje ajeno. Por eso se exige UNA, no las dos.
+  it('EL ATAQUE · ni mandando viaje Y pedido a la vez para colarse por la floja', async () => {
+    await sembrar();
+    const { doc, setDoc } = FS;
+    await RUT.assertFails(setDoc(doc(como('pasajero1'), 'calificaciones/a4'), {
+      pedidoId: 'pc1', restauranteId: 'r1', viajeId: 'vajeno',
+      calificadoId: 'conductor2', estrellas: 1,
+    }));
+  });
+
+  it('EL ATAQUE · ni un pedido de restaurante que no es mío', async () => {
+    await sembrar();
+    const { doc, setDoc } = FS;
+    await RUT.assertFails(setDoc(doc(como('conductor2'), 'calificaciones/a6'), delRestaurante({
+      estrellas: 1,
+    })));
+  });
+
+  // MI pedido, pero las estrellas para OTRO. Sin esta, el mutante que quita el par
+  // del pedido sobrevive: la de arriba lo niega por ser de otro cliente, no por el
+  // par. Lo cazó la segunda opinión.
+  it('EL ATAQUE · con MI pedido, las estrellas tienen que ir para MI restaurante', async () => {
+    await sembrar();
+    const { doc, setDoc } = FS;
+    await RUT.assertFails(setDoc(doc(como('pasajero1'), 'calificaciones/a14'), delRestaurante({
+      calificadoId: 'conductor2', estrellas: 1,
+    })));
+    await RUT.assertFails(setDoc(doc(como('pasajero1'), 'calificaciones/a15'), delRestaurante({
+      calificadoId: 'r2', estrellas: 1,
+    })));
+  });
+
+  // Con las dos claves, y un calificadoId que SÍ encaja con la rama del pedido: sin
+  // el candado de «una sola», entra por ahí y se cuelga de un viaje ajeno. La
+  // versión anterior de esta prueba pasaba por el motivo equivocado.
+  it('EL ATAQUE · ni con las dos claves aunque el calificadoId encaje con una', async () => {
+    await sembrar();
+    const { doc, setDoc } = FS;
+    await RUT.assertFails(setDoc(doc(como('pasajero1'), 'calificaciones/a16'), {
+      pedidoId: 'pc1', restauranteId: 'r1', calificadoId: 'r1',
+      viajeId: 'vajeno', estrellas: 1,
+    }));
+  });
+
+  it('EL ATAQUE · ni inventándose un viaje que no existe', async () => {
+    await sembrar();
+    const { doc, setDoc } = FS;
+    await RUT.assertFails(setDoc(doc(como('pasajero1'), 'calificaciones/a7'), delViaje({
+      viajeId: 'no-existe',
+    })));
+  });
+
+  it('EL ATAQUE · ni una calificación suelta, sin viaje ni pedido', async () => {
+    await sembrar();
+    const { doc, setDoc } = FS;
+    const suelta = delViaje(); delete suelta.viajeId;
+    await RUT.assertFails(setDoc(doc(como('pasajero1'), 'calificaciones/a8'), suelta));
+  });
+
+  it('EL ATAQUE · ni doscientas estrellas, ni cero, ni con coma', async () => {
+    await sembrar();
+    const { doc, setDoc } = FS;
+    await RUT.assertFails(setDoc(doc(como('pasajero1'), 'calificaciones/a9'), delViaje({ estrellas: 200 })));
+    await RUT.assertFails(setDoc(doc(como('pasajero1'), 'calificaciones/a10'), delViaje({ estrellas: 0 })));
+    await RUT.assertFails(setDoc(doc(como('pasajero1'), 'calificaciones/a11'), delViaje({ estrellas: 4.5 })));
+  });
+
+  // Un pedido sin dueño no se puede calificar: no hay forma de saber quién estuvo
+  // ahí. Los 29 pedidos viejos están así (el dueño se lo puso la REGLA 9-A a los
+  // nuevos), y no se pierde nada: el dueño del proyecto confirmó el 25-ago-2026
+  // que NINGÚN dato de esta base es real, son todos de prueba.
+  it('un pedido SIN dueño no se puede calificar', async () => {
+    const { doc, setDoc } = FS;
+    await RUT.assertFails(setDoc(doc(como('pasajero1'), 'calificaciones/a12'), {
+      pedidoId: 'ped1', restauranteId: 'r1', calificadoId: 'r1', estrellas: 5,
+    }));
+  });
+
+  // ── LOS DEFECTOS, QUE SON CARGA ──────────────────────────────────────────
+  // Sin estas tres, los mutantes que cambian el defecto de .get(campo, 'sin-X')
+  // por el uid de quien pregunta SOBREVIVEN: en el sembrado normal esos campos
+  // siempre están. Las cazó la segunda opinión del 25-ago-2026. Y no es
+  // hipotético: las propias reglas dicen que hay 13 viajes sin conductorId.
+  it('un viaje SIN conductor no deja calificar a nadie', async () => {
+    await entorno.withSecurityRulesDisabled(async (ctx) => {
+      const { doc, setDoc } = FS;
+      await setDoc(doc(ctx.firestore(), 'viajes/vsin'), { pasajeroId: 'pasajero1', estado: 'esperando' });
+    });
+    const { doc, setDoc } = FS;
+    await RUT.assertFails(setDoc(doc(como('pasajero1'), 'calificaciones/d1'), {
+      viajeId: 'vsin', calificadoId: 'pasajero1', estrellas: 5,
+    }), 'Con el defecto mal puesto, el pasajero de un viaje sin conductor se pone cinco a sí mismo.');
+    await RUT.assertFails(setDoc(doc(como('pasajero1'), 'calificaciones/d2'), {
+      viajeId: 'vsin', calificadoId: 'conductor1', estrellas: 1,
+    }));
+  });
+
+  it('un viaje SIN pasajero tampoco', async () => {
+    await entorno.withSecurityRulesDisabled(async (ctx) => {
+      const { doc, setDoc } = FS;
+      await setDoc(doc(ctx.firestore(), 'viajes/vsp'), { conductorId: 'conductor1', estado: 'aceptado' });
+    });
+    const { doc, setDoc } = FS;
+    await RUT.assertFails(setDoc(doc(como('conductor1'), 'calificaciones/d3'), {
+      viajeId: 'vsp', calificadoId: 'conductor1', estrellas: 5,
+    }));
+  });
+
+  it('un pedido SIN restaurante tampoco', async () => {
+    await entorno.withSecurityRulesDisabled(async (ctx) => {
+      const { doc, setDoc } = FS;
+      await setDoc(doc(ctx.firestore(), 'pedidosRestaurantes/psr'), { clienteId: 'pasajero1', total: 100 });
+    });
+    const { doc, setDoc } = FS;
+    await RUT.assertFails(setDoc(doc(como('pasajero1'), 'calificaciones/d4'), {
+      pedidoId: 'psr', calificadoId: 'pasajero1', estrellas: 5,
+    }));
+  });
+
+  // Con las dos claves y un calificadoId que encaja con la rama del VIAJE. La otra
+  // prueba de las dos claves solo mataba el candado de la rama del pedido.
+  it('EL ATAQUE · ni con las dos claves encajando por la rama del viaje', async () => {
+    await sembrar();
+    const { doc, setDoc } = FS;
+    await RUT.assertFails(setDoc(doc(como('pasajero1'), 'calificaciones/d5'), {
+      viajeId: 'vc1', pedidoId: 'pc1', calificadoId: 'conductor1', estrellas: 1,
+    }));
+  });
+
+  // Sin sesión no se crea, y tiene que negarlo la COMPROBACIÓN, no un error de
+  // evaluación. Con `allow create: if true` esto se pone rojo.
+  it('sin sesión no se crea una calificación', async () => {
+    await sembrar();
+    const { doc, setDoc } = FS;
+    await RUT.assertFails(setDoc(doc(sinCuenta(), 'calificaciones/d6'), delViaje()));
+  });
+
+  // ── REESCRIBIR LAS MALAS ─────────────────────────────────────────────────
+  it('LA FUGA · nadie reescribe una calificación para borrar la mala', async () => {
+    await sembrar();
+    const { doc, updateDoc } = FS;
+    await RUT.assertFails(updateDoc(doc(como('r1'), 'calificaciones/hecha'), { estrellas: 5 }),
+      'Borrarla no podía (REGLA 12), pero reescribirla dejaba el mismo resultado.');
+    await RUT.assertFails(updateDoc(doc(como('pasajero1'), 'calificaciones/hecha'), { estrellas: 5 }));
+    await RUT.assertFails(updateDoc(doc(como('conductor2'), 'calificaciones/hecha'), { comentario: 'otro' }));
+  });
+
+  // ── EL REPORTE, QUE POR POCO SE ROMPE ────────────────────────────────────
+  // El restaurante reporta los comentarios insultantes desde
+  // aliados/CalificacionesRestaurante.js:38. Esa pantalla pinta «Reportado» ANTES
+  // de saber si se guardó y se traga el error con un catch vacío: si la regla lo
+  // negara, quedaría un botón que dice que sí y no hace nada, y la cola de
+  // moderación del panel vacía para siempre. Se me había escapado — mi búsqueda
+  // de escritores llevaba un `head` que cortó justo esas líneas.
+  it('EL NEGOCIO puede reportar un comentario suyo (aliados:38)', async () => {
+    await sembrar();
+    const { doc, updateDoc } = FS;
+    await RUT.assertSucceeds(updateDoc(doc(como('r1'), 'calificaciones/hecha'), {
+      reportado: true, motivoReporte: 'Insultos', estadoReporte: 'pendiente',
+      fechaReporte: '2026-08-25T00:00:00.000Z',
+    }));
+  });
+
+  it('pero reportando NO le puede tocar las estrellas', async () => {
+    await sembrar();
+    const { doc, updateDoc } = FS;
+    await RUT.assertFails(updateDoc(doc(como('r1'), 'calificaciones/hecha'), {
+      reportado: true, estrellas: 5,
+    }));
+  });
+
+  // Autorizar por `calificadoId` en vez de por `restauranteId` pasaba todas las
+  // pruebas, porque en el sembrado los dos valen 'r1'. Aquí se separan: si mañana
+  // alguien cambia el campo, el CALIFICADO podría tapar su propia mala nota.
+  it('el reporte se autoriza por el NEGOCIO, no por a quién califican', async () => {
+    await entorno.withSecurityRulesDisabled(async (ctx) => {
+      const { doc, setDoc } = FS;
+      await setDoc(doc(ctx.firestore(), 'calificaciones/cruzada'), {
+        pedidoId: 'pc1', restauranteId: 'r1', calificadoId: 'r2', estrellas: 1,
+      });
+    });
+    const { doc, updateDoc } = FS;
+    await RUT.assertFails(updateDoc(doc(como('r2'), 'calificaciones/cruzada'), { reportado: true }));
+    await RUT.assertSucceeds(updateDoc(doc(como('r1'), 'calificaciones/cruzada'), { reportado: true }));
+  });
+
+  // El comodín: una calificación de VIAJE no tiene restauranteId, así que
+  // esDelNegocio('') dejaba entrar a un empleado con la ficha incompleta.
+  it('una calificación de VIAJE no la puede reportar ningún negocio', async () => {
+    await sembrar();
+    await entorno.withSecurityRulesDisabled(async (ctx) => {
+      const { doc, setDoc } = FS;
+      await setDoc(doc(ctx.firestore(), 'calificaciones/deviaje'), {
+        viajeId: 'vc1', calificadoId: 'conductor1', estrellas: 1,
+      });
+      await setDoc(doc(ctx.firestore(), 'empleados/empsin'), { nombre: 'SIN NEGOCIO', activo: true });
+    });
+    const { doc, updateDoc } = FS;
+    await RUT.assertFails(updateDoc(doc(como('empsin'), 'calificaciones/deviaje'), { reportado: true }),
+      'Reportar es ESCONDER: las pantallas filtran las reportadas. Con el comodín, esa ' +
+      'persona apagaba la calificación de quien quisiera.');
+    await RUT.assertFails(updateDoc(doc(como('r1'), 'calificaciones/deviaje'), { reportado: true }));
+  });
+
+  it('ni reportar la de OTRO negocio', async () => {
+    await sembrar();
+    const { doc, updateDoc } = FS;
+    await RUT.assertFails(updateDoc(doc(como('r2'), 'calificaciones/hecha'), { reportado: true }));
+  });
+
+  it('y el PANEL sigue moderando (admin/ComentariosReportados.js:28 y :35)', async () => {
+    await sembrar();
+    const { doc, updateDoc } = FS;
+    await RUT.assertSucceeds(updateDoc(doc(como('eladmin'), 'calificaciones/hecha'), {
+      reportado: false, estadoReporte: 'restaurado',
+    }));
+  });
+
+  // ── LEER ─────────────────────────────────────────────────────────────────
+  // Abierto a propósito: guajirago/src/Restaurantes.js:121 pide la colección
+  // ENTERA para las medias. Se puede dejar así porque el documento NO dice quién
+  // lo escribió — si algún día se le añade ese dato, esto hay que cerrarlo.
+  it('LEER sigue abierto a quien tenga cuenta', async () => {
+    await sembrar();
+    const { collection, getDocs } = FS;
+    await RUT.assertSucceeds(getDocs(collection(como('conductor2'), 'calificaciones')));
+  });
+
+  // Sin esta, el mutante de abrirlo al mundo entero (allow read: if true) pasaba
+  // con todo en verde. Lo cazó la segunda opinión.
+  it('pero SIN SESIÓN no, ni leer ni escribir', async () => {
+    await sembrar();
+    const { collection, getDocs, doc, setDoc } = FS;
+    await RUT.assertFails(getDocs(collection(sinCuenta(), 'calificaciones')));
+    await RUT.assertFails(setDoc(doc(sinCuenta(), 'calificaciones/a13'), delViaje()));
   });
 });

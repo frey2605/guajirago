@@ -332,9 +332,153 @@ service cloud.firestore {
       );
       allow delete: if false;
     }
+    // ── REGLA 10 · UNA CALIFICACIÓN LA ESCRIBE QUIEN ESTUVO AHÍ ─────────────
+    //
+    // Hasta el 25-ago-2026: `create, update: if request.auth != null`. Cualquiera
+    // con una cuenta se ponía doscientas de cinco estrellas, le ponía doscientas
+    // de una a un rival, o REESCRIBÍA las malas que ya tenía. Esa media sale en el
+    // perfil (MiPerfil.js:40), en la ficha del restaurante (Restaurantes.js:162),
+    // en la del negocio (aliados/CalificacionesRestaurante.js:18) y en el panel.
+    //
+    // LO QUE ATA ESTO NO ES UNA FIRMA, ES EL PAR. La primera versión de este
+    // arreglo añadía un campo `autorId` a la app y comprobaba que fuera de quien
+    // escribía. La segunda opinión demostró EJECUTANDO que eso no cerraba nada:
+    // comprobaba que el autor estuviera en ALGÚN viaje, pero nunca miraba a quién
+    // se le ponían las estrellas. Con UN solo viaje propio se le colgaban
+    // calificaciones a cualquiera — el ataque del informe, intacto.
+    //
+    // Y de paso el `autorId` era peor que inútil: con el `read` abierto, cualquiera
+    // se bajaba la colección y averiguaba QUÉ pasajero le puso una estrella a un
+    // conductor, y en qué viaje. Riesgo de represalia sobre una persona real, que
+    // antes no existía porque el documento era anónimo.
+    //
+    // Así que no se guarda quién escribe: se comprueba EL PAR. Para calificar un
+    // viaje hay que ser uno de los dos que iban en él, y las estrellas tienen que
+    // ir para EL OTRO. Para calificar un pedido hay que ser su cliente, y las
+    // estrellas van para SU restaurante. Sin datos nuevos y sin tocar la app.
+    //
+    // ⚠ LO QUE ESTO **NO** CIERRA, Y HAY QUE DECIRLO ANTES QUE NADA:
+    //
+    // Una versión anterior de este comentario decía que se le pregunta al viaje y
+    // al pedido «que son documentos que quien califica no controla». ERA FALSO, y
+    // lo demostró ejecutándolo la segunda opinión del 25-ago-2026: el atacante SE
+    // FABRICA los dos.
+    //   · `viajes` deja crear con solo `pasajeroId == mi uid` — `conductorId` va
+    //     libre. Se crea un viaje falso con la víctima de conductor y se le cuelgan
+    //     las estrellas que se quiera. Medido: 15 de 15 colaron, y la media pública
+    //     del negocio atacado quedó en 1.0.
+    //   · `pedidosRestaurantes` igual, con solo `clienteId == mi uid`.
+    //   · Y con un viaje falso donde uno es pasajero Y conductor, se pone cinco
+    //     estrellas a sí mismo.
+    //
+    // Es la TERCERA vez en dos días que muerde el mismo patrón, ya escrito en el
+    // bloque de las llamadas: UNA REGLA QUE LE PREGUNTA A OTRO DOCUMENTO NO VALE
+    // MÁS QUE LAS REGLAS DE ESE OTRO DOCUMENTO.
+    //
+    // Cerrarlo pide dos cosas que NO son de este bloque, y por eso no se hicieron
+    // aquí: que un viaje no pueda nacer ni cambiar con un `conductorId` puesto por
+    // su pasajero (solo lo pone `confirmarConductor`, que corre en el servidor), y
+    // que un pedido no valga como comprobante hasta que el restaurante lo haya
+    // marcado. Queda ANOTADO como el trabajo siguiente.
+    //
+    // ENTONCES, ¿QUÉ SÍ CIERRA ESTO? Reescribir una calificación para tapar la
+    // mala; ponerle doscientas estrellas o cero; calificar sin viaje ni pedido;
+    // calificar el viaje o el pedido DE OTRO; y que el negocio, al reportar, toque
+    // algo más que los cuatro campos del reporte. Es menos de lo que parecía, y
+    // más que nada.
+    //
+    // HAY DOS FORMAS DE CALIFICAR y una regla que solo conozca una rompe la otra:
+    //   · el VIAJE      — lleva `viajeId` (guajirago/src/Calificacion.js).
+    //   · el RESTAURANTE — lleva `pedidoId` (guajirago/src/Restaurantes.js).
+    // Y se exige UNA de las dos, no las dos: mandando las dos claves se entraba
+    // por la rama del pedido propio y se colgaba del viaje ajeno. También lo cazó
+    // la segunda opinión, ejecutándolo.
+    //
+    // EL `read` SE DEJA ABIERTO a quien tenga cuenta: una calificación es pública
+    // por naturaleza —son las estrellas del restaurante— y
+    // `guajirago/src/Restaurantes.js:121` pide la colección ENTERA sin filtro para
+    // las medias. Ahora se puede dejar así sin daño, porque el documento NO dice
+    // quién lo escribió.
+    //
+    // EL `update` NO ES SOLO DEL PANEL, y por poco se rompe: el restaurante
+    // REPORTA los comentarios insultantes desde
+    // `aliados/CalificacionesRestaurante.js:38`, y esa pantalla se traga el error
+    // con un catch vacío. Si la regla lo negara, quedaría un botón que se cierra
+    // sin decir nada y la cola de moderación del panel vacía para siempre. Así que
+    // el negocio puede marcar SU comentario como reportado — y solo esos cuatro
+    // campos: las estrellas no se tocan.
+    //
+    // (Una versión anterior de este comentario decía que esa pantalla pinta
+    // «Reportado» ANTES de saber si se guardó. No es cierto: el setLista va después
+    // del await y dentro del try. El problema real es que se cierra en silencio.)
+    //
+    // ANOTADO, no cerrado: (1) nada limita a UNA calificación por viaje — el
+    // addDoc genera id nuevo cada vez, y cerrarlo pide un id fijo, o sea tocar la
+    // app; (2) no se mira el estado del viaje, así que se puede calificar antes de
+    // que pase nada.
     match /calificaciones/{calId} {
+      function estrellasDeVerdad() {
+        return request.resource.data.get('estrellas', 0) is int
+          && request.resource.data.get('estrellas', 0) >= 1
+          && request.resource.data.get('estrellas', 0) <= 5;
+      }
+      function elViaje() {
+        return get(/databases/$(database)/documents/viajes/$(request.resource.data.viajeId)).data;
+      }
+      function elPedido() {
+        return get(/databases/$(database)/documents/pedidosRestaurantes/$(request.resource.data.pedidoId)).data;
+      }
+      // Los dos que iban en el viaje, y cada uno califica AL OTRO.
+      function calificaSuViaje() {
+        return exists(/databases/$(database)/documents/viajes/$(request.resource.data.viajeId)) && (
+          (elViaje().get('pasajeroId', '') == request.auth.uid &&
+           request.resource.data.get('calificadoId', '') == elViaje().get('conductorId', 'sin-conductor')) ||
+          (elViaje().get('conductorId', '') == request.auth.uid &&
+           request.resource.data.get('calificadoId', '') == elViaje().get('pasajeroId', 'sin-pasajero'))
+        );
+      }
+      // El cliente del pedido, y las estrellas van para SU restaurante.
+      function calificaSuPedido() {
+        return exists(/databases/$(database)/documents/pedidosRestaurantes/$(request.resource.data.pedidoId)) &&
+          elPedido().get('clienteId', '') == request.auth.uid &&
+          request.resource.data.get('calificadoId', '') == elPedido().get('restauranteId', 'sin-restaurante');
+      }
+      // Lo único que el negocio puede tocar de una calificación suya.
+      function soloElReporte() {
+        return request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['reportado', 'motivoReporte', 'estadoReporte', 'fechaReporte']);
+      }
+
       allow read: if request.auth != null;
-      allow create, update: if request.auth != null;
+
+      // SOBRE EL `request.auth != null` DE AQUÍ ABAJO: se plantó el mutante de
+      // quitarlo (25-ago-2026) y las pruebas siguieron VERDES. No es que falte una
+      // prueba: es que no se puede escribir. Sin sesión, cualquier camino de
+      // calificaSuViaje() o calificaSuPedido() toca request.auth.uid y revienta, y
+      // un error dentro de una regla deniega. O sea que el mutante es EQUIVALENTE.
+      // Se deja escrito porque negar «porque revienta» es fiarse de un detalle fino
+      // del motor, y porque leerlo aquí es más claro que deducirlo.
+      allow create: if request.auth != null
+        && estrellasDeVerdad()
+        && (
+          (request.resource.data.keys().hasAny(['viajeId']) &&
+           !request.resource.data.keys().hasAny(['pedidoId']) && calificaSuViaje()) ||
+          (request.resource.data.keys().hasAny(['pedidoId']) &&
+           !request.resource.data.keys().hasAny(['viajeId']) && calificaSuPedido())
+        );
+
+      // El `!= ''` NO sobra. Sin él, `esDelNegocio('')` es un COMODÍN: una ficha de
+      // empleado a la que le falte `restauranteId` cumple esa pregunta, y TODA
+      // calificación de viaje devuelve '' en ese campo. Esa persona podría reportar
+      // —o sea ESCONDER, porque Restaurantes.js:164 y aliados:29 filtran las
+      // reportadas— la calificación de quien quisiera. Lo cazó la segunda opinión
+      // del 25-ago-2026.
+      allow update: if esAdmin() || (
+        resource.data.get('restauranteId', '') != '' &&
+        esDelNegocio(resource.data.get('restauranteId', '')) &&
+        soloElReporte()
+      );
+
       allow delete: if false;
     }
     // ── REGLA 10 · UNA LLAMADA ES DE LOS DOS QUE VIAJAN, DE NADIE MÁS ───────
