@@ -1135,6 +1135,104 @@ describe('REGLA 9 · los pedidos dejan de ser públicos entre usuarios', () => {
     }));
   });
 
+  // ── CINCO ESTRELLAS A SI MISMO · POR LA PUERTA DEL PEDIDO ────────────────
+  // La rama esDelNegocio() del create NO le exige al negocio que el pedido nazca
+  // 'nuevo' ni le mira el clienteId: el dueno se hacia un pedido a si mismo ya
+  // 'entregado' y se ponia las estrellas. Medido: 15 de 15, media 5.0. Y con el uid
+  // compartido entre restaurantes/usuarios/conductores, un CONDUCTOR se registraba
+  // un negocio con su propio uid y las estrellas caian sobre su media DE CONDUCTOR.
+  // Sin calificadoId no entra: lo para el PAR (las estrellas tienen que ir para el
+  // otro). La version anterior de esta prueba sembraba sobre 'ped1', que no tiene
+  // ni clienteId ni restauranteId, asi que la negaba el PAR pasara lo que pasara:
+  // sobrevivia a los SEIS mutantes, incluido quitar el candado entero. Lo cazo la
+  // segunda opinion. Ahora el pedido es de verdad -del cliente, entregado, de un
+  // negocio real-, o sea que lo unico que falta es el calificadoId.
+  it('una calificacion SIN calificadoId no entra, aunque el pedido sea de verdad', async () => {
+    const { doc, setDoc, addDoc, collection } = FS;
+    await entorno.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'pedidosRestaurantes/pbueno'), {
+        restauranteId: 'r1', clienteId: 'pasajero1', estado: 'entregado', total: 30000,
+      });
+    });
+    // Con el calificadoId bueno SI entra: la semilla es valida.
+    await RUT.assertSucceeds(addDoc(collection(como('pasajero1'), 'calificaciones'), {
+      pedidoId: 'pbueno', calificadoId: 'r1', estrellas: 5,
+    }));
+    // Sin el campo, no.
+    await RUT.assertFails(addDoc(collection(como('pasajero1'), 'calificaciones'), {
+      pedidoId: 'pbueno', estrellas: 5,
+    }));
+    // Y vacio, tampoco.
+    await RUT.assertFails(addDoc(collection(como('pasajero1'), 'calificaciones'), {
+      pedidoId: 'pbueno', calificadoId: '', estrellas: 5,
+    }));
+  });
+
+  it('EL ATAQUE · el negocio NO se pone estrellas a si mismo', async () => {
+    const { doc, setDoc, addDoc, collection } = FS;
+    // El negocio SI puede hacerse el pedido (es su rama), pero no calificarlo.
+    await entorno.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'pedidosRestaurantes/pyo'), {
+        restauranteId: 'r1', clienteId: 'r1', estado: 'entregado', total: 30000,
+      });
+    });
+    await RUT.assertFails(addDoc(collection(como('r1'), 'calificaciones'), {
+      pedidoId: 'pyo', calificadoId: 'r1', estrellas: 5,
+    }), 'El que califica y el calificado son la misma persona.');
+  });
+
+  // ── Y EL TERCER CAMINO: LA SEGUNDA CUENTA PUESTA DE EMPLEADA ─────────────
+  // «Nadie se califica a si mismo» NO bastaba, y lo midio la segunda opinion con
+  // ese candado ya puesto: 15 de 15, media 5.0. La cadena era de UNA persona con
+  // dos cuentas: A se registra un negocio con su propio uid (nadie tiene que
+  // aprobarlo), nombra empleada a B, y B -que ya es «del negocio»- se fabrica el
+  // pedido entregado y lo califica. El candado de auto-calificarse ni lo roza,
+  // porque B no es A. Lo para !esDelNegocio(), que cubre las dos caras.
+  it('EL ATAQUE · un EMPLEADO no le pone estrellas al negocio donde trabaja', async () => {
+    const { doc, setDoc, addDoc, collection } = FS;
+    await entorno.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      // La cuenta B, empleada activa de r1.
+      await setDoc(doc(db, 'empleados/empleadoDeR1'), { restauranteId: 'r1', activo: true });
+      // El pedido que B se fabrica a su propio nombre, ya entregado.
+      await setDoc(doc(db, 'pedidosRestaurantes/pemp'), {
+        restauranteId: 'r1', clienteId: 'empleadoDeR1', estado: 'entregado', total: 30000,
+      });
+    });
+    await RUT.assertFails(addDoc(collection(como('empleadoDeR1'), 'calificaciones'), {
+      pedidoId: 'pemp', calificadoId: 'r1', estrellas: 5,
+    }), 'Quien trabaja en el negocio no le pone la nota al negocio.');
+  });
+
+  // Y un empleado DESPEDIDO (activo:false) ya no es del negocio, asi que SI puede
+  // calificarlo como cualquier cliente. Es lo correcto y conviene fijarlo.
+  it('pero un empleado despedido SI puede calificar como cualquier cliente', async () => {
+    const { doc, setDoc, addDoc, collection } = FS;
+    await entorno.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      await setDoc(doc(db, 'empleados/exempleado'), { restauranteId: 'r1', activo: false });
+      await setDoc(doc(db, 'pedidosRestaurantes/pex'), {
+        restauranteId: 'r1', clienteId: 'exempleado', estado: 'entregado', total: 30000,
+      });
+    });
+    await RUT.assertSucceeds(addDoc(collection(como('exempleado'), 'calificaciones'), {
+      pedidoId: 'pex', calificadoId: 'r1', estrellas: 4,
+    }));
+  });
+
+  // Y AL CLIENTE DE VERDAD no le quita nada: no trabaja donde pide.
+  it('y el cliente de siempre sigue calificando su restaurante', async () => {
+    const { doc, setDoc, addDoc, collection } = FS;
+    await entorno.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'pedidosRestaurantes/pnormal'), {
+        restauranteId: 'r1', clienteId: 'pasajero1', estado: 'entregado', total: 30000,
+      });
+    });
+    await RUT.assertSucceeds(addDoc(collection(como('pasajero1'), 'calificaciones'), {
+      pedidoId: 'pnormal', calificadoId: 'r1', estrellas: 5,
+    }), 'Restaurantes.js:425. Si esto se cae, nadie puede calificar un restaurante.');
+  });
+
   // LA CADENA ENTERA CONTRA UN RIVAL, de punta a punta.
   it('LA CADENA · contra un rival tampoco: ni naciendo entregado, ni moviendolo', async () => {
     const { doc, setDoc, updateDoc, addDoc, collection } = FS;
@@ -2762,6 +2860,44 @@ describe('REGLA 10 · un viaje no lo toca cualquiera', () => {
   // pasajera se sube al carro equivocado. Solicitar.js:588-599 saca el nombre, la
   // placa, el vehiculo y el telefono DEL DOCUMENTO DEL VIAJE. Sin tocar
   // conductorId ni una vez, se le reescribian los cuatro.
+  // ── CINCO ESTRELLAS A SI MISMO · LA ULTIMA PUERTA (25-ago-2026) ──────────
+  // Tenia dos caminos y los dos acaban igual: el que califica y el calificado son
+  // la MISMA persona. Se corta ahi, y ademas en el primer paso de cada camino.
+  it('EL ATAQUE · un pasajero NO se puede ofertar a si mismo su propio viaje', async () => {
+    await sembrarViajes();
+    const { doc, setDoc } = FS;
+    await RUT.assertFails(setDoc(doc(como('pasajero1'), 'viajes/vm/contraofertas/pasajero1'), {
+      conductorId: 'pasajero1', conductorNombre: 'Yo mismo', montoValor: 9000, vigente: true,
+    }), 'Primer paso de las cinco estrellas a si mismo: y ademas le descuenta comision sin suelo a alguien.');
+  });
+
+  it('LA CADENA · sin oferta propia no hay conductor propio, y sin eso no hay estrella propia', async () => {
+    await sembrarViajes();
+    const { doc, setDoc, addDoc, collection } = FS;
+    // 1 - no se puede ofertar a si mismo
+    await RUT.assertFails(setDoc(doc(como('pasajero1'), 'viajes/vm/contraofertas/pasajero1'), {
+      conductorId: 'pasajero1', montoValor: 9000, vigente: true,
+    }));
+    // 2 - y aunque el viaje acabara con el de conductor, la estrella no entra
+    await entorno.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'viajes/vyo'), {
+        pasajeroId: 'pasajero1', conductorId: 'pasajero1', estado: 'finalizado',
+      });
+    });
+    await RUT.assertFails(addDoc(collection(como('pasajero1'), 'calificaciones'), {
+      viajeId: 'vyo', calificadoId: 'pasajero1', estrellas: 5,
+    }), 'Nadie se califica a si mismo.');
+  });
+
+  // Y LO QUE SI: un conductor DE VERDAD sigue ofertando en el viaje de otro.
+  it('un conductor SI oferta en el viaje de otro, como siempre', async () => {
+    await sembrarViajes();
+    const { doc, setDoc } = FS;
+    await RUT.assertSucceeds(setDoc(doc(como('conductor2'), 'viajes/vm/contraofertas/conductor2'), {
+      conductorId: 'conductor2', conductorNombre: 'Luis', montoValor: 12000, vigente: true,
+    }), 'AppConductor.js:353. Si esto se cae, el conductor no puede trabajar.');
+  });
+
   it('EL ATAQUE · nadie le cambia el nombre, la placa ni el telefono al conductor', async () => {
     await sembrarViajes();
     const { doc, updateDoc } = FS;

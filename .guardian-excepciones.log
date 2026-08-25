@@ -61,3 +61,27 @@ mismo hace seis horas, que es justo lo que mas dano ha hecho en toda esta audito
 Lo cazo la segunda opinion, no el guardian: el guardian compara ARCHIVOS, no SITIOS,
 aunque la foto guarda los sitios. Ya estaba anotado como deuda; esta es la primera vez
 que muerde de verdad.
+
+────────────────────────────────────────────────────────────────────────────────
+2026-08-25 · "Cinco estrellas a si mismo: nadie se califica, y nadie se oferta su
+propio viaje"
+SITIOS DECLARADOS: firestore.rules:calificaciones, firestore.rules:viajes/contraofertas,
+                   pruebas/reglas.test.js:REGLA 2 y 10
+SITIO TOCADO DE MAS: firestore.rules:viajes  (SOLO COMENTARIO, otra vez)
+
+Es el MISMO caso de esta manana y ya van dos: el INDICE de las tres puertas vive
+dentro del bloque match /viajes/, y cada vez que se cierra una hay que actualizar la
+cuenta o el archivo se queda mintiendo. Esta vez ademas la primera version del
+comentario decia "la ULTIMA puerta, CERRADA" y era FALSO -la segunda opinion midio
+15 de 15 por el camino del empleado, con el arreglo puesto-, asi que dejarlo sin
+tocar habria sido peor.
+
+DEUDA QUE ESTO DESTAPA, y se dice para que se arregle de verdad algun dia: ese
+indice no deberia vivir dentro de un bloque de reglas. Es contabilidad de toda la
+auditoria metida en el sitio equivocado, y por eso cada cierre obliga a salirse de
+la foto. Su sitio seria un documento aparte.
+
+DESVIACION DE LA FOTO, tambien anotada: la foto dijo "pruebas/reglas.test.js:REGLA 2
+y 10", pero cuatro de las pruebas nuevas cayeron en el describe de la REGLA 9 (los
+pedidos), que es donde vive el camino del pedido, y ninguna en el de la REGLA 2. Los
+nombres de los describe no siguen la numeracion de las reglas del informe.

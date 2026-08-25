@@ -230,7 +230,12 @@ service cloud.firestore {
       //     tercero. POR DENTRO NO: quien es del negocio se fabrica su propio
       //     comprobante — es el caso de abajo, el de las cinco estrellas a sí
       //     mismo, por la puerta del pedido en vez de la del viaje.
-      //   · CINCO ESTRELLAS A SÍ MISMO — LA ÚLTIMA QUE QUEDA, y tiene DOS caminos:
+      //   · CINCO ESTRELLAS A SÍ MISMO — CERRADA el mismo día, con TRES candados:
+      //     nadie se califica a sí mismo, nadie se oferta su propio viaje, y nadie
+      //     califica al negocio para el que trabaja. El tercero hizo falta porque
+      //     con los dos primeros la segunda opinión seguía metiendo 15 de 15 con
+      //     una segunda cuenta puesta de EMPLEADA. Lo que NO se cierra con reglas
+      //     está escrito en el bloque de `calificaciones`. Tenía DOS caminos:
       //     · POR EL VIAJE: se crea uno, se deja a sí mismo una contraoferta (el id
       //       del documento ES su uid, así que la REGLA 2 lo permite) y llama a
       //       `confirmarConductor`, que cumple sus tres controles y le escribe el
@@ -489,7 +494,34 @@ service cloud.firestore {
           esAdmin()
         );
         // Ofertar: solo el conductor que firma (AppConductor.js:353 usa su uid).
-        allow create: if request.auth != null && request.auth.uid == conductorId;
+        //
+        // Y NO SOBRE SU PROPIO VIAJE (25-ago-2026). Este era el primer paso del
+        // ataque de las cinco estrellas a sí mismo: crear un viaje, dejarse una
+        // oferta a uno mismo —el id del documento ES su uid, así que la firma de
+        // arriba la cumple— y llamar a `confirmarConductor`, que le cumple sus
+        // CUATRO controles (el viaje es suyo, está en 'esperando', la oferta
+        // existe, y él no está ocupado) y le escribe el conductor. Se corta también
+        // aquí, y no solo en las
+        // calificaciones, porque el daño no era solo la nota:
+        //   · en BUCLE — al marcar el viaje 'finalizado' (puede: es suyo por los
+        //     dos lados), `onViajeCerrado` lo libera y vuelve a empezar.
+        //   · y la COMISIÓN SE DESCUENTA SIN SUELO (`functions/index.js:299`): los
+        //     créditos se van a negativo y ya. Quien pierde NO es un tercero: el
+        //     descuento cae en la cuenta del propio atacante — pierde GuajiraGo,
+        //     porque con el saldo en negativo sigue tomando viajes DE VERDAD sin
+        //     pagar comisión. El tope está solo en el celular
+        //     (`AppConductor.js:341`), y el celular no manda.
+        //   · y le infla la cuenta de viajes hechos, que es lo que mira el panel.
+        //
+        // NO ROMPE NADA, medido: el mercado del conductor NO le esconde sus propios
+        // viajes (`AppConductor.js:849` pide todos los del mercado sin filtrar por
+        // pasajero), así que hoy la app se lo permitiría — pero no hay ni un solo
+        // uso legítimo: nadie se lleva a sí mismo. Y en la base viva, medido el
+        // 25-ago-2026: 0 contraofertas en los 91 viajes. No hay nada que romper.
+        allow create: if request.auth != null
+          && request.auth.uid == conductorId
+          && get(/databases/$(database)/documents/viajes/$(viajeId)).data.get('pasajeroId', '')
+               != request.auth.uid;
         // Cambiarla: su conductor (AppConductor.js:635) o el pasajero DE ESE viaje,
         // que marca como no vigentes las que perdieron (Solicitar.js:1050 y
         // SolicitarMensajeria.js:1062). Sin esto último se rompe elegir conductor.
@@ -672,11 +704,26 @@ service cloud.firestore {
       // 25-ago-2026, solo puede dejar el estado quieto o cancelar. Así que para
       // calificar hace falta que el negocio haya dicho que el pedido pasó.
       //
-      // ⚠ SALVO CUANDO EL QUE CALIFICA ES EL NEGOCIO. Esto para a un tercero, no
-      // al de dentro: por la rama `esDelNegocio()` del `create` del pedido, el
-      // dueño o su empleado se hacen un pedido a sí mismos ya 'entregado' y se
-      // ponen las estrellas que quieran. Medido: 15 de 15, media 5.0. Es la puerta
-      // que queda, anotada arriba con las cinco estrellas a sí mismo.
+      // Y NO SE CALIFICA AL NEGOCIO PARA EL QUE UNO TRABAJA (25-ago-2026). Sin
+      // esto, «nadie se califica a sí mismo» no bastaba, y lo midió la segunda
+      // opinión EJECUTÁNDOLO con el otro candado ya puesto: 15 de 15, media 5.0.
+      // La cadena era de una sola persona con dos cuentas y no necesitaba a nadie:
+      //   1. la cuenta A se registra un negocio con SU PROPIO uid — solo pide
+      //      `uid == restauranteId`, y NADIE tiene que aprobarlo: el negocio nace
+      //      `aprobado: false` y las estrellas entran igual.
+      //   2. la cuenta A nombra EMPLEADA a la cuenta B.
+      //   3. la cuenta B ya es «del negocio», así que se fabrica un pedido por la
+      //      rama `esDelNegocio()` del `create` —que no le exige que nazca 'nuevo'
+      //      ni le mira el `clienteId`— ya 'entregado'.
+      //   4. y lo califica. El candado de arriba ni lo roza: quien califica (B) no
+      //      es el calificado (A).
+      // Con el uid compartido entre `restaurantes`, `usuarios` y `conductores`, esas
+      // quince estrellas caen sobre la media DE CONDUCTOR de la cuenta A
+      // (`MiPerfil.js:40`).
+      //
+      // `esDelNegocio()` cubre las dos caras —el dueño y el empleado activo—, así
+      // que con esta línea se cierran las dos. Al cliente de verdad no le quita
+      // nada: no trabaja en el restaurante donde pide.
       //
       // Y no cambia nada de lo que la app ya hacía: el botón de calificar SOLO se
       // pinta en esos dos estados (`Restaurantes.js:582`). Esto es la regla
@@ -685,7 +732,8 @@ service cloud.firestore {
         return exists(/databases/$(database)/documents/pedidosRestaurantes/$(request.resource.data.pedidoId)) &&
           elPedido().get('clienteId', '') == request.auth.uid &&
           request.resource.data.get('calificadoId', '') == elPedido().get('restauranteId', 'sin-restaurante') &&
-          elPedido().get('estado', '') in ['entregado', 'cerrado'];
+          elPedido().get('estado', '') in ['entregado', 'cerrado'] &&
+          !esDelNegocio(elPedido().get('restauranteId', ''));
       }
       // Lo único que el negocio puede tocar de una calificación suya.
       function soloElReporte() {
@@ -702,8 +750,65 @@ service cloud.firestore {
       // un error dentro de una regla deniega. O sea que el mutante es EQUIVALENTE.
       // Se deja escrito porque negar «porque revienta» es fiarse de un detalle fino
       // del motor, y porque leerlo aquí es más claro que deducirlo.
+      // ── REGLA 10 · NADIE SE CALIFICA A SÍ MISMO (25-ago-2026) ──────────────
+      //
+      // Una sola línea, y cierra la ÚLTIMA de las tres puertas — las dos por las
+      // que se entraba a ella, que estaban anotadas arriba:
+      //   · POR EL VIAJE: se creaba uno, se dejaba a sí mismo una contraoferta y
+      //     se llamaba a `confirmarConductor`, que cumplía sus tres controles y le
+      //     escribía el conductor. Cinco estrellas a sí mismo, 3 de 3.
+      //   · POR EL PEDIDO: quien es del negocio se hacía un pedido a sí mismo ya
+      //     'entregado' —la rama `esDelNegocio()` del create no le exige que nazca
+      //     'nuevo' ni le mira el `clienteId`— y se calificaba. 15 de 15, media
+      //     5.0. Y con el uid compartido entre `restaurantes`, `usuarios` y
+      //     `conductores`, un CONDUCTOR se registraba un negocio con su propio uid
+      //     y las quince estrellas caían sobre su media DE CONDUCTOR.
+      //
+      // Las dos acaban en el mismo sitio: el que califica y el calificado son la
+      // MISMA persona. Se corta ahí, que es donde vale para las dos y para las que
+      // no se nos han ocurrido.
+      //
+      // NO LE QUITA NADA A NADIE, medido: solo hay DOS sitios que escriben una
+      // calificación —`Calificacion.js:47` y `Restaurantes.js:425`—, y en los
+      // CUATRO usos `calificadoId` es SIEMPRE el otro: `Solicitar.js:1039` y
+      // `SolicitarMensajeria.js:1060` le pasan el conductor del viaje,
+      // `AppConductor.js:1168` le pasa el pasajero, y `Restaurantes.js:430` pone el
+      // restaurante del pedido. Ninguno puede ser uno mismo en un uso normal.
+      // (Ojo: `Calificacion.js:50` escribe `calificadoId: calificadoId || ''`, así
+      // que la app misma puede mandar '' — ver el párrafo del defecto, abajo.)
+      //
+      // EL DEFECTO ES '', y un mutante que lo cambia por el propio uid SOBREVIVE a
+      // las pruebas. Una versión anterior de este comentario decía que era un
+      // «mutante equivalente, comprobado ejecutándolo». NO ERA CIERTO, y lo
+      // desmintió la segunda opinión corriendo las dos versiones lado a lado: hay
+      // tres entradas donde NO niegan igual, y la que se queda es LA MÁS
+      // PERMISIVA. Son las tres en que falta `calificadoId` y el otro lado vale
+      // también '': un viaje con `conductorId: ''`, un viaje con `pasajeroId: ''`,
+      // y un pedido con `restauranteId: ''`. Ahí el PAR compara '' con '' y da que
+      // sí. NO son alcanzables hoy —un viaje no puede nacer con conductor, el
+      // candado del conductor impide ponerlo, y un pedido exige un restaurante que
+      // exista—, y la calificación que saldría no llevaría `calificadoId`, así que
+      // `MiPerfil.js:40` nunca la sumaría. Pero es una puerta que depende de que
+      // esos tres estados sigan siendo imposibles, no del candado. Queda dicho.
+      //
+      // LO QUE ESTO **NO** CIERRA, y hay que decirlo con precisión, porque la
+      // primera versión de este comentario se apuntó «la ÚLTIMA puerta» cuando
+      // faltaba una y la segunda opinión la midió con 15 de 15:
+      //   · CERRADO — una sola cuenta calificándose a sí misma, por el viaje o por
+      //     el pedido.
+      //   · CERRADO — el negocio, o quien trabaja en él, calificando al negocio.
+      //     Es el candado `!esDelNegocio()` de `calificaSuPedido()`.
+      //   · ABIERTO, y no se cierra con reglas: una SEGUNDA cuenta que NO trabaje
+      //     en el negocio, pida de verdad, y califique. El negocio marca su propio
+      //     pedido 'entregado' —tiene que poder— y esa cuenta ya tiene un
+      //     comprobante legítimo. Ninguna regla puede distinguir eso de un cliente
+      //     contento: haría falta mirar PATRONES (siempre el mismo par de cuentas,
+      //     pedidos sin pago, horas raras). Le pasa a todos los sistemas de reseñas
+      //     del mundo. Lo que sí se acabó es la versión gratis, instantánea e
+      //     ilimitada con una cuenta y media.
       allow create: if request.auth != null
         && estrellasDeVerdad()
+        && request.resource.data.get('calificadoId', '') != request.auth.uid
         && (
           (request.resource.data.keys().hasAny(['viajeId']) &&
            !request.resource.data.keys().hasAny(['pedidoId']) && calificaSuViaje()) ||
