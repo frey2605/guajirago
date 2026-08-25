@@ -683,9 +683,66 @@ describe('REGLA 6 · cada quien ve lo suyo', () => {
   };
 
   // ── los códigos de recarga ──
-  it('el conductor sigue pudiendo canjear UN código (Creditos.js:111)', async () => {
+  //
+  // ESTA PRUEBA DECÍA LO CONTRARIO, y llevaba dos días dando seguridad falsa.
+  // Se escribió el 23-ago-2026 para defender que el canje siguiera funcionando,
+  // cuando `Creditos.js:111` PEDÍA el documento del código desde la app. Pero la
+  // REGLA 7 (24-ago) movió el canje a la función `canjearCodigoRecarga`, y desde
+  // entonces la app ya NO lee esta colección: solo llama a la función, que corre
+  // con el SDK de administrador y se salta estas reglas.
+  //
+  // O sea que desde el 24-ago esta prueba defendía un camino que ya no existe —
+  // y de paso justificaba tener el `get` abierto. Se le da la vuelta.
+  it('NADIE fuera del panel puede pedir un código, ni sabiéndoselo', async () => {
     const { doc, getDoc } = FS;
-    await RUT.assertSucceeds(getDoc(doc(como('conductor1'), 'codigos/cod1')));
+    await RUT.assertFails(getDoc(doc(como('conductor1'), 'codigos/cod1')),
+      'Un código lleva dentro cuentaDestino, banco, numComprobante y el teléfono del ' +
+      'conductor que hizo la recarga. Quien acertara el código se los llevaba.');
+    await RUT.assertFails(getDoc(doc(como('pasajero1'), 'codigos/cod1')));
+  });
+
+  it('el canje NO se rompe: lo hace la función, no la app', async () => {
+    // La app solo llama a canjearCodigoRecarga (guajirago/src/Creditos.js:111).
+    // Esa función usa el SDK de administrador, que no pasa por estas reglas. Aquí
+    // se deja constancia de que el camino del cliente está cerrado A PROPÓSITO y
+    // de que el panel sí puede — que es quien los crea y los anula.
+    const { doc, getDoc } = FS;
+    await RUT.assertSucceeds(getDoc(doc(como('eladmin'), 'codigos/cod1')));
+  });
+
+  // ── LO GORDO: EL DINERO DE LA NADA ───────────────────────────────────────
+  // Hasta el 25-ago-2026 `create, update` estaba abierto a cualquiera con cuenta.
+  // La función del canje está bien hecha, pero se FÍA de `valor` y `usado`, y
+  // esos dos los escribía el cliente. Nadie lo probaba: las 7 pruebas del canje
+  // (pruebas/funciones.test.js) siembran el código saltándose las reglas, así que
+  // ninguna llegaba a preguntar si el usuario podía crearlo él mismo.
+  it('EL DINERO DE LA NADA · nadie se fabrica un código de cinco millones', async () => {
+    const { doc, setDoc } = FS;
+    await RUT.assertFails(setDoc(doc(como('conductor1'), 'codigos/GGO-INVENTADO'), {
+      valor: 5000000, usado: false,
+    }), 'Con esto se crea el código y se canja: saldo de la nada, sin tope y en bucle.');
+  });
+
+  it('EL DINERO DE LA NADA · ni revive uno ya gastado para cobrarlo otra vez', async () => {
+    await entorno.withSecurityRulesDisabled(async (ctx) => {
+      const { doc, setDoc } = FS;
+      await setDoc(doc(ctx.firestore(), 'codigos/GGO-GASTADO'), { valor: 50000, usado: true });
+    });
+    const { doc, updateDoc } = FS;
+    await RUT.assertFails(updateDoc(doc(como('conductor1'), 'codigos/GGO-GASTADO'), { usado: false }));
+  });
+
+  it('EL DINERO DE LA NADA · ni le sube el valor a uno de verdad', async () => {
+    const { doc, updateDoc } = FS;
+    await RUT.assertFails(updateDoc(doc(como('conductor1'), 'codigos/cod1'), { valor: 9000000 }));
+  });
+
+  it('pero el PANEL sí los crea y los anula (Codigos.js:208 y :266)', async () => {
+    const { doc, setDoc, updateDoc } = FS;
+    await RUT.assertSucceeds(setDoc(doc(como('eladmin'), 'codigos/GGO-NUEVO'), {
+      valor: 50000, usado: false, fechaCreacion: '2026-08-25T00:00:00.000Z', creadoPor: 'eladmin',
+    }));
+    await RUT.assertSucceeds(updateDoc(doc(como('eladmin'), 'codigos/cod1'), { anulado: true }));
   });
 
   it('un cualquiera NO puede pedir la LISTA de códigos', async () => {
