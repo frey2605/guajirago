@@ -239,7 +239,28 @@ service cloud.firestore {
         // descontaba la comisión a un conductor que nunca ofertó, y encima quedaba
         // marcado como ocupado. Cerrar solo la función no bastaba: el atacante
         // podía hacerlo en su PROPIO viaje.
-        allow read: if request.auth != null;
+
+        // ── REGLA 10 · Y LEERLAS TAMPOCO ES DE CUALQUIERA (25-ago-2026) ──────
+        //
+        // El `read` seguía abierto a cualquiera con cuenta. El id de cada oferta ES
+        // el número del conductor que la dejó, con su nombre, teléfono, placa y
+        // vehículo dentro (AppConductor.js:353).
+        //
+        // Por sí solo ya es una fuga. Lo que lo hace grave es lo de al lado: con
+        // esos números se le pide la ficha a cada conductor y se mira su UBICACIÓN
+        // EN VIVO. Era la forma de cosechar la flota entera aunque el `list` de
+        // `conductores` esté cerrado. Las dos puertas se cierran juntas o no se
+        // cierra ninguna.
+        //
+        // Quién las lee ahora: el PASAJERO de ese viaje —es quien las mira para
+        // escoger (Solicitar.js:649, SolicitarMensajeria.js:654), y es la única
+        // pantalla de las tres apps que pide esta colección—, el CONDUCTOR que la
+        // dejó, y el panel.
+        allow read: if request.auth != null && (
+          request.auth.uid == conductorId ||
+          get(/databases/$(database)/documents/viajes/$(viajeId)).data.get('pasajeroId', '') == request.auth.uid ||
+          esAdmin()
+        );
         // Ofertar: solo el conductor que firma (AppConductor.js:353 usa su uid).
         allow create: if request.auth != null && request.auth.uid == conductorId;
         // Cambiarla: su conductor (AppConductor.js:635) o el pasajero DE ESE viaje,
@@ -269,8 +290,41 @@ service cloud.firestore {
         allow delete: if false;
       }
     }
+    // ── REGLA 10 · LA FLOTA NO SE DESCARGA (25-ago-2026) ────────────────────
+    //
+    // Esto decía `allow read: if request.auth != null`. Medido ese día: 8 fichas,
+    // y dentro de cada una `ubicacion` —lat y lng, refrescada por watchPosition
+    // mientras el conductor trabaja (AppConductor.js:814)—, más `telefono`,
+    // `placa`, `vehiculo` y el token de avisos.
+    //
+    // O sea: con una cuenta gratis se seguía EN VIVO a toda la flota, y con
+    // nombre y teléfono al lado. Es riesgo físico, y de más alcance que el de las
+    // llamadas: no hace falta ni ir en el viaje.
+    //
+    // `read` se parte en dos, como en los pedidos y en las llamadas:
+    //
+    //   · list — pedir el montón. **NO LO HACE NADIE.** Buscado el 25-ago-2026 en
+    //     las TRES apps: no hay un solo getDocs(collection(db,'conductores')).
+    //     Ni siquiera el panel — su pantalla de conductores lee la colección
+    //     `usuarios`, donde vive la ficha de la persona. Se deja para el panel
+    //     por si algún día la necesita, no porque haga falta hoy.
+    //
+    //   · get  — pedir UNA. Esto SÍ hace falta y se deja abierto a quien tenga
+    //     cuenta: es como el pasajero ve moverse el carro de su conductor en el
+    //     mapa (Solicitar.js:688 y SolicitarMensajeria.js:692, que solo usan
+    //     `ubicacion.lat` y `ubicacion.lng`). Para pedirla hay que SABERSE el
+    //     número del conductor.
+    //
+    // Y por eso, en el mismo trabajo, se cierran las ofertas de un viaje: ahí es
+    // donde se podían cosechar esos números en montón. Mira `contraofertas`.
+    //
+    // LO QUE ESTO NO CIERRA, dicho claro: quien consiga el número de UN conductor
+    // —porque viajó con él— puede seguir mirando su ubicación después. Cerrarlo
+    // del todo pide mudar `ubicacion` a un sitio aparte, y eso toca las dos apps.
+    // Queda ANOTADO. Lo que se cierra hoy es la descarga en montón.
     match /conductores/{conductorId} {
-      allow read: if request.auth != null;
+      allow get: if request.auth != null;
+      allow list: if esAdmin();
       allow create, update: if request.auth != null && (
         request.auth.uid == conductorId ||
         get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.rol == 'admin' ||

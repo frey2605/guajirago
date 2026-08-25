@@ -2154,6 +2154,104 @@ describe('REGLA 10 · la llamada es de los dos que viajan', () => {
 // pudiera escribir cualquiera, ese candado tenía la llave puesta: bastaba con
 // escribirse `conductorId` encima. Lo demostró la segunda opinión del
 // 24-ago-2026 ejecutándolo, y por eso las dos cosas van juntas.
+// ═══════════════════════════════════════════════════════════════════════════
+// REGLA 10 · NO SE PUEDE SEGUIR A LA FLOTA
+// ═══════════════════════════════════════════════════════════════════════════
+// La ficha de `conductores/{uid}` lleva `ubicacion` —lat y lng, refrescada
+// mientras trabaja—, `telefono`, `placa` y `vehiculo`. Medido el 25-ago-2026: 8
+// fichas. Con `read` abierto se descargaban las 8 con una cuenta gratis.
+//
+// Y el `list` cerrado no basta solo: los números de los conductores se cosechan
+// en las ofertas de cualquier viaje, donde el id de cada oferta ES el número del
+// conductor. Por eso las dos puertas van juntas.
+describe('REGLA 10 · no se puede seguir a la flota', () => {
+  const sembrarFlota = async () => {
+    await entorno.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      const { doc, setDoc } = FS;
+      await setDoc(doc(db, 'conductores/conductor1'), {
+        nombre: 'Luis', telefono: '3160000000', placa: 'ABC123', activo: true,
+        ubicacion: { lat: 11.54, lng: -72.90 }, fcmToken: 'tok-de-luis',
+      });
+      await setDoc(doc(db, 'conductores/conductor2'), {
+        nombre: 'Otro', telefono: '3161111111', placa: 'XYZ789', activo: true,
+        ubicacion: { lat: 11.55, lng: -72.91 },
+      });
+      // Un viaje con ofertas de dos conductores. El id de cada oferta es su uid.
+      await setDoc(doc(db, 'viajes/vf'), { pasajeroId: 'pasajero1', estado: 'esperando' });
+      await setDoc(doc(db, 'viajes/vf/contraofertas/conductor1'), { monto: 11000, conductorTelefono: '3160000000' });
+      await setDoc(doc(db, 'viajes/vf/contraofertas/conductor2'), { monto: 12000, conductorTelefono: '3161111111' });
+    });
+  };
+
+  // ── LA COSECHA, QUE ES EL ATAQUE DE VERDAD ───────────────────────────────
+  it('LA FLOTA · nadie se descarga la lista de conductores', async () => {
+    await sembrarFlota();
+    const { collection, getDocs } = FS;
+    await RUT.assertFails(getDocs(collection(como('pasajero1'), 'conductores')),
+      'Con una cuenta gratis se bajaba la ubicación EN VIVO de los 8 conductores, con su ' +
+      'nombre, teléfono y placa al lado.');
+    await RUT.assertFails(getDocs(collection(como('conductor1'), 'conductores')));
+  });
+
+  // Sin esta, cerrar la lista no sirve: se sacan los números de aquí y luego se
+  // pide la ficha de cada uno, de una en una.
+  it('LA COSECHA · un extraño NO puede leer las ofertas de un viaje ajeno', async () => {
+    await sembrarFlota();
+    const { collection, getDocs, doc, getDoc } = FS;
+    await RUT.assertFails(getDocs(collection(como('conductor2'), 'viajes/vf/contraofertas')),
+      'El id de cada oferta ES el número del conductor. Con la lista de ofertas se cosechan ' +
+      'los conductores y después se les mira la ubicación uno por uno.');
+    await RUT.assertFails(getDoc(doc(como('conductor2'), 'viajes/vf/contraofertas/conductor1')));
+  });
+
+  // ── LO QUE NO SE PUEDE ROMPER ────────────────────────────────────────────
+  it('el PASAJERO de ese viaje sigue viendo las ofertas (Solicitar.js:649)', async () => {
+    await sembrarFlota();
+    const { collection, getDocs } = FS;
+    const r = await RUT.assertSucceeds(getDocs(collection(como('pasajero1'), 'viajes/vf/contraofertas')));
+    assert.strictEqual(r.size, 2, 'tiene que ver LAS DOS ofertas para poder escoger');
+  });
+
+  it('y el conductor sigue viendo y ajustando la SUYA', async () => {
+    await sembrarFlota();
+    const { doc, getDoc } = FS;
+    await RUT.assertSucceeds(getDoc(doc(como('conductor1'), 'viajes/vf/contraofertas/conductor1')));
+  });
+
+  // Así es como el pasajero ve moverse el carro en el mapa. Si esto se pusiera
+  // rojo, el mapa se queda quieto y en silencio: ese onSnapshot no tiene manejo
+  // de error (Solicitar.js:688).
+  it('el pasajero sigue viendo dónde va su conductor (Solicitar.js:688)', async () => {
+    await sembrarFlota();
+    const { doc, getDoc } = FS;
+    await RUT.assertSucceeds(getDoc(doc(como('pasajero1'), 'conductores/conductor1')));
+  });
+
+  it('y el conductor sigue leyendo y escribiendo la suya', async () => {
+    await sembrarFlota();
+    const { doc, getDoc, setDoc } = FS;
+    await RUT.assertSucceeds(getDoc(doc(como('conductor1'), 'conductores/conductor1')));
+    await RUT.assertSucceeds(setDoc(doc(como('conductor1'), 'conductores/conductor1'), {
+      ubicacion: { lat: 11.56, lng: -72.92 },
+    }, { merge: true }));
+  });
+
+  it('el panel sí puede con la lista y con las ofertas', async () => {
+    await sembrarFlota();
+    const { collection, getDocs } = FS;
+    await RUT.assertSucceeds(getDocs(collection(como('eladmin'), 'conductores')));
+    await RUT.assertSucceeds(getDocs(collection(como('eladmin'), 'viajes/vf/contraofertas')));
+  });
+
+  it('y sin sesión, nada de nada', async () => {
+    await sembrarFlota();
+    const { doc, getDoc, collection, getDocs } = FS;
+    await RUT.assertFails(getDoc(doc(sinCuenta(), 'conductores/conductor1')));
+    await RUT.assertFails(getDocs(collection(sinCuenta(), 'conductores')));
+  });
+});
+
 describe('REGLA 10 · un viaje no lo toca cualquiera', () => {
   const sembrarViajes = async () => {
     await entorno.withSecurityRulesDisabled(async (ctx) => {
