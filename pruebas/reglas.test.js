@@ -1748,11 +1748,14 @@ describe('REGLA 9 · el cuarto de atrás de cada negocio', () => {
     }));
   });
 
-  // LAS DOS DE ABAJO DEFIENDEN LO QUE VIENE, NO LO QUE HAY. Hoy el token se
-  // escribe en el escaparate (aliados/Notificaciones.js:22 usa la colección
-  // 'restaurantes'); la tanda 2 lo muda aquí. Se dejan puestas porque son las
-  // que justifican que el create tolere que falte 'creditos' — pero conviene
-  // saber que hoy ningún código recorre este camino.
+  // LAS DOS DE ABAJO DEFIENDEN UN CAMINO VIVO desde la tanda 1b-2a (24-ago-2026):
+  // aliados/Notificaciones.js escribe aquí el token del dueño y las dos funciones
+  // de avisos lo leen de aquí.
+  //
+  // De las dos, la del cuarto que YA EXISTE es el camino normal: el registro crea
+  // el cuarto y el token entra después, por update. La del cuarto que NO existe es
+  // el repuesto —para cuando el registro no llegó a crearlo—, y es la que justifica
+  // que el create tolere que falte 'creditos': ahí el token es el único campo.
   it('EL TOKEN · el dueño guarda su token aunque el cuarto no exista todavía', async () => {
     // El caso que obliga a que el create tolere que falte 'creditos': el cuarto
     // nace con UN solo campo.

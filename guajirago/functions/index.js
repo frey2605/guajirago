@@ -5,6 +5,25 @@ const admin = require("firebase-admin");
 
 admin.initializeApp();
 
+// EL CUARTO DE ATRÁS DE CADA NEGOCIO.
+//
+// El token de avisos del dueño vive AQUÍ, y no en restaurantes/{id}, que es el
+// escaparate que se descarga cualquier cliente de la app.
+//
+// Este nombre está escrito en TRES sitios del proyecto, y ninguno puede importar
+// a los otros:
+//   · guajirago-aliados/src/negocioPrivado.js  ← EL BUENO, la fuente única
+//   · firestore.rules                          ← match /restaurantesPrivado/
+//   · aquí                                     ← otro repo y otro runtime
+// Los ata pruebas/amarres.test.js, que lee los tres y se pone rojo si dejan de
+// decir lo mismo.
+//
+// Ese amarre importa más de lo que parece. Si los dos nombres se separan, aquí no
+// falla NADA: se busca el token en una colección que no existe, no se encuentra, y
+// la función se va sin mandar el aviso. El dueño dejaría de enterarse de sus
+// pedidos sin un solo error en ningún registro.
+const NEGOCIO_PRIVADO = "restaurantesPrivado";
+
 // Distancia en km entre dos coordenadas (Haversine)
 function distanciaKm(lat1, lng1, lat2, lng2) {
   const R = 6371;
@@ -89,7 +108,7 @@ exports.notificarNuevoPedidoRestaurante = onDocumentCreated("pedidosRestaurantes
 
   try {
     const tokens = [];
-    const restSnap = await admin.firestore().collection("restaurantes").doc(restauranteId).get();
+    const restSnap = await admin.firestore().collection(NEGOCIO_PRIVADO).doc(restauranteId).get();
     if (restSnap.exists && restSnap.data().fcmToken) tokens.push(restSnap.data().fcmToken);
 
     const empSnap = await admin.firestore().collection("empleados").where("restauranteId", "==", restauranteId).get();
@@ -167,7 +186,7 @@ exports.notificarNuevaReserva = onDocumentCreated("reservasTurismo/{id}", async 
   if (!agenciaId) return null;
   try {
     const tokens = [];
-    const agSnap = await admin.firestore().collection("restaurantes").doc(agenciaId).get();
+    const agSnap = await admin.firestore().collection(NEGOCIO_PRIVADO).doc(agenciaId).get();
     if (agSnap.exists && agSnap.data().fcmToken) tokens.push(agSnap.data().fcmToken);
     const empSnap = await admin.firestore().collection("empleados").where("restauranteId", "==", agenciaId).get();
     empSnap.forEach((doc) => {

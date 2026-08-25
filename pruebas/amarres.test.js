@@ -415,4 +415,99 @@ describe('SEGUNDA LEY · el cuarto privado del negocio, una sola lista', () => {
       'El negocio nuevo nacería sin cuarto — y la tanda 2, que vacía el escaparate, le ' +
       'borraría los datos del dueño sin tenerlos guardados en ningún sitio.');
   });
+
+  // ── EL TOKEN DE AVISOS, LOS TRES SITIOS ─────────────────────────────────
+  //
+  // Se miran los archivos SIN COMENTARIOS, por lo de siempre: buscando una
+  // cadena suelta, comentar la línea deja la prueba verde porque el texto sigue
+  // estando en el archivo.
+  //
+  // DOS LECCIONES QUE ESTAS PRUEBAS APRENDIERON A GOLPES (24-ago-2026):
+  //
+  // 1. Hay que comprobar la ESCRITURA ENTERA, no solo de dónde sale el nombre de
+  //    la colección. La primera versión miraba el import y el ternario y se
+  //    quedaba ahí: se podía BORRAR el setDoc entero —o mandarlo a 'empleados'—
+  //    y seguía verde. Es la MISMA lección del amarre de Login.js, doce renglones
+  //    más arriba, que ya la había aprendido. Se repite aquí escrita para que no
+  //    haya que aprenderla una tercera vez.
+  //
+  // 2. Los «no» van con expresión regular, no con includes(). Buscando la cadena
+  //    "'restaurantes'" solo se ve la comilla SIMPLE: con comilla doble la fuga
+  //    se reabría entera y la prueba seguía afirmando por escrito que no podía
+  //    pasar. Y en guajirago/functions/ no hay ni .eslintrc que obligue a un
+  //    estilo de comillas.
+  //
+  // (\x60 es la comilla invertida. Se escribe así para no tener que escapar
+  // acentos graves dentro de una expresión regular.)
+  const NOMBRA_EL_ESCAPARATE = /['"\x60]restaurantes['"\x60]/;
+  const LEE_DEL_ESCAPARATE = /collection\(\s*['"\x60]restaurantes['"\x60]\s*\)/;
+
+  it('la app de aliados guarda el token del dueño en el cuarto, no en el escaparate', () => {
+    const vivo = leer('guajirago-aliados/src/Notificaciones.js').replace(/\/\/.*$/gm, '');
+    assert.ok(vivo.includes("from './negocioPrivado'"),
+      'aliados/Notificaciones.js dejó de importar negocioPrivado.js: o escribió el nombre ' +
+      'de la colección a mano, o volvió a guardar el token en el escaparate.');
+    assert.ok(/dueno['"\x60]\s*\?\s*COLECCION_PRIVADA\s*:/.test(vivo),
+      'aliados/Notificaciones.js ya no elige COLECCION_PRIVADA para el dueño. Si el token ' +
+      'vuelve a restaurantes/{uid}, viaja dentro del escaparate que se descarga cualquier ' +
+      'cliente registrado — y con él se le pueden mandar al dueño avisos falsos con la ' +
+      'cara de GuajiraGo.');
+    assert.ok(vivo.includes('doc(db, col, user.uid), { fcmToken: token }'),
+      'aliados/Notificaciones.js ya no GUARDA el token, o lo guarda de otra forma. Elegir ' +
+      'bien la colección no sirve de nada si la escritura desapareció: el dueño no ' +
+      'recibiría ni un aviso y nada fallaría. Si de verdad cambió la forma de escribirlo, ' +
+      'cambia también esta prueba — pero cámbiala a mano, mirando lo que hace el código.');
+    assert.ok(!NOMBRA_EL_ESCAPARATE.test(vivo),
+      'aliados/Notificaciones.js volvió a nombrar la colección «restaurantes». El token del ' +
+      'dueño no puede acabar ahí, ni por el camino principal ni por uno añadido al lado.');
+  });
+
+  // LAS FUNCIONES NO PUEDEN IMPORTAR NADA DE ALIADOS: son otro repo y otro
+  // runtime. El nombre del cuarto está escrito en TRES sitios que no se pueden
+  // importar entre ellos —negocioPrivado.js, firestore.rules y functions/index.js—
+  // y estos amarres son lo único que los mantiene juntos.
+  //
+  // Importa más de lo que parece, porque si se separan NO FALLA NADA: la función
+  // buscaría el token en una colección que no existe, no lo encontraría, y se iría
+  // sin mandar el aviso. El dueño dejaría de enterarse de sus pedidos sin un solo
+  // error en ningún registro. Por eso se comprueban las DOS funciones por dentro,
+  // y no basta con que la constante esté bien escrita arriba.
+  //
+  // ANOTADO (24-ago-2026): pruebas/funciones.test.js no EJECUTA estas dos
+  // funciones. Este amarre de texto es lo único que las vigila, y por eso se le
+  // pide tanto. Ejecutarlas de verdad es trabajo aparte.
+  it('las funciones buscan el token en el MISMO cuarto que la app de aliados', () => {
+    const { COLECCION_PRIVADA } = modulo();
+    const vivo = leer('guajirago/functions/index.js').replace(/\/\/.*$/gm, '');
+
+    // Se LEE el nombre declarado y se compara con la fuente única, en vez de
+    // buscar el renglón entero letra por letra. Así cambiar el tipo de comillas
+    // no pone la prueba roja sin motivo, y el error dice qué dice cada lado.
+    const declara = vivo.match(/const NEGOCIO_PRIVADO\s*=\s*['"\x60]([^'"\x60]+)['"\x60]\s*;/);
+    assert.ok(declara,
+      'functions/index.js ya no declara NEGOCIO_PRIVADO como un texto suelto. Tiene que ' +
+      'serlo: es otro repo y no puede importar la lista buena, así que esta prueba lo lee ' +
+      'del archivo. Si se arma con trozos o sale de una variable, nadie puede comprobar ' +
+      'que sigue diciendo lo mismo que negocioPrivado.js.');
+    assert.strictEqual(declara[1], COLECCION_PRIVADA,
+      'Las funciones y negocioPrivado.js dejaron de decir lo mismo: negocioPrivado.js dice ' +
+      '«' + COLECCION_PRIVADA + '» y functions/index.js dice «' + declara[1] + '». Los ' +
+      'avisos de pedidos y reservas dejarían de llegarle al dueño EN SILENCIO: no falla ' +
+      'nada, simplemente no se encuentra el token.');
+
+    ['notificarNuevoPedidoRestaurante', 'notificarNuevaReserva'].forEach((nombre) => {
+      const desde = vivo.split('exports.' + nombre + ' =')[1];
+      assert.ok(desde, 'ya no existe la función ' + nombre + ' en functions/index.js. Si se ' +
+        'le cambió el nombre, cámbialo también aquí: esta prueba es lo único que vigila que ' +
+        'siga leyendo el token del sitio bueno.');
+      const cuerpo = desde.split(/\r?\nexports\./)[0];
+      assert.ok(cuerpo.includes('collection(NEGOCIO_PRIVADO)'),
+        nombre + ' ya no busca el token en el cuarto privado del negocio.');
+      assert.ok(!LEE_DEL_ESCAPARATE.test(cuerpo),
+        nombre + ' volvió a leer de la colección «restaurantes», que es EL ESCAPARATE: la ' +
+        'app del pasajero se la descarga entera. Un token guardado ahí se lo lleva ' +
+        'cualquiera con una cuenta. Ojo: esto salta también si la lectura buena sigue ahí ' +
+        'y alguien añadió otra al lado, que es justo como se cuela una fuga.');
+    });
+  });
 });
