@@ -1361,13 +1361,87 @@ service cloud.firestore {
       // aliados/PedidosDomicilio.js:92 — las dos ya filtran por restauranteId).
       allow list: if esAdmin() || esDelNegocio(resource.data.restauranteId);
 
+      // ── REGLA 10 · Y A NADIE SE LE NOMBRA EMPLEADO A LA FUERZA (25-ago-2026) ──
+      // Esta puerta la abrió el candado del 25-ago que está unos renglones más
+      // arriba, en calificaSuPedido(): «quien trabaja en el negocio no le pone la
+      // nota al negocio». La frase es correcta. El problema es QUIÉN contesta a
+      // «¿trabaja aquí?»: esta ficha. Y esta ficha la escribe el negocio.
+      //
+      // El identificador del documento —empleadoId— no lo miraba nadie. Con eso,
+      // un restaurante al que no le gustó una calificación:
+      //   1. lee el clienteId de su propio pedido —lo tiene, el pedido es suyo—,
+      //   2. escribe empleados/{ese cliente} con su restauranteId dentro,
+      //   3. y ese cliente NO PUEDE VOLVER A CALIFICARLO. Nunca. Y sin enterarse:
+      //      guajirago/src/Restaurantes.js:438 se traga el fallo con un catch
+      //      vacío, así que el botón de enviar simplemente no hace nada.
+      //
+      // Es otra vez la lección de siempre, la que ya está escrita cinco veces en
+      // este archivo: una regla no vale más que las reglas del documento del que
+      // se fía. Con un matiz NUEVO que conviene dejar escrito: en todas las demás
+      // reglas, esDelNegocio() ABRE puertas —el libro de pedidos, el equipo—, así
+      // que nombrar empleado a un extraño era regalarle algo al enemigo y nadie
+      // iba a hacerlo. En la de calificaciones, por primera vez, que te nombren
+      // empleado te QUITA algo. Ahí el mismo permiso de siempre cambió de bando.
+      //
+      // DÓNDE ESTÁ LA RAYA, medido y no supuesto:
+      //   · un empleado DE VERDAD nace en aliados/firebaseSecundario.js:20, que
+      //     lo llama aliados/Empleados.js:98: una cuenta recién creada, con un
+      //     identificador nuevo. NO tiene ficha en `usuarios` ni en `restaurantes`,
+      //     porque no ha pasado por ninguna de las dos puertas.
+      //   · un cliente que se registró BIEN tiene ficha en `usuarios`, y la escribe
+      //     el registro en guajirago/src/Login.js:153.
+      //   · y el dueño de OTRO negocio tiene ficha en `restaurantes`.
+      // Medido el 25-ago-2026 contra el servidor vivo: 1 empleado real, y NO tiene
+      // ficha de usuario. 10 usuarios, 3 negocios y 8 conductores, ninguno de ellos
+      // empleado y todos con su ficha. HOY la raya no parte a nadie.
+      //
+      // LO QUE ESTA RAYA NO CUBRE — y hay que escribirlo porque la primera versión
+      // de este comentario decía lo contrario. Decía que el registro escribe la
+      // ficha «sin try/catch, así que no queda cuenta a medias». Es FALSO por las
+      // dos mitades, y lo cazó la segunda opinión EJECUTANDO el ataque entero con
+      // este arreglo ya puesto:
+      //   · la cuenta de Auth nace en guajirago/src/Login.js:105 y la ficha se
+      //     escribe 48 renglones después, en :153, con tres viajes a la red por
+      //     medio (la callable de :114 y las lecturas de :131 y :150).
+      //   · todo eso va dentro del try que abre en :104, y su catch (:175) solo
+      //     pinta un mensaje: NO borra la cuenta. La única rama que la borra es la
+      //     del celular repetido (:116).
+      //   · y la propia app cuenta con que pasa: iniciarSesion (:192) hace
+      //     «if (docSnap.exists()) … else onEntrar('','','','','')» — deja entrar
+      //     igual, sin ficha. Esa rama else es la prueba de que el caso existe.
+      //   · guajirago-aliados/src/Login.js:49 y :75 tienen el mismo hueco.
+      // Una cuenta así PUEDE pedir comida y calificar —ni la regla del pedido ni la
+      // de la calificación le piden ficha de usuario—, y a ESA todavía se la puede
+      // fichar para callarla.
+      //
+      // O sea: esta raya se apoya en una COSTUMBRE de la app, no en una garantía.
+      // Tapa a todo el que se registró bien, que hoy son todos los que hay. Cerrarla
+      // del todo es trabajo de la APP y queda ANOTADO: o el registro borra la cuenta
+      // de Auth en CUALQUIER fallo —no solo en el del celular repetido—, o
+      // iniciarSesion, que ya sabe que la ficha no está, la vuelve a crear.
+      //
+      // Y para robar el empleado de OTRO no hay puerta: si la ficha ya existe,
+      // esto es un update, y allí manda el dueño de AHORA con el restauranteId
+      // congelado. Esto solo tiene que cuidar el nacimiento.
+      //
+      // Al admin no se le pide nada de esto, igual que antes: el panel es de
+      // confianza, y si algún día aparece un caso raro se resuelve desde ahí.
+      //
+      // Lo que esto NO cierra y queda ANOTADO: el catch vacío de
+      // guajirago/src/Restaurantes.js:438. Cualquier calificación que se niegue —
+      // por esta regla o por la de arriba— se ve como que el botón no funciona.
+      // Es la REGLA 9 del dueño («nada se rechaza en silencio») y es trabajo de
+      // la app, no de aquí.
+      //
       // Nombrar y editar: SOLO el dueño del negocio. Ojo, aquí se pregunta por
       // el dueño y no por esDelNegocio(): si valiera cualquiera del negocio, un
       // empleado se subiría los permisos a sí mismo o se reactivaría después de
       // que lo despidan, y volveríamos al carnet que rellena el visitante.
       allow create: if esAdmin() || (
         request.auth != null &&
-        request.auth.uid == request.resource.data.get('restauranteId', '')
+        request.auth.uid == request.resource.data.get('restauranteId', '') &&
+        !exists(/databases/$(database)/documents/usuarios/$(empleadoId)) &&
+        !exists(/databases/$(database)/documents/restaurantes/$(empleadoId))
       );
 
       // Y la ficha no puede mudarse de negocio: sin esto, el dueño de un negocio

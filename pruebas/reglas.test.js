@@ -1628,6 +1628,74 @@ describe('REGLA 9 · la ficha de empleado ya no se la escribe cualquiera', () =>
     }));
   });
 
+  // ── EL SILENCIADOR · A NADIE SE LE NOMBRA EMPLEADO A LA FUERZA (25-ago) ──
+  // Lo abrio el candado de calificaSuPedido() del 25-ago: «quien trabaja en el
+  // negocio no le pone la nota al negocio». Correcto — pero quien contesta a
+  // «¿trabaja aqui?» es esta ficha, y esta ficha la escribe el negocio. Con eso,
+  // el restaurante leia el clienteId de su propio pedido, escribia empleados/{ese
+  // cliente}, y ese cliente no volvia a calificarlo NUNCA. Y sin enterarse: el
+  // catch vacio de guajirago/src/Restaurantes.js:438 hace que el boton de enviar
+  // simplemente no haga nada.
+  //
+  // La prueba va ENTERA: el ataque y lo que el ataque queria quitar.
+  it('EL ATAQUE · un negocio NO puede callar a un cliente nombrandolo empleado', async () => {
+    const { doc, setDoc, addDoc, collection } = FS;
+    await entorno.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'pedidosRestaurantes/pcritico'), {
+        restauranteId: 'r1', clienteId: 'pasajero1', estado: 'entregado', total: 30000,
+      });
+    });
+    // Paso 1: el negocio intenta ficharlo. pasajero1 YA tiene ficha en 'usuarios'
+    // -la escribe el registro, guajirago/src/Login.js:153-, asi que no se puede.
+    //
+    // OJO A QUIEN NO TAPA ESTO, que la segunda opinion lo comprobo ejecutandolo
+    // con el arreglo puesto: una cuenta HUERFANA -de un registro que se murio a
+    // medias y dejo la cuenta de Auth sin ficha- todavia se puede fichar. Eso se
+    // cierra en la app, no aqui; esta explicado entero en firestore.rules, en el
+    // bloque de empleados.
+    await RUT.assertFails(setDoc(doc(como('r1'), 'empleados/pasajero1'), {
+      restauranteId: 'r1', nombre: 'EL CLIENTE MOLESTO', rol: 'empleado', activo: true,
+    }), 'Un negocio no ficha a un cliente para quitarle la voz.');
+    // Paso 2: y por eso el cliente sigue pudiendo calificarlo.
+    await RUT.assertSucceeds(addDoc(collection(como('pasajero1'), 'calificaciones'), {
+      pedidoId: 'pcritico', calificadoId: 'r1', estrellas: 1,
+    }), 'Esto es lo que el ataque queria apagar.');
+  });
+
+  // Y tampoco al dueno del negocio de al lado, que pide como cualquier cliente.
+  // El no tiene ficha en 'usuarios' -se registro por la app de aliados-, asi que
+  // hace falta la SEGUNDA comprobacion para que no se le pueda fichar.
+  it('EL ATAQUE · ni al dueno del negocio de al lado', async () => {
+    const { doc, setDoc } = FS;
+    await entorno.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'restaurantes/r2'), { nombre: 'EL RIVAL', activo: true });
+    });
+    await RUT.assertFails(setDoc(doc(como('r1'), 'empleados/r2'), {
+      restauranteId: 'r1', nombre: 'EL RIVAL', rol: 'empleado', activo: true,
+    }), 'Fichar al rival tambien le quitaria la voz.');
+  });
+
+  // Y EL PANEL sigue pudiendo, igual que antes: la rama esAdmin() no se toco, y
+  // es la salida por si algun dia aparece un caso raro que haya que arreglar.
+  //
+  // ESTA PRUEBA NO DEMUESTRA QUE EL AGUJERO ESTE CERRADO, y conviene decirlo: la
+  // segunda opinion la corrio con CUATRO juegos de reglas -con el arreglo, sin el,
+  // y con cada linea por separado- y sale VERDE en los cuatro. Es un guardian de
+  // no-romper-el-panel, no un candado. Las que muerden son las dos de arriba.
+  it('el panel sigue pudiendo nombrar empleado a quien sea', async () => {
+    const { doc, setDoc } = FS;
+    await RUT.assertSucceeds(setDoc(doc(como('eladmin'), 'empleados/pasajero1'), {
+      restauranteId: 'r1', nombre: 'ANA', rol: 'empleado', activo: true,
+    }));
+  });
+
+  // LO QUE TIENE QUE SEGUIR PASANDO, y es la razon de que la raya este donde
+  // esta: la cuenta de un empleado DE VERDAD nace en aliados/firebaseSecundario.js:20
+  // (la llama aliados/Empleados.js:98) y es nueva de cero — no tiene ficha en
+  // 'usuarios' ni en 'restaurantes'. Eso ya lo fija la prueba de aqui arriba,
+  // «el DUEÑO sigue nombrando a su gente»: 'nuevoEmp' no existe en ningun sitio.
+  // No se repite aqui a proposito.
+
   it('el dueño sigue editando y desactivando a los suyos (Empleados.js:79 y :126)', async () => {
     await sembrarMundo();
     const { doc, updateDoc } = FS;
