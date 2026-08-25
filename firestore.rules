@@ -169,7 +169,49 @@ service cloud.firestore {
       }
       allow read: if request.auth != null
         && (esMio() || enElMercado() || esAdmin() || dejoUnaOferta());
-      allow create, update: if request.auth != null;
+
+      // ── REGLA 10 · QUIÉN PUEDE TOCAR UN VIAJE (25-ago-2026) ─────────────
+      //
+      // Hasta hoy esto decía `allow create, update: if request.auth != null`:
+      // CUALQUIERA con una cuenta escribía CUALQUIER campo de CUALQUIER viaje.
+      //
+      // Se cierra ahora porque es la llave que abría el candado de las llamadas.
+      // La segunda opinión lo demostró EJECUTÁNDOLO: un extraño se escribía
+      // `conductorId: <su uid>` en un viaje ajeno y con eso pasaba a ser «de los
+      // dos» — leía la llamada, la contestaba, y al conductor DE VERDAD se le
+      // negaba la suya. Peor que antes de cerrar nada: ya no hacía falta ganarle
+      // una carrera, bastaba con echarlo.
+      //
+      // EL ALTA. El viaje nace a nombre de quien lo pide, y no de otro:
+      // guajirago/src/viajeNuevo.js:38 escribe `pasajeroId: user.uid`. Sin esto,
+      // cualquiera crea viajes a nombre de cualquiera.
+      //
+      // EL CAMBIO. Tres pueden tocarlo, y cada uno por su motivo:
+      //   · esMio()       — el pasajero y el conductor de ese viaje. Es todo el
+      //     ciclo normal: en camino, llegué, finalizado, cancelar.
+      //   · enElMercado() — mientras el viaje está buscando conductor, los
+      //     conductores lo tocan aunque todavía no sea suyo. Sin esto,
+      //     AppConductor.js:619 (soltar los viajes que no ganó) deja de funcionar
+      //     EN SILENCIO: ese updateDoc lleva un .catch(() => {}) vacío.
+      //   · esAdmin()     — el panel.
+      //
+      // Y `pasajeroId` SE CONGELA. Un viaje no cambia de dueño nunca; es el campo
+      // del que cuelgan el chat, la llamada, el código de seguridad y el cobro.
+      // Se compara el valor, no las claves, así que reenviarlo igual no molesta.
+      //
+      // LO QUE ESTO NO CIERRA, dicho sin adornos: mientras el viaje está EN EL
+      // MERCADO, un conductor cualquiera puede escribirle `conductorId`. Hace
+      // falta para el flujo de arriba y no le sirve de nada a un impostor: la
+      // llamada solo existe DESPUÉS de aceptar, y en ese momento el viaje ya no
+      // está en el mercado. Cerrar también esa ventana pide separar qué campos
+      // puede tocar un conductor que solo está ofertando — trabajo aparte.
+      allow create: if request.auth != null
+        && request.resource.data.get('pasajeroId', '') == request.auth.uid;
+
+      allow update: if request.auth != null
+        && (esMio() || enElMercado() || esAdmin())
+        && request.resource.data.get('pasajeroId', '') == resource.data.get('pasajeroId', '');
+
       allow delete: if false;
       // ── REGLAS 5 y 11 · EL CAJON PRIVADO DEL VIAJE ─────────────────────────
       // Aquí vive el código de seguridad. SOLO lo ve la pasajera que lo va a decir.
@@ -241,9 +283,82 @@ service cloud.firestore {
       allow create, update: if request.auth != null;
       allow delete: if false;
     }
+    // ── REGLA 10 · UNA LLAMADA ES DE LOS DOS QUE VIAJAN, DE NADIE MÁS ───────
+    // Hasta el 24-ago-2026 esto decía «allow read, create, update: if
+    // request.auth != null»: cualquiera con una cuenta podía LEER y ESCRIBIR
+    // ENCIMA de la llamada de un viaje ajeno.
+    //
+    // No es solo privacidad. Aquí dentro va la negociación de la llamada de voz
+    // (guajirago/src/Llamada.js): quien escriba primero la respuesta, HABLA. Así
+    // que un extraño podía tumbar la llamada de una pasajera en marcha y, con
+    // suerte de tiempo, contestar antes que su conductor y hacerse pasar por él.
+    // «Cambio de punto, sal a la esquina de atrás.» Es riesgo físico.
+    //
+    // ESTE BLOQUE SOLO NO CIERRA ESA PUERTA, y por poco se despliega creyendo que
+    // sí. La segunda opinión lo tumbó en un paso: como aquí se le pregunta al
+    // VIAJE quién va dentro, y el viaje lo escribía cualquiera, bastaba con
+    // ponerse de `conductorId` para entrar — y de paso dejar fuera al conductor de
+    // verdad. Lo que lo cierra son LAS DOS COSAS: esto y el `allow update` del
+    // bloque `viajes`, cerrado el mismo día. Si algún día alguien vuelve a abrir
+    // aquel, esto se queda de adorno.
+    //
+    // QUIÉN PUEDE, Y CÓMO SE SABE
+    //
+    // El id de este documento ES el id del viaje — lo hacen así los cuatro sitios
+    // que lo usan (Llamada.js:25, Solicitar.js:679, SolicitarMensajeria.js:683,
+    // AppConductor.js:1120). Comprobado el 24-ago-2026 contra el servidor vivo: la
+    // única llamada que existe tiene por id un viaje de verdad. Por eso no hace
+    // falta guardar nada nuevo dentro: se le pregunta al viaje.
+    //
+    // LOS DOS LADOS, y esto importa: quien llama NO es siempre el pasajero. En
+    // Llamada.js llaman los dos, y los dos escriben este mismo documento (la
+    // oferta, la respuesta y sus candidatos). Una regla que solo mirara
+    // `pasajeroId` dejaría MUDA la mitad de las llamadas — y en silencio, porque
+    // el catch de Llamada.js:206 y :212 se traga el error.
+    //
+    // `read` se parte en dos, como en los pedidos:
+    //   · get  — mirar UNA llamada, que es lo único que hace la app: los cuatro
+    //     sitios abren doc(db,'llamadas', viajeId), nunca la colección.
+    //   · list — pedirlas muchas. No lo hace nadie, y además cada documento
+    //     costaría preguntarle a su viaje. Solo el panel.
+    //
+    // SOBRE EL exists() DE ABAJO, y conviene saber qué hace y qué NO hace.
+    //
+    // Se plantó el mutante de quitarlo (24-ago-2026) y las pruebas siguieron
+    // VERDES. Motivo: preguntarle a un viaje que no existe da error, y un error
+    // dentro de una regla NIEGA. O sea que el exists() NO es lo que cierra esta
+    // puerta — la cierra el error. Queda dicho para que nadie crea que quitarlo
+    // abre una fuga: no la abre.
+    //
+    // Se queda porque negar «porque revienta» es fiarse de un detalle fino del
+    // motor de reglas: comprobado, el error NO niega por su cuenta — se lo traga
+    // el ||, y por eso el panel SÍ puede leer una llamada huérfana. Lo que cierra
+    // la puerta al extraño es que ahí el error se queda solo, sin un || que lo
+    // rescate. Es demasiado fino para dejarlo sin red.
+    //
+    // Y QUE CONSTE, porque el comentario anterior citaba solo al vecino que le
+    // daba la razón: en este mismo archivo la pregunta «¿va este uid en este
+    // viaje?» está escrita CUATRO veces y de cuatro formas distintas — esMio() en
+    // el bloque de viajes, elViaje() en el privado del viaje, vaEnEsteViaje() en
+    // el chat, y esta. Las tres primeras NO usan exists(). Ya se nota la
+    // divergencia: en el chat el panel puede escribir y aquí no. Unificarlas es
+    // trabajo aparte (SEGUNDA LEY), y queda ANOTADO.
+    //
+    // Y `.get(campo, '')` con defecto vacío SÍ es carga: un viaje sin conductor
+    // todavía no tiene ese campo, y la cadena vacía no es el uid de nadie. Ese
+    // mutante —cambiar el defecto por el uid de quien pregunta— sí muere.
     match /llamadas/{llamadaId} {
-      allow read: if request.auth != null;
-      allow create, update: if request.auth != null;
+      function esDeLosQueViajan() {
+        return request.auth != null &&
+          exists(/databases/$(database)/documents/viajes/$(llamadaId)) && (
+            get(/databases/$(database)/documents/viajes/$(llamadaId)).data.get('pasajeroId', '') == request.auth.uid ||
+            get(/databases/$(database)/documents/viajes/$(llamadaId)).data.get('conductorId', '') == request.auth.uid
+          );
+      }
+
+      allow get: if esDeLosQueViajan() || esAdmin();
+      allow list: if esAdmin();
+      allow create, update: if esDeLosQueViajan();
       allow delete: if false;
     }
     match /codigos/{codigoId} {

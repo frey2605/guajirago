@@ -1932,3 +1932,273 @@ describe('REGLA 9 · el cuarto de atrás de cada negocio', () => {
     await RUT.assertFails(getDoc(doc(sinCuenta(), 'restaurantesPrivado/r1')));
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════════════
+// REGLA 10 · LA LLAMADA ES DE LOS DOS QUE VIAJAN
+// ═══════════════════════════════════════════════════════════════════════════
+// Dentro de `llamadas/{viajeId}` va la negociación de la llamada de voz:
+// quien escriba primero la respuesta, HABLA. Hasta el 24-ago-2026 podía
+// escribirla cualquiera con una cuenta, así que un extraño podía tumbar la
+// llamada de una pasajera en marcha y contestar antes que su conductor.
+//
+// El id del documento ES el id del viaje. Medido ese día en el servidor: la
+// única llamada que existe tiene por id un viaje de verdad.
+describe('REGLA 10 · la llamada es de los dos que viajan', () => {
+  const sembrarLlamadas = async () => {
+    await entorno.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      const { doc, setDoc } = FS;
+      // Un viaje YA ASIGNADO: tiene pasajero y conductor. Su llamada existe.
+      await setDoc(doc(db, 'viajes/v10'), {
+        pasajeroId: 'pasajero1', conductorId: 'conductor1', estado: 'aceptado',
+      });
+      await setDoc(doc(db, 'llamadas/v10'), { estado: 'sonando', inicio: '2026-08-24T00:00:00.000Z' });
+      // Otro viaje asignado, SIN llamada todavía: para probar quién la abre.
+      await setDoc(doc(db, 'viajes/v11'), {
+        pasajeroId: 'pasajero1', conductorId: 'conductor1', estado: 'aceptado',
+      });
+      // Un viaje que todavía NO tiene conductor.
+      await setDoc(doc(db, 'viajes/v12'), { pasajeroId: 'pasajero1', estado: 'esperando' });
+      await setDoc(doc(db, 'llamadas/v12'), { estado: 'sonando' });
+    });
+  };
+
+  // ── LO QUE SE CIERRA ─────────────────────────────────────────────────────
+  it('LA FUGA · un extraño NO puede oír la llamada de un viaje ajeno', async () => {
+    await sembrarLlamadas();
+    const { doc, getDoc } = FS;
+    await RUT.assertFails(getDoc(doc(como('conductor2'), 'llamadas/v10')));
+  });
+
+  // ESTA ES LA GRAVE. No es privacidad: quien escribe la respuesta, habla. Un
+  // extraño que gane la carrera se pone a hablar con la pasajera haciéndose
+  // pasar por su conductor, con el viaje en marcha.
+  it('LA FUGA · ni escribir encima — que es como se suplanta al conductor', async () => {
+    await sembrarLlamadas();
+    const { doc, updateDoc } = FS;
+    await RUT.assertFails(updateDoc(doc(como('conductor2'), 'llamadas/v10'), {
+      respuesta: { sdp: 'la del impostor' },
+    }));
+  });
+
+  it('LA FUGA · ni abrirle una llamada nueva a un viaje que no es suyo', async () => {
+    await sembrarLlamadas();
+    const { doc, setDoc } = FS;
+    await RUT.assertFails(setDoc(doc(como('conductor2'), 'llamadas/v11'), { estado: 'sonando' }));
+  });
+
+  it('LA FUGA · ni pedir la lista de llamadas', async () => {
+    await sembrarLlamadas();
+    const { collection, getDocs } = FS;
+    await RUT.assertFails(getDocs(collection(como('pasajero1'), 'llamadas')));
+  });
+
+  it('y sin sesión, nada', async () => {
+    await sembrarLlamadas();
+    const { doc, getDoc } = FS;
+    await RUT.assertFails(getDoc(doc(sinCuenta(), 'llamadas/v10')));
+  });
+
+  // ── LO QUE NO SE PUEDE ROMPER ────────────────────────────────────────────
+  it('EL PASAJERO de ese viaje sí puede oírla y contestar', async () => {
+    await sembrarLlamadas();
+    const { doc, getDoc, updateDoc } = FS;
+    await RUT.assertSucceeds(getDoc(doc(como('pasajero1'), 'llamadas/v10')));
+    await RUT.assertSucceeds(updateDoc(doc(como('pasajero1'), 'llamadas/v10'), { estado: 'hablando' }));
+  });
+
+  // LA MITAD QUE SE QUEDA MUDA SI ESTO SE ESCRIBE MAL. En Llamada.js llaman LOS
+  // DOS, y los dos escriben este mismo documento. Una regla que solo mirara
+  // `pasajeroId` dejaría sin voz al conductor — y en silencio, porque el catch
+  // de Llamada.js:206 y :212 se traga el error y la llamada solo «no suena».
+  it('Y EL CONDUCTOR TAMBIÉN — es la mitad que se queda muda', async () => {
+    await sembrarLlamadas();
+    const { doc, getDoc, updateDoc } = FS;
+    await RUT.assertSucceeds(getDoc(doc(como('conductor1'), 'llamadas/v10')));
+    await RUT.assertSucceeds(updateDoc(doc(como('conductor1'), 'llamadas/v10'), {
+      candidatosOferente: ['uno', 'dos'],
+    }));
+  });
+
+  it('los dos pueden ABRIR la llamada de su viaje', async () => {
+    await sembrarLlamadas();
+    const { doc, setDoc } = FS;
+    await RUT.assertSucceeds(setDoc(doc(como('conductor1'), 'llamadas/v11'), { estado: 'sonando' }));
+  });
+
+  it('el panel puede mirarlas todas', async () => {
+    await sembrarLlamadas();
+    const { doc, getDoc, collection, getDocs } = FS;
+    await RUT.assertSucceeds(getDoc(doc(como('eladmin'), 'llamadas/v10')));
+    await RUT.assertSucceeds(getDocs(collection(como('eladmin'), 'llamadas')));
+  });
+
+  // ── LOS BORDES ───────────────────────────────────────────────────────────
+  // Un viaje al que todavía no le han asignado conductor no tiene ese campo. El
+  // defecto vacío de .get('conductorId','') hace que la comparación falle en vez
+  // de reventar — y la cadena vacía no es el uid de nadie, así que es seguro.
+  it('un viaje SIN conductor: su pasajero sí, un conductor cualquiera no', async () => {
+    await sembrarLlamadas();
+    const { doc, getDoc } = FS;
+    await RUT.assertSucceeds(getDoc(doc(como('pasajero1'), 'llamadas/v12')));
+    await RUT.assertFails(getDoc(doc(como('conductor1'), 'llamadas/v12')));
+  });
+
+  // `llamadas/lla1` la siembra la suite arriba y su id NO es ningún viaje: una
+  // llamada huérfana, que en la base de verdad puede existir. No la abre nadie.
+  //
+  // OJO: esta prueba sigue VERDE aunque se quite el exists() de la regla —
+  // comprobado plantando ese mutante el 24-ago-2026. No es que la prueba sea
+  // floja: es que ahí no hay nada que cerrar, porque el error de preguntarle a un
+  // viaje que no existe ya niega por su cuenta. Se deja porque alguien tiene que
+  // decir qué pasa con ese estado, y porque el día que la regla cambie de forma
+  // esta es la que avisa si empieza a dejar pasar huérfanas.
+  it('una llamada huérfana, cuyo viaje no existe, no la abre nadie', async () => {
+    const { doc, getDoc } = FS;
+    await RUT.assertFails(getDoc(doc(como('pasajero1'), 'llamadas/lla1')));
+    await RUT.assertFails(getDoc(doc(como('conductor1'), 'llamadas/lla1')));
+  });
+
+  it('y nadie la borra, ni sus dueños (REGLA 12)', async () => {
+    await sembrarLlamadas();
+    const { doc, deleteDoc } = FS;
+    await RUT.assertFails(deleteDoc(doc(como('pasajero1'), 'llamadas/v10')));
+    await RUT.assertFails(deleteDoc(doc(como('eladmin'), 'llamadas/v10')));
+  });
+
+  // El panel puede MIRAR, no meterse dentro. Si algún día hace falta cortar una
+  // llamada en curso desde el panel, se abre a propósito y con su prueba — no
+  // por descuido. (Este mutante sobrevivía: nadie lo comprobaba.)
+  it('el panel puede mirarla pero NO escribir dentro', async () => {
+    await sembrarLlamadas();
+    const { doc, updateDoc } = FS;
+    await RUT.assertFails(updateDoc(doc(como('eladmin'), 'llamadas/v10'), { estado: 'cortada' }));
+  });
+
+  // Un viaje sin pasajeroId no debe abrirle la puerta a NADIE. Sin esta, el
+  // mutante que cambia el defecto de .get('pasajeroId','') por el uid de quien
+  // pregunta sobrevive: en todas las demás semillas ese campo siempre está.
+  it('un viaje SIN dueños no le abre la llamada a nadie', async () => {
+    await entorno.withSecurityRulesDisabled(async (ctx) => {
+      const { doc, setDoc } = FS;
+      await setDoc(doc(ctx.firestore(), 'viajes/v13'), { estado: 'esperando' });
+      await setDoc(doc(ctx.firestore(), 'llamadas/v13'), { estado: 'sonando' });
+    });
+    const { doc, getDoc } = FS;
+    await RUT.assertFails(getDoc(doc(como('pasajero1'), 'llamadas/v13')));
+    await RUT.assertFails(getDoc(doc(como('conductor1'), 'llamadas/v13')));
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// REGLA 10 · EL VIAJE ES LA LLAVE DE TODO LO DEMÁS
+// ═══════════════════════════════════════════════════════════════════════════
+// El bloque de arriba le pregunta AL VIAJE quién va dentro. Mientras el viaje lo
+// pudiera escribir cualquiera, ese candado tenía la llave puesta: bastaba con
+// escribirse `conductorId` encima. Lo demostró la segunda opinión del
+// 24-ago-2026 ejecutándolo, y por eso las dos cosas van juntas.
+describe('REGLA 10 · un viaje no lo toca cualquiera', () => {
+  const sembrarViajes = async () => {
+    await entorno.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      const { doc, setDoc } = FS;
+      // Ya aceptado: FUERA del mercado. Aquí es donde vive la llamada.
+      await setDoc(doc(db, 'viajes/va'), {
+        pasajeroId: 'pasajero1', conductorId: 'conductor1', estado: 'aceptado', tarifaValor: 12000,
+      });
+      await setDoc(doc(db, 'llamadas/va'), { estado: 'sonando' });
+      // Todavía buscando conductor: DENTRO del mercado.
+      await setDoc(doc(db, 'viajes/vm'), { pasajeroId: 'pasajero1', estado: 'esperando', tarifaValor: 9000 });
+    });
+  };
+
+  // ── LA CADENA DEL ATAQUE, PASO POR PASO ──────────────────────────────────
+  // Esta es LA prueba de esta tanda. Si se pone verde por el sitio equivocado,
+  // todo lo demás es decoración.
+  it('EL ATAQUE · un extraño NO se puede escribir como conductor de un viaje ajeno', async () => {
+    await sembrarViajes();
+    const { doc, updateDoc } = FS;
+    await RUT.assertFails(updateDoc(doc(como('conductor2'), 'viajes/va'), { conductorId: 'conductor2' }),
+      'Con esto, el extraño pasa a ser «de los dos» del viaje: entra en la llamada, contesta ' +
+      'antes que nadie, y al conductor DE VERDAD se le niega la suya. Sin carrera.');
+  });
+
+  it('EL ATAQUE · y por eso sigue sin poder entrar en la llamada', async () => {
+    await sembrarViajes();
+    const { doc, getDoc, updateDoc } = FS;
+    await RUT.assertFails(updateDoc(doc(como('conductor2'), 'viajes/va'), { conductorId: 'conductor2' }));
+    await RUT.assertFails(getDoc(doc(como('conductor2'), 'llamadas/va')));
+    await RUT.assertFails(updateDoc(doc(como('conductor2'), 'llamadas/va'), { respuesta: 'la del impostor' }));
+  });
+
+  it('EL ATAQUE · ni ponerse de pasajero, ni siquiera el pasajero de verdad', async () => {
+    await sembrarViajes();
+    const { doc, updateDoc } = FS;
+    await RUT.assertFails(updateDoc(doc(como('conductor2'), 'viajes/va'), { pasajeroId: 'conductor2' }));
+    // Congelado del todo: un viaje no cambia de dueño NUNCA.
+    await RUT.assertFails(updateDoc(doc(como('pasajero1'), 'viajes/va'), { pasajeroId: 'otro' }));
+  });
+
+  it('EL ATAQUE · ni tocarle la tarifa a un viaje ajeno ya aceptado', async () => {
+    await sembrarViajes();
+    const { doc, updateDoc } = FS;
+    await RUT.assertFails(updateDoc(doc(como('conductor2'), 'viajes/va'), { tarifaValor: 1 }));
+  });
+
+  it('EL ALTA · un viaje nace a nombre de quien lo pide, no de otro', async () => {
+    const { doc, setDoc } = FS;
+    await RUT.assertFails(setDoc(doc(como('pasajero1'), 'viajes/nv1'), {
+      pasajeroId: 'conductor1', estado: 'esperando',
+    }));
+    await RUT.assertFails(setDoc(doc(como('pasajero1'), 'viajes/nv2'), { estado: 'esperando' }));
+  });
+
+  // ── LO QUE NO SE PUEDE ROMPER ────────────────────────────────────────────
+  it('el PASAJERO sigue llevando su viaje', async () => {
+    await sembrarViajes();
+    const { doc, setDoc, updateDoc } = FS;
+    await RUT.assertSucceeds(setDoc(doc(como('pasajero1'), 'viajes/nv3'), {
+      pasajeroId: 'pasajero1', estado: 'esperando', tarifaValor: 10000,
+    }));
+    await RUT.assertSucceeds(updateDoc(doc(como('pasajero1'), 'viajes/va'), { estado: 'cancelado' }));
+  });
+
+  it('el CONDUCTOR de ese viaje también', async () => {
+    await sembrarViajes();
+    const { doc, updateDoc } = FS;
+    await RUT.assertSucceeds(updateDoc(doc(como('conductor1'), 'viajes/va'), { estado: 'en_camino' }));
+  });
+
+  // LA QUE SE ROMPE EN SILENCIO SI ESTO SE ESCRIBE MAL. Mientras el viaje busca
+  // conductor, los conductores lo tocan aunque todavía no sea suyo:
+  // AppConductor.js:619 suelta los viajes que no ganó, y ese updateDoc lleva un
+  // .catch(() => {}) vacío. Si la regla lo negara, no fallaría nada a la vista:
+  // los viajes se quedarían pegados a un conductor que ya no los lleva.
+  it('un conductor SÍ puede tocar un viaje que está EN EL MERCADO', async () => {
+    await sembrarViajes();
+    const { doc, updateDoc } = FS;
+    await RUT.assertSucceeds(updateDoc(doc(como('conductor2'), 'viajes/vm'), {
+      estado: 'esperando', conductorId: null, conductorNombre: null,
+    }));
+  });
+
+  it('el panel puede con todos', async () => {
+    await sembrarViajes();
+    const { doc, updateDoc } = FS;
+    await RUT.assertSucceeds(updateDoc(doc(como('eladmin'), 'viajes/va'), { estado: 'finalizado' }));
+  });
+
+  it('reenviar pasajeroId con SU MISMO valor no rompe nada', async () => {
+    await sembrarViajes();
+    const { doc, updateDoc } = FS;
+    await RUT.assertSucceeds(updateDoc(doc(como('pasajero1'), 'viajes/va'), {
+      pasajeroId: 'pasajero1', estado: 'llegue',
+    }));
+  });
+
+  it('y sigue sin poder borrarse (REGLA 12)', async () => {
+    await sembrarViajes();
+    const { doc, deleteDoc } = FS;
+    await RUT.assertFails(deleteDoc(doc(como('pasajero1'), 'viajes/va')));
+  });
+});

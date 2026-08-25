@@ -31,3 +31,11 @@
   restauranteId; medido: 29 de 29 pedidos del servidor lo tienen). Estaba dando por bueno
   un pedido huerfano que nadie puede atender ni reclamar. Mismo caso que la correccion de
   la REGLA 2 del 23-ago. Se le anadieron restauranteId y clienteId: un renglon.
+
+2026-08-25 REGLA 10 (llamadas) — se AMPLIA la promesa a firestore.rules:viajes, con permiso
+  EXPRESO del dueno ("Despliega y termina con los 10 pasos", contestando a la pregunta de si
+  metia el viaje en la promesa). Motivo: la segunda opinion demostro EJECUTANDO que la regla
+  nueva de llamadas se salta en UN paso — viajes permite `create, update: if request.auth
+  != null`, asi que un extrano se escribe conductorId en el viaje ajeno y pasa a ser "de los
+  dos". Es PEOR que antes: deja mudo al conductor de verdad y contesta sin carrera. Desplegar
+  las llamadas solas seria subir un candado con la llave puesta. Las dos van juntas.
