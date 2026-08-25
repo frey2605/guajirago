@@ -1774,6 +1774,53 @@ describe('REGLA 9 · el cuarto de atrás de cada negocio', () => {
     await RUT.assertSucceeds(updateDoc(doc(como('eladmin'), 'restaurantesPrivado/r1'), { creditos: 50000 }));
   });
 
+  // ── LA PUERTA DE ATRÁS A LA REGLA 9-C ────────────────────────────────────
+  // El negocio no puede aprobarse solo en el ESCAPARATE: eso lo cerró la REGLA
+  // 9-C. Pero hasta el 24-ago-2026 SÍ podía escribir lo que quisiera en su
+  // propio cuarto, y desde la tanda 1b-2b el panel lee de ahí. La segunda
+  // opinión lo ejecutó: escribiendo {aprobado:true} en su cuarto, el negocio se
+  // borraba de la bandeja de pendientes del panel y salía como APROBADO.
+  //
+  // Nadie lo revisaría nunca. Estas cinco pruebas cierran esa puerta donde nace.
+  it('LA PUERTA DE ATRÁS · el negocio NO se aprueba desde su cuarto', async () => {
+    await sembrarCuartos();
+    const { doc, updateDoc } = FS;
+    await RUT.assertFails(updateDoc(doc(como('r1'), 'restaurantesPrivado/r1'), { aprobado: true }));
+  });
+
+  it('LA PUERTA DE ATRÁS · ni cambia su estado de aprobación', async () => {
+    await sembrarCuartos();
+    const { doc, updateDoc } = FS;
+    await RUT.assertFails(updateDoc(doc(como('r1'), 'restaurantesPrivado/r1'), { estadoAprobacion: 'aprobado' }));
+  });
+
+  it('LA PUERTA DE ATRÁS · ni se nombra admin, ni se reactiva', async () => {
+    await sembrarCuartos();
+    const { doc, updateDoc } = FS;
+    await RUT.assertFails(updateDoc(doc(como('r1'), 'restaurantesPrivado/r1'), { rol: 'admin' }));
+    await RUT.assertFails(updateDoc(doc(como('r1'), 'restaurantesPrivado/r1'), { activo: true }));
+  });
+
+  // Esta es la que se escapa si solo se congela el UPDATE: no hay ningún campo
+  // que cambiar, el cuarto NACE ya con la mentira dentro.
+  it('LA PUERTA DE ATRÁS · ni nace el cuarto ya aprobado', async () => {
+    const { doc, setDoc } = FS;
+    await RUT.assertFails(setDoc(doc(como('nuevo8'), 'restaurantesPrivado/nuevo8'), {
+      duenoNombre: 'TRAMPOSO', aprobado: true, estadoAprobacion: 'aprobado',
+    }));
+  });
+
+  // Y que el remate no le quite nada a quien trabaja: el registro escribe los
+  // cinco campos privados y ninguno de esos siete. Si esta se pusiera roja, un
+  // negocio nuevo no podría ni darse de alta.
+  it('LA PUERTA DE ATRÁS · pero el negocio nuevo sigue naciendo bien', async () => {
+    const { doc, setDoc } = FS;
+    await RUT.assertSucceeds(setDoc(doc(como('nuevo8'), 'restaurantesPrivado/nuevo8'), {
+      duenoNombre: 'MERCEDES', duenoTelefono: '+573001112233',
+      email: 'meche@ejemplo.com', creditos: 0,
+    }));
+  });
+
   // ── LO QUE TIENE QUE FUNCIONAR ───────────────────────────────────────────
   it('el REGISTRO crea el cuarto del negocio (aliados/Login.js)', async () => {
     const { doc, setDoc } = FS;

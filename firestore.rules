@@ -390,10 +390,26 @@ service cloud.firestore {
     // `guajirago-aliados/src/negocioPrivado.js`, y hay una prueba que carea ese
     // archivo con estas reglas (pruebas/amarres.test.js).
     match /restaurantesPrivado/{negocioId} {
-      // El dinero lo decide el panel, igual que en `restaurantes` y que en las
-      // fichas de personas (REGLA 7). El negocio ve su saldo, no lo escribe.
+      // LO QUE SOLO ESCRIBE EL PANEL. Son LOS MISMOS SIETE que en `restaurantes`,
+      // y eso es a propósito: si aquí fueran menos, este cuarto sería una PUERTA DE
+      // ATRÁS a la REGLA 9-C.
+      //
+      // Hasta el 24-ago-2026 esta lista tenía uno solo, 'creditos'. Daba igual
+      // mientras nadie leyera el cuarto más que su dueño. Dejó de dar igual cuando
+      // el panel empezó a leerlo (tanda 1b-2b), y la segunda opinión lo rompió
+      // EJECUTÁNDOLO contra el emulador:
+      //
+      //   escribir en restaurantes/r1        {aprobado:true}  -> NEGADO (REGLA 9-C)
+      //   escribir en restaurantesPrivado/r1 {aprobado:true}  -> ACEPTADO
+      //   ...y el panel lo veía APROBADO y el negocio DESAPARECÍA de la bandeja de
+      //   pendientes, que lista los que tienen aprobado === false.
+      //
+      // El panel ya no se lo traga —conSuCuarto() copia solo los campos privados—,
+      // pero eso es taparlo por fuera. Esto lo cierra donde nace. Los DOS lados,
+      // porque el próximo que escriba un lector no va a saber nada de esta historia.
       function camposDelPanel() {
-        return ['creditos'];
+        return ['creditos', 'aprobado', 'estadoAprobacion', 'activo', 'rol',
+                'fechaAprobacion', 'fechaRechazo'];
       }
 
       allow read: if request.auth != null && (
@@ -428,10 +444,19 @@ service cloud.firestore {
       // La regla que se saca de los dos casos: un defecto vale cuando el estado
       // por defecto es el SEGURO, y es un agujero cuando el estado por defecto
       // es el que el atacante quería.
+      // Congelarlos en el update NO basta. Sin el hasAny() de abajo, el negocio
+      // crea su cuarto DE CERO con `aprobado: true` dentro y nace mintiendo — no
+      // hay ningún campo que cambiar, así que affectedKeys() no lo ve venir. Es la
+      // misma lección del create de `restaurantes`, unos renglones más arriba.
+      //
+      // 'creditos' se saca de la lista aquí porque tiene su propia comprobación (la
+      // de al lado): puede venir, pero valiendo cero. Se saca con removeAll() en vez
+      // de escribir los seis a mano, para que no haya DOS listas que mantener.
       allow create: if esAdmin() || (
         request.auth != null &&
         request.auth.uid == negocioId &&
-        request.resource.data.get('creditos', 0) == 0
+        request.resource.data.get('creditos', 0) == 0 &&
+        !request.resource.data.keys().hasAny(camposDelPanel().removeAll(['creditos']))
       );
 
       allow update: if esAdmin() || (
