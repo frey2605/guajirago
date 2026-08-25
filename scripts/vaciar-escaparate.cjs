@@ -158,6 +158,46 @@ function enCristiano(v) {
 /** Dos valores de Firestore son el mismo dato. Se comparan crudos, sin convertir. */
 const mismoValor = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 
+/**
+ * EL CANDADO 1, SOLO. Decide qué hacer con UN negocio, sin tocar la red.
+ *
+ * Está aquí fuera —y se exporta— por una razón concreta: es lo ÚNICO que impide
+ * perder los datos de una persona. La segunda opinión del 24-ago-2026 plantó dos
+ * mutantes dentro del bucle (hacer que la comparación dijera siempre «cuadra», y
+ * quitar el aviso de «no tiene cuarto») y NO SE ENTERÓ NADIE: todo verde. Con el
+ * segundo, un negocio sin cuarto se vaciaba igual y sus datos se perdían para
+ * siempre.
+ *
+ * Ahora lo vigila `pruebas/vaciado.test.js`, que la ejecuta caso por caso. Este
+ * script se queda en el repo para que alguien lo corra dentro de un año; para
+ * entonces esta prueba es lo único que va a quedar de esta conversación.
+ *
+ * Devuelve una de tres:
+ *   · limpio  — no le queda nada privado en el escaparate, no hay que tocarlo.
+ *   · saltar  — falta algo por guardar. NO se toca, ni siquiera lo que sí cuadra.
+ *   · vaciar  — todo comprobado: se pueden quitar los campos de `campos`.
+ *
+ * @param campos            los campos del documento del escaparate, crudos de Firestore
+ * @param cuarto            los del cuarto de atrás, o undefined si no existe
+ * @param CAMPOS_PRIVADOS   la lista buena, de negocioPrivado.js
+ */
+function decidir(campos, cuarto, CAMPOS_PRIVADOS) {
+  const presentes = (CAMPOS_PRIVADOS || []).filter((c) => campos[c] !== undefined);
+  if (presentes.length === 0) return { accion: 'limpio', campos: [], descuadres: [] };
+  // Sin cuarto no hay dónde estén guardados: esto es lo que impide la pérdida.
+  if (!cuarto) return { accion: 'saltar', motivo: 'sin-cuarto', campos: presentes, descuadres: [] };
+  const descuadres = presentes.filter((c) => !mismoValor(campos[c], cuarto[c]));
+  if (descuadres.length) return { accion: 'saltar', motivo: 'descuadre', campos: presentes, descuadres };
+  return { accion: 'vaciar', campos: presentes, descuadres: [] };
+}
+
+// Las pruebas cargan este archivo para ejecutar decidir(). Si el vaciado echara a
+// andar solo al cargarlo, `npm test` se pondría a hablar con el servidor de
+// verdad. Por eso lo de abajo solo corre cuando alguien lo llama a mano.
+module.exports = { decidir, mismoValor };
+
+if (require.main !== module) return;
+
 (async () => {
   const { CAMPOS_PRIVADOS, COLECCION_PRIVADA } = listaDeCamposPrivados();
   const t = await token();
@@ -177,15 +217,19 @@ const mismoValor = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 
   for (const n of escaparate) {
     const nombre = (n.campos.nombre && n.campos.nombre.stringValue) || '(sin nombre)';
-    const presentes = CAMPOS_PRIVADOS.filter((c) => n.campos[c] !== undefined);
+    const cuarto = porId[n.id];
 
-    if (presentes.length === 0) { limpios++; continue; }
+    // ── CANDADO 1 · o todo está guardado, o no se toca nada ──────────────────
+    // La decisión NO se toma aquí: la toma decidir(), que vive arriba y tiene sus
+    // propias pruebas. Aquí solo se cuenta lo que dijo.
+    const fallo = decidir(n.campos, cuarto, CAMPOS_PRIVADOS);
+    const presentes = fallo.campos;
+
+    if (fallo.accion === 'limpio') { limpios++; continue; }
 
     say(C.neg + '── ' + nombre + C.off + C.gris + '   [' + n.id + ']' + C.off);
 
-    // ── CANDADO 1 · o todo está guardado, o no se toca nada ──────────────────
-    const cuarto = porId[n.id];
-    if (!cuarto) {
+    if (fallo.accion === 'saltar' && fallo.motivo === 'sin-cuarto') {
       say('   ' + C.rojo + 'SE SALTA: no tiene cuarto de atrás.' + C.off);
       say(C.gris + '   Borrar esto dejaría al dueño sin sus datos en ningún sitio.' + C.off);
       say(C.gris + '   Arreglo: corre antes  node scripts/mudar-datos-negocio.cjs --aplicar' + C.off);
@@ -193,14 +237,13 @@ const mismoValor = (a, b) => JSON.stringify(a) === JSON.stringify(b);
       say('');
       continue;
     }
-    const descuadres = presentes.filter((c) => !mismoValor(n.campos[c], cuarto[c]));
-    if (descuadres.length) {
-      say('   ' + C.rojo + 'SE SALTA: ' + descuadres.length + ' campo(s) NO están guardados igual.' + C.off);
-      for (const c of descuadres) {
+    if (fallo.accion === 'saltar') {
+      say('   ' + C.rojo + 'SE SALTA: ' + fallo.descuadres.length + ' campo(s) NO están guardados igual.' + C.off);
+      for (const c of fallo.descuadres) {
         say('     ' + C.rojo + c.padEnd(15) + C.off + ' escaparate=' + enCristiano(n.campos[c]) + '   cuarto=' + enCristiano(cuarto[c]));
       }
       say(C.gris + '   No se borra ni lo que sí cuadra: o todo o nada.' + C.off);
-      saltados.push(nombre + ' (' + descuadres.join(', ') + ')');
+      saltados.push(nombre + ' (' + fallo.descuadres.join(', ') + ')');
       say('');
       continue;
     }
