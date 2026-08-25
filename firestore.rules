@@ -189,11 +189,14 @@ service cloud.firestore {
       // EL CAMBIO. Tres pueden tocarlo, y cada uno por su motivo:
       //   · esMio()       — el pasajero y el conductor de ese viaje. Es todo el
       //     ciclo normal: en camino, llegué, finalizado, cancelar.
-      //   · enElMercado() — mientras el viaje está buscando conductor, los
-      //     conductores lo tocan aunque todavía no sea suyo. Sin esto,
-      //     AppConductor.js:619 (soltar los viajes que no ganó) deja de funcionar
-      //     EN SILENCIO: ese updateDoc lleva un .catch(() => {}) vacío.
       //   · esAdmin()     — el panel.
+      //
+      // AQUÍ HABÍA UN TERCERO, `enElMercado()`, y SE QUITÓ el 25-ago-2026 (ver el
+      // bloque de LA TARJETA FALSA, abajo). El motivo que estaba escrito aquí era
+      // FALSO: decía que sin él, `AppConductor.js:619` —soltar los viajes que no
+      // ganó— «deja de funcionar EN SILENCIO». No: esa función busca con
+      // `where('conductorId','==',miId)`, así que esos viajes YA son suyos y entra
+      // por `esMio()`. Se comprobó enumerando las escrituras una por una.
       //
       // Y `pasajeroId` SE CONGELA. Un viaje no cambia de dueño nunca; es el campo
       // del que cuelgan el chat, la llamada, el código de seguridad y el cobro.
@@ -233,20 +236,9 @@ service cloud.firestore {
       // Las dos son el trabajo siguiente: EL COMPROBANTE LO TIENE QUE FIRMAR EL
       // OTRO. No se hacen aquí porque están fuera de lo declarado en la foto.
       //
-      // ⚠ Y HAY UNA TERCERA COSA ABIERTA, que NO es de las calificaciones sino de
-      // la tarjeta de confirmación, y que este candado NO cierra. Se anota aquí
-      // porque la apareció arreglando esto y la ley dice que se anota y se avisa:
-      // la tarjeta que ve la pasajera (`Solicitar.js:588-599`) saca el NOMBRE, la
-      // PLACA, el VEHÍCULO y el TELÉFONO del propio documento del viaje — y esos
-      // cuatro campos NO están protegidos. `enElMercado()` deja que cualquiera con
-      // cuenta los reescriba en un viaje ajeno que ya tiene conductor. O sea: sin
-      // tocar `conductorId` ni una vez, a la pasajera le sale una tarjeta con un
-      // conductor legítimo y el TELÉFONO Y LA PLACA del impostor. Y por la misma
-      // puerta se le puede bajar la tarifa a 1 o matar el viaje poniéndolo en
-      // `vencido`. Medido en las tres versiones: PASA en todas, así que NO es una
-      // regresión de hoy — es la puerta vieja de `enElMercado()`, que sigue
-      // abierta. Cerrarlo pide separar QUÉ campos puede tocar un conductor que
-      // solo está ofertando, y eso es otro trabajo con su propia foto.
+      // (Aquí estuvo anotada unas horas una TERCERA cosa abierta —la tarjeta de
+      // confirmación falsa— que YA ESTÁ CERRADA el mismo día: ver el bloque de LA
+      // TARJETA FALSA, más abajo. Se cerró quitando `enElMercado()` del `update`.)
       //
       // Es la TERCERA vez que muerde el mismo patrón en dos días —las llamadas, el
       // canje de códigos y esto—, y ya está escrito arriba: una regla que le
@@ -284,7 +276,8 @@ service cloud.firestore {
       // NO SE USA UN CENTINELA, y esto costó una segunda opinión entera. La
       // primera versión comparaba `.get('conductorId', 'ninguno')` a los dos
       // lados. Parecía elegante y era una puerta: 'ninguno' es un texto que se
-      // PUEDE ESCRIBIR, así que a un viaje del mercado —que no tiene el campo—
+      // PUEDE ESCRIBIR, así que a un viaje del mercado —que entonces cualquiera
+      // podía escribir; esa puerta se tapió esa misma tarde, ver LA TARJETA FALSA—
       // cualquiera le escribía `conductorId: 'ninguno'` y los dos lados daban
       // 'ninguno', o sea IGUAL, o sea permitido. Y no era inocuo: 'ninguno' es
       // verdadero en JavaScript, así que `Solicitar.js:588` le sacaba a la
@@ -309,13 +302,24 @@ service cloud.firestore {
       // que salió falsa una vez en este mismo archivo, en el bloque de los
       // códigos, donde un `||` se tragaba el error y lo daba por bueno.
       //
-      // Y SOLTAR UN VIAJE ES COSA DE LOS DOS QUE VAN EN ÉL — `esMio()`. Esto es lo
-      // último que faltaba, y hacía falta: `confirmando` está DENTRO del mercado
-      // (ver `enElMercado()` arriba), así que sin este candado un conductor
-      // cualquiera —o cualquiera con cuenta— le quitaba el conductor a un viaje
-      // ajeno que estaba esperando a que la pasajera dijera que sí, y echaba al
-      // conductor DE VERDAD. Es el MISMO ataque de las llamadas, por la otra cara:
-      // allí se metía uno, aquí se saca al otro.
+      // Y SOLTAR UN VIAJE ES COSA DE LOS DOS QUE VAN EN ÉL — `esMio()`. OJO CON
+      // ESTE `esMio()`: la razón por la que se puso ya no es la razón por la que
+      // sigue aquí, y conviene decirlo porque si no, el próximo que lea esto lo
+      // borrará pensando que sobra.
+      //   · SE PUSO (mañana del 25-ago) para parar a un extraño: `confirmando`
+      //     estaba DENTRO de `enElMercado()`, y el `update` dejaba entrar por ahí,
+      //     así que un conductor cualquiera le quitaba el conductor a un viaje
+      //     ajeno y echaba al de verdad. Mismo ataque de las llamadas, por la otra
+      //     cara: allí se metía uno, aquí se sacaba al otro.
+      //   · ESA PUERTA SE TAPIÓ esa misma tarde (ver LA TARJETA FALSA, abajo):
+      //     `enElMercado()` salió del `update`. Al extraño ya lo para el
+      //     `(esMio() || esAdmin())` de fuera, antes de llegar aquí.
+      //   · LO QUE ESTE `esMio()` SIGUE HACIENDO, y es su único trabajo vivo, es
+      //     que EL PANEL no pueda soltar a un conductor. El panel pasa el filtro de
+      //     fuera por `esAdmin()` y llegaría hasta aquí. Tiene su prueba, abajo
+      //     («ni el panel suelta al conductor de un viaje»): sin ella un mutante
+      //     que borre este `esMio()` sobrevive a la suite entera — lo comprobó la
+      //     segunda opinión, 0 rojas de 297.
       //
       // Y no cuesta nada, porque MEDIDO: los tres sitios que sueltan un viaje son
       // siempre de uno de los dos. `limpiarViajesOtrosConductor`
@@ -348,8 +352,74 @@ service cloud.firestore {
       // la segunda opinión careando las dos versiones. Y de paso le cobraba una
       // lectura de más a TODO el mundo en CADA escritura del viaje, porque
       // `esAdmin()` hace un `get()` y al ir primero ya no se lo salta nadie.
+      // ── LA TARJETA FALSA · FUERA `enElMercado()` DEL UPDATE (25-ago-2026) ──
+      //
+      // ESTO ES LO QUE CIERRA LA TERCERA PUERTA, la que quedó anotada arriba esta
+      // mañana. `enElMercado()` en el UPDATE le daba a CUALQUIERA con cuenta
+      // permiso de escritura sobre CUALQUIER viaje que estuviera buscando
+      // conductor. El candado de `conductorId` de hoy tapaba un campo; la puerta
+      // seguía abierta para todos los demás, y por ahí:
+      //   · SE MONTABA LA TARJETA FALSA. El NOMBRE, la PLACA, el VEHÍCULO y el
+      //     TELÉFONO del conductor salen del documento del viaje, y se pintan en la
+      //     ficha que ve la pasajera durante el viaje (`Solicitar.js:1108`,
+      //     `:1144-1145`, `:1218-1219`). Sin tocar `conductorId` ni una vez se le
+      //     reescribían los cuatro: conductor legítimo, teléfono y placa del
+      //     impostor. La pasajera se sube al carro equivocado.
+      //     Y PEOR, que es lo que lo convierte en el daño físico más grave de toda
+      //     la auditoría: esos mismos cuatro campos son los que van en el WhatsApp
+      //     DE EMERGENCIA que la pasajera le manda a su familia
+      //     (`Solicitar.js:749-757`, y `Seguridad.js:93-96`). O sea que el impostor
+      //     no solo la sube a su carro: le hace mandarle a su familia la placa y el
+      //     teléfono equivocados. Si algo pasa, buscan el carro que no es.
+      //     (Una versión anterior de este comentario citaba `Solicitar.js:588-599`.
+      //     Esa pantalla lee los mismos campos, pero cuelga de `estado ==
+      //     'confirmando'`, que YA NO LO ESCRIBE NADIE: es camino muerto. La cita
+      //     buena es la de arriba, y el argumento es más fuerte, no más flojo.)
+      //   · se le bajaba la tarifa a 1, y
+      //   · se le mataba el viaje poniéndolo en `vencido`.
+      //
+      // SE QUITA ENTERO EN VEZ DE CONGELAR CAMPO POR CAMPO, porque congelar cuatro
+      // campos deja los otros treinta abiertos —`pasajeroLat`/`pasajeroLng`, por
+      // ejemplo, que mandan al conductor a una dirección— y porque la lista de
+      // campos se queda vieja el día que alguien añade uno.
+      //
+      // MEDIDO ANTES DE TOCAR, enumerando TODAS las escrituras al documento del
+      // viaje en las tres apps y en las funciones, una por una y sin truncar:
+      //   · UN CONDUCTOR QUE SOLO ESTÁ OFERTANDO NO ESCRIBE NADA EN EL VIAJE. Su
+      //     oferta va a la subcolección `contraofertas/{suUid}`
+      //     (`AppConductor.js:353`), que tiene sus propias reglas. El propio código
+      //     lo dice: «La tarjeta NO se descarta: el viaje sigue abierto».
+      //   · las otras 5 escrituras del conductor sobre el viaje son sobre
+      //     `viajeActual`, y `viajeActual` sale de dos sitios, los dos filtrados
+      //     por él mismo: `where('conductorId','==',miId)` (`AppConductor.js:711`)
+      //     y un `data.conductorId === miId` (`AppConductor.js:659`). Todas pasan
+      //     por `esMio()`.
+      //   · `limpiarViajesOtrosConductor` (`AppConductor.js:612`), que suelta los
+      //     que no ganó, también busca con `where('conductorId','==',miId)`.
+      //     Por eso el comentario de más arriba —el que decía que sin
+      //     `enElMercado()` esa función «deja de funcionar EN SILENCIO»— ERA
+      //     FALSO, y llevaba escrito ahí desde ayer.
+      //   · todas las escrituras del pasajero son sobre SU viaje.
+      //   · quien pone al conductor y su tarjeta es `confirmarConductor`
+      //     (`functions/index.js:284-292`), que corre en el servidor y no pasa por
+      //     estas reglas. La pasajera lo llama con `httpsCallable`
+      //     (`Solicitar.js:980`, `SolicitarMensajeria.js:993`).
+      //   · el panel no escribe NADA en `viajes`; aliados no la toca.
+      //
+      // OJO: `enElMercado()` SE QUEDA EN EL `read` (arriba). El conductor TIENE que
+      // ver el mercado — es el negocio. Lo que se le quita es escribir en él.
+      //
+      // ANOTADO al paso, NO se toca aquí: los estados `confirmando` y
+      // `contraoferta` YA NO LOS ESCRIBE NADIE en ninguna de las tres apps ni en
+      // las funciones — se quedaron del flujo viejo, antes de que el mercado de
+      // ofertas pasara por `confirmarConductor`. Siguen declarados en
+      // `guajirago/src/estadosViaje.js:28` (y de ahí entran en `enElMercado()`), y
+      // la pantalla de confirmación del pasajero con sus dos botones
+      // (`Solicitar.js:939-974` y sus gemelos de mensajería) solo se alcanza desde
+      // ahí: son unos 40 renglones que nadie ejecuta. Borrarlos es otro trabajo,
+      // con su foto y su permiso.
       allow update: if request.auth != null
-        && (esMio() || enElMercado() || esAdmin())
+        && (esMio() || esAdmin())
         && request.resource.data.get('pasajeroId', '') == resource.data.get('pasajeroId', '')
         && conductorIntacto();
 

@@ -2477,6 +2477,28 @@ describe('REGLA 10 · un viaje no lo toca cualquiera', () => {
     }));
   });
 
+  // ── EL UNICO TRABAJO VIVO DEL esMio() DE DENTRO DE conductorIntacto() ────
+  // Ese esMio() se puso para parar a un extraño, pero esa puerta se tapio esa
+  // misma tarde al sacar enElMercado() del update: ahora al extraño lo para el
+  // (esMio() || esAdmin()) de fuera, antes de llegar. Lo unico que sigue haciendo
+  // es que EL PANEL no pueda soltar a un conductor -el panel pasa el filtro de
+  // fuera por esAdmin() y llegaria hasta ahi-. Y eso no lo probaba NADIE: un
+  // mutante que borra ese esMio() sobrevivia a la suite entera, 0 rojas de 297.
+  // Lo cazo la segunda opinion. Esta es la prueba que faltaba.
+  it('ni el panel suelta al conductor de un viaje', async () => {
+    await sembrarViajes();
+    const { doc, updateDoc, deleteField } = FS;
+    await RUT.assertFails(updateDoc(doc(como('eladmin'), 'viajes/va'), {
+      conductorId: null,
+    }), 'Mover un conductor se hace por el sitio bueno: la funcion del servidor.');
+    await RUT.assertFails(updateDoc(doc(como('eladmin'), 'viajes/va'), {
+      conductorId: deleteField(),
+    }), 'Y borrar el campo es la misma jugada por la puerta de al lado.');
+    await RUT.assertFails(updateDoc(doc(como('eljefe'), 'viajes/va'), {
+      conductorId: null,
+    }), 'El superadmin tampoco.');
+  });
+
   // ── BORRAR EL CAMPO ES OTRA FORMA DE ESCRIBIRLO ──────────────────────────
   // deleteField() borra el campo, asi que DESAPARECE de request.resource.data
   // .keys(). La segunda version del candado preguntaba por las claves y lo leia
@@ -2582,14 +2604,51 @@ describe('REGLA 10 · un viaje no lo toca cualquiera', () => {
     }));
   });
 
-  // Un conductor cualquiera SIGUE pudiendo tocar el viaje del mercado para lo suyo
-  // -ofertar, mirar-: lo que no puede es tocar ESE campo.
-  it('pero un conductor del mercado sigue pudiendo hacer lo suyo en el viaje', async () => {
+  // ── LA TARJETA FALSA · UN CONDUCTOR DEL MERCADO NO ESCRIBE EN EL VIAJE ───
+  // Esta prueba decia lo contrario hasta el 25-ago-2026 por la tarde: afirmaba
+  // que un conductor cualquiera SIGUE pudiendo tocar el viaje del mercado «para lo
+  // suyo». Se midio enumerando TODAS las escrituras al documento del viaje en las
+  // tres apps: no hay ninguna. La oferta va a la subcoleccion contraofertas/{uid}
+  // (AppConductor.js:353), que tiene sus propias reglas. Asi que no.
+  it('un conductor del mercado NO escribe en el documento del viaje', async () => {
     await sembrarViajes();
     const { doc, updateDoc } = FS;
-    await RUT.assertSucceeds(updateDoc(doc(como('conductor2'), 'viajes/vm'), {
+    await RUT.assertFails(updateDoc(doc(como('conductor2'), 'viajes/vm'), {
       estado: 'en_negociacion', nuevaOferta: '2026-08-25T12:00:00.000Z',
-    }));
+    }), 'Su oferta va a la subcoleccion, no al viaje. Aqui no tiene nada que escribir.');
+  });
+
+  // EL ATAQUE DE LA TARJETA, que es el daño fisico mas grave de la auditoria: la
+  // pasajera se sube al carro equivocado. Solicitar.js:588-599 saca el nombre, la
+  // placa, el vehiculo y el telefono DEL DOCUMENTO DEL VIAJE. Sin tocar
+  // conductorId ni una vez, se le reescribian los cuatro.
+  it('EL ATAQUE · nadie le cambia el nombre, la placa ni el telefono al conductor', async () => {
+    await sembrarViajes();
+    const { doc, updateDoc } = FS;
+    await RUT.assertFails(updateDoc(doc(como('conductor2'), 'viajes/vc'), {
+      conductorNombre: 'El impostor', conductorTelefono: '3001234567',
+      conductorPlaca: 'XXX-999', conductorVehiculo: 'Moto roja',
+    }), 'La pasajera veria un conductor legitimo con el telefono y la placa del impostor.');
+  });
+
+  it('EL ATAQUE · ni le baja la tarifa, ni le mata el viaje', async () => {
+    await sembrarViajes();
+    const { doc, updateDoc } = FS;
+    await RUT.assertFails(updateDoc(doc(como('conductor2'), 'viajes/vm'), {
+      tarifa: '$1', tarifaValor: 1,
+    }), 'Por la misma puerta se le bajaba la tarifa a 1 peso.');
+    await RUT.assertFails(updateDoc(doc(como('conductor2'), 'viajes/vm'), {
+      estado: 'vencido',
+    }), 'Y se le mataba el viaje a otro.');
+  });
+
+  // Y LO QUE SI TIENE QUE SEGUIR PASANDO: el conductor ofertando por su sitio.
+  it('pero SI puede dejar su oferta, que va a la subcoleccion', async () => {
+    await sembrarViajes();
+    const { doc, setDoc } = FS;
+    await RUT.assertSucceeds(setDoc(doc(como('conductor2'), 'viajes/vm/contraofertas/conductor2'), {
+      conductorId: 'conductor2', conductorNombre: 'Luis', montoValor: 12000, vigente: true,
+    }), 'AppConductor.js:353. Si esto se cae, el conductor no puede trabajar.');
   });
 
   it('el PASAJERO sigue llevando su viaje', async () => {
@@ -2609,13 +2668,23 @@ describe('REGLA 10 · un viaje no lo toca cualquiera', () => {
 
   // LA QUE SE ROMPE EN SILENCIO SI ESTO SE ESCRIBE MAL. Mientras el viaje busca
   // conductor, los conductores lo tocan aunque todavía no sea suyo:
-  // AppConductor.js:619 suelta los viajes que no ganó, y ese updateDoc lleva un
-  // .catch(() => {}) vacío. Si la regla lo negara, no fallaría nada a la vista:
-  // los viajes se quedarían pegados a un conductor que ya no los lleva.
-  it('un conductor SÍ puede tocar un viaje que está EN EL MERCADO', async () => {
+  // ESTA PRUEBA ESTUVO MAL DESDE QUE SE ESCRIBIO, y daba una seguridad falsa.
+  // Decia: «un conductor SI puede tocar un viaje que esta EN EL MERCADO», y lo
+  // justificaba con que AppConductor.js:619 suelta los viajes que no gano y lleva
+  // un .catch(()=>{}) vacio. El .catch es cierto; el razonamiento no:
+  // limpiarViajesOtrosConductor busca con where('conductorId','==',miId), o sea
+  // SOLO viajes donde el YA es el conductor. Entra por esMio(), no por
+  // enElMercado(). Se comprobo enumerando las escrituras una por una.
+  // Asi que la prueba dice ahora lo que de verdad tiene que pasar.
+  it('el conductor suelta los viajes QUE YA SON SUYOS (AppConductor.js:612)', async () => {
     await sembrarViajes();
     const { doc, updateDoc } = FS;
-    await RUT.assertSucceeds(updateDoc(doc(como('conductor2'), 'viajes/vm'), {
+    // vc: en el mercado Y con conductor1. Es el caso exacto de esa funcion.
+    await RUT.assertSucceeds(updateDoc(doc(como('conductor1'), 'viajes/vc'), {
+      estado: 'esperando', conductorId: null, conductorNombre: null,
+    }));
+    // Y un conductor que NO es el de ese viaje, no.
+    await RUT.assertFails(updateDoc(doc(como('conductor2'), 'viajes/vc'), {
       estado: 'esperando', conductorId: null, conductorNombre: null,
     }));
   });
