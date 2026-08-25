@@ -1701,6 +1701,41 @@ describe('REGLA 9 · el cuarto de atrás de cada negocio', () => {
     await RUT.assertFails(getDocs(collection(como('pasajero1'), 'restaurantesPrivado')));
   });
 
+  // ── ¿PUEDE EL PANEL PEDIR LA LISTA ENTERA? ───────────────────────────────
+  // Esta es LA prueba que decide cómo se puede escribir el panel. Sus tres
+  // pantallas (admin/Restaurantes.js, Turismo.js y AliadosPendientes.js) piden la
+  // colección de negocios SIN filtro y tienen que juntar cada negocio con su
+  // cuarto. Si el panel NO pudiera pedir la lista de cuartos, habría que pedirlos
+  // de uno en uno —una consulta más por cada negocio— y el diseño sería otro.
+  //
+  // Se comprueba EJECUTANDO, no razonando. En una consulta de LISTA las reglas se
+  // evalúan de otra manera que al pedir UN documento, y una condición que necesite
+  // mirar dentro del documento tumba la consulta entera. Aquí la condición es el
+  // id del camino (uid == negocioId) y esAdmin(), que no miran dentro — pero eso
+  // hay que VERLO. Es la misma trampa que en la REGLA 6 dejó al panel ciego por el
+  // orden de una cláusula, y allí también se descubrió corriéndolo.
+  it('EL PANEL · SÍ puede pedir la lista entera de cuartos', async () => {
+    await sembrarCuartos();
+    const { collection, getDocs } = FS;
+    const lista = await RUT.assertSucceeds(getDocs(collection(como('eladmin'), 'restaurantesPrivado')));
+    // Se cuentan los dos a propósito, aunque en Firestore una consulta de lista con
+    // un solo documento prohibido falla ENTERA — o sea que esto solo puede ser 0 o 2,
+    // nunca 1. Se deja escrito porque leer «size, 2» sin saber eso hace pensar que
+    // podrían llegar a medias, y no es así.
+    assert.strictEqual(lista.size, 2,
+      'el panel tiene que ver LOS DOS cuartos: sin ellos, las fichas saldrían sin ' +
+      'nombre ni teléfono del dueño.');
+  });
+
+  // El negocio no puede pedir la lista NI para sacar el suyo: en una consulta sin
+  // filtro, un solo documento que no le toque tumba la consulta entera. Que es lo
+  // que se quiere — así no hay forma de barrer la colección.
+  it('EL PANEL · pero un negocio NO puede pedirla, ni para sacar el suyo', async () => {
+    await sembrarCuartos();
+    const { collection, getDocs } = FS;
+    await RUT.assertFails(getDocs(collection(como('r1'), 'restaurantesPrivado')));
+  });
+
   it('un negocio NO puede mirar el cuarto del negocio de al lado', async () => {
     await sembrarCuartos();
     const { doc, getDoc } = FS;

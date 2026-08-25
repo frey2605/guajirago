@@ -511,3 +511,156 @@ describe('SEGUNDA LEY · el cuarto privado del negocio, una sola lista', () => {
     });
   });
 });
+
+describe('SEGUNDA LEY · el panel y aliados leen el cuarto privado por el MISMO nombre', () => {
+  const deAliados = () => cargarDeLaApp('guajirago-aliados/src/negocioPrivado.js');
+  const delPanel = () => cargarDeLaApp('guajirago-admin/src/negocioPrivado.js');
+
+  // EL PANEL ES OTRO REPO. No puede importar de aliados —no hay forma—, así que el
+  // nombre del cuarto está escrito DOS veces y esto es lo único que las junta.
+  //
+  // Si se separan NO FALLA NADA con estruendo: el panel pide una colección que no
+  // existe, le llega vacía, y las fichas salen con «—» donde va el nombre y el
+  // teléfono del dueño. Parecería que los negocios no tienen datos, no que el panel
+  // esté roto. Nadie miraría el código durante semanas.
+  it('el panel y aliados nombran el MISMO cuarto', () => {
+    assert.strictEqual(delPanel().COLECCION_PRIVADA, deAliados().COLECCION_PRIVADA,
+      'guajirago-admin/src/negocioPrivado.js y guajirago-aliados/src/negocioPrivado.js ' +
+      'dejaron de decir lo mismo. El que MANDA es el de aliados. Cambia el del panel y ' +
+      'esto vuelve a verde — si no, el panel se queda sin los datos del dueño y no avisa.');
+  });
+
+  it('y traen la MISMA lista de campos privados', () => {
+    assert.deepStrictEqual([...delPanel().CAMPOS_PRIVADOS].sort(), [...deAliados().CAMPOS_PRIVADOS].sort(),
+      'Las dos listas de campos privados se separaron. La del panel decide QUÉ acepta el ' +
+      'panel del cuarto del negocio: si le falta un campo, deja de enseñarlo; y si le ' +
+      'sobra uno, acepta del negocio algo que no le corresponde. El que manda es aliados.');
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // EL ATAQUE QUE ESTA PRUEBA EXISTE PARA IMPEDIR (24-ago-2026)
+  //
+  // La primera versión de conSuCuarto() hacía { ...negocio, ...cuarto }: volcaba
+  // el cuarto ENTERO. La segunda opinión lo rompió EJECUTÁNDOLO contra el
+  // emulador, y esto es lo que consiguió entrando como el negocio:
+  //
+  //   escribir en restaurantes/r1        {aprobado:true}  -> NEGADO   (REGLA 9-C)
+  //   escribir en restaurantesPrivado/r1 {aprobado:true}  -> ACEPTADO
+  //   ...y el panel veía aprobado:true, y el negocio DESAPARECÍA de la bandeja
+  //   de pendientes, que lista los que tienen aprobado === false.
+  //
+  // O sea: la puerta de atrás a una regla que ya estaba cerrada por delante. En
+  // el escaparate el negocio no puede tocar esos campos; en su cuarto sí, porque
+  // allí las reglas solo congelan 'creditos'.
+  // ─────────────────────────────────────────────────────────────────────────
+  it('EL ATAQUE · lo que el negocio escriba de MÁS en su cuarto, el panel NO lo mira', () => {
+    const { conSuCuarto } = delPanel();
+    const [visto] = conSuCuarto(
+      [{ id: 'r1', nombre: 'EL NEGOCIO', aprobado: false, estadoAprobacion: 'pendiente', duenoNombre: 'VIEJO' }],
+      { r1: {
+        duenoNombre: 'MECHE',
+        // lo que un negocio se escribiría en su propio cuarto para colarse:
+        aprobado: true, estadoAprobacion: 'aprobado', activo: true, rol: 'admin',
+        nombre: 'NOMBRE FALSO', logo: 'otro.jpg',
+      } },
+    );
+    assert.strictEqual(visto.duenoNombre, 'MECHE', 'lo privado sí tiene que llegar');
+    assert.strictEqual(visto.aprobado, false,
+      'EL PANEL SE TRAGÓ UN «aprobado» ESCRITO POR EL NEGOCIO. Con eso un restaurante se ' +
+      'borra a sí mismo de la bandeja de pendientes y sale como aprobado sin que nadie lo ' +
+      'revise. conSuCuarto() tiene que copiar SOLO los campos de CAMPOS_PRIVADOS.');
+    assert.strictEqual(visto.estadoAprobacion, 'pendiente', 'igual con estadoAprobacion');
+    assert.strictEqual(visto.nombre, 'EL NEGOCIO',
+      'el negocio le enseñó al panel un nombre que el escaparate nunca aceptó');
+    assert.strictEqual(visto.rol, undefined, 'ni un rol inventado');
+    assert.strictEqual(visto.logo, undefined, 'ni un logo inventado');
+  });
+
+  // conSuCuarto() se EJECUTA, no se lee: es la calculadora que junta el escaparate
+  // con el cuarto, y la usan las TRES pantallas del panel. Una sola por proceso
+  // (SEGUNDA LEY) — si cada pantalla juntara a su manera, dos se quedarían viejas.
+  it('al juntar, MANDA lo del cuarto sobre lo del escaparate', () => {
+    const { conSuCuarto } = delPanel();
+    const juntos = conSuCuarto(
+      [{ id: 'r1', nombre: 'EL NEGOCIO', duenoNombre: 'LO VIEJO DEL ESCAPARATE' }],
+      { r1: { duenoNombre: 'MECHE', duenoTelefono: '+573001112233' } },
+    );
+    assert.deepStrictEqual(juntos, [{
+      id: 'r1', nombre: 'EL NEGOCIO', duenoNombre: 'MECHE', duenoTelefono: '+573001112233',
+    }], 'Si mandara lo del escaparate, el panel enseñaría el dato viejo y la tanda 2 ' +
+      '—que vacía el escaparate— dejaría las fichas en blanco de golpe.');
+  });
+
+  it('un negocio sin cuarto no revienta la lista', () => {
+    const { conSuCuarto } = delPanel();
+    assert.deepStrictEqual(conSuCuarto([{ id: 'r9', nombre: 'SIN CUARTO' }], {}),
+      [{ id: 'r9', nombre: 'SIN CUARTO' }]);
+    assert.deepStrictEqual(conSuCuarto(null, null), [],
+      'Antes de que llegue nada, el panel llama a esto con las manos vacías. Si reventara ' +
+      'aquí, la pantalla se quedaría en blanco al abrirla.');
+  });
+
+  // Que el módulo exista no significa que nadie lo use. Aquí se mira que las TRES
+  // pantallas lo PIDAN de verdad y lo JUNTEN — es el mutante de «borrar el
+  // useEffect y dejar el import», que si no sobrevive tan tranquilo.
+  // El import se busca con expresión regular y no con la cadena suelta: con
+  // includes("from './negocioPrivado'") bastaba cambiar a comillas dobles —código
+  // perfectamente correcto, compila igual— para poner esto rojo. Un amarre que
+  // castiga código bueno enseña a la gente a ignorar los amarres. Lo cazó la
+  // segunda opinión del 24-ago-2026, y es la MISMA lección de las comillas que ya
+  // se había aprendido en el amarre del token, unos renglones más arriba.
+  const IMPORTA_EL_MODULO = /from\s*['"]\.\/negocioPrivado['"]/;
+
+  it('las TRES pantallas del panel piden el cuarto, lo guardan y lo juntan', () => {
+    ['Restaurantes', 'Turismo', 'AliadosPendientes'].forEach((pantalla) => {
+      const donde = 'guajirago-admin/src/' + pantalla + '.js';
+      const vivo = leer(donde).replace(/\/\/.*$/gm, '');
+      assert.ok(IMPORTA_EL_MODULO.test(vivo),
+        donde + ' dejó de importar negocioPrivado.js: o escribió el nombre de la colección ' +
+        'a mano, o volvió a sacar los datos del dueño del escaparate.');
+      assert.ok(vivo.includes('collection(db, COLECCION_PRIVADA)'),
+        donde + ' ya no PIDE el cuarto privado. Importarlo no basta: sin esta consulta la ' +
+        'pantalla enseñaría lo que quede en el escaparate, y el día que la tanda 2 lo vacíe ' +
+        'se quedaría sin nombre ni teléfono del dueño sin que nada avisara.');
+      // Pedirlo tampoco basta: se puede pedir y tirar a la basura. Este mutante
+      // —porId[d.id] = {}— sobrevivió a la primera versión de esta prueba.
+      assert.ok(vivo.includes('porId[d.id] = d.data();'),
+        donde + ' pide el cuarto pero NO se queda con lo que llega. La pantalla se vería ' +
+        'perfecta hoy —el escaparate todavía tiene los datos— y quedaría vacía el día que ' +
+        'la tanda 2 lo vacíe, sin que nada hubiera avisado en medio.');
+      assert.ok(vivo.includes('conSuCuarto(negocios, privados)'),
+        donde + ' ya no junta el negocio con su cuarto usando la calculadora compartida. ' +
+        'Si se junta a mano, esa pantalla se queda vieja el día que esto cambie — y sin la ' +
+        'lista de campos, se tragaría lo que el negocio le escriba en su cuarto.');
+    });
+  });
+
+  // En la app de aliados el dueño ve su propio nombre en el saludo. Salía del
+  // escaparate, que es de donde se lo llevaba cualquier cliente.
+  // Aquí NO basta con mirar que se pida el cuarto. Dos mutantes de la segunda
+  // opinión (24-ago-2026) sobrevivieron a la primera versión de esta prueba:
+  //   · nombreDueno: d['duenoNombre']       — con corchetes, no con punto.
+  //   · nombreDueno: snap.data().duenoNombre — se pide el cuarto Y se usa el
+  //     escaparate. La lectura buena sigue ahí, y la fuga entra al lado.
+  // Por eso ahora se mira DE DÓNDE SALE el valor que va a la sesión, no solo que
+  // el cuarto se pida. Es la misma forma de colarse que en las funciones.
+  const SALE_DEL_CUARTO = /nombreDueno:\s*p\.duenoNombre/;
+  const SALE_DEL_ESCAPARATE = /nombreDueno:\s*(d|snap)\b/;
+
+  it('la app de aliados saca el nombre del dueño del cuarto, no del escaparate', () => {
+    ['App', 'Login'].forEach((pantalla) => {
+      const donde = 'guajirago-aliados/src/' + pantalla + '.js';
+      const vivo = leer(donde).replace(/\/\/.*$/gm, '');
+      assert.ok(vivo.includes('doc(db, COLECCION_PRIVADA'),
+        donde + ' ya no lee el cuarto privado del negocio.');
+      assert.ok(SALE_DEL_CUARTO.test(vivo),
+        donde + ' pide el cuarto pero el nombre que mete en la sesión ya no sale de ahí. ' +
+        'Pedirlo y no usarlo se ve exactamente igual que hacerlo bien, hasta que la tanda 2 ' +
+        'vacíe el escaparate y el saludo se quede en blanco.');
+      assert.ok(!SALE_DEL_ESCAPARATE.test(vivo),
+        donde + ' vuelve a sacar el nombre del dueño del documento del ESCAPARATE, que la ' +
+        'app del pasajero se descarga entero. Salta también si la lectura buena sigue ahí ' +
+        'y alguien puso la mala al lado.');
+    });
+  });
+});
