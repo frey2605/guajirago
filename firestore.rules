@@ -334,6 +334,23 @@ service cloud.firestore {
                 'fechaAprobacion', 'fechaRechazo'];
       }
 
+      // LO QUE NO PUEDE VOLVER AL ESCAPARATE (tanda 2, 24-ago-2026).
+      //
+      // Esta colección se la descarga ENTERA la app del pasajero para enseñar
+      // dónde pedir (guajirago/src/Restaurantes.js, Turismo.js). Hasta hoy dentro
+      // viajaban el nombre, el teléfono y el correo del dueño: le llegaban solos a
+      // cualquiera que abriera esa pantalla. Ya se mudaron a restaurantesPrivado.
+      //
+      // Esto es lo que impide que VUELVAN. Sin ello, vaciarlos es un trabajo de un
+      // día: la próxima pantalla que guarde el perfil los mete otra vez y nadie se
+      // entera, porque nada falla — simplemente el dato reaparece en el escaparate.
+      //
+      // Es la MISMA lista que guajirago-aliados/src/negocioPrivado.js, y hay una
+      // prueba que carea los dos lados (pruebas/amarres.test.js).
+      function camposPrivados() {
+        return ['duenoNombre', 'duenoTelefono', 'email', 'creditos', 'fcmToken'];
+      }
+
       allow read: if request.auth != null;
 
       // En el ALTA sí hay que dejarlos escribir: si se prohibieran aquí, nadie
@@ -354,25 +371,59 @@ service cloud.firestore {
       // El mismo agujero por la otra puerta. Por eso ahora se exige que el campo
       // ESTÉ, no solo que «si está valga lo seguro».
       //
-      // Medido: aliados/Login.js:49 ya manda los cinco, así que al alta legítima
-      // no le cuesta nada. Y exigir el valor exacto cierra de paso los tipos: un
-      // `aprobado: 'true'` de texto no es igual a false, así que se niega — y se
-      // niega a propósito, no por un error de evaluación.
+      // Al alta legítima no le cuesta nada: aliados/Login.js manda `aprobado`,
+      // `estadoAprobacion` y `rol` en el mismo setDoc. (Antes decía «los cinco» y
+      // se quedó viejo con la tanda 2: desde entonces `creditos` NO se manda aquí,
+      // vive en el cuarto — mira el hasAny() de más abajo.)
+      //
+      // Y exigir el valor exacto cierra de paso los tipos: un `aprobado: 'true'` de
+      // texto no es igual a false, así que se niega — a propósito, no por un error
+      // de evaluación.
       allow create: if esAdmin() || (
         request.auth != null &&
         request.auth.uid == restauranteId &&
         request.resource.data.aprobado == false &&
         request.resource.data.estadoAprobacion == 'pendiente' &&
-        request.resource.data.creditos == 0 &&
         request.resource.data.rol == 'dueno' &&
-        !request.resource.data.keys().hasAny(['fechaAprobacion', 'fechaRechazo'])
+        !request.resource.data.keys().hasAny(['fechaAprobacion', 'fechaRechazo']) &&
+        // OJO: aquí YA NO se pide «creditos == 0». Desde la tanda 2, 'creditos' no
+        // vive en el escaparate: vive en el cuarto. Así que ahora tiene que estar
+        // AUSENTE, y de eso se encarga el hasAny() de abajo, porque 'creditos' es
+        // uno de los camposPrivados(). Es más fuerte que antes: antes podía venir
+        // valiendo cero, ahora no puede venir.
+        !request.resource.data.keys().hasAny(camposPrivados())
       );
 
       // Al cambiarlo: el negocio manda en lo suyo, pero no en lo del panel.
+      // En el update se mira affectedKeys() y no keys(): así lo que YA esté dentro
+      // de un documento viejo no bloquea guardar el perfil, pero nadie puede
+      // añadirlo ni cambiarlo. Con esto, EL VACIADO se puede correr antes o después
+      // de desplegar, sin una ventana en la que un negocio no pueda guardar su
+      // perfil.
+      //
+      // OJO — ESO VALE PARA EL VACIADO, NO PARA EL ALTA. La segunda opinión del
+      // 24-ago-2026 lo comprobó ejecutando las cuatro combinaciones: el create de
+      // aquí abajo y aliados/Login.js son INCOMPATIBLES en las dos direcciones.
+      //   · reglas nuevas + app vieja  -> el alta manda los datos del dueño: NEGADA.
+      //   · app nueva + reglas viejas  -> el alta no manda `creditos` y la regla
+      //     vieja pedía `creditos == 0`: NEGADA por campo ausente.
+      // O sea que hay una ventana, corta pero real, en la que un negocio NUEVO no
+      // se puede registrar — y con la caché del navegador, quien tenga la app vieja
+      // sigue sin poder hasta que la refresque.
+      //
+      // Y falla feo: createUserWithEmailAndPassword ya se ejecutó, así que la cuenta
+      // queda creada sin negocio. Al reintentar sale «ese correo ya tiene una
+      // cuenta» y ese correo no se puede volver a usar.
+      //
+      // Se asumió a propósito (24-ago-2026): no hay clientes todavía y los dos
+      // despliegues van seguidos. Si algún día se repite con negocios trabajando,
+      // el camino es un paso intermedio en las reglas que acepte las DOS altas, y
+      // endurecerlas después de que la app vieja haya desaparecido.
       allow update: if esAdmin() || (
         request.auth != null &&
         request.auth.uid == restauranteId &&
-        !request.resource.data.diff(resource.data).affectedKeys().hasAny(camposDelPanel())
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny(camposDelPanel()) &&
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny(camposPrivados())
       );
 
       allow delete: if false;

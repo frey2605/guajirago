@@ -1442,13 +1442,50 @@ describe('REGLA 9 · un negocio no se aprueba a sí mismo', () => {
   });
 
   // ── EL ALTA, QUE NO SE PUEDE ROMPER ──────────────────────────────────────
-  it('el alta de un negocio sigue funcionando tal cual (aliados/Login.js:49)', async () => {
+  // Esto es EXACTAMENTE lo que escribe aliados/Login.js desde la tanda 2: el
+  // resultado de sinLoPrivado(datos). Ya no lleva duenoNombre, duenoTelefono,
+  // email ni creditos — esos van al cuarto, en el segundo setDoc del registro.
+  // Si esta prueba se pusiera roja, un negocio nuevo no podría darse de alta.
+  it('el alta de un negocio sigue funcionando tal cual (aliados/Login.js)', async () => {
     const { doc, setDoc } = FS;
     await RUT.assertSucceeds(setDoc(doc(como('nuevo1'), 'restaurantes/nuevo1'), {
-      nombre: 'NUEVO', duenoNombre: 'ANA', duenoTelefono: '+573009998877',
-      email: 'ana@ejemplo.com', rol: 'dueno', tipoNegocio: 'restaurante',
-      activo: true, aprobado: false, estadoAprobacion: 'pendiente', creditos: 0,
+      nombre: 'NUEVO', rol: 'dueno', tipoNegocio: 'restaurante',
+      activo: true, aprobado: false, estadoAprobacion: 'pendiente',
       menu: [], tours: [], fechaCreacion: '2026-08-24T00:00:00.000Z',
+    }));
+  });
+
+  // ── LA TANDA 2: EL ESCAPARATE NO VUELVE A LLENARSE ───────────────────────
+  // Vaciar los 3 documentos no sirve de nada si la próxima pantalla que guarde
+  // el perfil los mete otra vez. Y no fallaría nada al hacerlo: el dato
+  // simplemente reaparecería en la colección que se descarga cualquier cliente.
+  it('EL ESCAPARATE · un negocio NO puede nacer con los datos del dueño dentro', async () => {
+    const { doc, setDoc } = FS;
+    const base = { nombre: 'NUEVO', rol: 'dueno', activo: true, aprobado: false, estadoAprobacion: 'pendiente' };
+    await RUT.assertFails(setDoc(doc(como('nv2'), 'restaurantes/nv2'), { ...base, duenoNombre: 'ANA' }));
+    await RUT.assertFails(setDoc(doc(como('nv3'), 'restaurantes/nv3'), { ...base, duenoTelefono: '+573009998877' }));
+    await RUT.assertFails(setDoc(doc(como('nv4'), 'restaurantes/nv4'), { ...base, email: 'ana@ejemplo.com' }));
+    await RUT.assertFails(setDoc(doc(como('nv5'), 'restaurantes/nv5'), { ...base, fcmToken: 'tok' }));
+  });
+
+  it('EL ESCAPARATE · ni devolverlos después', async () => {
+    await sembrarNegocios();
+    const { doc, updateDoc } = FS;
+    await RUT.assertFails(updateDoc(doc(como('r1'), 'restaurantes/r1'), { duenoTelefono: '+570000000000' }));
+    await RUT.assertFails(updateDoc(doc(como('r1'), 'restaurantes/r1'), { email: 'otro@ejemplo.com' }));
+    await RUT.assertFails(updateDoc(doc(como('r1'), 'restaurantes/r1'), { fcmToken: 'tok9' }));
+  });
+
+  // Y ESTA es la que permite hacer el vaciado y el despliegue en cualquier orden.
+  // El sembrado de arriba deja a r1 con los datos del dueño DENTRO, como están
+  // los 3 documentos de verdad antes de vaciarlos. Si la regla mirase keys() en
+  // vez de affectedKeys(), ese negocio no podría ni guardar su perfil hasta que
+  // pasara el script — una ventana en la que la app queda rota sin avisar.
+  it('EL ESCAPARATE · un negocio TODAVÍA sin vaciar sigue guardando su perfil', async () => {
+    await sembrarNegocios();
+    const { doc, updateDoc } = FS;
+    await RUT.assertSucceeds(updateDoc(doc(como('r1'), 'restaurantes/r1'), {
+      descripcion: 'La mejor comida', horarioApertura: 7, perfilCompleto: true,
     }));
   });
 
@@ -1461,16 +1498,20 @@ describe('REGLA 9 · un negocio no se aprueba a sí mismo', () => {
     const { doc, setDoc } = FS;
     await RUT.assertFails(setDoc(doc(como('nuevo2'), 'restaurantes/nuevo2'), {
       nombre: 'TRAMPOSO', rol: 'dueno', activo: true,
-      aprobado: true, estadoAprobacion: 'pendiente', creditos: 0,
+      aprobado: true, estadoAprobacion: 'pendiente',
     }));
   });
 
-  it('ni nacer con plata en el bolsillo', async () => {
+  // CAMBIÓ EN LA TANDA 2 (24-ago-2026). Antes 'creditos' podía venir en el alta,
+  // valiendo cero, y lo que se negaba era traerlo con plata dentro. Ahora el
+  // escaparate no lleva créditos EN ABSOLUTO —viven en el cuarto—, así que se
+  // niegan los dos casos. Se comprueban los dos a propósito: si mañana alguien
+  // sacara 'creditos' de camposPrivados(), el de cero volvería a colarse.
+  it('ni nacer con plata en el bolsillo — ni con la cartera vacía', async () => {
     const { doc, setDoc } = FS;
-    await RUT.assertFails(setDoc(doc(como('nuevo3'), 'restaurantes/nuevo3'), {
-      nombre: 'TRAMPOSO', rol: 'dueno', activo: true,
-      aprobado: false, estadoAprobacion: 'pendiente', creditos: 900000,
-    }));
+    const base = { nombre: 'TRAMPOSO', rol: 'dueno', activo: true, aprobado: false, estadoAprobacion: 'pendiente' };
+    await RUT.assertFails(setDoc(doc(como('nuevo3'), 'restaurantes/nuevo3'), { ...base, creditos: 900000 }));
+    await RUT.assertFails(setDoc(doc(como('nuevo4'), 'restaurantes/nuevo4'), { ...base, creditos: 0 }));
   });
 
   it('ni con el sello de aprobado puesto por otro lado', async () => {
@@ -1501,16 +1542,22 @@ describe('REGLA 9 · un negocio no se aprueba a sí mismo', () => {
     const { doc, setDoc } = FS;
     await RUT.assertFails(setDoc(doc(como('fantasma1'), 'restaurantes/fantasma1'), {
       nombre: 'FANTASMA', tipoNegocio: 'restaurante', rol: 'dueno',
-      perfilCompleto: true, menu: [], estadoAprobacion: 'pendiente', creditos: 0,
+      perfilCompleto: true, menu: [], estadoAprobacion: 'pendiente',
     }));
   });
 
-  it('EL ATAQUE POR OMISIÓN · ni sin estadoAprobacion, ni sin creditos, ni sin rol', async () => {
+  // AQUÍ YA NO SE PRUEBA «ni sin creditos», y es a propósito (tanda 2,
+  // 24-ago-2026): desde que el escaparate se vació, registrarse SIN créditos es
+  // el camino NORMAL, no un ataque — el campo ni siquiera puede venir. El dinero
+  // se vigila ahora en el cuarto privado, y allí «sin creditos» significa «sin
+  // dinero», que es el estado seguro. Los dos casos que quedan sí siguen siendo
+  // ataques: un negocio sin estado de aprobación no sale en pendientes, y uno sin
+  // rol no se sabe qué es.
+  it('EL ATAQUE POR OMISIÓN · ni sin estadoAprobacion, ni sin rol', async () => {
     const { doc, setDoc } = FS;
-    const base = { nombre: 'FANTASMA', rol: 'dueno', aprobado: false, estadoAprobacion: 'pendiente', creditos: 0 };
+    const base = { nombre: 'FANTASMA', rol: 'dueno', aprobado: false, estadoAprobacion: 'pendiente' };
     const sin = (campo) => { const c = { ...base }; delete c[campo]; return c; };
     await RUT.assertFails(setDoc(doc(como('fantasma2'), 'restaurantes/fantasma2'), sin('estadoAprobacion')));
-    await RUT.assertFails(setDoc(doc(como('fantasma3'), 'restaurantes/fantasma3'), sin('creditos')));
     await RUT.assertFails(setDoc(doc(como('fantasma4'), 'restaurantes/fantasma4'), sin('rol')));
   });
 
@@ -1521,7 +1568,7 @@ describe('REGLA 9 · un negocio no se aprueba a sí mismo', () => {
 
   it('ni puede nacer nombrándose admin, ni con la fecha de aprobación puesta', async () => {
     const { doc, setDoc } = FS;
-    const base = { nombre: 'X', aprobado: false, estadoAprobacion: 'pendiente', creditos: 0 };
+    const base = { nombre: 'X', aprobado: false, estadoAprobacion: 'pendiente' };
     await RUT.assertFails(setDoc(doc(como('fant6'), 'restaurantes/fant6'), { ...base, rol: 'admin' }));
     await RUT.assertFails(setDoc(doc(como('fant7'), 'restaurantes/fant7'), { ...base, rol: 'dueno', fechaAprobacion: '2026-01-01' }));
   });
@@ -1529,7 +1576,7 @@ describe('REGLA 9 · un negocio no se aprueba a sí mismo', () => {
   it('y el sello de texto no cuela: aprobado "true" no es aprobado false', async () => {
     const { doc, setDoc } = FS;
     await RUT.assertFails(setDoc(doc(como('fant8'), 'restaurantes/fant8'), {
-      nombre: 'X', rol: 'dueno', aprobado: 'true', estadoAprobacion: 'pendiente', creditos: 0,
+      nombre: 'X', rol: 'dueno', aprobado: 'true', estadoAprobacion: 'pendiente',
     }));
   });
 
@@ -1624,10 +1671,16 @@ describe('REGLA 9 · un negocio no se aprueba a sí mismo', () => {
     }));
   });
 
-  it('y el dueño sigue guardando su token de avisos (aliados/Notificaciones.js:22)', async () => {
+  // ESTA PRUEBA DECÍA LO CONTRARIO hasta la tanda 2 (24-ago-2026): comprobaba que
+  // el dueño SÍ pudiera guardar su token aquí, porque aliados/Notificaciones.js
+  // lo escribía en el escaparate. Desde la tanda 1b-2a lo escribe en el cuarto
+  // (y allí hay dos pruebas que lo comprueban), así que ahora esto es al revés:
+  // el token es una llave para mandarle avisos al teléfono del dueño, y no puede
+  // acabar en la colección que se descarga cualquier cliente.
+  it('y el token de avisos YA NO puede guardarse aquí (va al cuarto)', async () => {
     await sembrarNegocios();
     const { doc, setDoc } = FS;
-    await RUT.assertSucceeds(setDoc(doc(como('r1'), 'restaurantes/r1'), { fcmToken: 'tok9' }, { merge: true }));
+    await RUT.assertFails(setDoc(doc(como('r1'), 'restaurantes/r1'), { fcmToken: 'tok9' }, { merge: true }));
   });
 
   // OJO: esta NO prueba nada del panel. `allow read` sigue abierto a cualquiera
