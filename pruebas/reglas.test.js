@@ -2436,7 +2436,12 @@ describe('REGLA 10 · un viaje no lo toca cualquiera', () => {
   // JavaScript, y Solicitar.js:588 saca la tarjeta de confirmacion cuando
   // estado === 'confirmando' && data.conductorId. Con el centinela escribible, un
   // impostor le sacaba a la pasajera una tarjeta con SU nombre y SU telefono.
-  it('EL ATAQUE · ni montar una tarjeta de confirmacion falsa con nombre y telefono propios', async () => {
+  // OJO CON EL NOMBRE DE ESTA PRUEBA: cierra UNA de las dos rutas a la tarjeta
+  // falsa -la del centinela-, no la tarjeta falsa entera. La otra sigue abierta y
+  // esta anotada en firestore.rules: conductorNombre, conductorPlaca,
+  // conductorVehiculo y conductorTelefono NO estan protegidos, y cualquiera del
+  // mercado los reescribe en un viaje ajeno sin tocar conductorId.
+  it('EL ATAQUE · por la ruta del centinela ya no se monta una tarjeta falsa', async () => {
     await sembrarViajes();
     const { doc, updateDoc } = FS;
     await RUT.assertFails(updateDoc(doc(como('conductor2'), 'viajes/vm'), {

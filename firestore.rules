@@ -233,6 +233,21 @@ service cloud.firestore {
       // Las dos son el trabajo siguiente: EL COMPROBANTE LO TIENE QUE FIRMAR EL
       // OTRO. No se hacen aquí porque están fuera de lo declarado en la foto.
       //
+      // ⚠ Y HAY UNA TERCERA COSA ABIERTA, que NO es de las calificaciones sino de
+      // la tarjeta de confirmación, y que este candado NO cierra. Se anota aquí
+      // porque la apareció arreglando esto y la ley dice que se anota y se avisa:
+      // la tarjeta que ve la pasajera (`Solicitar.js:588-599`) saca el NOMBRE, la
+      // PLACA, el VEHÍCULO y el TELÉFONO del propio documento del viaje — y esos
+      // cuatro campos NO están protegidos. `enElMercado()` deja que cualquiera con
+      // cuenta los reescriba en un viaje ajeno que ya tiene conductor. O sea: sin
+      // tocar `conductorId` ni una vez, a la pasajera le sale una tarjeta con un
+      // conductor legítimo y el TELÉFONO Y LA PLACA del impostor. Y por la misma
+      // puerta se le puede bajar la tarifa a 1 o matar el viaje poniéndolo en
+      // `vencido`. Medido en las tres versiones: PASA en todas, así que NO es una
+      // regresión de hoy — es la puerta vieja de `enElMercado()`, que sigue
+      // abierta. Cerrarlo pide separar QUÉ campos puede tocar un conductor que
+      // solo está ofertando, y eso es otro trabajo con su propia foto.
+      //
       // Es la TERCERA vez que muerde el mismo patrón en dos días —las llamadas, el
       // canje de códigos y esto—, y ya está escrito arriba: una regla que le
       // pregunta a otro documento no vale más que las reglas de ESE documento.
@@ -255,12 +270,15 @@ service cloud.firestore {
       //     `rechazarConfirmacion`: la pasajera dice que no a la tarjeta del
       //     conductor y el viaje vuelve al mercado. Por eso el update deja dejarlo
       //     sin conductor, y nada más.
-      //   · y el PANEL pierde algo que hoy puede hacer, aunque no lo use: hasta
-      //     ahora podía ponerle o cambiarle el conductor a un viaje. Se comprobó
-      //     que `guajirago-admin` no escribe NADA en `viajes` —sus 6 usos son
-      //     `getDocs`— y que `guajirago-aliados` no la toca. Se dice aquí para que
-      //     el día que el panel necesite mover un conductor, se sepa por qué no
-      //     puede y se haga por el sitio bueno: la función del servidor.
+      //   · y el PANEL pierde TRES cosas que hoy puede hacer, aunque no las use:
+      //     ponerle un conductor a un viaje, cambiárselo, y —esto también, y
+      //     conviene decirlo— QUITÁRSELO. El `esMio()` de soltar no le vale al
+      //     panel, así que `conductorId: null` desde admin o superadmin ahora se
+      //     niega, cuando antes pasaba. Se comprobó que `guajirago-admin` no
+      //     escribe NADA en `viajes` —sus 6 usos son `getDocs`— y que
+      //     `guajirago-aliados` no la toca. Se dice aquí para que el día que el
+      //     panel necesite mover un conductor, se sepa por qué no puede y se haga
+      //     por el sitio bueno: la función del servidor.
       //   · el panel NO escribe conductorId en ningún viaje.
       //
       // NO SE USA UN CENTINELA, y esto costó una segunda opinión entera. La
