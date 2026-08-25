@@ -219,22 +219,38 @@ service cloud.firestore {
       // fabricaba el propio atacante. Medido ejecutándolo: 15 de 15 de una
       // estrella coladas, y la media pública de la víctima en 1.0.
       //
-      // ⚠ LAS OTRAS DOS SIGUEN ABIERTAS AL 25-ago-2026, y se dice aquí porque una
-      // versión anterior de este comentario se apuntaba el cierre entero. La
-      // segunda opinión volvió a reproducir el MISMO ataque CON ESTE ARREGLO
-      // PUESTO, y volvió a dar 15 de 15 y media 1.0:
-      //   · EL PEDIDO. `pedidosRestaurantes` deja crear con solo `clienteId == mi
-      //     uid`; `restauranteId` va libre y nadie comprueba que sea un negocio de
-      //     verdad. Se fabrica un pedido con el uid de la víctima de «restaurante»
-      //     y `calificaSuPedido()` lo da por bueno. Llega a la MISMA media, porque
-      //     `MiPerfil.js:40` suma por `calificadoId` sin mirar de dónde salió.
-      //   · CINCO ESTRELLAS A SÍ MISMO. Se crea un viaje, se deja a sí mismo una
-      //     contraoferta (el id del documento ES su uid, así que la REGLA 2 lo
-      //     permite) y llama a `confirmarConductor`, que cumple sus tres controles
-      //     y le escribe el conductor. 3 de 3, y en bucle, porque al finalizar
-      //     `onViajeCerrado` lo suelta y la comisión baja sin suelo.
-      // Las dos son el trabajo siguiente: EL COMPROBANTE LO TIENE QUE FIRMAR EL
-      // OTRO. No se hacen aquí porque están fuera de lo declarado en la foto.
+      // ⚠ LAS OTRAS DOS, y cómo quedaron. Se cuentan aquí porque una versión
+      // anterior de este comentario se apuntaba el cierre entero, y la segunda
+      // opinión volvió a reproducir el MISMO ataque CON ESTE ARREGLO PUESTO,
+      // dando otra vez 15 de 15 y media 1.0:
+      //   · EL PEDIDO — CERRADO POR FUERA esa misma tarde. Ver EL COMPROBANTE LO
+      //     TIENE QUE FIRMAR EL OTRO, en el bloque de `pedidosRestaurantes`: el
+      //     pedido del cliente nace 'nuevo', contra un negocio que existe, y el
+      //     cliente no lo mueve por el flujo. Ya no se le cuelgan estrellas a un
+      //     tercero. POR DENTRO NO: quien es del negocio se fabrica su propio
+      //     comprobante — es el caso de abajo, el de las cinco estrellas a sí
+      //     mismo, por la puerta del pedido en vez de la del viaje.
+      //   · CINCO ESTRELLAS A SÍ MISMO — LA ÚLTIMA QUE QUEDA, y tiene DOS caminos:
+      //     · POR EL VIAJE: se crea uno, se deja a sí mismo una contraoferta (el id
+      //       del documento ES su uid, así que la REGLA 2 lo permite) y llama a
+      //       `confirmarConductor`, que cumple sus tres controles y le escribe el
+      //       conductor. 3 de 3, y en bucle, porque al finalizar `onViajeCerrado`
+      //       lo suelta y la comisión baja sin suelo.
+      //     · POR EL PEDIDO: quien es del negocio —dueño o empleado— entra por la
+      //       rama `esDelNegocio()` del `create`, que NO le exige que el pedido
+      //       nazca 'nuevo' ni le mira el `clienteId`. Se hace un pedido a sí
+      //       mismo ya 'entregado' y lo califica. Medido: 15 de 15, media 5.0.
+      //       Y LO QUE MÁS MUERDE, que no estaba escrito en ninguna parte:
+      //       `restaurantes/{id}`, `usuarios/{id}` y `conductores/{id}` comparten
+      //       el MISMO espacio de uid, y crear un negocio solo pide `uid ==
+      //       restauranteId`. Así que un CONDUCTOR se registra un negocio con su
+      //       propio uid, se hace quince pedidos a sí mismo, y las quince
+      //       estrellas caen sobre el uid que `MiPerfil.js:40` lee para pintar su
+      //       media DE CONDUCTOR.
+      //     Lo de siempre: el que califica y el calificado son la misma persona.
+      // La primera se cerró esa misma tarde; la segunda NO, y es la última que
+      // queda de las tres. Las dos son la misma idea: EL COMPROBANTE LO TIENE QUE
+      // FIRMAR EL OTRO.
       //
       // (Aquí estuvo anotada unas horas una TERCERA cosa abierta —la tarjeta de
       // confirmación falsa— que YA ESTÁ CERRADA el mismo día: ver el bloque de LA
@@ -648,11 +664,28 @@ service cloud.firestore {
            request.resource.data.get('calificadoId', '') == elViaje().get('pasajeroId', 'sin-pasajero'))
         );
       }
-      // El cliente del pedido, y las estrellas van para SU restaurante.
+      // El cliente del pedido, y las estrellas van para SU restaurante. Y EL
+      // PEDIDO TIENE QUE ESTAR ENTREGADO O CERRADO — que es la mitad que faltaba,
+      // y sin ella todo lo demás era decoración: preguntarle a un documento que el
+      // atacante se fabrica no prueba nada. 'entregado' y 'cerrado' solo los pone
+      // EL RESTAURANTE (`aliados/PedidosDomicilio.js:138`); el cliente, desde el
+      // 25-ago-2026, solo puede dejar el estado quieto o cancelar. Así que para
+      // calificar hace falta que el negocio haya dicho que el pedido pasó.
+      //
+      // ⚠ SALVO CUANDO EL QUE CALIFICA ES EL NEGOCIO. Esto para a un tercero, no
+      // al de dentro: por la rama `esDelNegocio()` del `create` del pedido, el
+      // dueño o su empleado se hacen un pedido a sí mismos ya 'entregado' y se
+      // ponen las estrellas que quieran. Medido: 15 de 15, media 5.0. Es la puerta
+      // que queda, anotada arriba con las cinco estrellas a sí mismo.
+      //
+      // Y no cambia nada de lo que la app ya hacía: el botón de calificar SOLO se
+      // pinta en esos dos estados (`Restaurantes.js:582`). Esto es la regla
+      // exigiendo lo que la pantalla ya cumplía.
       function calificaSuPedido() {
         return exists(/databases/$(database)/documents/pedidosRestaurantes/$(request.resource.data.pedidoId)) &&
           elPedido().get('clienteId', '') == request.auth.uid &&
-          request.resource.data.get('calificadoId', '') == elPedido().get('restauranteId', 'sin-restaurante');
+          request.resource.data.get('calificadoId', '') == elPedido().get('restauranteId', 'sin-restaurante') &&
+          elPedido().get('estado', '') in ['entregado', 'cerrado'];
       }
       // Lo único que el negocio puede tocar de una calificación suya.
       function soloElReporte() {
@@ -1100,14 +1133,72 @@ service cloud.firestore {
       );
       allow list: if esAdmin() || esDelNegocio(resource.data.restauranteId);
 
+      // ── REGLA 10 · EL COMPROBANTE LO TIENE QUE FIRMAR EL OTRO (25-ago-2026) ──
+      //
+      // Esta es la SEGUNDA de las tres puertas por las que se fabricaba el
+      // comprobante de una calificación, y la que más dolía: la primera —el viaje—
+      // se cerró esta mañana, y la segunda opinión volvió a reproducir el MISMO
+      // ataque por aquí, con aquel arreglo puesto, y volvió a dar 15 de 15
+      // calificaciones de una estrella y la media pública de la víctima en 1.0.
+      //
+      // CÓMO ERA: el `create` solo pedía `clienteId == mi uid`. `restauranteId`
+      // iba LIBRE y nadie comprobaba que fuera un negocio de verdad. El atacante
+      // se fabricaba un pedido con el uid de la VÍCTIMA de «restaurante» —incluso
+      // el de un CONDUCTOR, que no es un negocio— y `calificaSuPedido()` lo daba
+      // por bueno. Llega a la misma media, porque `MiPerfil.js:40` suma por
+      // `calificadoId` sin mirar de dónde salió.
+      //
+      // SE CIERRA CON TRES CANDADOS, y hacen falta los tres:
+      //   1. el pedido del cliente NACE 'nuevo'. Siempre: `Restaurantes.js:337`
+      //      escribe eso y nada más.
+      //   2. contra un negocio QUE EXISTE. Con esto ya no se le pueden colgar
+      //      estrellas a un conductor, que es lo que medía el informe.
+      //   3. y EL CLIENTE NO MUEVE EL PEDIDO por el flujo: lo único que puede
+      //      hacerle al `estado` es dejarlo como está o ponerlo en 'cancelado'.
+      //      Sin esto los dos primeros no sirven de nada contra un RIVAL: bastaba
+      //      crear un pedido a nombre del restaurante de al lado, marcarlo
+      //      'entregado' uno mismo y calificarlo con una estrella.
+      // El tercero es el que convierte el pedido en un comprobante DE VERDAD: para
+      // que sirva para calificar tiene que estar en un estado que SOLO el
+      // restaurante puede poner. Ver `calificaSuPedido()` más abajo.
+      //
+      // MEDIDO ANTES DE TOCAR, los dos lados, sin truncar:
+      //   · EL CLIENTE solo escribe dos estados en toda la app: 'nuevo' al crear
+      //     (`Restaurantes.js:337`) y 'cancelado' al cancelar
+      //     (`Restaurantes.js:370`, y solo desde 'nuevo' o 'confirmado' —
+      //     `puedeCancelar`, `Restaurantes.js:365`). Sus otras tres escrituras no
+      //     tocan el estado: el motivo de cancelación (:379), el chat (:404) y la
+      //     marca de calificado (:435).
+      //   · EL RESTAURANTE escribe todos los demás: 'confirmado', 'preparando',
+      //     'empacado', 'en_camino', 'entregado', 'cerrado'
+      //     (`aliados/PedidosDomicilio.js:138`, con la cadena de
+      //     `flujoPedidos.js:11`), y 'tomado'/'cerrado' para las mesas
+      //     (`aliados/Mesero.js:295` y `:248`).
+      //   · el PANEL no escribe NADA en esta colección. Las funciones solo
+      //     reaccionan para avisar (`functions/index.js:103` y `:149`).
+      //   · en la base viva: 29 pedidos, los 29 apuntan a un negocio REAL, y los
+      //     29 están en un estado final (20 cerrados, 7 cancelados, 2 entregados).
+      //     La única calificación con `pedidoId` cuelga de un pedido 'entregado'.
+      //     O sea: esto no le quita nada a nada de lo que ya hay.
+      //
       // Al crearlo, el pedido se FIRMA. Dos firmas valen, y son los dos únicos
       // sitios de todo el proyecto que crean pedidos:
       //   · el cliente de la app (Restaurantes.js) — pone su propio clienteId.
-      //   · el restaurante tomando una mesa (Mesero.js) — es del negocio.
+      //   · el restaurante tomando una mesa (Mesero.js) — es del negocio, y por
+      //     eso ÉL sí puede crear un pedido ya 'tomado': es su propio trabajo.
       allow create: if esAdmin() ||
         esDelNegocio(request.resource.data.restauranteId) ||
         (request.auth != null &&
-         request.resource.data.get('clienteId', '') == request.auth.uid);
+         request.resource.data.get('clienteId', '') == request.auth.uid &&
+         request.resource.data.get('estado', '') == 'nuevo' &&
+         exists(/databases/$(database)/documents/restaurantes/$(request.resource.data.restauranteId)));
+
+      // Lo único que el cliente puede hacerle al estado de SU pedido: dejarlo
+      // como está, o cancelarlo. Todo lo demás lo mueve el restaurante.
+      function elClienteNoMueveElPedido() {
+        return request.resource.data.get('estado', '') == resource.data.get('estado', '')
+            || request.resource.data.get('estado', '') == 'cancelado';
+      }
 
       // Al cambiarlo: su cliente, su restaurante o el panel. Y el pedido NO
       // puede cambiar de dueño ni de restaurante por el camino: si pudiera, la
@@ -1116,7 +1207,8 @@ service cloud.firestore {
       allow update: if (esAdmin() ||
           esDelNegocio(resource.data.restauranteId) ||
           (request.auth != null &&
-           resource.data.get('clienteId', '') == request.auth.uid)) &&
+           resource.data.get('clienteId', '') == request.auth.uid &&
+           elClienteNoMueveElPedido())) &&
         request.resource.data.restauranteId == resource.data.restauranteId &&
         request.resource.data.get('clienteId', '') == resource.data.get('clienteId', '');
 

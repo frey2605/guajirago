@@ -39,3 +39,25 @@
   != null`, asi que un extrano se escribe conductorId en el viaje ajeno y pasa a ser "de los
   dos". Es PEOR que antes: deja mudo al conductor de verdad y contesta sin carrera. Desplegar
   las llamadas solas seria subir un candado con la llave puesta. Las dos van juntas.
+
+────────────────────────────────────────────────────────────────────────────────
+2026-08-25 · "El comprobante lo firma el otro: un pedido fabricado ya no sirve
+para calificar"
+SITIOS DECLARADOS: firestore.rules:pedidosRestaurantes, firestore.rules:calificaciones,
+                   pruebas/reglas.test.js:REGLA 9 y 10
+SITIO TOCADO DE MAS: firestore.rules:viajes  (SOLO COMENTARIO, ni un renglon de regla)
+
+Que se toco: la anotacion de las TRES PUERTAS vive dentro del bloque match /viajes/,
+porque ahi fue donde se escribio esta manana al cerrar la primera. Este cambio cierra
+la segunda, asi que esa anotacion pasaba a MENTIR: decia "las otras dos siguen
+abiertas" y "las dos son el trabajo siguiente". Se corrigio la cuenta y se le puso
+nombre a la que queda.
+
+Por que no se pidio permiso antes: no se vio venir al declarar la foto. La regla que se
+cambia esta en otros dos bloques; lo que vive en el de viajes es el INDICE de las tres
+puertas. Dejarlo sin tocar habria dejado en el archivo una frase falsa escrita por mi
+mismo hace seis horas, que es justo lo que mas dano ha hecho en toda esta auditoria.
+
+Lo cazo la segunda opinion, no el guardian: el guardian compara ARCHIVOS, no SITIOS,
+aunque la foto guarda los sitios. Ya estaba anotado como deuda; esta es la primera vez
+que muerde de verdad.

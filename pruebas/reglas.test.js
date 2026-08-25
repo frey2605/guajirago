@@ -76,6 +76,9 @@ beforeEach(async () => {
     await setDoc(doc(db, 'reservasTurismo/res1'), { total: 200000 });
     await setDoc(doc(db, 'llamadas/lla1'), { de: 'pasajero1' });
     await setDoc(doc(db, 'empleados/emp1'), { restauranteId: 'r1' });
+    // El negocio r1 tiene que EXISTIR: desde el 25-ago-2026 un cliente no puede
+    // crear un pedido contra un restauranteId que no es un negocio de verdad.
+    await setDoc(doc(db, 'restaurantes/r1'), { nombre: 'La Guajira', activo: true });
     await setDoc(doc(db, 'promociones/promo1'), { titulo: 'Bienvenida' });
     await setDoc(doc(db, 'anuncios/anun1'), { titulo: 'Aviso' });
   });
@@ -261,10 +264,13 @@ describe('REGLA 12 · lo que la app hace hoy sigue funcionando', () => {
   // es lo que hace la app — Restaurantes.js:322 escribe 15 campos y SIEMPRE el
   // restaurante. Un pedido sin restaurante no lo puede atender nadie ni reclamar
   // nadie: la prueba estaba dando por bueno un pedido huerfano.
+  // Lleva estado 'nuevo' porque es lo que escribe la app: Restaurantes.js:337 no
+  // pone otra cosa nunca. Antes esta prueba lo omitia y pasaba igual; desde el
+  // 25-ago-2026 el pedido del cliente tiene que NACER 'nuevo'.
   it('un restaurante sigue pudiendo recibir un pedido', async () => {
     const { doc, setDoc } = FS;
     await RUT.assertSucceeds(
-      setDoc(doc(como('pasajero1'), 'pedidosRestaurantes/ped2'), { restauranteId: 'r1', clienteId: 'pasajero1', total: 25000 })
+      setDoc(doc(como('pasajero1'), 'pedidosRestaurantes/ped2'), { restauranteId: 'r1', clienteId: 'pasajero1', estado: 'nuevo', total: 25000 })
     );
   });
 });
@@ -1096,6 +1102,140 @@ describe('REGLA 9 · los pedidos dejan de ser públicos entre usuarios', () => {
     await RUT.assertFails(addDoc(collection(como('pasajero1'), 'pedidosRestaurantes'), {
       restauranteId: 'r1', clienteId: 'otroCliente', tipo: 'domicilio', estado: 'nuevo', total: 30000,
     }));
+  });
+
+  // ── EL COMPROBANTE LO TIENE QUE FIRMAR EL OTRO (25-ago-2026) ─────────────
+  // La segunda puerta por la que se fabricaba el comprobante de una calificacion.
+  // La primera -el viaje- se cerro por la manana, y la segunda opinion volvio a
+  // reproducir el MISMO ataque por aqui, con aquel arreglo puesto: otra vez 15 de
+  // 15 estrellas de una y la media de la victima en 1.0.
+  it('EL ATAQUE · un pedido NO se puede crear contra alguien que no es un negocio', async () => {
+    const { collection, addDoc } = FS;
+    await RUT.assertFails(addDoc(collection(como('pasajero1'), 'pedidosRestaurantes'), {
+      restauranteId: 'conductor1', clienteId: 'pasajero1', estado: 'nuevo', total: 30000,
+    }), 'Asi se le colgaban estrellas de una a un CONDUCTOR, que ni siquiera es un negocio.');
+  });
+
+  // EL ATAQUE CONTRA UN RIVAL, que es el que se cuela si solo se mira el flujo:
+  // el restaurante de al lado SI existe, asi que el candado del exists() no lo
+  // para. Lo que lo para es que el pedido tenga que NACER 'nuevo'. Sin esta
+  // prueba, un mutante que borraba esa linea sobrevivia a las 382: el atacante se
+  // creaba el pedido YA entregado y lo calificaba de una.
+  it('EL ATAQUE · ni creando el pedido YA entregado contra un rival', async () => {
+    const { collection, addDoc } = FS;
+    await RUT.assertFails(addDoc(collection(como('pasajero1'), 'pedidosRestaurantes'), {
+      restauranteId: 'r1', clienteId: 'pasajero1', estado: 'entregado', total: 30000,
+    }), 'Nacer entregado es fabricarse el comprobante de una sola vez.');
+    await RUT.assertFails(addDoc(collection(como('pasajero1'), 'pedidosRestaurantes'), {
+      restauranteId: 'r1', clienteId: 'pasajero1', estado: 'cerrado', total: 30000,
+    }));
+    // Y tampoco a medio camino del flujo, que seria el paso previo.
+    await RUT.assertFails(addDoc(collection(como('pasajero1'), 'pedidosRestaurantes'), {
+      restauranteId: 'r1', clienteId: 'pasajero1', estado: 'confirmado', total: 30000,
+    }));
+  });
+
+  // LA CADENA ENTERA CONTRA UN RIVAL, de punta a punta.
+  it('LA CADENA · contra un rival tampoco: ni naciendo entregado, ni moviendolo', async () => {
+    const { doc, setDoc, updateDoc, addDoc, collection } = FS;
+    // 1 - no puede nacer entregado
+    await RUT.assertFails(addDoc(collection(como('pasajero1'), 'pedidosRestaurantes'), {
+      restauranteId: 'r1', clienteId: 'pasajero1', estado: 'entregado', total: 30000,
+    }));
+    // 2 - naciendo 'nuevo' (lo unico que puede), no lo puede mover
+    await entorno.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'pedidosRestaurantes/prival'), {
+        restauranteId: 'r1', clienteId: 'pasajero1', estado: 'nuevo', total: 30000,
+      });
+    });
+    await RUT.assertFails(updateDoc(doc(como('pasajero1'), 'pedidosRestaurantes/prival'), { estado: 'entregado' }));
+    // 3 - y sin comprobante, la estrella de una no entra
+    await RUT.assertFails(addDoc(collection(como('pasajero1'), 'calificaciones'), {
+      pedidoId: 'prival', calificadoId: 'r1', estrellas: 1,
+    }), 'Este es el ataque del informe: 15 de 15 y la media del rival en 1.0.');
+  });
+
+  it('EL ATAQUE · el cliente NO mueve su pedido por el flujo del restaurante', async () => {
+    const { doc, setDoc, updateDoc } = FS;
+    await entorno.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'pedidosRestaurantes/pmio'), {
+        restauranteId: 'r1', clienteId: 'pasajero1', estado: 'nuevo', total: 30000,
+      });
+    });
+    await RUT.assertFails(updateDoc(doc(como('pasajero1'), 'pedidosRestaurantes/pmio'), {
+      estado: 'entregado',
+    }), 'Marcarselo entregado uno mismo es fabricarse el comprobante para calificar.');
+    await RUT.assertFails(updateDoc(doc(como('pasajero1'), 'pedidosRestaurantes/pmio'), {
+      estado: 'cerrado',
+    }));
+    await RUT.assertFails(updateDoc(doc(como('pasajero1'), 'pedidosRestaurantes/pmio'), {
+      estado: 'confirmado',
+    }));
+  });
+
+  // LA CADENA ENTERA: sin poder fabricar el comprobante, la calificacion se cae.
+  it('LA CADENA · un pedido que el cliente no puede entregar no sirve para calificar', async () => {
+    const { doc, setDoc, updateDoc, addDoc, collection } = FS;
+    await entorno.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'pedidosRestaurantes/pfalso'), {
+        restauranteId: 'r1', clienteId: 'pasajero1', estado: 'nuevo', total: 30000,
+      });
+    });
+    // 1 - no lo puede marcar entregado
+    await RUT.assertFails(updateDoc(doc(como('pasajero1'), 'pedidosRestaurantes/pfalso'), { estado: 'entregado' }));
+    // 2 - y por eso la calificacion tampoco entra
+    await RUT.assertFails(addDoc(collection(como('pasajero1'), 'calificaciones'), {
+      pedidoId: 'pfalso', calificadoId: 'r1', estrellas: 1,
+    }), 'Un pedido en nuevo no es comprobante de nada.');
+  });
+
+  // Y LO QUE SI TIENE QUE SEGUIR PASANDO, que es todo lo que la app hace hoy.
+  it('el cliente SI puede cancelar su pedido (Restaurantes.js:370)', async () => {
+    const { doc, setDoc, updateDoc } = FS;
+    await entorno.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'pedidosRestaurantes/pcanc'), {
+        restauranteId: 'r1', clienteId: 'pasajero1', estado: 'nuevo', total: 30000,
+      });
+    });
+    await RUT.assertSucceeds(updateDoc(doc(como('pasajero1'), 'pedidosRestaurantes/pcanc'), {
+      estado: 'cancelado', canceladoPor: 'cliente',
+    }));
+  });
+
+  it('y SI puede escribir en el chat y marcar que califico, sin tocar el estado', async () => {
+    const { doc, setDoc, updateDoc, arrayUnion } = FS;
+    await entorno.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'pedidosRestaurantes/pchat'), {
+        restauranteId: 'r1', clienteId: 'pasajero1', estado: 'entregado', total: 30000,
+      });
+    });
+    // Restaurantes.js:404 - el chat
+    await RUT.assertSucceeds(updateDoc(doc(como('pasajero1'), 'pedidosRestaurantes/pchat'), {
+      mensajesPedido: arrayUnion({ de: 'cliente', texto: 'ya llego?', fecha: '2026-08-25T12:00:00.000Z' }),
+    }));
+    // Restaurantes.js:435 - la marca de calificado
+    await RUT.assertSucceeds(updateDoc(doc(como('pasajero1'), 'pedidosRestaurantes/pchat'), {
+      calificado: true, estrellas: 5,
+    }));
+  });
+
+  it('y EL RESTAURANTE sigue moviendo el pedido por su flujo (PedidosDomicilio.js:138)', async () => {
+    const { doc, setDoc, updateDoc } = FS;
+    await entorno.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'pedidosRestaurantes/pflujo'), {
+        restauranteId: 'r1', clienteId: 'pasajero1', estado: 'nuevo', total: 30000,
+      });
+    });
+    for (const e of ['confirmado', 'preparando', 'empacado', 'en_camino', 'entregado', 'cerrado']) {
+      await RUT.assertSucceeds(updateDoc(doc(como('r1'), 'pedidosRestaurantes/pflujo'), { estado: e }));
+    }
+  });
+
+  it('y el restaurante SI crea un pedido de mesa ya tomado (Mesero.js:295)', async () => {
+    const { collection, addDoc } = FS;
+    await RUT.assertSucceeds(addDoc(collection(como('r1'), 'pedidosRestaurantes'), {
+      restauranteId: 'r1', tipo: 'local', estado: 'tomado', mesa: 4, total: 45000,
+    }), 'Es su propio trabajo: el mesero toma la mesa y el pedido nace tomado.');
   });
 
   it('ni puede crear uno SIN firma para colarse en un restaurante ajeno', async () => {
