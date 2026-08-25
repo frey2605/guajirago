@@ -199,18 +199,141 @@ service cloud.firestore {
       // del que cuelgan el chat, la llamada, el código de seguridad y el cobro.
       // Se compara el valor, no las claves, así que reenviarlo igual no molesta.
       //
-      // LO QUE ESTO NO CIERRA, dicho sin adornos: mientras el viaje está EN EL
-      // MERCADO, un conductor cualquiera puede escribirle `conductorId`. Hace
-      // falta para el flujo de arriba y no le sirve de nada a un impostor: la
-      // llamada solo existe DESPUÉS de aceptar, y en ese momento el viaje ya no
-      // está en el mercado. Cerrar también esa ventana pide separar qué campos
-      // puede tocar un conductor que solo está ofertando — trabajo aparte.
-      allow create: if request.auth != null
-        && request.resource.data.get('pasajeroId', '') == request.auth.uid;
+      // LO QUE ESTO NO CERRABA —y se cerró el mismo día, aquí abajo—: este
+      // bloque dejaba que cualquiera escribiera `conductorId`. Se escribió que
+      // «no le sirve de nada a un impostor» porque se pensó solo en la llamada,
+      // que en efecto ya no existe cuando el viaje está en el mercado. Pero sí
+      // servía, y para otra cosa: para fabricarse un viaje con la víctima de
+      // conductor y colgarle las calificaciones. Es la lección de siempre —
+      // «no le sirve de nada» es una frase sobre el ataque que UNO imaginó.
 
+      // ── REGLA 10 · EL CONDUCTOR NO SE LO PONE EL PASAJERO (25-ago-2026) ──
+      //
+      // Cierra UNA de las tres puertas por las que se fabrica el comprobante de
+      // una calificación. Hasta hoy cualquiera se creaba un viaje con la VÍCTIMA
+      // de conductor y le colgaba las estrellas que quisiera: la regla de
+      // `calificaciones` pregunta «¿ibas en ese viaje?», y el viaje se lo
+      // fabricaba el propio atacante. Medido ejecutándolo: 15 de 15 de una
+      // estrella coladas, y la media pública de la víctima en 1.0.
+      //
+      // ⚠ LAS OTRAS DOS SIGUEN ABIERTAS AL 25-ago-2026, y se dice aquí porque una
+      // versión anterior de este comentario se apuntaba el cierre entero. La
+      // segunda opinión volvió a reproducir el MISMO ataque CON ESTE ARREGLO
+      // PUESTO, y volvió a dar 15 de 15 y media 1.0:
+      //   · EL PEDIDO. `pedidosRestaurantes` deja crear con solo `clienteId == mi
+      //     uid`; `restauranteId` va libre y nadie comprueba que sea un negocio de
+      //     verdad. Se fabrica un pedido con el uid de la víctima de «restaurante»
+      //     y `calificaSuPedido()` lo da por bueno. Llega a la MISMA media, porque
+      //     `MiPerfil.js:40` suma por `calificadoId` sin mirar de dónde salió.
+      //   · CINCO ESTRELLAS A SÍ MISMO. Se crea un viaje, se deja a sí mismo una
+      //     contraoferta (el id del documento ES su uid, así que la REGLA 2 lo
+      //     permite) y llama a `confirmarConductor`, que cumple sus tres controles
+      //     y le escribe el conductor. 3 de 3, y en bucle, porque al finalizar
+      //     `onViajeCerrado` lo suelta y la comisión baja sin suelo.
+      // Las dos son el trabajo siguiente: EL COMPROBANTE LO TIENE QUE FIRMAR EL
+      // OTRO. No se hacen aquí porque están fuera de lo declarado en la foto.
+      //
+      // Es la TERCERA vez que muerde el mismo patrón en dos días —las llamadas, el
+      // canje de códigos y esto—, y ya está escrito arriba: una regla que le
+      // pregunta a otro documento no vale más que las reglas de ESE documento.
+      // Aquí es donde se para.
+      //
+      // QUIÉN PONE UN CONDUCTOR DE VERDAD: la función `confirmarConductor`
+      // (functions/index.js), que corre en el servidor con el SDK de administrador
+      // y NO pasa por estas reglas. Por eso cerrar esto por aquí no rompe el taxi
+      // —comprobado ejecutando el ciclo entero— pero TAMPOCO basta: esa función
+      // hace lo que le pidan si le cumplen sus tres controles. Es la puerta, no el
+      // guardia. Ver arriba.
+      //
+      // MEDIDO ANTES DE TOCAR (25-ago-2026), buscando en las tres apps:
+      //   · un viaje NACE sin conductor — `guajirago/src/viajeNuevo.js` no escribe
+      //     ese campo. Por eso el create puede prohibirlo sin coste.
+      //   · lo ÚNICO que las apps escriben en ese campo es `conductorId: null`,
+      //     para SOLTAR un viaje: AppConductor.js:619 (el conductor suelta los que
+      //     no ganó), y Solicitar.js:966 / SolicitarMensajeria.js:980, que NO son
+      //     cancelar —eso es Solicitar.js:771 y no toca este campo— sino
+      //     `rechazarConfirmacion`: la pasajera dice que no a la tarjeta del
+      //     conductor y el viaje vuelve al mercado. Por eso el update deja dejarlo
+      //     sin conductor, y nada más.
+      //   · y el PANEL pierde algo que hoy puede hacer, aunque no lo use: hasta
+      //     ahora podía ponerle o cambiarle el conductor a un viaje. Se comprobó
+      //     que `guajirago-admin` no escribe NADA en `viajes` —sus 6 usos son
+      //     `getDocs`— y que `guajirago-aliados` no la toca. Se dice aquí para que
+      //     el día que el panel necesite mover un conductor, se sepa por qué no
+      //     puede y se haga por el sitio bueno: la función del servidor.
+      //   · el panel NO escribe conductorId en ningún viaje.
+      //
+      // NO SE USA UN CENTINELA, y esto costó una segunda opinión entera. La
+      // primera versión comparaba `.get('conductorId', 'ninguno')` a los dos
+      // lados. Parecía elegante y era una puerta: 'ninguno' es un texto que se
+      // PUEDE ESCRIBIR, así que a un viaje del mercado —que no tiene el campo—
+      // cualquiera le escribía `conductorId: 'ninguno'` y los dos lados daban
+      // 'ninguno', o sea IGUAL, o sea permitido. Y no era inocuo: 'ninguno' es
+      // verdadero en JavaScript, así que `Solicitar.js:588` le sacaba a la
+      // pasajera la tarjeta de confirmación CON EL NOMBRE Y EL TELÉFONO que el
+      // impostor quisiera. Un mutante que cambiaba 'ninguno' por '' sobrevivió a
+      // las 357 pruebas: nadie miraba qué pasa si alguien ESCRIBE el centinela.
+      //
+      // TAMPOCO se pregunta por las CLAVES, y ésta es la tercera versión: la
+      // segunda preguntaba `keys().hasAny(['conductorId'])` y tenía su propia
+      // puerta. `deleteField()` BORRA el campo, así que desaparece de `keys()` y
+      // la rama de «no mandas el campo» lo daba por bueno: cualquiera le borraba
+      // el conductor a un viaje ajeno. Lo midió la segunda opinión careando las
+      // tres versiones — y con retintín, porque `pasajeroId`, dos renglones más
+      // abajo, ya usaba el patrón bueno.
+      //
+      // ASÍ QUE SE COMPARA CON `null` DE DEFECTO, y con eso «el campo no está» y
+      // «el campo vale null» pasan a ser LA MISMA COSA — que es lo que son de
+      // verdad: las dos dicen que este viaje no tiene conductor, y las dos lo
+      // sueltan igual (`onViajeCerrado` hace `if (!cid) return`, y el
+      // `where('conductorId','==',uid)` lo pierde igual). Con eso no queda ninguna
+      // rama que pueda dar ERROR: esto ya no se apoya en «un error niega», frase
+      // que salió falsa una vez en este mismo archivo, en el bloque de los
+      // códigos, donde un `||` se tragaba el error y lo daba por bueno.
+      //
+      // Y SOLTAR UN VIAJE ES COSA DE LOS DOS QUE VAN EN ÉL — `esMio()`. Esto es lo
+      // último que faltaba, y hacía falta: `confirmando` está DENTRO del mercado
+      // (ver `enElMercado()` arriba), así que sin este candado un conductor
+      // cualquiera —o cualquiera con cuenta— le quitaba el conductor a un viaje
+      // ajeno que estaba esperando a que la pasajera dijera que sí, y echaba al
+      // conductor DE VERDAD. Es el MISMO ataque de las llamadas, por la otra cara:
+      // allí se metía uno, aquí se saca al otro.
+      //
+      // Y no cuesta nada, porque MEDIDO: los tres sitios que sueltan un viaje son
+      // siempre de uno de los dos. `limpiarViajesOtrosConductor`
+      // (AppConductor.js:612) busca con `where('conductorId','==',miId)` — o sea
+      // SOLO viajes donde él ya es el conductor. Y `rechazarConfirmacion`
+      // (Solicitar.js:960, SolicitarMensajeria.js:974) lo hace la pasajera sobre su
+      // propio viaje. Ninguno necesita soltar un viaje ajeno.
+      //
+      // Quedan tres casos y ya está:
+      //   · lo dejas igual que está → pasa. Incluye no mandarlo.
+      //   · lo dejas SIN conductor y el viaje es TUYO → pasa, con null o
+      //     borrándolo. Es soltar el viaje.
+      //   · cualquier otra cosa → se niega. Ponerle uno a un viaje que no lo
+      //     tiene, cambiárselo al que lo tiene, colar un texto cualquiera, o
+      //     quitárselo a un viaje que no es tuyo.
+      function conductorIntacto() {
+        return request.resource.data.get('conductorId', null) ==
+                 resource.data.get('conductorId', null)
+          || (request.resource.data.get('conductorId', null) == null && esMio());
+      }
+
+      allow create: if request.auth != null
+        && request.resource.data.get('pasajeroId', '') == request.auth.uid
+        && !request.resource.data.keys().hasAny(['conductorId']);
+
+      // El `esAdmin()` va DONDE ESTABA, dentro del `&&`, y no delante con un `||`.
+      // Sacarlo delante —como se hizo en el primer intento— le quitaba al panel el
+      // congelado de `pasajeroId`: el panel podía cambiarle el DUEÑO a un viaje,
+      // que es justo lo que el comentario de arriba jura que no pasa nunca. Lo cazó
+      // la segunda opinión careando las dos versiones. Y de paso le cobraba una
+      // lectura de más a TODO el mundo en CADA escritura del viaje, porque
+      // `esAdmin()` hace un `get()` y al ir primero ya no se lo salta nadie.
       allow update: if request.auth != null
         && (esMio() || enElMercado() || esAdmin())
-        && request.resource.data.get('pasajeroId', '') == resource.data.get('pasajeroId', '');
+        && request.resource.data.get('pasajeroId', '') == resource.data.get('pasajeroId', '')
+        && conductorIntacto();
 
       allow delete: if false;
       // ── REGLAS 5 y 11 · EL CAJON PRIVADO DEL VIAJE ─────────────────────────
