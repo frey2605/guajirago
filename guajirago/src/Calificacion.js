@@ -1,6 +1,9 @@
 import React, { useState } from 'react';
 import { db } from './firebase';
 import { doc, updateDoc, addDoc, collection } from 'firebase/firestore';
+// REGLA 9 — el motivo del rechazo sale de UN solo archivo, compartido con
+// Restaurantes.js. Si se escribiera aqui, en un mes dirian cosas distintas.
+import { motivoDeRechazo, apuntarRechazo } from './avisoCalificacion';
 
 const OPCIONES_PASAJERO = [
   { texto: 'Llegó rápido', buena: true },
@@ -30,6 +33,7 @@ function Calificacion({ tipo, viajeId, nombreCalificado, calificadoId, quienCali
   const [comentario, setComentario] = useState('');
   const [enviando, setEnviando] = useState(false);
   const [opcionesSeleccionadas, setOpcionesSeleccionadas] = useState([]);
+  const [aviso, setAviso] = useState(null);
 
   const opciones = quienCalifica === 'pasajero' ? OPCIONES_PASAJERO : OPCIONES_CONDUCTOR;
 
@@ -42,6 +46,12 @@ function Calificacion({ tipo, viajeId, nombreCalificado, calificadoId, quienCali
   const enviar = async () => {
     if (estrellas === 0 || enviando) return;
     setEnviando(true);
+    // Son DOS escrituras y la que cuenta es la PRIMERA: si el addDoc entra y el
+    // updateDoc del viaje falla, la calificación YA ESTÁ GUARDADA. Sin esto se
+    // le decía «no pudimos guardarla» a quien sí había calificado, y se le
+    // invitaba a reintentar — y las reglas no impiden una segunda calificación
+    // del mismo viaje, así que el mismo voto contaría dos veces en la media.
+    let guardada = false;
     try {
       // Guardar calificación en Firestore
       await addDoc(collection(db, 'calificaciones'), {
@@ -54,12 +64,31 @@ function Calificacion({ tipo, viajeId, nombreCalificado, calificadoId, quienCali
         comentario,
         fecha: new Date().toISOString(),
       });
+      guardada = true;
       // Marcar en el viaje que ya calificó
       if (viajeId) {
         const campo = quienCalifica === 'pasajero' ? 'calificadoPorPasajero' : 'calificadoPorConductor';
         await updateDoc(doc(db, 'viajes', viajeId), { [campo]: true, [`estrellas_${quienCalifica}`]: estrellas });
       }
-    } catch (e) {}
+    } catch (e) {
+      // REGLA 9 del dueño — «nada se rechaza en silencio». Esto era `catch (e) {}`
+      // Y ADEMAS se llamaba a onFinalizar() pasara lo que pasara: la pantalla se
+      // cerraba igual y el pasajero se iba creyendo que habia calificado. De los
+      // 16 viajes terminados que hay en el servidor, CERO estan calificados por
+      // ninguno de los dos lados — y con este catch no habia forma de saber si
+      // era porque nadie quiso o porque nunca entro ninguna.
+      //
+      // Ahora: se apunta, se le dice, y NO se cierra. Puede reintentar, o salir
+      // por «Omitir», que sigue donde estaba.
+      apuntarRechazo('Calificacion.js (viaje ' + (viajeId || 'sin id') + ')', e);
+      // Si entró, lo que falló fue la marca del viaje: se sigue como si nada,
+      // que es la verdad. Avisar aquí sería mentir e invitar a calificar otra vez.
+      if (!guardada) {
+        setAviso(motivoDeRechazo(e));
+        setEnviando(false);
+        return;
+      }
+    }
     onFinalizar();
   };
 
@@ -108,6 +137,20 @@ function Calificacion({ tipo, viajeId, nombreCalificado, calificadoId, quienCali
         {enviando ? 'Enviando...' : estrellas > 0 ? 'Enviar calificación' : 'Selecciona una estrella'}
       </button>
       <button onClick={onFinalizar} style={{ background: 'none', border: 'none', color: '#6B7280', fontSize: '13px', cursor: 'pointer', marginTop: '16px' }}>Omitir</button>
+
+      {/* Ventanita: la calificacion no entro. Misma forma que las de Restaurantes.js
+          a proposito — el dueño quiere que TODO aviso sea una ventanita, y que se
+          parezcan entre si. */}
+      {aviso && (
+        <div onClick={() => setAviso(null)} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', zIndex: 10000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ background: '#FFFFFF', borderRadius: '20px', padding: '28px 24px', width: '100%', maxWidth: '340px', textAlign: 'center' }}>
+            <div style={{ fontSize: '46px', marginBottom: '8px' }}>⭐</div>
+            <p style={{ color: '#1A1A1E', fontSize: '17px', fontWeight: '900', margin: '0 0 8px' }}>{aviso.titulo}</p>
+            <p style={{ color: '#6B7280', fontSize: '14px', margin: '0 0 20px' }}>{aviso.texto}</p>
+            <button onClick={() => setAviso(null)} style={{ width: '100%', padding: '14px', background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F)', border: 'none', borderRadius: '12px', color: '#FFF', fontSize: '15px', fontWeight: '900', cursor: 'pointer' }}>Entendido</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

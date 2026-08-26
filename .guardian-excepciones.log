@@ -85,3 +85,28 @@ DESVIACION DE LA FOTO, tambien anotada: la foto dijo "pruebas/reglas.test.js:REG
 y 10", pero cuatro de las pruebas nuevas cayeron en el describe de la REGLA 9 (los
 pedidos), que es donde vive el camino del pedido, y ninguna en el de la REGLA 2. Los
 nombres de los describe no siguen la numeracion de las reglas del informe.
+
+── 26-ago-2026 · REGLA 9, nada se rechaza en silencio ──────────────────────────
+FOTO: "Nada se rechaza en silencio: una calificacion que no entra se le dice al
+       cliente, con su motivo"
+SITIO DECLARADO:  guajirago/src/Restaurantes.js:enviarCalificacion
+SITIO REALMENTE TOCADO TAMBIEN:  el JSX de la pantalla 'seguimiento' del mismo
+       archivo (la ventanita que enseña el aviso).
+
+POR QUE: avisar desde una funcion exige DOS mitades — la funcion que decide, y el
+trozo de pantalla que lo pinta. La segunda no cabe dentro de la primera. Se
+declaro solo la funcion, y eso fue un error de la declaracion, no del arreglo.
+
+LO QUE COSTO, y por eso queda escrito: en la PRIMERA version la ventanita cayo en
+la pantalla del MENU, y el boton de calificar vive en la de SEGUIMIENTO. Son
+excluyentes: el aviso NO SE VEIA NUNCA. El guardian dijo "cuadra" porque compara
+ARCHIVOS, no SITIOS — el archivo era el declarado. Lo cazo la segunda opinion
+usando el mismo Babel que compila la app. Ya hay una prueba que lo caza sola
+("la ventanita se pinta en la MISMA pantalla donde esta el boton").
+
+LECCION PARA LA PROXIMA FOTO: cuando el arreglo tenga que ENSEÑAR algo, se
+declaran los dos sitios — la funcion Y la pantalla donde se pinta.
+
+Y UN DEFECTO DEL GUARDIAN QUE ESTO CONFIRMA (ya anotado, sin arreglar): compara
+archivos y no sitios, asi que un cambio dentro del archivo correcto pero en el
+sitio equivocado le pasa por delante sin que se entere.

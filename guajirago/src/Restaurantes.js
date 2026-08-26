@@ -4,6 +4,9 @@ import { auth, db, storage } from './firebase';
 import { cop } from './moneda';
 // Y el filtro anti-datos de los chats, en filtroChat.js — amarrado al panel.
 import { contieneInfoSensible } from './filtroChat';
+// REGLA 9 — qué se le dice al cliente cuando una calificación no entra. Sale de
+// un solo archivo, el mismo que usa Calificacion.js.
+import { motivoDeRechazo, apuntarRechazo } from './avisoCalificacion';
 import {
   collection,
   onSnapshot,
@@ -85,6 +88,10 @@ function Restaurantes({ nombre, onVolver, foto, onCerrarSesion, onIrPerfil, onIr
   const [avisoPago, setAvisoPago] = useState('');
   const [ubicando, setUbicando] = useState(false);
   const [avisoUbic, setAvisoUbic] = useState('');
+  const [avisoCalif, setAvisoCalif] = useState(null);
+  // Que la calificación YA ENTRÓ, aunque la marca del pedido no llegara a
+  // escribirse. Ver el porqué en enviarCalificacion.
+  const [califEntro, setCalifEntro] = useState(false);
   const [cancelando, setCancelando] = useState(false);
   const [pidiendoMotivoCancel, setPidiendoMotivoCancel] = useState(false);
   const [motivoCancelCliente, setMotivoCancelCliente] = useState('');
@@ -421,6 +428,15 @@ function Restaurantes({ nombre, onVolver, foto, onCerrarSesion, onIrPerfil, onIr
   const enviarCalificacion = async () => {
     if (estrellasCal === 0 || enviandoCal || !pedidoActivo) return;
     setEnviandoCal(true);
+    // Son DOS escrituras seguidas, y la que cuenta es la PRIMERA: si el addDoc
+    // entra y el updateDoc falla, la calificación YA ESTÁ GUARDADA. Sin esta
+    // bandera se le decía «no pudimos guardarla» a alguien cuya calificación sí
+    // entró, y —peor— se le invitaba a reintentar: las reglas NO impiden una
+    // segunda calificación del mismo pedido (firestore.rules, el allow create de
+    // `calificaciones`, no mira `calificado` por ningún lado), así que cada
+    // reintento metía OTRO voto en la media. Esa puerta la abrió este mismo
+    // arreglo al dejar reintentar, y la cazó la segunda opinión.
+    let guardada = false;
     try {
       await addDoc(collection(db, 'calificaciones'), {
         pedidoId: pedidoActivo.id,
@@ -432,10 +448,25 @@ function Restaurantes({ nombre, onVolver, foto, onCerrarSesion, onIrPerfil, onIr
         comentario: comentarioCal.trim(),
         fecha: new Date().toISOString(),
       });
+      guardada = true;
       await updateDoc(doc(db, 'pedidosRestaurantes', pedidoActivo.id), { calificado: true, estrellas: estrellasCal });
       setEstrellasCal(0);
       setComentarioCal('');
-    } catch (e) {}
+    } catch (e) {
+      // REGLA 9 del dueño — «nada se rechaza en silencio». Esto era `catch (e) {}`:
+      // el cliente tocaba «enviar», las estrellas se quedaban puestas y no pasaba
+      // nada. Parecía un botón roto, y no había forma de saber por qué.
+      apuntarRechazo('Restaurantes.js (pedido ' + pedidoActivo.id + ')', e);
+      if (guardada) {
+        // La calificación entró; lo que falló fue la marca del pedido. Se cierra
+        // el formulario para que no se pueda mandar otra, y NO se le miente.
+        setCalifEntro(true);
+        setEstrellasCal(0);
+        setComentarioCal('');
+      } else {
+        setAvisoCalif(motivoDeRechazo(e));
+      }
+    }
     setEnviandoCal(false);
   };
 
@@ -581,7 +612,7 @@ function Restaurantes({ nombre, onVolver, foto, onCerrarSesion, onIrPerfil, onIr
           {/* Calificar el pedido (cuando ya fue entregado) */}
           {['entregado', 'cerrado'].includes(pedidoActivo.estado) && (
             <div style={{ background: 'linear-gradient(135deg, #FFFFFF, #ECECEF)', borderRadius: '16px', padding: '18px', marginBottom: '20px', border: '1px solid #ECECEF', textAlign: 'center' }}>
-              {pedidoActivo.calificado ? (
+              {(pedidoActivo.calificado || califEntro) ? (
                 <p style={{ color: '#2ECC71', fontWeight: '900', fontSize: '14px', margin: 0 }}>⭐ ¡Gracias por calificar!</p>
               ) : (
                 <>
@@ -668,6 +699,23 @@ function Restaurantes({ nombre, onVolver, foto, onCerrarSesion, onIrPerfil, onIr
               <input value={motivoCancelCliente} onChange={(e) => setMotivoCancelCliente(e.target.value)} placeholder="Otro motivo… (escríbelo)" style={{ width: '100%', boxSizing: 'border-box', padding: '12px', border: '1px solid #ECECEF', borderRadius: '12px', fontSize: '14px', outline: 'none', marginBottom: '16px' }} />
               <button onClick={guardarMotivoCancel} style={{ width: '100%', padding: '14px', background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F)', border: 'none', borderRadius: '12px', color: '#FFF', fontSize: '15px', fontWeight: '900', cursor: 'pointer' }}>Enviar</button>
               <p onClick={() => setPidiendoMotivoCancel(false)} style={{ color: '#999', fontSize: '13px', cursor: 'pointer', margin: '12px 0 0' }}>Omitir</p>
+            </div>
+          </div>
+        )}
+        {/* Ventanita: la calificación no entró (REGLA 9).
+            VA EN ESTA PANTALLA Y NO EN OTRA: el botón de calificar vive aquí, en
+            «seguimiento». La primera versión la puso en la pantalla del MENÚ —se
+            copió el sitio de las otras tres ventanitas sin mirar desde dónde se
+            disparan— y las dos pantallas son excluyentes: el aviso no se veía
+            NUNCA. Lo cazó la segunda opinión con el mismo Babel que compila la
+            app. El guardián no podía verlo: compara ARCHIVOS, no sitios. */}
+        {avisoCalif && (
+          <div onClick={() => setAvisoCalif(null)} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', zIndex: 10000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+            <div onClick={(e) => e.stopPropagation()} style={{ background: '#FFFFFF', borderRadius: '20px', padding: '28px 24px', width: '100%', maxWidth: '340px', textAlign: 'center' }}>
+              <div style={{ fontSize: '46px', marginBottom: '8px' }}>⭐</div>
+              <p style={{ color: '#1A1A1E', fontSize: '17px', fontWeight: '900', margin: '0 0 8px' }}>{avisoCalif.titulo}</p>
+              <p style={{ color: '#6B7280', fontSize: '14px', margin: '0 0 20px' }}>{avisoCalif.texto}</p>
+              <button onClick={() => setAvisoCalif(null)} style={{ width: '100%', padding: '14px', background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F)', border: 'none', borderRadius: '12px', color: '#FFF', fontSize: '15px', fontWeight: '900', cursor: 'pointer' }}>Entendido</button>
             </div>
           </div>
         )}
