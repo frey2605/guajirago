@@ -845,3 +845,170 @@ describe('AMARRES · REGLA 9 · las tres apps clasifican IGUAL un rechazo', () =
       'el aviso no dice qué se estaba intentando: «' + m.titulo + ' / ' + m.texto + '»');
   });
 });
+
+describe('AMARRES · REGLA 9 · la bandeja de rechazos', () => {
+  it('los DOS guardarRechazo.js (app y aliados) son el mismo archivo, byte a byte', () => {
+    // Son la misma pieza copiada porque los repos no pueden compartir archivo. Si
+    // se separan, una app apunta en la bandeja con un formato y la otra con otro,
+    // y el candado anti-vertedero deja de valer en una de las dos.
+    const app = leer('guajirago/src/guardarRechazo.js');
+    const aliados = leer('guajirago-aliados/src/guardarRechazo.js');
+    assert.strictEqual(app, aliados,
+      'guardarRechazo.js se separó entre la app del pasajero y aliados. Son gemelos: ' +
+      'se tocan los dos o ninguno.');
+  });
+
+  it('la etiqueta de la clase dice lo mismo en la app que en aliados', () => {
+    // La app del pasajero guarda `motivo.clave` y aliados también. Si una dijera
+    // 'sinRed' y la otra 'sin_red', la bandeja del panel pintaría la mitad de los
+    // rechazos como «no sabemos por qué» sin que nada fallara a la vista.
+    const app = cargarDeLaApp('guajirago/src/avisoCalificacion.js');
+    const aliados = cargarDeLaApp('guajirago-aliados/src/avisoRechazo.js');
+
+    // En la app, la etiqueta de cada motivo tiene que ser SU PROPIO nombre: si no,
+    // el que lee MOTIVOS.permiso se llevaría una etiqueta que dice otra cosa.
+    for (const k of Object.keys(app.MOTIVOS)) {
+      assert.strictEqual(app.MOTIVOS[k].clave, k,
+        'el motivo «' + k + '» de la app lleva la etiqueta «' + app.MOTIVOS[k].clave + '»');
+    }
+    // Y las tres etiquetas son exactamente las que aliados declara.
+    assert.deepStrictEqual(Object.keys(app.MOTIVOS).sort(), [...aliados.CLAVES].sort(),
+      'la app y aliados no manejan las mismas clases de fallo');
+  });
+
+  it('la etiqueta que se guarda es la MISMA que la del aviso que ve la persona', () => {
+    // Sin esto, el usuario podría ver «sin conexión» en su ventanita y la bandeja
+    // apuntar «el servidor dijo que no» del mismo suceso. Dos versiones del mismo
+    // hecho, y la del dueño sería la falsa.
+    const app = cargarDeLaApp('guajirago/src/avisoCalificacion.js');
+    const aliados = cargarDeLaApp('guajirago-aliados/src/avisoRechazo.js');
+    for (const code of ['permission-denied', 'unavailable', 'deadline-exceeded', 'vete-a-saber']) {
+      assert.strictEqual(
+        app.motivoDeRechazo({ code }).clave,
+        aliados.motivoDeRechazo({ code }, 'hacer algo').clave,
+        'con «' + code + '» la app apunta una clase y aliados otra');
+    }
+  });
+
+  it('la bandeja del panel entiende las MISMAS clases que las apps escriben', () => {
+    // El panel traduce la clase a cristiano con una lista suya. Si una app
+    // escribiera una clase que esa lista no conoce, el rechazo se pintaría como
+    // «no sabemos por qué» — y sí que se sabe.
+    const aliados = cargarDeLaApp('guajirago-aliados/src/avisoRechazo.js');
+    const pantalla = leer('guajirago-admin/src/Rechazos.js');
+    for (const clave of aliados.CLAVES) {
+      assert.ok(new RegExp('\\b' + clave + ':').test(pantalla),
+        'la bandeja del panel no sabe pintar la clase «' + clave + '»');
+    }
+  });
+});
+
+describe('AMARRES · REGLA 9 · la bandeja: la lista de sitios y el modo de escribir', () => {
+  // LA CUARTA COPIA, que era la que nadie vigilaba. La lista de sitios está en
+  // TRES sitios —las reglas, guardarRechazo.js y la tabla del panel— y hasta que
+  // se escribió esto, cambiar uno y olvidar los otros no lo cazaba nada: el
+  // rechazo se negaba en el servidor, o el panel lo pintaba sin traducir.
+  const G = (() => {
+    const fuente = leer('guajirago/src/guardarRechazo.js').replace(/^import[^;]+;$/gm, '');
+    const nombres = [...fuente.matchAll(/^export\s+(?:const|function|async function)\s+([A-Za-z0-9_]+)/gm)]
+      .map((m) => m[1]);
+    // eslint-disable-next-line no-new-func
+    return new Function(fuente.replace(/^export\s+/gm, '') + '\nreturn { ' + nombres.join(', ') + ' };')();
+  })();
+
+  it('los TRES lados conocen exactamente los mismos sitios', () => {
+    // 1 · lo que escriben las apps
+    const enLaApp = [...G.SITIOS].sort();
+
+    // 2 · lo que aceptan las reglas
+    const reglas = leer('firestore.rules');
+    const trozo = reglas.match(/function sitios\(\)\s*\{\s*return \[([\s\S]*?)\];/);
+    assert.ok(trozo, 'las reglas ya no tienen la lista de sitios');
+    const enLasReglas = [...trozo[1].matchAll(/'([^']+)'/g)].map((m) => m[1]).sort();
+
+    // 3 · lo que el panel sabe traducir
+    const pantalla = leer('guajirago-admin/src/Rechazos.js');
+    const tabla = pantalla.match(/const DONDE_EN_CRISTIANO = \{([\s\S]*?)\};/);
+    assert.ok(tabla, 'el panel ya no tiene la tabla de sitios');
+    const enElPanel = [...tabla[1].matchAll(/'([^']+)':/g)].map((m) => m[1]).sort();
+
+    assert.deepStrictEqual(enLasReglas, enLaApp,
+      'las reglas y la app no conocen los mismos sitios: los rechazos de los que sobren '
+      + 'se van a NEGAR en el servidor, en silencio');
+    assert.deepStrictEqual(enElPanel, enLaApp,
+      'el panel no sabe traducir los mismos sitios que escriben las apps: los que falten '
+      + 'se van a pintar con el nombre técnico');
+  });
+
+  it('los sitios que se pasan en las pantallas están en la lista', () => {
+    // Si una pantalla pasa un sitio que no está en la lista, las reglas niegan el
+    // apunte y NADIE se entera: guardarRechazo se traga el fallo a propósito.
+    const PANTALLAS = [
+      'guajirago/src/Calificacion.js',
+      'guajirago/src/Restaurantes.js',
+      'guajirago-aliados/src/CalificacionesRestaurante.js',
+    ];
+    let encontrados = 0;
+    for (const p of PANTALLAS) {
+      for (const m of leer(p).matchAll(/guardarRechazo\('[^']+',\s*'([^']+)'/g)) {
+        assert.ok(G.SITIOS.includes(m[1]),
+          p + ' apunta en el sitio «' + m[1] + '», que no está en la lista: el servidor '
+          + 'lo va a negar y nadie se va a enterar');
+        encontrados += 1;
+      }
+    }
+    assert.strictEqual(encontrados, 4, 'esperaba 4 sitios que apuntan y encontré ' + encontrados);
+  });
+
+  it('EL QUE MUERDE · el apunte se escribe como las reglas exigen', () => {
+    // Estos cuatro renglones son los que hacen que la bandeja FUNCIONE en
+    // producción, y ninguno tenía prueba: la segunda opinión rompió los cuatro y
+    // las 65 pruebas siguieron verdes. Cada uno deja la bandeja sin apuntar nada,
+    // o apuntando mentiras, sin que nada falle a la vista.
+    const t = leer('guajirago/src/guardarRechazo.js');
+    assert.ok(/veces:\s*increment\(1\)/.test(t),
+      'el contador no sube de UNO en uno: las reglas niegan el apunte y no entra nada');
+    assert.ok(/ultima:\s*serverTimestamp\(\)/.test(t),
+      'la hora no la pone el SERVIDOR: dependería del reloj del teléfono');
+    assert.ok(/\{\s*merge:\s*true\s*\}/.test(t),
+      'sin merge cada apunte pisa el anterior y el contador se pierde');
+    assert.ok(/quienUid:\s*usuario\.uid/.test(t),
+      'la firma no es la del que escribe: las reglas van a negar TODOS los apuntes');
+  });
+
+  it('EL QUE MUERDE · la pantalla de la bandeja está enchufada al panel', () => {
+    // Es la clase de bicho que ya mordió una vez: una pantalla que existe y no se
+    // ve. Aquí serían dos formas — sin el botón del menú no se llega, y sin el
+    // renglón del render se llega a una pantalla en blanco.
+    const s = leer('guajirago-admin/src/Superadmin.js');
+    assert.ok(/import Rechazos from '\.\/Rechazos'/.test(s), 'el panel no importa la pantalla');
+    assert.ok(/id: 'rechazos'/.test(s), 'la bandeja no tiene botón en el menú: no se llega');
+    assert.ok(/seccion === 'rechazos'\) return <Rechazos \/>/.test(s),
+      'el botón está pero no pinta nada');
+  });
+
+  it('EL QUE MUERDE · la bandeja lee SU colección, entera y por lo más nuevo', () => {
+    const t = leer('guajirago-admin/src/Rechazos.js');
+    assert.ok(/collection\(db, 'rechazos'\)/.test(t), 'la pantalla está leyendo otra colección');
+    assert.ok(/orderBy\('ultima', 'desc'\)/.test(t),
+      'no ordena por lo más nuevo: el dueño vería primero lo viejo');
+    const tope = t.match(/limit\((\d+)\)/);
+    assert.ok(tope && Number(tope[1]) >= 100,
+      'el tope de la consulta es demasiado bajo: el dueño solo vería una parte');
+  });
+
+  it('la pantalla NO consulta las tablas por índice directo', () => {
+    // Con `tabla[texto]` y texto = '__proto__', React revienta la pantalla entera
+    // — y como aquí no se borra nada, se quedaría rota para siempre. Lo midió la
+    // segunda opinión pintando el componente de verdad. Las reglas ya no dejan
+    // escribir ese sitio; esto es el segundo cerrojo.
+    const t = leer('guajirago-admin/src/Rechazos.js');
+    for (const tabla of ['DONDE_EN_CRISTIANO', 'EN_CRISTIANO', 'APP_EN_CRISTIANO']) {
+      assert.ok(!new RegExp(tabla + '\\[').test(t),
+        'la pantalla consulta ' + tabla + ' por índice directo: un sitio llamado '
+        + '«__proto__» la revienta para siempre');
+    }
+    assert.ok(/hasOwnProperty\.call/.test(t), 'no está el traductor seguro');
+    assert.ok(/new Map\(\)/.test(t), 'el ranking sigue con un objeto en vez de un Map');
+  });
+});

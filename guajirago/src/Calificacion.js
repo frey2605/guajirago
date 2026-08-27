@@ -4,6 +4,8 @@ import { doc, updateDoc, addDoc, collection } from 'firebase/firestore';
 // REGLA 9 — el motivo del rechazo sale de UN solo archivo, compartido con
 // Restaurantes.js. Si se escribiera aqui, en un mes dirian cosas distintas.
 import { motivoDeRechazo, apuntarRechazo } from './avisoCalificacion';
+// Y la BANDEJA: la otra mitad de la REGLA 9, la que ve el dueño en el panel.
+import { guardarRechazo } from './guardarRechazo';
 
 const OPCIONES_PASAJERO = [
   { texto: 'Llegó rápido', buena: true },
@@ -84,7 +86,11 @@ function Calificacion({ tipo, viajeId, nombreCalificado, calificadoId, quienCali
       // Si entró, lo que falló fue la marca del viaje: se sigue como si nada,
       // que es la verdad. Avisar aquí sería mentir e invitar a calificar otra vez.
       if (!guardada) {
-        setAviso(motivoDeRechazo(e));
+        const motivo = motivoDeRechazo(e);
+        setAviso(motivo);
+        // A la bandeja. Va sin await a propósito: el pasajero ya tiene su
+        // ventanita y no se le hace esperar por un apunte que es para el dueño.
+        guardarRechazo('pasajero', 'calificar-viaje', motivo.clave, e);
         setEnviando(false);
         return;
       }

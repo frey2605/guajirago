@@ -211,7 +211,7 @@ describe('REGLA 9 · las dos pantallas que califican ya no se tragan el fallo', 
         p.archivo + ': el catch no deja rastro del rechazo');
       assert.ok(/motivoDeRechazo\s*\(/.test(cuerpo),
         p.archivo + ': el catch no saca el motivo del archivo compartido');
-      assert.ok(/set[A-Za-z]*\s*\(\s*motivoDeRechazo/.test(cuerpo),
+      assert.ok(/set[A-Za-z]*\s*\(\s*motivo(DeRechazo)?\b/.test(cuerpo),
         p.archivo + ': saca el motivo pero NO lo enseña. Calcularlo y no pintarlo '
         + 'es exactamente lo mismo que tragárselo.');
     }
@@ -316,7 +316,7 @@ describe('REGLA 9 · reportar y moderar una reseña tampoco se rechazan en silen
       assert.ok(cuerpo !== null, 'no encontré el catch de ' + c.fn);
       assert.ok(/apuntarRechazo\s*\(/.test(cuerpo),
         c.archivo + ' · ' + c.fn + ': el catch no deja rastro');
-      assert.ok(/setAviso\s*\(\s*motivoDeRechazo/.test(cuerpo),
+      assert.ok(/setAviso\s*\(\s*motivo(DeRechazo)?\b/.test(cuerpo),
         c.archivo + ' · ' + c.fn + ': saca el motivo pero no lo enseña, o ni lo saca');
     });
   }
@@ -377,4 +377,116 @@ describe('REGLA 9 · reportar y moderar una reseña tampoco se rechazan en silen
     });
   }
 
+});
+
+// ── LA BANDEJA DE RECHAZOS (26-ago-2026) ────────────────────────────────────
+// La otra mitad de la REGLA 9: que lo rechazado quede escrito y el dueño lo vea.
+describe('REGLA 9 · la bandeja: lo que se apunta y quién lo apunta', () => {
+  // guardarRechazo.js habla con la base de datos, así que lleva imports y
+  // cargarDeLaApp no puede con él. Se le quitan los imports y se ejecuta: las
+  // funciones que interesan —las del NOMBRE del documento— no tocan la base,
+  // solo hacen cuentas con texto. Es lo que hay que probar de verdad: ese nombre
+  // es el candado que impide que la bandeja se convierta en un vertedero.
+  const cargarConImports = (rel) => {
+    const fuente = leer(rel).replace(/^import[^;]+;$/gm, '');
+    const nombres = [...fuente.matchAll(/^export\s+(?:const|function|async function)\s+([A-Za-z0-9_]+)/gm)]
+      .map((m) => m[1]);
+    assert.ok(nombres.length > 0, 'no se encontró nada exportado en ' + rel);
+    // eslint-disable-next-line no-new-func
+    return new Function(fuente.replace(/^export\s+/gm, '') + '\nreturn { ' + nombres.join(', ') + ' };')();
+  };
+
+  const G = cargarConImports('guajirago/src/guardarRechazo.js');
+
+  it('EL CANDADO · el nombre del documento NO tiene ninguna parte libre', () => {
+    // Es lo único que impide que esta colección se convierta en un vertedero:
+    // lo que el que escribe pueda ELEGIR del nombre, son documentos que puede
+    // crear. La primera versión metía la FECHA dentro y las reglas solo exigían
+    // que el nombre EMPEZARA por el uid: la segunda opinión creó 300 documentos
+    // de basura con una sola cuenta. Ahora el nombre es uid + sitio, y el sitio
+    // sale de una lista cerrada de cuatro.
+    assert.strictEqual(G.nombreDelRechazo('pasajero1', 'calificar-pedido'),
+      'pasajero1__calificar-pedido');
+    // El mismo uid y el mismo sitio dan SIEMPRE el mismo nombre — no depende de
+    // la hora, del día ni de nada que cambie solo.
+    assert.strictEqual(G.nombreDelRechazo('pasajero1', 'calificar-pedido'),
+      G.nombreDelRechazo('pasajero1', 'calificar-pedido'));
+    assert.notStrictEqual(G.nombreDelRechazo('pasajero1', 'calificar-pedido'),
+      G.nombreDelRechazo('otro', 'calificar-pedido'));
+  });
+
+  it('EL CANDADO · con los cuatro sitios salen CUATRO nombres, ni uno más', () => {
+    // El tope no es «un puñado»: es un número, y aquí se cuenta.
+    const nombres = new Set(G.SITIOS.map((s) => G.nombreDelRechazo('pasajero1', s)));
+    assert.strictEqual(nombres.size, G.SITIOS.length);
+    assert.strictEqual(G.SITIOS.length, 4, 'cambió el número de sitios: repasa el tope');
+    for (const n of nombres) {
+      assert.ok(n.startsWith('pasajero1__'), 'el nombre no empieza por el uid: ' + n);
+    }
+  });
+
+  it('EL CANDADO · el nombre cuadra con lo que se guarda, o el apunte se pierde', () => {
+    // Las reglas comparan el nombre del documento con el campo `donde`. Si el
+    // nombre se limpiara y el campo no (o al revés), NINGÚN apunte entraría —y
+    // fallaría en silencio justo cuando hace falta.
+    for (const s of G.SITIOS) {
+      assert.strictEqual(G.nombreDelRechazo('u', s), 'u__' + G.limpiar(s),
+        'el nombre y el campo no cuadran con «' + s + '»');
+    }
+  });
+
+  it('el sitio se limpia: sin barras y con tope, o el apunte se pierde', () => {
+    // Una barra parte el nombre en dos y Firestore lo rechaza; pasar de 60
+    // letras lo niegan las reglas. Cualquiera de las dos cosas perdería el
+    // rechazo justo cuando hace falta.
+    assert.ok(!G.limpiar('con/barra y espacios').includes('/'));
+    assert.ok(!/[^a-zA-Z0-9_-]/.test(G.limpiar('¡ñoño! con acentos/y barras')));
+    assert.ok(G.limpiar('z'.repeat(200)).length <= 60);
+    assert.ok(G.limpiar('').length > 0, 'sin sitio tiene que quedar ALGO, o el nombre se rompe');
+    assert.ok(G.limpiar(null).length > 0);
+  });
+
+  // ── QUE LAS PANTALLAS DE VERDAD LO APUNTEN ───────────────────────────────
+  const APUNTAN = [
+    { archivo: 'guajirago/src/Calificacion.js', fn: 'const enviar = async', que: 'calificar un viaje' },
+    { archivo: 'guajirago/src/Restaurantes.js', fn: 'const enviarCalificacion = async', que: 'calificar un pedido' },
+    { archivo: 'guajirago-aliados/src/CalificacionesRestaurante.js', fn: 'const cargar = async', que: 'ver las calificaciones' },
+    { archivo: 'guajirago-aliados/src/CalificacionesRestaurante.js', fn: 'const enviarReporte = async', que: 'reportar un comentario' },
+  ];
+
+  for (const a of APUNTAN) {
+    it('EL QUE MUERDE · «' + a.que + '» apunta el rechazo en la bandeja', () => {
+      const t = soloCodigo(leer(a.archivo));
+      assert.ok(t.includes("from './guardarRechazo'"),
+        a.archivo + ' no importa la bandeja');
+      const cuerpo = cuerpoDelCatch(t, t.indexOf(a.fn));
+      assert.ok(cuerpo !== null, 'no encontré el catch de ' + a.fn);
+      assert.ok(/guardarRechazo\s*\(/.test(cuerpo),
+        a.archivo + ' · ' + a.fn + ': avisa al usuario pero NO lo apunta en la bandeja');
+      // Y la clase se saca del motivo, no se escribe a mano: si se escribiera a
+      // mano seria una SEGUNDA calculadora del mismo numero (SEGUNDA LEY), y en
+      // un mes diria una cosa distinta de la que ve el usuario en su ventanita.
+      assert.ok(/guardarRechazo\([^)]*motivo\.clave/.test(cuerpo),
+        a.archivo + ' · ' + a.fn + ': la clase del fallo no sale del motivo');
+    });
+  }
+
+  it('EL QUE MUERDE · la bandeja del panel NO dice «no ha fallado nada» cuando no pudo mirar', () => {
+    // Es la mentira más peligrosa de las tres, porque aquí «vacío» es la mejor
+    // noticia posible: el dueño se iría convencido de que todo va bien.
+    const codigo = soloCodigo(leer('guajirago-admin/src/Rechazos.js'));
+    assert.ok(/setFalloCargar\s*\(\s*true\s*\)/.test(codigo), 'nadie apunta que la carga falló');
+    const guarda = /\(\s*falloCargar\s*&&\s*lista\.length === 0\s*\)\s*\?/;
+    assert.ok(guarda.test(codigo), 'la pantalla no distingue «no hay» de «no pude mirar»');
+    assert.ok(codigo.search(guarda) < codigo.indexOf('lista.length === 0 ?'),
+      'el «no hay nada» se evalúa antes que el «no pude mirar»');
+  });
+
+  it('la bandeja cuenta las VECES, no los renglones', () => {
+    // Un renglón puede llevar cuarenta rechazos dentro. Contar renglones diría
+    // «pasó 4 veces» cuando pasó 40, que es justo al revés de lo que importa.
+    const codigo = soloCodigo(leer('guajirago-admin/src/Rechazos.js'));
+    assert.ok(/reduce\(\(s, r\) => s \+ \(r\.veces \|\| 0\), 0\)/.test(codigo),
+      'el total no suma las veces: está contando renglones');
+  });
 });

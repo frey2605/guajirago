@@ -19,25 +19,28 @@
 // SEGUNDA LEY: esto vive en UN archivo y lo usan las dos pantallas. Si el
 // motivo se escribiera en cada una, en un mes dirían cosas distintas.
 //
-// LO QUE ESTO NO HACE, y queda ANOTADO:
+// ESTE ARCHIVO ES LA MITAD DEL CLIENTE: que se entere. La otra mitad que pide la
+// REGLA 9 —«todo rechazo va a una bandeja con su motivo», o sea un sitio donde el
+// DUEÑO los vea— se construyó el 26-ago y vive en guardarRechazo.js, en la
+// colección `rechazos` y en la pantalla del panel. Las dos se llaman desde el
+// mismo catch: primero se avisa, luego se apunta.
 //
-//   · La REGLA 9 pide además que «todo rechazo vaya a una bandeja con su
-//     motivo», o sea un sitio donde el dueño los vea. Eso es infraestructura
-//     aparte (colección + reglas + pantalla) y no se construye sin pedirlo.
-//     Esta mitad es la del cliente: que se entere.
-//
-//   · Siguen mudos TRES rechazos del mismo flujo, en las otras dos apps (los
-//     buscó la segunda opinión; no estaban en la foto, así que no se tocan):
-//       - guajirago-aliados/src/CalificacionesRestaurante.js:47 — el restaurante
-//         reporta una reseña, el servidor la rechaza, y el modal se queda ahí
-//         sin decir nada.
-//       - guajirago-admin/src/ComentariosReportados.js:30 y :37 — el panel
-//         restaura u oculta una reseña reportada y no se entera si falló.
-//     `guajirago/functions/index.js` no toca calificaciones: por ahí no hay nada.
+// Y los rechazos mudos que quedaban en las otras dos apps también se cerraron ese
+// día (aliados/CalificacionesRestaurante.js y admin/ComentariosReportados.js).
+// `guajirago/functions/index.js` no toca calificaciones: por ahí no hay nada.
 
 // El texto que ve el cliente. Sale de aquí y de ningún otro sitio.
+//
+// La `clave` la usa la BANDEJA (guardarRechazo.js): es lo que se guarda para que
+// el dueño vea «sin permiso» o «sin internet» en vez de jerga en inglés. Va
+// DENTRO de cada motivo a propósito: la alternativa era que alguien clasificara
+// otra vez el mismo fallo en otro sitio, y una segunda calculadora del mismo
+// número acaba SIEMPRE dando otro resultado (SEGUNDA LEY). Es el mismo nombre y
+// los mismos tres valores que en guajirago-aliados/src/avisoRechazo.js, y hay un
+// amarre que carea los dos lados.
 export const MOTIVOS = {
   permiso: {
+    clave: 'permiso',
     titulo: 'No pudimos guardar tu calificación',
     // OJO AL DETALLE: esto decía «puede que ya esté calificado», y era MENTIRA.
     // Lo cazó la segunda opinión leyendo las reglas: el `allow create` de
@@ -50,11 +53,13 @@ export const MOTIVOS = {
       + 'equivocación, escríbenos desde Ayuda y soporte.',
   },
   sinRed: {
+    clave: 'sinRed',
     titulo: 'Sin conexión',
     texto: 'No hay internet ahora mismo, así que tu calificación no salió. '
       + 'Vuelve a intentarlo cuando tengas señal.',
   },
   otro: {
+    clave: 'otro',
     titulo: 'No pudimos guardar tu calificación',
     texto: 'Algo falló al enviarla y no se guardó. Vuelve a intentarlo; si '
       + 'sigue pasando, escríbenos desde Ayuda y soporte.',

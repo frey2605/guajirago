@@ -988,6 +988,132 @@ service cloud.firestore {
         get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.rol == 'superadmin'
       );
     }
+    // ── REGLA 9 · LA BANDEJA DE RECHAZOS (26-ago-2026) ──────────────────────
+    // Palabras del dueño: «Nada se rechaza en silencio. Todo rechazo va a una
+    // bandeja con su motivo.» El 26-ago se cerró la primera mitad —que el cliente
+    // se entere— en las tres apps. Esta es la segunda: que el dueño lo VEA.
+    //
+    // POR QUÉ NO VA EN `logs`, que ya existe justo aquí arriba: `logs` es el rastro
+    // de auditoría del superadmin y solo lo escriben admin y superadmin. Un pasajero
+    // al que le rechacen una calificación NO puede escribir ahí — y aunque pudiera,
+    // ahogaría la auditoría: la pantalla que la lee pide los ÚLTIMOS 100
+    // (admin/Superadmin.js:151) y hoy hay 53 registros. Los rechazos empujarían
+    // fuera de la vista lo que de verdad hay que auditar.
+    //
+    // EL PELIGRO DE ESTA COLECCIÓN, y cómo se ataja. Aquí escribe CUALQUIERA con
+    // cuenta —tiene que ser así: el que sufre el rechazo es quien lo cuenta—, y eso
+    // es un vertedero esperando a pasar. Se ataja por el NOMBRE del documento:
+    //
+    //     rechazos/{uid}__{donde}
+    //
+    // El nombre tiene que ser EXACTAMENTE ése, y `donde` tiene que salir de la lista
+    // cerrada de abajo. Con eso, lo máximo que una persona puede crear en toda su
+    // vida son TANTOS DOCUMENTOS COMO SITIOS HAY. Hoy, cuatro. Repetirse cae siempre
+    // en el mismo y solo sube el contador.
+    //
+    // LA PRIMERA VERSIÓN NO CERRABA, y aquí está escrito para que no se repita. Decía
+    // `rechazoId.matches(uid + '__.*')` —solo que EMPEZARA por el uid— y el resto del
+    // nombre era texto libre. El comentario prometía «un puñado al día». La segunda
+    // opinión lo midió ejecutándolo contra el emulador: UNA cuenta creó 300 documentos
+    // de basura, 300 de 300 intentos. Y con eso la bandeja repetía el mismo defecto
+    // por el que se descartó `logs` cuatro renglones más arriba: la pantalla pide 200
+    // y la basura empuja fuera de la vista los rechazos de verdad.
+    //
+    // La lección, otra vez: un candado que ata el PRINCIPIO de algo no ata nada. Lo
+    // que no se fija, el que escribe lo elige.
+    //
+    // Y SE MIRA LO QUE ENTRA. `hasOnly` para que no cuelen campos de paso, `hasAll`
+    // para que no nazca a medias, la lista cerrada de clases y de apps, y un tope de
+    // 60 letras a los dos textos libres. Un campo libre sin tope es un sitio donde
+    // guardar lo que sea.
+    //
+    // LO QUE AQUÍ SE VE POCO, y por qué — con la medición delante, porque la primera
+    // versión de este comentario decía otra cosa y era FALSA.
+    //
+    // Decía que sin internet «esta escritura tampoco sale». No es verdad: las dos apps
+    // encienden la cola de escrituras sin red (guajirago/src/firebase.js:24 y
+    // guajirago-aliados/src/firebase.js:24), así que el apunte se guarda en el
+    // teléfono y LLEGA solo cuando vuelve la señal. La segunda opinión lo midió
+    // apagando y encendiendo la red: el apunte apareció en el servidor.
+    //
+    // Lo que pasa de verdad es otra cosa: sin red una ESCRITURA no falla, se queda
+    // esperando. Así que en los caminos que escriben —calificar un viaje, calificar
+    // un pedido— el fallo nunca salta y no hay nada que apuntar. Donde sí salta es en
+    // los que LEEN, que sin red fallan de inmediato: ver las calificaciones del
+    // restaurante, o cargar esta misma bandeja.
+    match /rechazos/{rechazoId} {
+      // Solo el panel lo lee. Aquí dentro hay identificadores de personas y de qué
+      // les falló: no es para el escaparate.
+      allow get, list: if esAdmin();
+
+      // Los sitios que existen. Es una lista CERRADA a propósito: es lo que convierte
+      // «puede crear los que quiera» en «puede crear cuatro». Si mañana hace falta
+      // uno nuevo, se añade AQUÍ y en la tabla del panel (admin/Rechazos.js), y hay
+      // una prueba que carea los dos lados.
+      function sitios() {
+        return ['calificar-viaje', 'calificar-pedido',
+                'ver-calificaciones', 'reportar-comentario'];
+      }
+
+      // El nombre del documento se compara ENTERO, no por el principio. Así el que
+      // escribe no elige nada: ni cuántos documentos, ni cómo se llaman.
+      function esSuyo() {
+        return request.auth != null
+          && request.resource.data.get('quienUid', '') == request.auth.uid
+          && rechazoId == request.auth.uid + '__' + request.resource.data.get('donde', '');
+      }
+
+      function camposBuenos() {
+        return request.resource.data.keys().hasOnly(
+                 ['quienUid', 'app', 'donde', 'clave', 'codigo', 'veces', 'ultima'])
+          // ESTE RENGLÓN HOY NO HACE NADA, y se dice en vez de fingir que sí.
+          // Las comprobaciones de tipo de abajo —`in [...]`, `is timestamp`,
+          // `is int`— ya obligan a que los campos ESTÉN: en estas reglas, leer un
+          // campo que falta da error, y un error niega. Se comprobó EJECUTANDO
+          // las dos versiones con diez escrituras distintas: cero diferencias.
+          // Se queda como cinturón, por si mañana alguien cambia una de esas
+          // comprobaciones por una con valor por defecto —`.get(campo, algo)`—,
+          // que sí toleraría el campo ausente sin que nada avisara.
+          && request.resource.data.keys().hasAll(
+                 ['quienUid', 'app', 'donde', 'clave', 'veces', 'ultima'])
+          && request.resource.data.clave in ['permiso', 'sinRed', 'otro']
+          && request.resource.data.app in ['pasajero', 'aliados']
+          // `donde` SALE DE LA LISTA. No es solo higiene: es la mitad del candado
+          // anti-vertedero, porque el nombre del documento se construye con él. Y de
+          // paso cierra otro agujero que midió la segunda opinión: con
+          // `donde: '__proto__'` la pantalla del panel REVENTABA al pintarla —y como
+          // aquí no se borra nada (REGLA 12), habría quedado rota para siempre.
+          && request.resource.data.donde in sitios()
+          // `ultima` es OBLIGATORIA. La pantalla ordena por ella, y en Firestore un
+          // documento sin el campo por el que se ordena NO SALE en la consulta:
+          // estaría en la base y el panel diría «ningún rechazo apuntado». Lo midió
+          // la segunda opinión: 1 de 2 documentos visibles, y quitándosela a uno que
+          // ya se veía, 0 de 1.
+          && request.resource.data.ultima is timestamp
+          && request.resource.data.get('codigo', '') is string
+          && request.resource.data.get('codigo', '').size() <= 60
+          && request.resource.data.veces is int;
+      }
+
+      // Nace contando UNO. Si naciera contando mil, el contador no diría nada.
+      allow create: if esSuyo() && camposBuenos() && request.resource.data.veces == 1;
+
+      // Repetirse SUBE el contador DE UNO EN UNO, y nada más. No se puede cambiar de
+      // dueño, ni de app, ni de sitio: eso convertiría un documento viejo en otro
+      // distinto y la bandeja contaría una historia falsa.
+      //
+      // EL «DE UNO EN UNO» NO SOBRA. Antes decía solo `>`, y la segunda opinión saltó
+      // de 1 a mil millones de una escritura: el titular que ve el dueño («N rechazos
+      // en M sitios») era un número que elegía el atacante. Bajarlo tampoco se puede:
+      // sería borrar sin dejar lápida (REGLA 12).
+      allow update: if esSuyo() && camposBuenos()
+        && request.resource.data.quienUid == resource.data.quienUid
+        && request.resource.data.app == resource.data.app
+        && request.resource.data.donde == resource.data.donde
+        && request.resource.data.veces == resource.data.veces + 1;
+
+      allow delete: if false;
+    }
     match /dispositivosBeneficio/{deviceId} {
       allow read: if request.auth != null;
       allow create: if request.auth != null;

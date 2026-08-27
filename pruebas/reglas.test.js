@@ -3374,3 +3374,207 @@ describe('REGLA 10 · una calificación la escribe quien estuvo ahí', () => {
     await RUT.assertFails(setDoc(doc(sinCuenta(), 'calificaciones/a13'), delViaje()));
   });
 });
+
+// ───────────────────────────────────────────────────────────────────────────
+// REGLA 9 · LA BANDEJA DE RECHAZOS (26-ago-2026)
+// ───────────────────────────────────────────────────────────────────────────
+// «Nada se rechaza en silencio. Todo rechazo va a una bandeja con su motivo.»
+// La primera mitad —que el cliente se entere— se cerró en las tres apps. Esta
+// es la segunda: que quede escrito y el dueño lo vea.
+//
+// Aquí escribe CUALQUIERA con cuenta, y tiene que ser así: el que sufre el
+// rechazo es el único que puede contarlo. Eso convierte a esta colección en un
+// vertedero en potencia, y por eso la mitad de estas pruebas no van de permisos
+// sino de que NO SE PUEDA LLENAR.
+describe('REGLA 9 · la bandeja de rechazos', () => {
+  // Los cuatro sitios que existen. La MISMA lista que en firestore.rules y en
+  // guajirago/src/guardarRechazo.js; hay un amarre que carea los tres.
+  const SITIOS = ['calificar-viaje', 'calificar-pedido', 'ver-calificaciones', 'reportar-comentario'];
+  const nombre = (uid, donde) => 'rechazos/' + uid + '__' + donde;
+  const unRechazo = (uid, extra) => ({
+    quienUid: uid, app: 'pasajero', donde: 'calificar-pedido',
+    clave: 'permiso', codigo: 'permission-denied', veces: 1,
+    ultima: new Date('2026-08-26T12:00:00Z'), ...(extra || {}),
+  });
+
+  it('quien sufre el rechazo SÍ lo puede apuntar, en los cuatro sitios', async () => {
+    const { doc, setDoc } = FS;
+    for (const donde of SITIOS) {
+      await RUT.assertSucceeds(setDoc(
+        doc(como('pasajero1'), nombre('pasajero1', donde)),
+        unRechazo('pasajero1', { donde })), 'no dejó apuntar en «' + donde + '»');
+    }
+  });
+
+  it('EL ATAQUE · nadie apunta un rechazo a nombre de otro', async () => {
+    const { doc, setDoc } = FS;
+    await RUT.assertFails(setDoc(
+      doc(como('pasajero1'), nombre('conductor1', 'calificar-pedido')),
+      unRechazo('conductor1')));
+    await RUT.assertFails(setDoc(
+      doc(como('pasajero1'), nombre('pasajero1', 'calificar-pedido')),
+      unRechazo('conductor1')));
+  });
+
+  // ── EL CANDADO ANTI-VERTEDERO ────────────────────────────────────────────
+  // ESTA ES LA PRUEBA QUE FALTABA, y por eso se escribe primero y con el número
+  // dentro. La versión anterior de la regla solo exigía que el nombre EMPEZARA
+  // por el uid, y la anterior de esta prueba solo probaba nombres que NO
+  // empezaban por él: por eso salía verde con el agujero abierto. La segunda
+  // opinión creó 300 documentos de basura con UNA cuenta, 300 de 300 intentos.
+  //
+  // Ahora el nombre se compara ENTERO y `donde` sale de una lista cerrada, así
+  // que el tope no es «un puñado»: son CUATRO, y esta prueba lo cuenta.
+  it('EL ATAQUE · una cuenta NO puede crear más documentos que sitios hay', async () => {
+    const { doc, setDoc } = FS;
+    let colaron = 0;
+    // 40 nombres inventados que SÍ empiezan por el uid — que es justo lo que la
+    // regla vieja dejaba pasar.
+    for (let i = 0; i < 40; i++) {
+      const intento = setDoc(doc(como('pasajero1'), 'rechazos/pasajero1__basura' + i),
+        unRechazo('pasajero1', { donde: 'basura' + i }));
+      // eslint-disable-next-line no-await-in-loop
+      await intento.then(() => { colaron += 1; }).catch(() => {});
+    }
+    assert.strictEqual(colaron, 0,
+      'colaron ' + colaron + ' documentos de basura: el candado anti-vertedero NO cierra');
+  });
+
+  it('EL ATAQUE · el nombre tiene que ser EXACTAMENTE {uid}__{donde}', async () => {
+    const { doc, setDoc } = FS;
+    const malos = [
+      'rechazos/basura1',                                  // ni empieza por el uid
+      'rechazos/pasajero1',                                // sin sitio
+      'rechazos/pasajero1__calificar-pedido__de-mas',      // con cola
+      'rechazos/pasajero1__2026-08-26__calificar-pedido',  // el formato viejo
+      'rechazos/otro__calificar-pedido',                   // el uid de otro
+    ];
+    for (const malo of malos) {
+      await RUT.assertFails(setDoc(doc(como('pasajero1'), malo), unRechazo('pasajero1')),
+        'coló con el nombre «' + malo + '»');
+    }
+  });
+
+  it('EL ATAQUE · el sitio SALE DE LA LISTA: nada de nombres raros', async () => {
+    // '__proto__' no es una rareza teórica: con él, la pantalla del panel
+    // REVENTABA al pintarla, y como aquí no se borra nada (REGLA 12) se habría
+    // quedado rota para siempre. Lo midió la segunda opinión pintándola de verdad.
+    const { doc, setDoc } = FS;
+    for (const raro of ['__proto__', 'toString', 'constructor', 'lo-que-sea']) {
+      await RUT.assertFails(setDoc(doc(como('pasajero1'), nombre('pasajero1', raro)),
+        unRechazo('pasajero1', { donde: raro })), 'coló el sitio «' + raro + '»');
+    }
+  });
+
+  it('repetirse SUBE el contador, y no crea otro documento', async () => {
+    const { doc, setDoc } = FS;
+    const d = nombre('pasajero1', 'calificar-pedido');
+    await RUT.assertSucceeds(setDoc(doc(como('pasajero1'), d), unRechazo('pasajero1')));
+    await RUT.assertSucceeds(setDoc(doc(como('pasajero1'), d), unRechazo('pasajero1', { veces: 2 })));
+    await RUT.assertSucceeds(setDoc(doc(como('pasajero1'), d), unRechazo('pasajero1', { veces: 3 })));
+  });
+
+  it('EL ATAQUE · el contador sube DE UNO EN UNO: no se salta a mil millones', async () => {
+    // El titular que ve el dueño («N rechazos en M sitios») no lo puede fijar
+    // nadie desde fuera. Antes la regla solo pedía que subiera, y la segunda
+    // opinión saltó de 1 a mil millones en una escritura.
+    const { doc, setDoc } = FS;
+    const d = nombre('pasajero1', 'calificar-pedido');
+    await RUT.assertSucceeds(setDoc(doc(como('pasajero1'), d), unRechazo('pasajero1')));
+    await RUT.assertFails(setDoc(doc(como('pasajero1'), d), unRechazo('pasajero1', { veces: 1000000000 })));
+    await RUT.assertFails(setDoc(doc(como('pasajero1'), d), unRechazo('pasajero1', { veces: 3 })));
+    await RUT.assertSucceeds(setDoc(doc(como('pasajero1'), d), unRechazo('pasajero1', { veces: 2 })));
+  });
+
+  it('el contador NO baja, ni se queda quieto: eso sería borrar sin dejar lápida', async () => {
+    const { doc, setDoc } = FS;
+    const d = nombre('pasajero1', 'calificar-pedido');
+    await RUT.assertSucceeds(setDoc(doc(como('pasajero1'), d), unRechazo('pasajero1')));
+    await RUT.assertSucceeds(setDoc(doc(como('pasajero1'), d), unRechazo('pasajero1', { veces: 2 })));
+    await RUT.assertFails(setDoc(doc(como('pasajero1'), d), unRechazo('pasajero1', { veces: 1 })));
+    await RUT.assertFails(setDoc(doc(como('pasajero1'), d), unRechazo('pasajero1', { veces: 2 })));
+  });
+
+  it('no nace contando mil: un contador que nace alto no cuenta nada', async () => {
+    const { doc, setDoc } = FS;
+    await RUT.assertFails(setDoc(
+      doc(como('pasajero1'), nombre('pasajero1', 'calificar-pedido')),
+      unRechazo('pasajero1', { veces: 999 })));
+  });
+
+  it('EL ATAQUE · sin la hora del servidor no entra, ni se le puede quitar después', async () => {
+    // La pantalla ordena por `ultima`, y en Firestore un documento SIN el campo
+    // por el que se ordena NO SALE en la consulta. Sin esta regla, un rechazo
+    // podía estar en la base y el panel decir «ningún rechazo apuntado» — y uno
+    // que ya se veía se podía volver invisible subiendo el contador y quitándola.
+    // Las dos cosas las midió la segunda opinión.
+    const { doc, setDoc } = FS;
+    const d = nombre('pasajero1', 'calificar-pedido');
+    const sinHora = { quienUid: 'pasajero1', app: 'pasajero', donde: 'calificar-pedido', clave: 'otro', veces: 1 };
+    await RUT.assertFails(setDoc(doc(como('pasajero1'), d), sinHora), 'entró sin la hora');
+    await RUT.assertSucceeds(setDoc(doc(como('pasajero1'), d), unRechazo('pasajero1')));
+    await RUT.assertFails(setDoc(doc(como('pasajero1'), d), { ...sinHora, veces: 2 }),
+      'se le pudo quitar la hora: el rechazo se vuelve invisible para el panel');
+  });
+
+  it('un documento viejo no se convierte en otro distinto', async () => {
+    const { doc, setDoc } = FS;
+    const d = nombre('pasajero1', 'calificar-pedido');
+    await RUT.assertSucceeds(setDoc(doc(como('pasajero1'), d), unRechazo('pasajero1')));
+    await RUT.assertFails(setDoc(doc(como('pasajero1'), d),
+      unRechazo('pasajero1', { veces: 2, donde: 'calificar-viaje' })));
+    await RUT.assertFails(setDoc(doc(como('pasajero1'), d),
+      unRechazo('pasajero1', { veces: 2, app: 'aliados' })));
+  });
+
+  // ── LO QUE ENTRA SE MIRA ─────────────────────────────────────────────────
+  it('no se cuelan campos de paso, ni nace a medias, ni con valores inventados', async () => {
+    const { doc, setDoc } = FS;
+    const d = nombre('pasajero1', 'calificar-pedido');
+    const casos = [
+      ['un campo de más', unRechazo('pasajero1', { loQueSea: 'hola' })],
+      ['sin clave', { quienUid: 'pasajero1', app: 'pasajero', donde: 'calificar-pedido', veces: 1, ultima: new Date() }],
+      ['sin app', { quienUid: 'pasajero1', donde: 'calificar-pedido', clave: 'otro', veces: 1, ultima: new Date() }],
+      ['una clase inventada', unRechazo('pasajero1', { clave: 'loquesea' })],
+      ['una app inventada', unRechazo('pasajero1', { app: 'panel' })],
+      ['el contador de texto', unRechazo('pasajero1', { veces: 'muchas' })],
+      ['la hora de texto', unRechazo('pasajero1', { ultima: 'ayer' })],
+      ['un codigo sin tope', unRechazo('pasajero1', { codigo: 'y'.repeat(61) })],
+    ];
+    for (const [que, datos] of casos) {
+      await RUT.assertFails(setDoc(doc(como('pasajero1'), d), datos), 'coló: ' + que);
+    }
+  });
+
+  // ── QUIÉN LA MIRA ────────────────────────────────────────────────────────
+  it('la bandeja la lee el PANEL, y nadie más', async () => {
+    const { doc, setDoc, getDoc, getDocs, collection } = FS;
+    const d = nombre('pasajero1', 'calificar-pedido');
+    await entorno.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), d), unRechazo('pasajero1'));
+    });
+    await RUT.assertSucceeds(getDocs(collection(como('eladmin'), 'rechazos')));
+    await RUT.assertSucceeds(getDoc(doc(como('eljefe'), d)));
+    // Ni siquiera el que lo escribió: dentro hay identificadores de personas.
+    await RUT.assertFails(getDoc(doc(como('pasajero1'), d)));
+    await RUT.assertFails(getDocs(collection(como('pasajero1'), 'rechazos')));
+    await RUT.assertFails(getDocs(collection(sinCuenta(), 'rechazos')));
+  });
+
+  it('sin sesión no se apunta nada', async () => {
+    const { doc, setDoc } = FS;
+    await RUT.assertFails(setDoc(doc(sinCuenta(), nombre('pasajero1', 'calificar-pedido')),
+      unRechazo('pasajero1')));
+  });
+
+  it('nadie borra un rechazo, ni el panel (REGLA 12)', async () => {
+    const { doc, setDoc, deleteDoc } = FS;
+    const d = nombre('pasajero1', 'calificar-pedido');
+    await entorno.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), d), unRechazo('pasajero1'));
+    });
+    await RUT.assertFails(deleteDoc(doc(como('pasajero1'), d)));
+    await RUT.assertFails(deleteDoc(doc(como('eladmin'), d)));
+    await RUT.assertFails(deleteDoc(doc(como('eljefe'), d)));
+  });
+});

@@ -7,6 +7,8 @@ import { contieneInfoSensible } from './filtroChat';
 // REGLA 9 — qué se le dice al cliente cuando una calificación no entra. Sale de
 // un solo archivo, el mismo que usa Calificacion.js.
 import { motivoDeRechazo, apuntarRechazo } from './avisoCalificacion';
+// Y la BANDEJA: la otra mitad de la REGLA 9, la que ve el dueño en el panel.
+import { guardarRechazo } from './guardarRechazo';
 import {
   collection,
   onSnapshot,
@@ -464,7 +466,10 @@ function Restaurantes({ nombre, onVolver, foto, onCerrarSesion, onIrPerfil, onIr
         setEstrellasCal(0);
         setComentarioCal('');
       } else {
-        setAvisoCalif(motivoDeRechazo(e));
+        const motivo = motivoDeRechazo(e);
+        setAvisoCalif(motivo);
+        // A la bandeja. Sin await: el cliente ya tiene su ventanita.
+        guardarRechazo('pasajero', 'calificar-pedido', motivo.clave, e);
       }
     }
     setEnviandoCal(false);
