@@ -16,11 +16,19 @@ const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
 // El cargador vive en cargar.cjs: un solo sitio para todas las pruebas (SEGUNDA LEY).
-const { RAIZ, cargarDeLaApp } = require('./cargar.cjs');
+// `leer` SE TRAE DE AHÍ. La primera versión de este archivo se lo volvía a escribir
+// a mano —y su copia era PEOR: reventaba con un error de sistema si faltaba un
+// repo, mientras que la de cargar.cjs lo dice en cristiano («las pruebas necesitan
+// los tres repos juntos»). Justo el caso que importa aquí, porque aliados y el
+// panel son repos APARTE que pueden no estar en el disco.
+//
+// Lo cazó la segunda opinión, y de paso desmintió algo que yo había escrito en el
+// libro de excepciones: dije que no había casa común para los ayudantes de
+// pruebas y que por eso me salía de la foto con «CERO código duplicado». Las dos
+// mitades eran falsas: la casa es esta, y este archivo duplicaba `leer`.
+const { leer, cargarDeLaApp } = require('./cargar.cjs');
 
 const { motivoDeRechazo, MOTIVOS } = cargarDeLaApp('guajirago/src/avisoCalificacion.js');
-
-const leer = (rel) => fs.readFileSync(path.join(RAIZ, rel), 'utf8');
 
 // Se miran los RENGLONES DE CÓDIGO, no los comentarios. La primera versión de
 // estas pruebas no lo hacía y se puso roja ella sola: encontró un «catch (e) {}»
@@ -37,21 +45,62 @@ const soloCodigo = (t) => t
   .split('\n').map((l) => l.replace(/^\s*\/\/.*$/, '')).join('\n');
 
 /**
- * El cuerpo de un `catch`, contando llaves. Se cuenta en vez de buscar con una
- * expresión porque el agujero se puede escribir de muchas formas —`catch {}` sin
- * paréntesis es JavaScript válido desde 2019— y una expresión solo pilla las que
- * a uno se le ocurrieron. Con el cuerpo en la mano se puede preguntar lo único
- * que importa: si DENTRO pasa algo o no.
+ * Deja el código con la MISMA longitud pero sin nada dentro de los textos
+ * entrecomillados: cada letra de dentro pasa a ser una «x». Se conserva el largo
+ * para que los números de posición sigan valiendo.
+ *
+ * Hace falta para contar llaves. Sin esto, un `console.log('formato {{ raro')`
+ * dentro de un catch descuadraba la cuenta, el contador se salía de la función y
+ * acababa mirando el catch del vecino — y la prueba salía VERDE con el agujero
+ * abierto. Lo demostró la segunda opinión ejecutándolo.
+ */
+const sinTextos = (t) => t.replace(/'(?:[^'\\\n]|\\.)*'|"(?:[^"\\\n]|\\.)*"|`(?:[^`\\]|\\.)*`/g,
+  (s) => s[0] + 'x'.repeat(s.length - 2) + s[s.length - 1]);
+
+/**
+ * El cuerpo de la función que empieza en `desde`, contando llaves.
+ */
+function cuerpoDeLaFuncion(codigo, desde) {
+  const seguro = sinTextos(codigo);
+  const abre = seguro.indexOf('{', desde);
+  if (abre < 0) return null;
+  let i = abre + 1;
+  let hondo = 1;
+  while (i < seguro.length && hondo > 0) {
+    if (seguro[i] === '{') hondo += 1;
+    else if (seguro[i] === '}') hondo -= 1;
+    i += 1;
+  }
+  return { ini: abre + 1, fin: i - 1, texto: codigo.slice(abre + 1, i - 1) };
+}
+
+/**
+ * El cuerpo de un `catch`, buscado SOLO DENTRO de la función que empieza en
+ * `desde`. Se cuenta en vez de buscar con una expresión porque el agujero se
+ * puede escribir de muchas formas —`catch {}` sin paréntesis es JavaScript válido
+ * desde 2019— y una expresión solo pilla las que a uno se le ocurrieron.
+ *
+ * EL «SOLO DENTRO» NO ES ADORNO. La primera versión buscaba hacia adelante sin
+ * tope: al quitarle el try/catch a `restaurar()`, agarraba el de
+ * `mantenerOculto()` —la función de al lado— y daba la prueba por buena. La
+ * segunda opinión lo puso y salió VERDE con el rechazo otra vez mudo. En ese
+ * archivo hay TRES catch seguidos: cada uno tapaba al anterior.
+ *
+ * Devuelve null si esa función no tiene catch, y eso ES un fallo: quien llama
+ * tiene que comprobarlo.
  */
 function cuerpoDelCatch(codigo, desde) {
-  const m = /catch\s*(\([^)]*\))?\s*\{/.exec(codigo.slice(desde));
+  const fn = cuerpoDeLaFuncion(codigo, desde);
+  if (!fn) return null;
+  const seguro = sinTextos(codigo);
+  const m = /catch\s*(\([^)]*\))?\s*\{/.exec(seguro.slice(fn.ini, fn.fin));
   if (!m) return null;
-  let i = desde + m.index + m[0].length;
+  let i = fn.ini + m.index + m[0].length;
   let hondo = 1;
   const ini = i;
-  while (i < codigo.length && hondo > 0) {
-    if (codigo[i] === '{') hondo += 1;
-    else if (codigo[i] === '}') hondo -= 1;
+  while (i < fn.fin && hondo > 0) {
+    if (seguro[i] === '{') hondo += 1;
+    else if (seguro[i] === '}') hondo -= 1;
     i += 1;
   }
   return codigo.slice(ini, i - 1);
@@ -236,4 +285,96 @@ describe('REGLA 9 · las dos pantallas que califican ya no se tragan el fallo', 
     assert.ok(/return;/.test(catchBloque),
       'el catch no corta: la pantalla se cierra igual y el pasajero cree que calificó');
   });
+});
+
+// ── LAS OTRAS DOS APPS (26-ago-2026) ────────────────────────────────────────
+// El mismo agujero estaba en aliados y en el panel. Estas pruebas viven AQUÍ y
+// no en amarres.test.js porque necesitan `cuerpoDelCatch`, que ya está en este
+// archivo: llevárselo a otro sitio sería tener el ayudante en dos casas, y eso
+// es justo lo que prohíbe la SEGUNDA LEY. Queda anotado en el libro de
+// excepciones, porque este archivo no estaba en la foto de este arreglo.
+describe('REGLA 9 · reportar y moderar una reseña tampoco se rechazan en silencio', () => {
+  const CATCHES = [
+    { archivo: 'guajirago-aliados/src/CalificacionesRestaurante.js', fn: 'const cargar = async',
+      que: 'aliados carga las calificaciones del restaurante' },
+    { archivo: 'guajirago-aliados/src/CalificacionesRestaurante.js', fn: 'const enviarReporte = async',
+      que: 'el restaurante reporta un comentario' },
+    { archivo: 'guajirago-admin/src/ComentariosReportados.js', fn: 'const cargar = async',
+      que: 'el panel carga los reportados' },
+    { archivo: 'guajirago-admin/src/ComentariosReportados.js', fn: 'const restaurar = async',
+      que: 'el panel restaura un comentario' },
+    { archivo: 'guajirago-admin/src/ComentariosReportados.js', fn: 'const mantenerOculto = async',
+      que: 'el panel mantiene oculto un comentario' },
+  ];
+
+  for (const c of CATCHES) {
+    it('EL QUE MUERDE · «' + c.que + '»: su catch avisa, no se lo traga', () => {
+      const t = soloCodigo(leer(c.archivo));
+      const i = t.indexOf(c.fn);
+      assert.ok(i >= 0, 'no encontré «' + c.fn + '» en ' + c.archivo);
+      const cuerpo = cuerpoDelCatch(t, i);
+      assert.ok(cuerpo !== null, 'no encontré el catch de ' + c.fn);
+      assert.ok(/apuntarRechazo\s*\(/.test(cuerpo),
+        c.archivo + ' · ' + c.fn + ': el catch no deja rastro');
+      assert.ok(/setAviso\s*\(\s*motivoDeRechazo/.test(cuerpo),
+        c.archivo + ' · ' + c.fn + ': saca el motivo pero no lo enseña, o ni lo saca');
+    });
+  }
+
+  for (const a of ['guajirago-aliados/src/CalificacionesRestaurante.js',
+    'guajirago-admin/src/ComentariosReportados.js']) {
+    it('«' + a.split('/')[0] + '» pinta la ventanita en el mismo componente', () => {
+      // Se mira el CÓDIGO, no el texto crudo. La primera versión usaba el archivo
+      // entero, así que bastaba comentar la ventanita para que saliera verde — y
+      // la cabecera de este mismo archivo dice, con todas las letras, que eso no
+      // se hace. Lo cazó la segunda opinión comentándola de verdad.
+      const t = soloCodigo(leer(a));
+      assert.ok(t.includes("from './avisoRechazo'"), a + ' no importa el archivo compartido');
+      assert.ok(t.includes('{aviso && ('), a + ' no pinta la ventanita en ningún sitio');
+      // Las dos pantallas tienen UN solo return: si la ventanita está en el
+      // archivo, está donde se dispara. En la app del pasajero no era así —había
+      // tres pantallas excluyentes— y un aviso acabó donde no se veía nunca.
+      //
+      // SE CUENTAN LOS RETURN SIN MIRAR LA SANGRÍA. La primera versión exigía
+      // exactamente dos espacios, así que metiendo una segunda pantalla sangrada
+      // con cuatro se colaba justo el fallo que esta prueba venía a impedir.
+      // También lo demostró la segunda opinión, ejecutándolo.
+      const returns = (t.match(/^[ \t]*return \(/gm) || []).length;
+      assert.strictEqual(returns, 1,
+        a + ' ya no tiene un solo return (' + returns + '): hay que comprobar en qué '
+        + 'pantalla cae la ventanita, como se hace con Restaurantes.js.');
+    });
+  }
+
+  // La misma mentira estaba en LAS DOS apps, y la primera versión de este arreglo
+  // solo tapó la del panel: en aliados quedó, trece renglones más abajo del catch
+  // que sí se arregló y en el mismo archivo declarado en la foto. Lo cazó la
+  // segunda opinión. Si falla la carga, al restaurante se le decía «Aún no tienes
+  // calificaciones» — pudiendo tener veinte. Aquí se fija para los dos.
+  const NO_MIENTEN = [
+    { archivo: 'guajirago-admin/src/ComentariosReportados.js', quien: 'el panel',
+      vacio: 'lista.length === 0' },
+    { archivo: 'guajirago-aliados/src/CalificacionesRestaurante.js', quien: 'aliados',
+      vacio: 'lista.length === 0' },
+  ];
+
+  for (const n of NO_MIENTEN) {
+    it('EL QUE MUERDE · «' + n.quien + '» NO dice «no hay nada» cuando no pudo mirar', () => {
+      const codigo = soloCodigo(leer(n.archivo));
+      assert.ok(/setFalloCargar\s*\(\s*true\s*\)/.test(codigo),
+        n.archivo + ': nadie apunta que la carga falló');
+      // La condición es «falló Y no hay nada que enseñar». Las dos mitades importan:
+      // sin la primera la pantalla miente; sin la segunda le quita al moderador la
+      // lista que ya tenía delante cuando le falla un refresco.
+      const guarda = /\(\s*falloCargar\s*&&\s*lista\.length === 0\s*\)\s*\?/;
+      assert.ok(guarda.test(codigo),
+        n.archivo + ': la pantalla no distingue «vacía porque no hay» de «vacía porque '
+        + 'no pude mirar», así que va a seguir diciendo que no hay nada');
+      // Y tiene que evaluarse ANTES del «no hay nada», o ese se lleva siempre el caso.
+      assert.ok(codigo.search(guarda) < codigo.indexOf(n.vacio + ' ?'),
+        n.archivo + ': el «no hay nada» se evalúa antes que el «no pude mirar», '
+        + 'así que el segundo no se vería nunca');
+    });
+  }
+
 });

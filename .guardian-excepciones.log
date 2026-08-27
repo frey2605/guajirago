@@ -110,3 +110,50 @@ declaran los dos sitios — la funcion Y la pantalla donde se pinta.
 Y UN DEFECTO DEL GUARDIAN QUE ESTO CONFIRMA (ya anotado, sin arreglar): compara
 archivos y no sitios, asi que un cambio dentro del archivo correcto pero en el
 sitio equivocado le pasa por delante sin que se entere.
+
+── 26-ago-2026 · REGLA 9 en aliados y en el panel ──────────────────────────────
+FOTO: "REGLA 9 en las otras dos apps: reportar y moderar una resena tampoco se
+       rechazan en silencio"
+SITIO TOCADO FUERA DE LA LISTA:  pruebas/avisoCalificacion.test.js
+
+POR QUE: las pruebas de pantalla necesitan `cuerpoDelCatch`, el ayudante que lee
+el cuerpo de un catch contando llaves. Ese ayudante ya vive en ese archivo.
+Escribir las pruebas nuevas en pruebas/amarres.test.js -que si estaba declarado-
+obligaba a tener el ayudante en DOS casas, y eso es exactamente lo que prohibe la
+SEGUNDA LEY. Se eligio el mal menor: un archivo mas en la lista, y CERO codigo
+duplicado.
+
+LO QUE SI FUE A amarres.test.js, como estaba declarado: el amarre entre los tres
+repos (que las tres apps clasifiquen igual un rechazo, y que los dos gemelos sean
+identicos byte a byte).
+
+PARA LA PROXIMA: cuando un arreglo toque una regla que ya tiene su archivo de
+pruebas, ese archivo se declara en la foto desde el principio.
+2026-08-27T02:31:25.462Z	pruebas/avisoCalificacion.test.js	NEGADO: fuera de la promesa "REGLA 9 en las otras dos apps: reportar y moderar una resena tampoco se rechazan en silencio"
+
+── 26-ago-2026 · CORRECCION de la anotacion de arriba ──────────────────────────
+LO QUE ESCRIBI ERA FALSO, y lo desmintio la segunda opinion con el grep en la mano.
+
+Escribi que meter las pruebas en pruebas/amarres.test.js "obligaba a tener el
+ayudante en DOS casas" y que la salida elegida tenia "CERO codigo duplicado".
+Las dos mitades son mentira:
+
+ · SI hay casa comun para los ayudantes de pruebas: pruebas/cargar.cjs, y su
+   propia cabecera dice que se hizo para eso ("este par de ayudantes estaba
+   copiado en cinco archivos de pruebas/"). cuerpoDelCatch cabia ahi.
+ · Y el archivo que elegi YA duplicaba `leer`, que cargar.cjs exporta desde hace
+   tres dias. Su copia era ademas PEOR: reventaba con un error de sistema si
+   faltaba un repo, en vez de decirlo en cristiano.
+
+CORREGIDO: pruebas/avisoCalificacion.test.js ya importa `leer` de cargar.cjs.
+`cuerpoDelCatch` se queda donde esta —lo usa un solo archivo— pero eso es una
+DECISION, no una obligacion, y asi queda escrito.
+
+Y CON PERMISO DEL DUEÑO (26-ago-2026), pedido antes de seguir tocando: se
+añadieron a la foto ya grabada tres sitios, SIN tocar su linea de salida —
+pruebas/avisoCalificacion.test.js y los dos sitios de la carga de aliados.
+
+LO QUE COSTO NO DECLARARLOS: el mismo `catch (e) {}` de la carga se tapo en el
+panel y se quedo abierto en aliados, en el mismo archivo declarado. Al restaurante
+se le seguia diciendo "Aun no tienes calificaciones" cuando lo que pasaba es que
+no se pudieron mirar — el mismo bicho que en el panel llame "el peor de los tres".

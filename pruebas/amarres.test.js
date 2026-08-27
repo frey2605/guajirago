@@ -729,3 +729,119 @@ describe('SEGUNDA LEY · el panel y aliados leen el cuarto privado por el MISMO 
     });
   });
 });
+
+describe('AMARRES · REGLA 9 · las tres apps clasifican IGUAL un rechazo', () => {
+  // «Nada se rechaza en silencio» está resuelto en los tres repos, y los tres son
+  // repos APARTE: no hay forma de importar de uno a otro. Así que hay copias, y
+  // este amarre EJECUTA las tres con los mismos fallos.
+  //
+  // Lo que se compara es la CLASIFICACIÓN, no el texto: el texto tiene que ser
+  // distinto a propósito (a un cliente se le dice que no entró su calificación; a
+  // un restaurante, que no se pudo reportar un comentario). Lo que no puede
+  // separarse es QUÉ clase de fallo es cada código: si un día una app tratara
+  // «sin internet» como «no tienes permiso», le diría a alguien que no puede
+  // hacer algo que sí puede.
+  const CASOS = [
+    { e: { code: 'permission-denied' }, clase: 'permiso' },
+    { e: { code: 'unavailable' }, clase: 'sinRed' },
+    { e: { code: 'deadline-exceeded' }, clase: 'sinRed' },
+    { e: { code: 'algo-que-nadie-ha-visto' }, clase: 'otro' },
+    { e: {}, clase: 'otro' },
+    { e: null, clase: 'otro' },
+  ];
+
+  it('el mismo fallo cae en la misma clase en la app, en aliados y en el panel', () => {
+    // La app del pasajero devuelve el objeto de MOTIVOS; los otros dos traen la
+    // clase dentro. Se normalizan las dos formas y se comparan.
+    const app = cargarDeLaApp('guajirago/src/avisoCalificacion.js');
+    const claseEnLaApp = (e) => {
+      const m = app.motivoDeRechazo(e);
+      for (const k of Object.keys(app.MOTIVOS)) if (app.MOTIVOS[k] === m) return k;
+      return '(ninguna)';
+    };
+    const aliados = cargarDeLaApp('guajirago-aliados/src/avisoRechazo.js');
+    const panel = cargarDeLaApp('guajirago-admin/src/avisoRechazo.js');
+
+    // LOS CÓDIGOS NO SE ESCRIBEN A MANO. La primera versión de este amarre solo
+    // probaba seis, cada uno contra una respuesta fija, y NUNCA comparaba las tres
+    // apps entre sí. La segunda opinión lo rompió: enseñó a los dos gemelos un
+    // código nuevo ('resource-exhausted') que la app del pasajero seguía tratando
+    // de otra manera, y el amarre pasó en verde. Su propio comentario prometía que
+    // «se pone roja si alguno clasifica distinto». No era cierto.
+    //
+    // Ahora se barren TODOS los códigos que nombra cualquiera de los tres
+    // archivos, más los raros de siempre. Si mañana una app aprende un código que
+    // las otras no, este barrido lo encuentra solo.
+    const nombrados = new Set();
+    for (const ruta of ['guajirago/src/avisoCalificacion.js',
+      'guajirago-aliados/src/avisoRechazo.js', 'guajirago-admin/src/avisoRechazo.js']) {
+      // Se sacan de donde se comparan de verdad —`codigo === '…'`— y no de
+      // cualquier texto entrecomillado del archivo: así no entran las claves
+      // ('permiso', 'sinRed') ni los trozos de frase.
+      for (const m of leer(ruta).matchAll(/codigo === '([^']+)'/g)) nombrados.add(m[1]);
+    }
+    assert.ok(nombrados.size >= 3,
+      'esperaba al menos 3 códigos de fallo entre los tres archivos y encontré '
+      + nombrados.size + ': ' + [...nombrados].join(', '));
+    const RAROS = [null, undefined, {}, 'un texto suelto', new Error('boom'), { code: 42 }];
+    const TODOS = [...[...nombrados].map((code) => ({ code })), ...RAROS];
+
+    for (const e of TODOS) {
+      const enApp = claseEnLaApp(e);
+      const enAliados = aliados.motivoDeRechazo(e, 'hacer algo').clave;
+      const enPanel = panel.motivoDeRechazo(e, 'hacer algo').clave;
+      const cual = JSON.stringify(e && e.code ? e.code : e);
+      // Las TRES entre sí, que es lo que promete el nombre de esta prueba.
+      assert.strictEqual(enAliados, enApp,
+        'con ' + cual + ' la app dice «' + enApp + '» y aliados «' + enAliados + '»');
+      assert.strictEqual(enPanel, enApp,
+        'con ' + cual + ' la app dice «' + enApp + '» y el panel «' + enPanel + '»');
+      // Y ninguna se inventa una clase que no esté en la lista compartida.
+      assert.ok(aliados.CLAVES.includes(enApp),
+        'con ' + cual + ' sale la clase «' + enApp + '», que no está en CLAVES');
+    }
+
+    // Y encima, los casos escritos a mano con su respuesta esperada: el barrido
+    // de arriba se pondría rojo si las tres se equivocaran IGUAL, pero no si las
+    // tres cambiaran a la vez. Esto fija la conducta, no solo el acuerdo.
+    for (const c of CASOS) {
+      assert.strictEqual(claseEnLaApp(c.e), c.clase,
+        'la app clasifica ' + JSON.stringify(c.e) + ' como «' + claseEnLaApp(c.e) + '»');
+    }
+  });
+
+  it('ninguna de las tres devuelve un aviso vacío, pase lo que pase', () => {
+    // De donde venimos es de no avisar NUNCA. Un aviso genérico vale; ninguno, no.
+    const app = cargarDeLaApp('guajirago/src/avisoCalificacion.js');
+    const aliados = cargarDeLaApp('guajirago-aliados/src/avisoRechazo.js');
+    const panel = cargarDeLaApp('guajirago-admin/src/avisoRechazo.js');
+    for (const c of CASOS.concat([{ e: 'un texto suelto' }, { e: new Error('boom') }])) {
+      for (const [nombre, m] of [
+        ['la app', app.motivoDeRechazo(c.e)],
+        ['aliados', aliados.motivoDeRechazo(c.e, 'hacer algo')],
+        ['el panel', panel.motivoDeRechazo(c.e, 'hacer algo')],
+      ]) {
+        assert.ok(m && m.titulo && m.texto,
+          nombre + ' se quedó sin aviso con ' + JSON.stringify(c.e));
+      }
+    }
+  });
+
+  it('los DOS GEMELOS (aliados y panel) son el mismo archivo, byte a byte', () => {
+    // Estos dos sí tienen que ser idénticos: son la misma pieza copiada porque los
+    // repos no pueden compartir archivo. El de la app del pasajero NO entra aquí:
+    // su texto es distinto a propósito, y lo que lo amarra es la prueba de arriba.
+    const a = leer('guajirago-aliados/src/avisoRechazo.js');
+    const p = leer('guajirago-admin/src/avisoRechazo.js');
+    assert.strictEqual(a, p,
+      'avisoRechazo.js se separó entre aliados y el panel. Son gemelos: se tocan los dos ' +
+      'o ninguno.');
+  });
+
+  it('la acción se mete en la frase: el aviso dice QUÉ falló, no «error» a secas', () => {
+    const aliados = cargarDeLaApp('guajirago-aliados/src/avisoRechazo.js');
+    const m = aliados.motivoDeRechazo({ code: 'unavailable' }, 'reportar el comentario');
+    assert.ok((m.titulo + m.texto).includes('reportar el comentario'),
+      'el aviso no dice qué se estaba intentando: «' + m.titulo + ' / ' + m.texto + '»');
+  });
+});
