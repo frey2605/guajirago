@@ -157,3 +157,85 @@ LO QUE COSTO NO DECLARARLOS: el mismo `catch (e) {}` de la carga se tapo en el
 panel y se quedo abierto en aliados, en el mismo archivo declarado. Al restaurante
 se le seguia diciendo "Aun no tienes calificaciones" cuando lo que pasaba es que
 no se pudieron mirar — el mismo bicho que en el panel llame "el peor de los tres".
+
+── 27-ago-2026 · REGLA 9 en el panel ───────────────────────────────────────────
+FOTO: "REGLA 9 en el panel: los botones que fallaban en silencio"
+EL GUARDIAN PARA POR: CODIGO MOVIDO DE SITIO
+       pruebas/avisoCalificacion.test.js -> pruebas/cargar.cjs
+       (soloCodigo, sinTextos, cuerpoDeLaFuncion, cuerpoDelCatch)
+
+Y hace bien en parar: la PRIMERA LEY dice que el codigo que funciona no se mueve.
+
+POR QUE SE MOVIO IGUAL, y por que estaba DECLARADO en la foto antes de tocar:
+esos cuatro ayudantes los usan ahora DOS archivos de pruebas. Dejarlos donde
+estaban obligaba a copiarlos, y eso es lo que prohibe la SEGUNDA LEY. No es un
+arreglo "de paso": es la correccion de un fallo mio que la segunda opinion
+señalo el 26-ago con el grep en la mano — yo habia escrito en este mismo libro
+que "no habia casa comun para los ayudantes de pruebas", y era falso: la casa es
+pruebas/cargar.cjs, y su propia cabecera dice que se hizo para eso.
+
+Los dos sitios estaban en la foto desde el principio:
+   · pruebas/cargar.cjs:los ayudantes de leer codigo
+   · pruebas/avisoCalificacion.test.js:traerse los ayudantes de cargar.cjs
+Lo que NO se hizo fue pedir permiso APARTE para el movimiento en si. Queda dicho.
+
+QUE NO SE ROMPIO NADA, comprobado: 480 pruebas verdes, las mismas de antes mas
+las nuevas. Y al mudarlo aparecio un fallo que el ayudante traia de antes:
+cuerpoDeLaFuncion tomaba las llaves de los PARAMETROS por el cuerpo, asi que con
+`function Restaurantes({ irA }) {` devolvia 33 letras en vez de 15.000. Arreglado
+en la mudanza, con su prueba.
+
+── 27-ago-2026 · AUTORIZADO POR EL DUEÑO ───────────────────────────────────────
+Se le pregunto por la mudanza de los cuatro ayudantes (la anotacion de aqui
+arriba) y contesto: «Dejalo, lo autorizo».
+
+Y de paso dejo la regla para todo lo que venga, con sus palabras:
+
+  «Si en algun momento necesitas modificar un documento para el bienestar y
+   desarrollo del sistema solo debes pedir el permiso. Pero solo si es necesario
+   hacerlo y solo tocando lo que es necesario. Pides siempre el permiso y yo te
+   lo autorizo.»
+
+LO QUE CAMBIA A PARTIR DE AHORA: cuando el guardian o el candado paren, se
+PREGUNTA. Anotarlo aqui y seguir NO sustituye a preguntar — eso fue el error de
+la anotacion anterior. Las dos veces que se pregunto (26-ago), al declarar bien
+el sitio aparecio un fallo real que se habria quedado dentro.
+
+── 30-ago-2026 · ANOTADO, NO ARREGLADO: Conductores.js ─────────────────────────
+La segunda opinion previa al commit del arreglo del panel encontro un problema
+NUEVO, fuera de la foto. Se anota y se le dice al dueño (PRIMERA LEY, punto 4).
+
+QUE ES: guajirago-admin/src/Conductores.js tiene DOCE escrituras que no le dicen
+NADA al dueño cuando el servidor dice que no. En todo el archivo hay 0 setAviso,
+0 alert y 0 apuntarRechazo. Medido, no supuesto:
+  · Cuatro con `catch (e) { console.error(e); }` — rastro en la consola, CERO en
+    pantalla: renglones 299, 307, 321, 333.
+  · Ocho SIN catch ninguno, `onClick={async () => { await updateDoc(...) }}` a
+    pelo: renglones 471, 479, 517, 767, 901, 909, 1009, 1017.
+
+POR QUE PESA: es la pantalla donde se SANCIONA y se REACTIVA a un conductor. Se
+le quita el trabajo a alguien, el servidor lo rechaza, y la pantalla se queda
+igual. No hay forma de distinguir "se hizo" de "no se hizo".
+
+POR QUE SE ESCAPO: la cuenta de escrituras mudas se hizo buscando `catch (e) {}`
+VACIOS. Ninguna de las doce lo es. El metodo fallo, no la intencion — pero el
+numero que quedo escrito ("quedan TRES") era FALSO, y el dueño se lo iba a creer.
+Corregido a QUINCE en los dos sitios donde estaba: AvisoModal.js y la cabecera de
+pruebas/avisosPanel.test.js.
+
+LO QUE SI SE ARREGLO EN ESTE MISMO CAMBIO, porque eran pruebas MIAS de ESTE
+arreglo que no podian fallar nunca (dentro de la foto, archivo declarado):
+  · «la ventanita es UNA para todo el panel» buscaba el fondo oscuro y la palabra
+    «Entendido» a menos de 400 letras. En la ventanita de verdad hay 785: el
+    detector de gemelos no reconocia ni al original. La segunda opinion pego la
+    ventanita ENTERA dentro de Turismo.js y la prueba siguio verde. Ahora se
+    miran las dos MARCAS (fondo oscuro + boton de cerrar) sin medir distancia.
+  · «no queda NINGUNA escritura muda» solo cazaba el catch VACIO. Un boton nuevo
+    con `catch (e) { console.error(e); }` pasaba verde — y esa es la costumbre de
+    esta misma casa. Ahora caza las dos formas: el catch que no avisa, y la
+    escritura que no tiene catch ninguno.
+  Comprobado por mutantes: los TRES que sobrevivian ahora MUEREN, y los mata la
+  prueba correcta por su nombre. Los diez de la vuelta anterior siguen muertos.
+
+QUEDA PENDIENTE: Conductores.js con su propia foto y sus diez pasos. NO se toca
+en este cambio.

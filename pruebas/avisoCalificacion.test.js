@@ -26,86 +26,12 @@ const path = require('node:path');
 // libro de excepciones: dije que no había casa común para los ayudantes de
 // pruebas y que por eso me salía de la foto con «CERO código duplicado». Las dos
 // mitades eran falsas: la casa es esta, y este archivo duplicaba `leer`.
-const { leer, cargarDeLaApp } = require('./cargar.cjs');
+// Los ayudantes que leen código sin que los comentarios engañen viven en
+// cargar.cjs, la casa común de las pruebas (SEGUNDA LEY). Estaban aquí, y aquí
+// se quedaron de más: los usa también pruebas/avisosPanel.test.js.
+const { leer, cargarDeLaApp, soloCodigo, cuerpoDelCatch } = require('./cargar.cjs');
 
 const { motivoDeRechazo, MOTIVOS } = cargarDeLaApp('guajirago/src/avisoCalificacion.js');
-
-// Se miran los RENGLONES DE CÓDIGO, no los comentarios. La primera versión de
-// estas pruebas no lo hacía y se puso roja ella sola: encontró un «catch (e) {}»
-// escrito DENTRO de un comentario que explicaba cómo era antes. Una prueba que
-// lee comentarios no comprueba lo que hace el programa: comprueba lo que dice.
-//
-// El `//` se quita solo cuando ABRE el renglón. La versión anterior lo quitaba
-// en cualquier posición, así que se comía la mitad de un texto entrecomillado
-// como 'https://…' y mutilaba justo el código que venía a mirar. Y se quitan
-// también los comentarios de bloque, que la anterior no tocaba — por ahí se le
-// colaba un `catch (e) { /* nada */ }`. Las dos cosas las cazó la segunda opinión.
-const soloCodigo = (t) => t
-  .replace(/\/\*[\s\S]*?\*\//g, '')
-  .split('\n').map((l) => l.replace(/^\s*\/\/.*$/, '')).join('\n');
-
-/**
- * Deja el código con la MISMA longitud pero sin nada dentro de los textos
- * entrecomillados: cada letra de dentro pasa a ser una «x». Se conserva el largo
- * para que los números de posición sigan valiendo.
- *
- * Hace falta para contar llaves. Sin esto, un `console.log('formato {{ raro')`
- * dentro de un catch descuadraba la cuenta, el contador se salía de la función y
- * acababa mirando el catch del vecino — y la prueba salía VERDE con el agujero
- * abierto. Lo demostró la segunda opinión ejecutándolo.
- */
-const sinTextos = (t) => t.replace(/'(?:[^'\\\n]|\\.)*'|"(?:[^"\\\n]|\\.)*"|`(?:[^`\\]|\\.)*`/g,
-  (s) => s[0] + 'x'.repeat(s.length - 2) + s[s.length - 1]);
-
-/**
- * El cuerpo de la función que empieza en `desde`, contando llaves.
- */
-function cuerpoDeLaFuncion(codigo, desde) {
-  const seguro = sinTextos(codigo);
-  const abre = seguro.indexOf('{', desde);
-  if (abre < 0) return null;
-  let i = abre + 1;
-  let hondo = 1;
-  while (i < seguro.length && hondo > 0) {
-    if (seguro[i] === '{') hondo += 1;
-    else if (seguro[i] === '}') hondo -= 1;
-    i += 1;
-  }
-  return { ini: abre + 1, fin: i - 1, texto: codigo.slice(abre + 1, i - 1) };
-}
-
-/**
- * El cuerpo de un `catch`, buscado SOLO DENTRO de la función que empieza en
- * `desde`. Se cuenta en vez de buscar con una expresión porque el agujero se
- * puede escribir de muchas formas —`catch {}` sin paréntesis es JavaScript válido
- * desde 2019— y una expresión solo pilla las que a uno se le ocurrieron.
- *
- * EL «SOLO DENTRO» NO ES ADORNO. La primera versión buscaba hacia adelante sin
- * tope: al quitarle el try/catch a `restaurar()`, agarraba el de
- * `mantenerOculto()` —la función de al lado— y daba la prueba por buena. La
- * segunda opinión lo puso y salió VERDE con el rechazo otra vez mudo. En ese
- * archivo hay TRES catch seguidos: cada uno tapaba al anterior.
- *
- * Devuelve null si esa función no tiene catch, y eso ES un fallo: quien llama
- * tiene que comprobarlo.
- */
-function cuerpoDelCatch(codigo, desde) {
-  const fn = cuerpoDeLaFuncion(codigo, desde);
-  if (!fn) return null;
-  const seguro = sinTextos(codigo);
-  const m = /catch\s*(\([^)]*\))?\s*\{/.exec(seguro.slice(fn.ini, fn.fin));
-  if (!m) return null;
-  let i = fn.ini + m.index + m[0].length;
-  let hondo = 1;
-  const ini = i;
-  while (i < fn.fin && hondo > 0) {
-    if (seguro[i] === '{') hondo += 1;
-    else if (seguro[i] === '}') hondo -= 1;
-    i += 1;
-  }
-  return codigo.slice(ini, i - 1);
-}
-
 describe('REGLA 9 · una calificación que no entra se le dice al cliente', () => {
   it('el «no tienes permiso» del servidor se traduce a algo que una persona entiende', () => {
     const m = motivoDeRechazo({ code: 'permission-denied' });

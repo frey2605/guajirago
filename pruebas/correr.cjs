@@ -73,7 +73,7 @@ const r = spawnSync(
     // tarifas.test.js no necesita el emulador (es aritmética), pero se corre aquí
     // igual para que `npm test` sea UN solo comando: una prueba que hay que
     // acordarse de correr aparte es una prueba que nadie corre.
-    '"node --test pruebas/reglas.test.js pruebas/tarifas.test.js pruebas/descuentos.test.js pruebas/codigoSeguridad.test.js pruebas/viajeNuevo.test.js pruebas/compartidos.test.js pruebas/avisoCalificacion.test.js pruebas/filtroChat.test.js pruebas/amarres.test.js pruebas/vaciado.test.js"',
+    '"node --test pruebas/reglas.test.js pruebas/tarifas.test.js pruebas/descuentos.test.js pruebas/codigoSeguridad.test.js pruebas/viajeNuevo.test.js pruebas/compartidos.test.js pruebas/avisoCalificacion.test.js pruebas/avisosPanel.test.js pruebas/filtroChat.test.js pruebas/amarres.test.js pruebas/vaciado.test.js"',
   ],
   { cwd: RAIZ, env: entorno, stdio: 'inherit', shell: true }
 );
