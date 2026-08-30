@@ -46,7 +46,45 @@ const BOTONES = [
   ['guajirago-admin/src/Codigos.js', 'enviarCodigoExistentePorChat', 'reenviar un código por el chat'],
   ['guajirago-admin/src/Codigos.js', 'anular', 'anular un código de recarga'],
   ['guajirago-admin/src/App.js', 'enviarRespuestaChat', 'contestar un reclamo'],
+
+  // ── CONDUCTORES.JS, cerrado el 30-ago-2026 ────────────────────────────────
+  // Entra en ESTA lista y no en un archivo de pruebas propio, y no es por
+  // comodidad: la comprobación de «no queda ninguna escritura muda» saca sus
+  // archivos de aquí abajo (PANTALLAS). Un archivo aparte habría sido una SEGUNDA
+  // versión del mismo proceso, que es lo que prohíbe la SEGUNDA LEY. Se le pidió
+  // permiso al dueño para tocar este archivo, que no estaba en la foto, y lo dio.
+  //
+  // Estas cuatro tienen nombre y caben en la maquinaria de arriba. Las OTRAS OCHO
+  // viven dentro del JSX y no tienen nombre: van en la lista de más abajo.
+  ['guajirago-admin/src/Conductores.js', 'aplicarSancion', 'sancionar a un conductor'],
+  ['guajirago-admin/src/Conductores.js', 'reactivar', 'reactivar a un conductor'],
+  ['guajirago-admin/src/Conductores.js', 'enviarLlamado', 'enviar un llamado de atención'],
+  ['guajirago-admin/src/Conductores.js', 'guardarEdicion', 'guardar los datos de un conductor'],
 ];
+
+// ── LOS BOTONES QUE NO TIENEN NOMBRE ────────────────────────────────────────
+// Ocho escrituras de Conductores.js viven sueltas dentro del JSX, en
+// `onClick={async () => { … }}`. No hay ninguna función que buscar por nombre, así
+// que se buscan por la ESCRITURA misma. Cada ancla tiene que salir el número de
+// veces que se dice: si mañana alguien copia una más, la prueba lo dice.
+//
+// SEIS DE LAS OCHO SON EL MISMO CÓDIGO ESCRITO TRES VECES (cambiar la duración y
+// quitar la sanción, copiado tal cual en tres vistas). Se arregló en los tres
+// sitios, como manda la SEGUNDA LEY —«se hace el arreglo en los dos sitios porque
+// hay que dejarlo funcionando, y se anota el gemelo como deuda»—. NO se unificó:
+// eso es tocar código que funciona, y va con su propia foto y su permiso.
+const SIN_NOMBRE = [
+  ["nuevasSanciones[i] = { ...s, duracion: d.label", 2, 'cambiar la duración de la sanción'],
+  ["nuevasSanciones[idxReal] = { ...s, duracion: d.label", 1, 'cambiar la duración (vista de detalle)'],
+  ["(c.sanciones || []).filter((_, idx) => idx !== i)", 2, 'quitar una sanción'],
+  ["(c.sanciones || []).filter((_, idx) => idx !== idxReal)", 1, 'quitar una sanción (vista de detalle)'],
+  // Se ancla en el updateDoc entero: `mensajesApelacion: [...previos,
+  // nuevoMensaje]` a secas sale DOS veces —la escritura y el setSeleccionado de
+  // después— y estaríamos comprobando dos cosas creyendo que es una.
+  ["updateDoc(doc(db, 'usuarios', c.id), { mensajesApelacion:", 1, 'contestar la apelación del conductor'],
+  ["{ fechaArchivado: new Date().toISOString() }", 1, 'archivar a un conductor'],
+];
+const ARCHIVO_SIN_NOMBRE = 'guajirago-admin/src/Conductores.js';
 
 const PANTALLAS = [...new Set(BOTONES.map((b) => b[0]))];
 
@@ -147,6 +185,41 @@ describe('REGLA 9 · los botones del panel ya no fallan en silencio', () => {
     });
   }
 
+  // ── Y QUE NO ESTÉ METIDA DENTRO DE OTRA COSA ─────────────────────────────
+  // Estar en el return bueno no basta. La segunda opinión cogió la ventanita de
+  // Conductores.js y la metió, letra por letra, DENTRO del modal de llamado de
+  // atención: `{llamadoConductor && ( … <AvisoModal/> … )}`. Las 51 pruebas
+  // siguieron verdes, y el aviso solo se vería con ese otro modal abierto — o sea,
+  // casi nunca. Las dos comprobaciones de arriba no lo ven: está en el return del
+  // componente, y su propio renglón no lleva ningún `&&`.
+  //
+  // Lo que se mira ahora es la ANIDACIÓN: desde que abre el return hasta la
+  // ventanita, no puede quedar ninguna llave de JSX abierta. Una llave abierta es
+  // un «solo si…» de por medio.
+  it('EL QUE MUERDE · la ventanita no está METIDA DENTRO de otro modal', () => {
+    for (const archivo of PANTALLAS) {
+      const t = soloCodigo(leer(archivo));
+      const seguro = sinTextos(t);
+      const pos = t.indexOf('<AvisoModal aviso={aviso}');
+      assert.ok(pos > 0, archivo + ': no encontré la ventanita');
+
+      // El `return (` del componente que la contiene: el último que hay antes.
+      const antes = [...seguro.slice(0, pos).matchAll(/^ {2}return \($/gm)];
+      assert.ok(antes.length > 0, archivo + ': la ventanita no está dentro de ningún return');
+      const abre = antes[antes.length - 1].index;
+
+      let hondo = 0;
+      for (let i = abre; i < pos; i += 1) {
+        if (seguro[i] === '{') hondo += 1;
+        else if (seguro[i] === '}') hondo -= 1;
+      }
+      assert.strictEqual(hondo, 0,
+        archivo + ': la ventanita está METIDA DENTRO de otra cosa (quedan ' + hondo
+        + ' llave(s) sin cerrar antes de ella). Solo se vería cuando esa otra cosa '
+        + 'se esté pintando, y eso es casi nunca.');
+    }
+  });
+
   // ── EL MISMO ARCHIVO NO ES EL MISMO SITIO ────────────────────────────────
   // Van TRES veces que muerde este bicho: archivo correcto, sitio equivocado. La
   // tercera fue aquí — el estado `aviso` acabó en el componente del login y el
@@ -228,6 +301,106 @@ describe('REGLA 9 · los botones del panel ya no fallan en silencio', () => {
     assert.ok(quedan > 0,
       'ya no quedan catch vacíos en las lecturas: si es así, borra esta prueba y '
       + 'la anotación que la acompaña.');
+  });
+});
+
+// ── LOS OCHO BOTONES SIN NOMBRE DE CONDUCTORES.JS ──────────────────────────
+// Están sueltos dentro del JSX: `onClick={async () => { … }}`. No hay función que
+// buscar, así que se busca la ESCRITURA y se sube desde ella hasta el `try` que la
+// envuelve. Hasta el 30-ago-2026 no tenían try ninguno: si el servidor decía que
+// no, el fallo se perdía en el aire y la pantalla se quedaba igual.
+describe('REGLA 9 · los botones sin nombre de Conductores.js', () => {
+  // El catch que protege la posición `pos`. Se sube contando llaves hasta dar con
+  // el `try {` que nos envuelve, y desde su llave de cierre se lee el catch.
+  //
+  // NO VALE «el primer catch que venga después»: en este archivo los botones están
+  // pegados unos a otros y se leería el del vecino, que es el fallo contra el que
+  // ya avisa cuerpoDelCatch en cargar.cjs. Aquí se sube primero y se baja después.
+  //
+  // Y SE PARA EN LA PUERTA DE LA FUNCIÓN. Sin ese tope, un `try` puesto en un
+  // ancestro —por ejemplo alrededor del `.map()` que dibuja el botón— se daría por
+  // bueno, y en marcha ese try no protege NADA: el dibujo terminó mucho antes de
+  // que el `onClick` asíncrono falle. Lo señaló la segunda opinión.
+  const catchQueProtege = (codigo, pos) => {
+    const seguro = sinTextos(codigo);
+    let hondo = 0;
+    let abreTry = -1;
+    for (let i = pos - 1; i >= 0; i -= 1) {
+      if (seguro[i] === '}') hondo += 1;
+      else if (seguro[i] === '{') {
+        if (hondo > 0) { hondo -= 1; continue; }
+        if (/\btry\s*$/.test(seguro.slice(Math.max(0, i - 8), i))) { abreTry = i; break; }
+        // Esta llave abierta no es un try. Si es la de una FUNCIÓN, se acabó:
+        // lo que haya más arriba pertenece a otra ejecución.
+        const delante = seguro.slice(Math.max(0, i - 40), i);
+        if (/=>\s*$/.test(delante) || /\)\s*$/.test(delante)) return null;
+      }
+    }
+    if (abreTry < 0) return null;
+    // De la llave del try hasta la suya de cierre.
+    let j = abreTry + 1;
+    let h = 1;
+    while (j < seguro.length && h > 0) {
+      if (seguro[j] === '{') h += 1;
+      else if (seguro[j] === '}') h -= 1;
+      j += 1;
+    }
+    const m = /^\s*catch\s*(\([^)]*\))?\s*\{/.exec(seguro.slice(j));
+    if (!m) return null;
+    let k = j + m[0].length;
+    const ini = k;
+    h = 1;
+    while (k < seguro.length && h > 0) {
+      if (seguro[k] === '{') h += 1;
+      else if (seguro[k] === '}') h -= 1;
+      k += 1;
+    }
+    return codigo.slice(ini, k - 1);
+  };
+
+  for (const [ancla, veces, que] of SIN_NOMBRE) {
+    it('EL QUE MUERDE · «' + que + '» avisa si el servidor dice que no', () => {
+      const t = soloCodigo(leer(ARCHIVO_SIN_NOMBRE));
+      const trozos = t.split(ancla);
+      assert.strictEqual(trozos.length - 1, veces,
+        'el botón «' + que + '» sale ' + (trozos.length - 1) + ' veces y se esperaban '
+        + veces + '. O se copió otra vez —y entonces hay una copia sin comprobar— o '
+        + 'se cambió el código y esta prueba está mirando al vacío.');
+
+      let desde = 0;
+      for (let n = 0; n < veces; n += 1) {
+        const pos = t.indexOf(ancla, desde);
+        desde = pos + ancla.length;
+        const donde = que + ' (copia ' + (n + 1) + ' de ' + veces + ', renglón '
+          + t.slice(0, pos).split('\n').length + ')';
+
+        const cuerpo = catchQueProtege(t, pos);
+        assert.ok(cuerpo !== null, donde + ': la escritura NO está dentro de ningún '
+          + 'try. Si el servidor dice que no, el fallo se pierde en el aire.');
+        assert.ok(/apuntarRechazo\s*\(/.test(cuerpo),
+          donde + ': el catch no deja rastro del rechazo');
+        assert.ok(/setAviso\s*\(\s*motivoDeRechazo/.test(cuerpo),
+          donde + ': no le dice NADA al dueño. Aquí se sanciona y se reactiva a un '
+          + 'conductor: si falla callado, el dueño cree que lo bloqueó y el conductor '
+          + 'sigue trabajando.');
+        assert.ok(!/setAviso\s*\(\s*null\s*\)/.test(cuerpo),
+          donde + ': pone el aviso y lo quita en el mismo catch. Se ve igual que no avisar.');
+      }
+    });
+  }
+
+  it('EL QUE MUERDE · la ventanita va por ENCIMA de los modales de esta pantalla', () => {
+    // Conductores.js tiene sus propios modales a 9999. Si el aviso quedara por
+    // debajo, saldría tapado — que en la pantalla se ve igual que no salir.
+    const modal = leer('guajirago-admin/src/AvisoModal.js');
+    const suyo = Number((/zIndex:\s*(\d+)/.exec(modal) || [])[1]);
+    assert.ok(suyo > 0, 'la ventanita no declara zIndex');
+    const t = soloCodigo(leer(ARCHIVO_SIN_NOMBRE));
+    for (const m of t.matchAll(/zIndex:\s*(\d+)/g)) {
+      assert.ok(suyo >= Number(m[1]),
+        'Conductores.js tiene algo a zIndex ' + m[1] + ' y la ventanita está a '
+        + suyo + ': el aviso sale TAPADO, que se ve igual que no salir.');
+    }
   });
 });
 
@@ -362,6 +535,45 @@ describe('REGLA 9 · en el panel no queda NINGUNA escritura muda', () => {
       // primera versión tampoco la veía.
       for (const m of t.matchAll(GUARDA)) {
         if (!dentroDeTry(seguro, m.index)) mudas.push(renglon(m.index) + ' (sin try)');
+      }
+
+      // FORMA 3 · la escritura SIN `await`, dentro de un try perfecto.
+      //
+      // Este es el que de verdad devuelve la pantalla al silencio, y sobrevivía a
+      // TODO lo demás: sin `await`, la promesa se rechaza sola, el catch no se
+      // entera y el aviso no sale nunca. El try sigue ahí, el catch sigue ahí con
+      // sus dos renglones, y no sirven para nada. La segunda opinión le quitó el
+      // await a las doce escrituras de Conductores.js de golpe y las 51 pruebas
+      // siguieron VERDES. Medido el 30-ago-2026: las 31 escrituras de las siete
+      // pantallas lo llevan, así que esto no cambia nada hoy — cierra el mañana.
+      for (const m of t.matchAll(GUARDA)) {
+        if (!/await\s+$/.test(t.slice(Math.max(0, m.index - 10), m.index))) {
+          mudas.push(renglon(m.index) + ' (sin await: el catch no se entera)');
+        }
+      }
+
+      // FORMA 4 · un `.catch(...)` pegado a la escritura, DENTRO del try.
+      //
+      // Se traga el fallo antes de que el catch bueno lo vea. Mismo resultado que
+      // no tener catch, pero con toda la pinta de estar bien puesto.
+      //
+      // SE CUENTAN LOS PARÉNTESIS de la propia llamada; NO vale «busca un .catch
+      // en las próximas 400 letras». Esa fue la primera versión y señaló como
+      // culpable a Codigos.js:122, saltando por encima de diez renglones hasta un
+      // `.catch` de `navigator.clipboard.writeText` que no tiene nada que ver.
+      // Se puso roja sobre código sano, que es el peor fallo que puede tener una
+      // prueba: enseña a desconfiar de ella.
+      for (const m of t.matchAll(GUARDA)) {
+        let i = m.index + m[0].length;
+        let hondo = 1;
+        while (i < seguro.length && hondo > 0) {
+          if (seguro[i] === '(') hondo += 1;
+          else if (seguro[i] === ')') hondo -= 1;
+          i += 1;
+        }
+        if (/^\s*\.catch\s*\(/.test(seguro.slice(i, i + 20))) {
+          mudas.push(renglon(m.index) + ' (un .catch pegado se come el fallo antes)');
+        }
       }
 
       assert.deepStrictEqual(mudas, [],

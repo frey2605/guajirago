@@ -239,3 +239,81 @@ arreglo que no podian fallar nunca (dentro de la foto, archivo declarado):
 
 QUEDA PENDIENTE: Conductores.js con su propia foto y sus diez pasos. NO se toca
 en este cambio.
+
+── 30-ago-2026 · AUTORIZADO POR EL DUEÑO ───────────────────────────────────────
+Trabajo: REGLA 9 en Conductores.js (las 12 escrituras que no dicen nada).
+
+SE PIDIO PERMISO para tocar pruebas/avisosPanel.test.js, que NO estaba en la foto.
+Contesto: «Toca avisosPanel.test.js — un solo sitio».
+
+POR QUE HIZO FALTA PREGUNTAR: la foto declaraba un archivo NUEVO,
+pruebas/avisosConductores.test.js. Pero la comprobacion de «no queda ninguna
+escritura muda» YA EXISTE en avisosPanel.test.js y saca su lista de archivos de
+la lista BOTONES. Un archivo aparte habria creado una SEGUNDA version del mismo
+proceso — justo lo que prohibe la SEGUNDA LEY: «Antes de escribir algo nuevo se
+busca si ya existe. No se hace una segunda version.»
+
+No es el caso de «aparecio un gemelo, se anota»: aqui el gemelo lo iba a crear YO
+a proposito, y eso no se anota, se evita.
+
+QUE SE TOCA DE ESE ARCHIVO: la lista BOTONES (se le añaden los 12 de Conductores),
+la lista PANTALLAS, y las pruebas nuevas que hagan falta para los 8 botones que
+viven DENTRO del JSX y no tienen nombre de funcion — la maquinaria de ahora busca
+por nombre y con esos no sirve. NO se toca nada mas de ese archivo.
+
+pruebas/avisosConductores.test.js NO SE CREA. Queda fuera.
+
+── 30-ago-2026 · EL GUARDIAN NO CUBRIO ESTE CAMBIO. Se dice ────────────────────
+`guardian.cjs revisar` dijo «✓ LO TOCADO CUADRA CON LO PROMETIDO (1 archivo)» y
+ese archivo era SOLO la prueba. Conductores.js —que es todo el cambio— y
+scripts/medir-conductores.cjs le fueron INVISIBLES.
+
+POR QUE: la foto se re-tomo a las 8:39, DESPUES de haberlos tocado (habia que
+re-tomarla para declarar avisosPanel.test.js, que el dueño acababa de autorizar).
+Los dos entraron en `suciosPrevios`, y guardian.cjs:206 los salta:
+`if (previos.has(c.ruta)) continue; // ya estaba sucio antes de la foto`.
+
+Rompe la LEY 1 punto 5: la promesa se graba ANTES de empezar. Se toco primero y
+se fotografio despues.
+
+QUE SE HIZO EN SU LUGAR, porque el visto bueno del guardian no valia: se careo el
+diff contra lo COMMITEADO, que es la unica referencia limpia. Resultado medido:
+  · 45 renglones quitados, 41 REAPARECEN IDENTICOS salvo la sangria (entraron en
+    un try, que corre el codigo dos espacios).
+  · Los 4 que NO vuelven son exactamente los 4 `catch (e) { console.error(e); }`,
+    que es lo que este arreglo viene a cerrar.
+  · Ni un bloque movido de sitio. Lo confirmo tambien la segunda opinion, por su
+    cuenta y con su propio metodo.
+
+QUE HAY QUE HACER LA PROXIMA VEZ: si a mitad de trabajo hay que ampliar la foto,
+se COMMITEA o se guarda lo hecho antes de re-fotografiar; si no, el guardian se
+queda ciego para lo que ya estaba tocado y su «verde» no significa nada.
+
+── 30-ago-2026 · LO QUE ENCONTRO LA SEGUNDA OPINION Y SE ARREGLO ───────────────
+De 29 mutantes, TRES sobrevivian. Los tres se comprobaron aparte antes de creerlos:
+
+1. SIN `await`. Quitarle el await a las DOCE escrituras dejaba las 51 pruebas en
+   verde y la pantalla muda otra vez: la promesa se rechaza sola, el catch no se
+   entera. El try y el catch siguen ahi de adorno. Era un agujero de TODO el
+   bloque REGLA 9, no solo de Conductores.
+2. UN `.catch(() => {})` PEGADO a la escritura, dentro del try: se come el fallo
+   antes de que el catch bueno lo vea.
+3. LA VENTANITA ANIDADA dentro de otro modal. Se metio letra por letra dentro de
+   `{llamadoConductor && ( … )}` y las 51 pruebas siguieron verdes; el aviso solo
+   se veria con ese otro modal abierto. Estar en el return bueno NO basta.
+
+Y el cuarto, el `try` de un ANCESTRO (alrededor del .map que dibuja el boton), que
+en marcha no protege nada: se cerro tambien, parando la subida en la puerta de la
+funcion.
+
+MI PROPIO FALLO EN EL ARREGLO DE ESTO: la primera version del detector de
+«.catch pegado» buscaba en las 400 letras siguientes y señalo a Codigos.js:122,
+saltando diez renglones hasta un `.catch` de navigator.clipboard que no tiene nada
+que ver. Se puso ROJA SOBRE CODIGO SANO — el peor fallo de una prueba, porque
+enseña a desconfiar de ella. Ahora cuenta los parentesis de la propia llamada.
+
+Y un comentario FALSO mio en scripts/medir-conductores.cjs:30 decia «no hay un
+solo PATCH ni POST en este archivo». Si lo hay: el POST de abrir la sesion. No
+toca la base, pero el comentario mentia. Corregido.
+
+DESPUES DE TODO ESTO: 29 mutantes, 0 vivos. 506 pruebas verdes.
