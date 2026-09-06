@@ -92,7 +92,7 @@ describe('SEGUNDA LEY · el descuento, una sola calculadora', () => {
     // nombre: las pantallas conservan un pase de un renglón que se llama igual,
     // pero la cuenta (restar el crédito, el % y su redondeo, armar la ficha)
     // solo puede vivir en descuentos.js.
-    const PANTALLAS = ['guajirago/src/Solicitar.js', 'guajirago/src/SolicitarMensajeria.js'];
+    const PANTALLAS = ['guajirago/src/Solicitar.js'];
     for (const pantalla of PANTALLAS) {
       const fuente = fs.readFileSync(path.join(RAIZ, pantalla), 'utf8');
       for (const huella of ['valorBeneficio / 100', 'tarifaBase - descuentoPendiente', 'descuentoAplicado:']) {

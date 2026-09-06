@@ -48,7 +48,6 @@ describe('SEGUNDA LEY · los datos compartidos salen del mismo sitio', () => {
     // el 23-ago-2026 con permiso del dueño.)
     const PANTALLAS = [
       'guajirago/src/Solicitar.js',
-      'guajirago/src/SolicitarMensajeria.js',
       'guajirago/src/AppConductor.js',
       'guajirago/src/Home.js',
     ];

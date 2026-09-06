@@ -94,8 +94,18 @@ function TarjetaContraoferta({ oferta, onAceptar, onRechazar }) {
     setFotoConductor(oferta.conductorFoto || null);
   }, [oferta.conductorFoto]);
 
-  // Las ofertas ya NO expiran solas: viven hasta que el pasajero confirme o rechace.
-  const colorBarra = '#2ECC71';
+  // AQUÍ SE VEÍA LA SEPARACIÓN que causó tener dos archivos: mensajería escribía
+  // `progreso > 50 ? verde : progreso > 25 ? amarillo : rojo` y taxi solo verde.
+  //
+  // PERO NO SE VEÍA NADA: `progreso` está fijo en 100 ahí arriba, así que la
+  // condición siempre da verde. Las dos pantallas pintaban EXACTAMENTE el mismo
+  // color. Era una mejora a medias —el degradado sin el contador que lo mueva—,
+  // no una diferencia que el cliente notara.
+  //
+  // Se deja el gradiente porque describe lo que se quiso hacer, y queda ANOTADO:
+  // si algún día el contador mueve `progreso`, esto empieza a cambiar de color
+  // solo. Eso es una decisión del dueño, no algo que se cuele en una unión.
+  const colorBarra = progreso > 50 ? '#2ECC71' : progreso > 25 ? '#FFCF4D' : '#FF4444';
 
   return (
     <div style={{ background: '#FFFFFF', borderRadius: '20px', padding: '16px', marginBottom: '10px', border: '1px solid #FF7A2F' }}>
@@ -376,8 +386,19 @@ function MapaPasajero({ ubicacionPasajero, ubicacionConductor, tipo, onTiempo })
 }
 
 function Solicitar({ tipo, onVolver, destinoInicial }) {
+  // UN SOLO ARCHIVO para las dos pantallas (SEGUNDA LEY). Eran gemelos: 94% de
+  // renglones idénticos. Lo que de verdad cambiaba eran rótulos, un color y el
+  // bloque de campos del paquete — todo lo demás era la misma pantalla escrita
+  // dos veces, y ya se habían separado solos (ver `colorBarra` más abajo).
+  const esMensajeria = tipo === 'Mensajería';
   const [origen, setOrigen] = useState('');
   const [destino, setDestino] = useState(destinoInicial || '');
+  // NUEVO (mensajería): datos del paquete
+  const [queEnvia, setQueEnvia] = useState('');
+  const [recibeNombre, setRecibeNombre] = useState('');
+  const [recibeTel, setRecibeTel] = useState('');
+  const [notaEnvio, setNotaEnvio] = useState('');
+  const [avisoFaltan, setAvisoFaltan] = useState(null);
   const [favoritos, setFavoritos] = useState([]);
   const [avisoLimite, setAvisoLimite] = useState(false);
   const [pantalla, setPantalla] = useState('solicitar');
@@ -425,7 +446,7 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
   const [ofertaModificada, setOfertaModificada] = useState(false);
   // Contraofertas múltiples: lista de { conductorId, conductorNombre, conductorPlaca, conductorVehiculo, contraoferta, contraofertaValor }
   const [contraofertas, setContraofertas] = useState([]);
-  const [avisoOcupado, setAvisoOcupado] = useState(''); // nombre del conductor ya ocupado (o '__error__')
+  const [avisoOcupado, setAvisoOcupado] = useState('');
   const contadorRef = useRef(null);
   const pantallaRef = useRef(pantalla);
   const intervaloRespaldoRef = useRef(null);
@@ -643,7 +664,6 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
   }, [viajeId, celebrando, conductorEnPunto]);
 
   // Ofertas de conductores EN TIEMPO REAL (subcolección) — fuente de verdad, hasta 5, mejor precio primero.
-  // Nada pisa a nada: cada conductor tiene su propio documento.
   useEffect(() => {
     if (!viajeId) return;
     const unsub = onSnapshot(collection(db, 'viajes', viajeId, 'contraofertas'), (snap) => {
@@ -673,7 +693,6 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
     return () => unsub();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viajeId]);
-
   useEffect(() => {
     if (!viajeId) return;
     const unsub = onSnapshot(doc(db, 'llamadas', viajeId), (s) => {
@@ -850,7 +869,19 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
   const bajarTarifa = () => setTarifa(t => Math.max(TARIFA_MINIMA, t - configApp.incrementoTarifa));
 
   const solicitarViaje = async () => {
-    if (!origen || !destino) { setError('Por favor escribe el origen y destino'); return; }
+    // Un mandado pide seis datos; un viaje pide dos. Cada uno como estaba.
+    if (esMensajeria) {
+      const faltan = [];
+      if (!origen) faltan.push('Dónde se recoge');
+      if (!destino) faltan.push('Dónde se entrega');
+      if (!queEnvia.trim()) faltan.push('Qué vas a enviar');
+      if (!recibeNombre.trim()) faltan.push('Nombre de quien recibe');
+      if (recibeTel.trim().length !== 10) faltan.push('Teléfono de quien recibe (10 números)');
+      if (!notaEnvio.trim()) faltan.push('Nota para el domiciliario');
+      if (faltan.length > 0) { setAvisoFaltan(faltan); return; }
+    } else {
+      if (!origen || !destino) { setError('Por favor escribe el origen y destino'); return; }
+    }
     activarAudioiOS();
     precargarAudio();
     setCargando(true); setError('');
@@ -898,12 +929,15 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
 
       // El documento del viaje se arma en viajeNuevo.js: un solo sitio para el
       // contrato de campos que leen el conductor, las reglas y el servidor.
+      // Lo ÚNICO propio de esta pantalla es el paquete de mensajería, que entra
+      // por `extras`.
       const docRef = await addDoc(collection(db, 'viajes'), armarViajeNuevo({
         user, nombrePasajero,
         coords: coordsRecogida,
         tipo, origen, destino, tarifa,
         datosDescuento,
         radioBusqueda: configApp.radioBusquedaInicial,
+        extras: { mensajeria: { queEnvia: queEnvia.trim(), recibeNombre: recibeNombre.trim(), recibeTel: recibeTel.trim(), nota: notaEnvio.trim() } },
       }));
       setViajeId(docRef.id);
       // El código, al cajón privado del viaje: ahí solo lo ve ella.
@@ -976,7 +1010,6 @@ const confirmarViaje = async () => {
     if (!viajeId || celebrando) return;
     setCelebrando(true);
     try {
-      // Confirmación ATÓMICA en el servidor: el primer pasajero gana; si el conductor ya está ocupado, avisa.
       const fn = httpsCallable(getFunctions(), 'confirmarConductor');
       const res = await fn({ viajeId, conductorId: oferta.conductorId });
       const r = (res && res.data) || {};
@@ -1036,6 +1069,14 @@ const PanelEmergencia = () => (
       </div>
     ) : null
   );
+  const resumenMandado = (tipo === 'Mensajería') ? (
+    <div style={{ background: '#FFFFFF', borderRadius: '14px', padding: '12px 14px', margin: '0 0 16px', border: '1px solid #FF7A2F', width: '100%', maxWidth: '400px', boxSizing: 'border-box' }}>
+      <p style={{ color: '#FF7A2F', fontSize: '11px', margin: '0 0 6px', letterSpacing: '1px', fontWeight: '900' }}>📦 TU MANDADO</p>
+      {queEnvia && <p style={{ color: '#1A1A1E', fontSize: '14px', margin: '0 0 3px', fontWeight: 'bold' }}>📦 Envías: {queEnvia}</p>}
+      {recibeNombre && <p style={{ color: '#1A1A1E', fontSize: '14px', margin: '0 0 3px' }}>🙋 Recibe: {recibeNombre}{recibeTel ? ` · 📞 ${recibeTel}` : ''}</p>}
+      {notaEnvio && <p style={{ color: '#FF7A2F', fontSize: '13px', margin: '0', fontWeight: 'bold' }}>📝 {notaEnvio}</p>}
+    </div>
+  ) : null;
   if (mostrarCalificacion) return <Calificacion tipo={tipo} viajeId={viajeId} nombreCalificado={viaje?.conductorNombre} calificadoId={viaje?.conductorId} quienCalifica="pasajero" onFinalizar={onVolver} />;
   if (celebrando) return <Celebracion />;
   if (llamandoConductor) return <Llamada viajeId={viajeId} miRol="pasajero" nombreOtro={viaje?.conductorNombre || 'Conductor'} onCerrar={() => setLlamandoConductor(false)} />;
@@ -1228,6 +1269,8 @@ const PanelEmergencia = () => (
               <p style={{ color: '#6B7280', fontSize: '11px', margin: '4px 0 0' }}>Dáselo al conductor al finalizar</p>
             </div>
           )}
+          {resumenMandado}
+          <button onClick={() => setLlamandoConductor(true)} style={{ width: '100%', marginBottom: '10px', padding: '13px', background: 'linear-gradient(135deg, #2ECC71, #27AE60)', border: 'none', borderRadius: '14px', color: '#FFFFFF', fontSize: '14px', fontWeight: 'bold', cursor: 'pointer' }}>📞 Llamar al conductor</button>
           <p style={{ color: '#6B7280', fontSize: '11px', letterSpacing: '2px', margin: '12px 0 8px' }}>RESPUESTAS RÁPIDAS</p>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '10px' }}>
             {RESPUESTAS_RAPIDAS.map((resp, i) => (
@@ -1264,6 +1307,7 @@ const PanelEmergencia = () => (
         <div style={{ fontSize: '80px', marginBottom: '24px' }}>{buscandoAgotado ? '😕' : (tipo === 'Taxi' ? '🚗' : '🏍️')}</div>
         <h2 style={{ color: '#1A1A1E', fontSize: '22px', margin: '0 0 8px', textAlign: 'center' }}>{buscandoAgotado ? 'No encontramos conductor' : 'Buscando conductor...'}</h2>
         <p style={{ color: '#6B7280', fontSize: '14px', margin: '0 0 4px', textAlign: 'center' }}>{origen} → {destino}</p>
+        {resumenMandado}
         {!buscandoAgotado && (
           <p style={{ color: '#2ECC71', fontSize: '20px', fontWeight: '900', margin: '0 0 16px', textAlign: 'center' }}>
             Tu oferta: ${tarifa.toLocaleString()}
@@ -1285,13 +1329,13 @@ const PanelEmergencia = () => (
           </div>
         )}
 
-        {/* Ventanita: conductor ya ocupado (otro pasajero lo tomó primero) */}
+        {/* Ventanita: conductor ya ocupado */}
         {avisoOcupado && (
           <div onClick={() => setAvisoOcupado('')} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', zIndex: 10000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
             <div onClick={(e) => e.stopPropagation()} style={{ background: '#FFFFFF', borderRadius: '20px', padding: '28px 24px', width: '100%', maxWidth: '340px', textAlign: 'center' }}>
-              <div style={{ fontSize: '46px', marginBottom: '8px' }}>{avisoOcupado === '__error__' ? '⚠️' : '🚕'}</div>
+              <div style={{ fontSize: '46px', marginBottom: '8px' }}>{avisoOcupado === '__error__' ? '⚠️' : (esMensajeria ? '🏍️' : '🚕')}</div>
               <p style={{ color: '#1A1A1E', fontSize: '17px', fontWeight: '900', margin: '0 0 8px' }}>{avisoOcupado === '__error__' ? 'No se pudo confirmar' : 'Conductor ocupado'}</p>
-              <p style={{ color: '#6B7280', fontSize: '14px', margin: '0 0 20px' }}>{avisoOcupado === '__error__' ? 'Intenta de nuevo en un momento.' : `${avisoOcupado} ya tomó otro viaje. Escoge otra de las propuestas.`}</p>
+              <p style={{ color: '#6B7280', fontSize: '14px', margin: '0 0 20px' }}>{avisoOcupado === '__error__' ? 'Intenta de nuevo en un momento.' : `${avisoOcupado} ya tomó otro ${esMensajeria ? 'servicio' : 'viaje'}. Escoge otra de las propuestas.`}</p>
               <button onClick={() => setAvisoOcupado('')} style={{ width: '100%', padding: '14px', background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F)', border: 'none', borderRadius: '12px', color: '#FFF', fontSize: '15px', fontWeight: '900', cursor: 'pointer' }}>Entendido</button>
             </div>
           </div>
@@ -1336,6 +1380,24 @@ const PanelEmergencia = () => (
 
   return (
     <div style={{ backgroundColor: '#FFFFFF', minHeight: '100vh', fontFamily: 'Arial, sans-serif' }}>
+      {avisoFaltan && (
+        <div onClick={() => setAvisoFaltan(null)} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
+          <div onClick={e => e.stopPropagation()} style={{ background: '#FFFFFF', borderRadius: '24px', padding: '28px 24px', width: '100%', maxWidth: '400px', border: '2px solid #FF7A2F' }}>
+            <div style={{ fontSize: '48px', textAlign: 'center', marginBottom: '8px' }}>📋</div>
+            <p style={{ color: '#FF7A2F', fontSize: '13px', margin: '0 0 6px', letterSpacing: '2px', fontWeight: 'bold', textAlign: 'center' }}>TE FALTAN DATOS</p>
+            <p style={{ color: '#1A1A1E', fontSize: '18px', fontWeight: '900', margin: '0 0 18px', textAlign: 'center' }}>Completa esto para enviar tu mandado:</p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '22px' }}>
+              {avisoFaltan.map((f, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '10px', background: '#FFFFFF', borderRadius: '12px', padding: '12px 14px' }}>
+                  <span style={{ fontSize: '18px' }}>❌</span>
+                  <span style={{ color: '#1A1A1E', fontSize: '15px', fontWeight: 'bold' }}>{f}</span>
+                </div>
+              ))}
+            </div>
+            <button onClick={() => setAvisoFaltan(null)} style={{ width: '100%', padding: '16px', background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)', border: 'none', borderRadius: '14px', color: '#1A1A1E', fontSize: '16px', fontWeight: '900', cursor: 'pointer' }}>Entendido</button>
+          </div>
+        </div>
+      )}
       {avisoLimite && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
           <div style={{ background: '#FFFFFF', borderRadius: '24px', padding: '32px 24px', width: '100%', maxWidth: '380px', border: '1px solid #FF7A2F', textAlign: 'center', position: 'relative' }}>
@@ -1349,14 +1411,14 @@ const PanelEmergencia = () => (
       )}
       <div style={{ background: '#FFFFFF', padding: '12px 20px', display: 'flex', alignItems: 'center', gap: '16px', position: 'relative', borderBottom: '1px solid #ECECEF' }}>
         <div onClick={onVolver} style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(0,0,0,0.06)', borderRadius: '12px', color: '#1A1A1E', fontSize: '14px', fontWeight: '500', padding: '8px 16px', cursor: 'pointer' }}><span style={{ fontSize: '22px', fontWeight: '900', lineHeight: '1', position: 'relative', top: '-1px' }}>‹</span> Volver</div>
-        <h2 style={{ color: '#1A1A1E', margin: '0', fontSize: '20px' }}>Solicitar {tipo}</h2>
+        <h2 style={{ color: '#1A1A1E', margin: '0', fontSize: '20px' }}>{esMensajeria ? 'Pedir mandado 📦' : `Solicitar ${tipo}`}</h2>
         <Logo size={26} style={{ position: 'absolute', top: '12px', right: '16px' }} />
       </div>
       <div style={{ padding: '12px 20px 24px' }}>
-        <AutocompleteInput value={origen} onChange={(v) => { setOrigen(v); pinActivoRef.current = false; }} placeholder="¿Dónde estás? (Riohacha)" icon="origen" onPlaceCoords={(coords) => { setPuntoRecogida(coords); setCentroMapa(coords); pinActivoRef.current = true; }} />
+        <AutocompleteInput value={origen} onChange={(v) => { setOrigen(v); pinActivoRef.current = false; }} placeholder={esMensajeria ? '¿Dónde se recoge? (Riohacha)' : '¿Dónde estás? (Riohacha)'} icon="origen" onPlaceCoords={(coords) => { setPuntoRecogida(coords); setCentroMapa(coords); pinActivoRef.current = true; }} />
         <div style={{ display: 'flex', alignItems: 'stretch', gap: '8px' }}>
           <div style={{ flex: 1 }}>
-            <AutocompleteInput value={destino} onChange={setDestino} placeholder="¿A dónde vas? (Riohacha)" icon="destino" />
+            <AutocompleteInput value={destino} onChange={setDestino} placeholder={esMensajeria ? '¿Dónde se entrega? (Riohacha)' : '¿A dónde vas? (Riohacha)'} icon="destino" />
           </div>
           {destino && !favoritos.find(f => f.direccion === destino) && (
             <div onClick={guardarFavorito} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F)', borderRadius: '16px', padding: '0 14px', marginBottom: '12px', cursor: 'pointer', flexShrink: 0 }}>
@@ -1372,6 +1434,28 @@ const PanelEmergencia = () => (
           ubicacionInicial={centroMapa}
           onCambioPunto={(punto, direccion) => { setPuntoRecogida(punto); pinActivoRef.current = true; if (direccion) setOrigen(direccion); }}
         />
+
+        {/* Los datos del paquete solo existen en mensajería. Un viaje de taxi no
+            los pide, y dejarlos sueltos los pintaría también ahí. */}
+        {esMensajeria && (<>
+          <p style={{ color: '#1A1A1E', fontSize: '11px', letterSpacing: '2px', margin: '4px 0 8px' }}>DATOS DEL ENVÍO</p>
+          <div style={{ background: '#FFFFFF', border: '1.5px solid #ECECEF', borderRadius: '14px', padding: '10px 14px', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <span style={{ fontSize: '18px' }}>📦</span>
+            <input value={queEnvia} onChange={e => setQueEnvia(e.target.value)} placeholder="¿Qué envías? (ej: una caja)" style={{ background: 'none', border: 'none', outline: 'none', color: '#1A1A1E', fontSize: '16px', width: '100%' }} />
+          </div>
+          <div style={{ background: '#FFFFFF', border: '1.5px solid #ECECEF', borderRadius: '14px', padding: '10px 14px', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <span style={{ fontSize: '18px' }}>🙋</span>
+            <input value={recibeNombre} onChange={e => setRecibeNombre(e.target.value.toUpperCase())} placeholder="NOMBRE DE QUIEN RECIBE" style={{ background: 'none', border: 'none', outline: 'none', color: '#1A1A1E', fontSize: '16px', width: '100%', textTransform: 'uppercase' }} />
+          </div>
+          <div style={{ background: '#FFFFFF', border: '1.5px solid #ECECEF', borderRadius: '14px', padding: '10px 14px', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <span style={{ fontSize: '18px' }}>📞</span>
+            <input value={recibeTel} onChange={e => setRecibeTel(e.target.value.replace(/\D/g, '').slice(0, 10))} placeholder="Teléfono (10 números)" type="tel" inputMode="numeric" maxLength={10} style={{ background: 'none', border: 'none', outline: 'none', color: '#1A1A1E', fontSize: '16px', width: '100%' }} />
+          </div>
+          <div style={{ background: '#FFFFFF', border: '1.5px solid #ECECEF', borderRadius: '14px', padding: '10px 14px', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <span style={{ fontSize: '18px' }}>📝</span>
+            <input value={notaEnvio} onChange={e => setNotaEnvio(e.target.value)} placeholder="Nota para el domiciliario (ej: dejar en portería)" style={{ background: 'none', border: 'none', outline: 'none', color: '#1A1A1E', fontSize: '16px', width: '100%' }} />
+          </div>
+        </>)}
 
         {favoritos.length > 0 && (
           <div style={{ marginBottom: '20px' }}>
@@ -1415,7 +1499,9 @@ const PanelEmergencia = () => (
         </div>
         {error && <p style={{ color: '#FF4444', fontSize: '13px', textAlign: 'center', marginBottom: '12px' }}>{error}</p>}
         <button onClick={solicitarViaje} style={{ width: '100%', padding: '13px', background: cargando ? '#ECECEF' : 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)', border: 'none', borderRadius: '14px', color: cargando ? '#6B7280' : '#FFFFFF', fontSize: '16px', fontWeight: '900', cursor: cargando ? 'default' : 'pointer' }}>
-          {cargando ? 'Enviando...' : `Solicitar ${tipo} — $${tarifa.toLocaleString()}`}
+          {cargando ? 'Enviando...' : (esMensajeria
+            ? `Pedir mandado — $${tarifa.toLocaleString()}`
+            : `Solicitar ${tipo} — $${tarifa.toLocaleString()}`)}
         </button>
       </div>
     </div>

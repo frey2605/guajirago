@@ -365,7 +365,7 @@ describe('ANOTADO · lo que sigue mudo en la app del pasajero y conductor', () =
     // ESTA PRUEBA SE PONE ROJA EL DÍA QUE SE ARREGLEN, y es a propósito: entonces
     // se borra, junto con esta anotación. Mientras esté verde, queda dicho.
     let quedan = 0;
-    for (const archivo of ['guajirago/src/Solicitar.js', 'guajirago/src/SolicitarMensajeria.js']) {
+    for (const archivo of ['guajirago/src/Solicitar.js']) {
       const t = soloCodigo(leer(archivo));
       const seguro = sinTextos(t);
       for (const m of t.matchAll(/setDoc\s*\(|updateDoc\s*\(|addDoc\s*\(|deleteDoc\s*\(/g)) {

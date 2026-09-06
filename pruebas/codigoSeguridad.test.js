@@ -132,7 +132,7 @@ describe('SEGUNDA LEY · el código de seguridad, un solo sitio', () => {
   });
 
   it('NINGUNA pantalla toca el cajón privado por su cuenta', () => {
-    const PANTALLAS = ['guajirago/src/Solicitar.js', 'guajirago/src/SolicitarMensajeria.js'];
+    const PANTALLAS = ['guajirago/src/Solicitar.js'];
     for (const pantalla of PANTALLAS) {
       const fuente = fs.readFileSync(path.join(RAIZ, pantalla), 'utf8');
       assert.ok(!fuente.includes("'privado'"),

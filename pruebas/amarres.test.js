@@ -63,7 +63,7 @@ describe('AMARRES · la app y el servidor miden la distancia IGUAL', () => {
   });
 
   it('NINGUNA pantalla vuelve a tener su propia fórmula de distancia', () => {
-    const PANTALLAS = ['guajirago/src/AppConductor.js', 'guajirago/src/Solicitar.js', 'guajirago/src/SolicitarMensajeria.js', 'guajirago/src/Home.js'];
+    const PANTALLAS = ['guajirago/src/AppConductor.js', 'guajirago/src/Solicitar.js', 'guajirago/src/Home.js'];
     for (const pantalla of PANTALLAS) {
       const fuente = leer(pantalla);
       assert.ok(!fuente.includes('6371'),
@@ -260,7 +260,7 @@ describe('AMARRES · el respaldo del panel y el de la app son el MISMO número a
   });
 
   it('NINGUNA pantalla de la app vuelve a escribir esos números a mano', () => {
-    const PANTALLAS = ['guajirago/src/Solicitar.js', 'guajirago/src/SolicitarMensajeria.js', 'guajirago/src/AppConductor.js'];
+    const PANTALLAS = ['guajirago/src/Solicitar.js', 'guajirago/src/AppConductor.js'];
     const HUELLAS = ['incrementoTarifa:', 'radioBusquedaInicial:', 'radioBusquedaAmpliado:', 'maximoFavoritos:', 'tiempoEsperaConductor:', 'duracionContraoferta:'];
     for (const pantalla of PANTALLAS) {
       const fuente = leer(pantalla);

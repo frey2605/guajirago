@@ -102,7 +102,7 @@ describe('SEGUNDA LEY · el documento del viaje se arma en un solo sitio', () =>
   });
 
   it('NINGUNA pantalla arma el documento por su cuenta', () => {
-    const PANTALLAS = ['guajirago/src/Solicitar.js', 'guajirago/src/SolicitarMensajeria.js'];
+    const PANTALLAS = ['guajirago/src/Solicitar.js'];
     for (const pantalla of PANTALLAS) {
       const fuente = fs.readFileSync(path.join(RAIZ, pantalla), 'utf8');
       assert.ok(!fuente.includes('pasajeroId: user.uid'),

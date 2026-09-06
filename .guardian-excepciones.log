@@ -530,3 +530,55 @@ Y SE CORRIGIO CLAUDE.md, solo el parrafo de la trampa: decia que el HEAD del rep
 anidado y sus stashes no estaban en GitHub. El HEAD SI esta —es la rama
 respaldo-v2.1-23ago, subida el 23-ago— y nadie habia corregido el aviso. Un aviso
 que miente manda a buscar donde no es.
+
+── 5-sep-2026 · AUTORIZADO · quitar el gemelo borrado de las listas de pruebas ─
+Al unir los gemelos quedaron 8 pruebas rojas: barren listas de pantallas escritas
+a mano que nombran guajirago/src/SolicitarMensajeria.js, que ya no existe. Se
+pregunto y contesto: «Si, quita el nombre de las listas».
+
+Se toca SOLO el nombre dentro de la lista, en 6 archivos de pruebas. La pantalla
+NO deja de estar vigilada: sigue barrida dentro de Solicitar.js, que ya estaba en
+todas esas listas.
+
+── 5-sep-2026 · LA UNION DE LOS GEMELOS SOLICITAR ─────────────────────────────
+El dueño pregunto si los gemelos debian quedarse asi o juntarse. Se MIDIO antes de
+contestar: 1.235 de 1.308 renglones identicos, el 94%. De lo que cambiaba, 32 eran
+estilos y 7 cosas de paqueteria; la logica ya se habia sacado a 12 archivos
+comunes en agosto. Contesto: «Juntalos primero, luego REGLA 9».
+
+COMO SE UNIO: la base es SolicitarMensajeria.js porque es el SUPERCONJUNTO —tiene
+todo lo del otro mas los campos del paquete— y ya estaba escrito con la bandera
+`tipo` puesta. Se le devolvio `tipo` como prop y se pusieron detras de
+`esMensajeria` las OCHO cosas que de verdad cambiaban.
+
+LA UNION NO CAMBIA LO QUE SE VE. Comprobado renglon a renglon contra los DOS
+originales: de 1.247 + 1.308 renglones de codigo, los 19 que no aparecen tal cual
+en el unido son EXACTAMENTE los 19 que se hicieron condicionales o son comentarios.
+Nada se perdio.
+
+DOS COSAS QUE SE ME COLARON Y CAZO LA COMPROBACION, no yo:
+  1. El texto del conductor ocupado decia «ya tomo otro VIAJE» en taxi y «otro
+     SERVICIO» en mensajeria. Al unir se quedo el de mensajeria: la pantalla de
+     taxi habria cambiado de palabra. Corregido, cada una dice la suya.
+  2. Puse `colorBarra` detras de `esMensajeria` y NO COMPILO: esa variable vive en
+     otro componente (TarjetaContraoferta) donde la bandera no llega. Lo cazo
+     `CI=true npm run build`.
+
+Y AL ARREGLAR EL 2 SE DESCUBRIO QUE YO LE HABIA DICHO AL DUEÑO ALGO FALSO: le
+conte que «en mensajeria la barra cambia de color y en taxi es verde fija». Es
+FALSO en la practica: `progreso` esta fijo en 100 en ese componente, asi que la
+condicion SIEMPRE da verde y las dos pantallas pintaban el mismo color. Era una
+mejora a medias, no una diferencia visible. Corregido en el comentario del codigo
+y dicho al dueño.
+
+ESCAPE RECONOCIDO Y AUTORIZADO: se toco pruebas/correr.cjs sin declararlo (se me
+olvido al re-tomar la foto). Es UN renglon: añadir gemelosSolicitar.test.js a la
+lista de pruebas que se ejecutan; sin eso la prueba nueva existe y no la corre
+nadie. Se pregunto y contesto: «Dejalo, es un renglon».
+
+MUTANTES: 8 soltados, 8 muertos. Uno sobrevivia —poner «Pedir mandado» fijo, o sea
+un pasajero pidiendo taxi leyendo «Pedir mandado»— porque mi lista comprobaba los
+rotulos del taxi pero no su TITULO. Cerrado.
+
+LO QUE NO PUEDE COMPROBAR NINGUNA PRUEBA: como se VE la pantalla. Ninguna prueba
+de este proyecto dibuja nada. Se le dijo al dueño antes de empezar.

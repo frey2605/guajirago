@@ -89,7 +89,6 @@ describe('SEGUNDA LEY · la tarifa mínima, una sola calculadora', () => {
     // ANTES de que las dos versiones empiecen a dar respuestas distintas.
     const PANTALLAS = [
       'guajirago/src/Solicitar.js',
-      'guajirago/src/SolicitarMensajeria.js',
       'guajirago/src/AppConductor.js',
     ];
     for (const pantalla of PANTALLAS) {
