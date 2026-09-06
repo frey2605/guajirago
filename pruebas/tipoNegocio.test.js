@@ -17,7 +17,7 @@
 const { describe, it } = require('node:test');
 const assert = require('node:assert');
 const {
-  decidir, SENALES, direccionDeEscritura, cuerpoDeEscritura,
+  decidir, SENALES, direccionDeEscritura, cuerpoDeEscritura, aQuienSeLeEscribe,
 } = require('../scripts/poner-tipo-negocio.cjs');
 const { leer } = require('./cargar.cjs');
 
@@ -261,5 +261,46 @@ describe('EL ESQUELETO · los dos guiones deciden con la misma lista', () => {
     assert.ok(!/'costoEnvio'/.test(medir),
       'reapareció `costoEnvio` como señal: ninguna pantalla lo escribe, es un campo '
       + 'fósil.');
+  });
+});
+
+// ── A QUIÉN SE LE ESCRIBE · EL CORAZÓN DEL DISEÑO ──────────────────────────
+//
+// La segunda opinión cambió `accion === 'poner'` por `accion !== 'dejar'` dentro
+// del bucle y las 18 pruebas siguieron VERDES: con eso, los negocios sobre los
+// que el guion había decidido PREGUNTARLE AL DUEÑO entraban en la lista de
+// escritura y se les inventaba un tipo.
+//
+// Es exactamente lo que todo este guion existe para impedir, y el único renglón
+// que lo garantizaba no lo miraba nadie. Por eso la selección se sacó a una
+// función propia: para poder mirarla.
+describe('EL ESQUELETO · a quién se le escribe, y a quién NO', () => {
+  it('EL QUE MUERDE · a un «preguntar» NO se le escribe JAMÁS', () => {
+    const decisiones = [
+      { accion: 'poner', tipo: 'restaurante', id: 'r1' },
+      { accion: 'preguntar', porque: 'las señales se CONTRADICEN', id: 'r2' },
+      { accion: 'preguntar', porque: 'no tiene ni una señal', id: 'r3' },
+      { accion: 'dejar', porque: 'ya lo dice', id: 'r4' },
+    ];
+    const elegidos = aQuienSeLeEscribe(decisiones).map((d) => d.id);
+    assert.deepStrictEqual(elegidos, ['r1'],
+      'entró en la lista de escritura alguien que NO era un «poner». Si es un '
+      + '«preguntar», se le está inventando el tipo de negocio a un cliente '
+      + 'sobre el que el guion dijo expresamente que había que preguntarle al dueño.');
+  });
+
+  it('EL QUE MUERDE · si TODOS son para preguntar, no se escribe a nadie', () => {
+    const decisiones = [
+      { accion: 'preguntar', id: 'r1' },
+      { accion: 'preguntar', id: 'r2' },
+    ];
+    assert.deepStrictEqual(aQuienSeLeEscribe(decisiones), []);
+  });
+
+  it('EL QUE MUERDE · un «dejar» tampoco entra, aunque traiga tipo', () => {
+    // Un «dejar» ya tiene su tipo puesto. Reescribírselo no haría daño hoy, pero
+    // el simulacro le habría dicho al dueño que no se tocaba, y sí se tocó.
+    const decisiones = [{ accion: 'dejar', tipo: 'turismo', id: 'r1' }];
+    assert.deepStrictEqual(aQuienSeLeEscribe(decisiones), []);
   });
 });

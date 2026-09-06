@@ -751,3 +751,28 @@ ANOTADO, NO ARREGLADO:
     la escritura, se le pisa. Ventana de segundos.
 
 Despues de todo esto: 17 mutantes, 0 vivos. 584 pruebas verdes.
+
+── 6-sep-2026 · EL AGUJERO QUE ENCONTRO LA SEGUNDA OPINION AL RE-AUDITAR ──────
+Volvio a mirar el guion DESPUES de mis correcciones. De 14 mutantes vivos bajaron
+a 3, pero encontro UNO NUEVO que no estaba en su primer informe, y era el corazon:
+
+Cambiar `d2.accion === 'poner'` por `d2.accion !== 'dejar'` dentro del bucle metia
+en la lista de escritura a los negocios sobre los que el guion habia decidido
+PREGUNTARLE AL DUEÑO. Las 18 pruebas seguian VERDES.
+
+Es exactamente lo que todo el guion existe para impedir —«no adivina el negocio de
+un cliente que paga»— y el UNICO renglon que lo garantizaba no lo miraba nadie,
+porque vivia dentro del bucle que habla con la red.
+
+CERRADO: la seleccion se saco a `aQuienSeLeEscribe()`, una funcion propia que se
+puede mirar, con tres pruebas. 3 mutantes contra ella, 3 muertos.
+
+Y CONFIRMO EL PASO 10 POR SU CUENTA, leyendo del servidor campo por campo: la
+escritura añadio `tipoNegocio` y NO BORRO NI UN CAMPO. ASD REST conserva sus 17,
+RESTAURANTE sus 24, y a la AGENCIA no se la toco. El `updateMask` hizo lo que
+prometia.
+
+LO QUE SIGUE VIVO Y ES HONESTO QUE ASI SEA: dos mutantes en el bucle que habla con
+la red —el interruptor --aplicar invertido, que se delata solo porque imprime
+«APLICANDO DE VERDAD», y `val()` cegada—. Viven donde no se puede probar sin
+fingir la conexion. Es una limitacion dicha, no un descuido.

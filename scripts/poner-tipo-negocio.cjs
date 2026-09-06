@@ -160,7 +160,27 @@ function cuerpoDeEscritura(tipo) {
   return { fields: { tipoNegocio: { stringValue: tipo } } };
 }
 
-module.exports = { decidir, SENALES, direccionDeEscritura, cuerpoDeEscritura };
+/**
+ * A QUIÉN se le escribe, de todo lo que se leyó. Solo a los que `decidir` dijo
+ * «poner» — nunca a los que dijo «preguntar» ni a los que dijo «dejar».
+ *
+ * ESTO ES EL CORAZÓN DEL DISEÑO Y ESTABA SIN VIGILAR. La segunda opinión cambió
+ * `accion === 'poner'` por `accion !== 'dejar'` dentro del bucle y las 18 pruebas
+ * siguieron VERDES: con eso, los negocios sobre los que el guion había decidido
+ * PREGUNTARLE AL DUEÑO entraban en la lista de escritura y se les inventaba un
+ * tipo. Es exactamente lo que todo este guion existe para impedir, y el único
+ * renglón que lo garantizaba no lo miraba nadie.
+ *
+ * Hoy no muerde —no hay ninguno para preguntar— pero el día que llegue un hotel
+ * sin señales conocidas, muerde.
+ */
+function aQuienSeLeEscribe(decisiones) {
+  return decisiones.filter((d) => d.accion === 'poner');
+}
+
+module.exports = {
+  decidir, SENALES, direccionDeEscritura, cuerpoDeEscritura, aQuienSeLeEscribe,
+};
 
 // ── DE AQUÍ ABAJO, LA PLOMERÍA ────────────────────────────────────────────
 // Solo corre si se llama al guion directamente; si lo cargan las pruebas, no.
@@ -199,14 +219,19 @@ async function token() {
   console.log(APLICAR ? '\n*** APLICANDO DE VERDAD ***\n' : '\n=== SIMULACRO — no se escribe nada ===\n');
   console.log('negocios en el servidor: ' + docs.length + '\n');
 
-  const aPoner = [];
+  // Se decide sobre TODOS primero, y luego una sola función elige a quién se le
+  // escribe. Antes el bucle metía en la lista según su propio `if`, y ese renglón
+  // —el único que garantizaba que a un «preguntar» no se le escribe— no lo
+  // vigilaba ninguna prueba.
+  const decisiones = [];
   const aPreguntar = [];
 
   for (const d of docs) {
     const f = d.fields || {};
     const id = d.name.split('/').pop();
     const nombre = val(f.nombre) || '(sin nombre)';
-    const d2 = decidir(Object.keys(f), val(f.tipoNegocio));
+    const d2 = { ...decidir(Object.keys(f), val(f.tipoNegocio)), id, nombre };
+    decisiones.push(d2);
 
     console.log('· ' + nombre + '   ' + id);
     if (d2.accion === 'dejar') {
@@ -216,13 +241,15 @@ async function token() {
       console.log('    por qué:   ' + d2.porque);
       console.log('    y con eso: nada cambia para nadie — las OCHO lecturas de');
       console.log('               ese campo ya lo tratan así. Solo deja de adivinarse.\n');
-      aPoner.push({ id, nombre, tipo: d2.tipo, name: d.name });
     } else {
       console.log('    *** NO SE TOCA: ' + d2.porque);
       console.log('    lo decide el dueño, negocio por negocio.\n');
       aPreguntar.push({ id, nombre, porque: d2.porque });
     }
   }
+
+  // AQUI, y no dentro del bucle: una sola funcion decide a quien se le escribe.
+  const aPoner = aQuienSeLeEscribe(decisiones);
 
   console.log('───────────────────────────────────────────────────────────');
   console.log('se pondría el tipo a: ' + aPoner.length + ' de ' + docs.length
