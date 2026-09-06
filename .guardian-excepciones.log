@@ -582,3 +582,56 @@ rotulos del taxi pero no su TITULO. Cerrado.
 
 LO QUE NO PUEDE COMPROBAR NINGUNA PRUEBA: como se VE la pantalla. Ninguna prueba
 de este proyecto dibuja nada. Se le dijo al dueño antes de empezar.
+
+── 6-sep-2026 · REGLA 9 DEL PASAJERO · lo que encontro la segunda opinion ──────
+De 29 mutantes, DIECIOCHO sobrevivieron. Tres reproducian EXACTAMENTE el daño que
+el propio mensaje de la prueba juraba impedir — que es la peor clase de prueba
+floja, porque se lee como si comprobara algo.
+
+LOS QUE MAS DOLIAN, cerrados:
+  · CANCELAR con `onVolver()` DENTRO del catch, justo antes del `return`: la
+    prueba solo pedia que el catch TERMINARA en return. El pasajero se iba igual y
+    el viaje se quedaba vivo — la frase literal del mensaje de esa prueba.
+  · La ventanita puesta en las siete pantallas pero con `aviso={aviso && false}`:
+    no enseñaba NADA nunca. Las pruebas solo miraban que la etiqueta estuviera,
+    no QUE SE LE PASA.
+  · CONFIRMAR avisando y yendose de la pantalla: el «tiene que cortar» solo se le
+    exigia a cancelarViaje.
+  · La ventanita la PRIMERA de la pantalla: la comprobacion de orden solo saltaba
+    si habia un `zIndex:` literal detras, y eso solo pasa en UNA de las siete. En
+    las otras seis la posicion no la vigilaba nadie. Ahora se pide lo que de
+    verdad se quiere: que despues de la ventanita no quede ninguna etiqueta.
+  · Pisar el aviso bueno con otro escrito a mano: solo se prohibia `setAviso(null)`.
+Despues: 19 mutantes, 0 vivos.
+
+UNA ASIMETRIA REAL QUE ENCONTRO, y se arreglo porque estaba DENTRO de lo
+declarado: `rechazarConfirmacion` quitaba la tarjeta antes de escribir y, si
+fallaba, avisaba pero NO la devolvia. Al pasajero se le decia «no se pudo
+rechazar» y se quedaba sin boton para reintentar, con el viaje todavia asignado al
+conductor que acababa de rechazar. Es el MISMO agujero que se le acababa de cerrar
+a confirmarViaje, abierto justo al lado.
+
+Y CONFIRMO LA AFIRMACION PRINCIPAL leyendo las reglas por su cuenta: la mentira de
+confirmarViaje era SIEMPRE falsa. firestore.rules r442-445 no dice ni una palabra
+sobre si el conductor sigue libre. Es mas: con esas reglas esa escritura casi solo
+puede fallar por falta de internet. O sea que al pasajero SIN SEÑAL se le decia
+que habia perdido el conductor. Y añadio el dato que lo remata: la comprobacion de
+«ocupado» SI existe, pero en OTRA funcion —aceptarContraoferta, que llama al
+callable confirmarConductor—, donde el mensaje SI es verdad.
+
+ANOTADO, NO ARREGLADO:
+  · Por encima de las siete pantallas hay CUATRO salidas mas sin ventanita:
+    <Calificacion/>, <Celebracion/> y dos <Llamada/>. Mientras una esta puesta el
+    aviso queda tapado; en tres se recupera solo, en <Calificacion/> se PIERDE
+    porque desmonta la pantalla. El unico aviso que puede saltar ahi es el del
+    descuento.
+  · Los temporizadores de cancelarViaje se matan ANTES de intentar la escritura
+    (era asi de antes): tras una cancelacion fallida el pasajero se queda en
+    «esperando» con el contador parado.
+  · Quedan DIEZ escrituras mudas en el archivo, todas de las declaradas fuera.
+
+Y SE ARREGLO UNA TRAMPA QUE DEJE YO AYER: la prueba que compara la ventanita del
+conductor con la del panel comparaba BYTE A BYTE, y git saca esos dos archivos con
+finales de linea distintos. Medido: en una copia recien bajada, guajirago sale en
+CRLF y el panel en LF. La prueba se ponia ROJA sobre codigo identico. Ahora compara
+el CONTENIDO. Autorizado por el dueño.

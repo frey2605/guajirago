@@ -16,6 +16,10 @@ import { armarViajeNuevo } from './viajeNuevo';
 // Los datos que comparten las pantallas salen de archivos únicos (SEGUNDA LEY).
 import { centroRiohacha, BOUNDS_RIOHACHA } from './riohacha';
 import { RESPUESTAS_RAPIDAS, RAZONES_CANCELACION_PASAJERO } from './textosViaje';
+// REGLA 9 · qué se le dice al pasajero cuando el servidor dice que no. Mismo
+// archivo y misma ventanita que usan el conductor, el panel y aliados.
+import { motivoDeRechazo, apuntarRechazo } from './avisoRechazo';
+import AvisoModal from './AvisoModal';
 
 // Valores por defecto (respaldo). Se reemplazan por los de config/global cuando cargan.
 const CONFIG_APP_DEFECTO = {
@@ -435,6 +439,10 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
   const [contactoEmergencia, setContactoEmergencia] = useState('');
   const [datosConductor, setDatosConductor] = useState(null);
   const [conductorYaTomado, setConductorYaTomado] = useState(false);
+  // REGLA 9 · «Nada se rechaza en silencio». Hasta el 6-sep-2026 los botones que
+  // deciden el viaje —cancelar, aceptar, rechazar— y el que quema el descuento no
+  // decían NADA si el servidor los rechazaba.
+  const [aviso, setAviso] = useState(null);
   const [llamandoConductor, setLlamandoConductor] = useState(false);
   const [llamadaEntrante, setLlamadaEntrante] = useState(false);
   const [tiempoBusqueda, setTiempoBusqueda] = useState(240);
@@ -569,7 +577,14 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
       if (data.descuentoInfo?.consumido === true && descuentoPendiente) {
         const user = auth.currentUser;
         if (user) {
-          updateDoc(doc(db, 'usuarios', user.uid), { descuentoPendiente: null }).catch(() => {});
+          // Esto QUEMA el descuento que el conductor acaba de marcar como usado.
+          // Si falla callado, el descuento NO se quema y se puede volver a gastar
+          // en otro viaje: es plata que se va sin que nadie se entere.
+          updateDoc(doc(db, 'usuarios', user.uid), { descuentoPendiente: null })
+            .catch((e) => {
+              apuntarRechazo('Solicitar.js (quemar el descuento)', e);
+              setAviso(motivoDeRechazo(e, 'registrar que usaste tu descuento'));
+            });
         }
         setDescuentoPendiente(null);
       }
@@ -787,7 +802,18 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
     clearInterval(contadorRef.current);
     if (radioRef.current) { clearTimeout(radioRef.current.ampliar); clearTimeout(radioRef.current.agotar); }
     clearInterval(contadorBusquedaRef.current);
-    if (viajeId) await updateDoc(doc(db, 'viajes', viajeId), { estado: 'cancelado', canceladoPor: 'pasajero', razonCancelacion: razon });
+    // Si la cancelación no entra, NO se sale de la pantalla: el viaje seguiría
+    // vivo en el servidor —un conductor en camino a alguien que ya se fue— y sin
+    // el botón delante no habría forma de reintentar.
+    if (viajeId) {
+      try {
+        await updateDoc(doc(db, 'viajes', viajeId), { estado: 'cancelado', canceladoPor: 'pasajero', razonCancelacion: razon });
+      } catch (e) {
+        apuntarRechazo('Solicitar.js (cancelarViaje)', e);
+        setAviso(motivoDeRechazo(e, 'cancelar el viaje'));
+        return;
+      }
+    }
     setMostrarCancelacion(false);
     onVolver();
   };
@@ -987,11 +1013,27 @@ const confirmarViaje = async () => {
         if (datos.conductorId) escucharConductor(datos.conductorId);
       }, 3000);
     } catch (e) {
-      setConductorYaTomado(true);
+      // AQUÍ ESTABA LA MENTIRA. Fallara lo que fallara, esto enseñaba la pantalla
+      // de «el conductor ya fue tomado». Y en este camino ESO NO PUEDE PASAR: la
+      // escritura solo pone `estado: aceptado` en el viaje del propio pasajero;
+      // nadie comprueba si el conductor sigue libre, ni el código ni las reglas
+      // (comprobado el 6-sep-2026). O sea que el mensaje era SIEMPRE falso: el
+      // pasajero creía que había perdido un viaje que seguía ahí.
+      //
+      // Ahora se dice lo que de verdad pasó, y NO se manda a buscar otro conductor.
+      apuntarRechazo('Solicitar.js (confirmarViaje)', e);
+      setAviso(motivoDeRechazo(e, 'confirmar el viaje'));
+      setConfirmacionPendiente(datos);
     }
   };
 
   const rechazarConfirmacion = async () => {
+    // Se guarda la tarjeta antes de quitarla: si el rechazo no entra, hay que
+    // devolvérsela. Sin esto se le decía «no se pudo rechazar» y se quedaba sin el
+    // botón para reintentar, con el viaje todavía asignado al conductor que acababa
+    // de rechazar. Es el mismo agujero que se le cerró a confirmarViaje, y estaba
+    // abierto justo al lado; lo señaló la segunda opinión.
+    const datosRechazados = confirmacionPendiente;
     setConfirmacionPendiente(null);
     if (viajeId) {
       // Devolver el viaje a 'esperando' y liberar al conductor
@@ -1003,7 +1045,13 @@ const confirmarViaje = async () => {
         conductorVehiculo: null,
         conductorTelefono: null,
         nuevaOferta: new Date().toISOString(),
-      }).catch(() => {});
+      }).catch((e) => {
+        // Si esto no entra, el viaje sigue asignado a un conductor que el pasajero
+        // ya rechazó, y el conductor sigue creyendo que va a recogerlo.
+        apuntarRechazo('Solicitar.js (rechazarConfirmacion)', e);
+        setAviso(motivoDeRechazo(e, 'rechazar al conductor'));
+        setConfirmacionPendiente(datosRechazados);
+      });
     }
   };
   const aceptarContraoferta = async (oferta) => {
@@ -1039,7 +1087,13 @@ const confirmarViaje = async () => {
   // Rechazar una oferta: la marca como NO vigente en la subcolección (desaparece de la lista en vivo).
   const rechazarContraoferta = async (conductorId) => {
     setContraofertas(prev => prev.filter(c => c.conductorId !== conductorId));
-    if (viajeId) updateDoc(doc(db, 'viajes', viajeId, 'contraofertas', conductorId), { vigente: false }).catch(() => {});
+    // La oferta ya se quitó de la lista de arriba. Si la escritura no entra, el
+    // pasajero deja de verla pero el conductor sigue creyendo que está viva.
+    if (viajeId) updateDoc(doc(db, 'viajes', viajeId, 'contraofertas', conductorId), { vigente: false })
+      .catch((e) => {
+        apuntarRechazo('Solicitar.js (rechazarContraoferta)', e);
+        setAviso(motivoDeRechazo(e, 'rechazar esa oferta'));
+      });
   };
 const PanelEmergencia = () => (
     mostrarEmergencia ? (
@@ -1091,6 +1145,7 @@ const PanelEmergencia = () => (
           <p style={{ color: '#6B7280', fontSize: '14px', margin: '0', lineHeight: '1.5' }}>Otro pasajero lo tomó primero. No te preocupes, seguimos buscando otro conductor para ti.</p>
         </div>
         <button onClick={() => { setConductorYaTomado(false); seguirBuscando(); }} style={{ marginTop: '28px', width: '100%', maxWidth: '420px', padding: '18px', background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)', border: 'none', borderRadius: '16px', color: '#1A1A1E', fontSize: '17px', fontWeight: '900', cursor: 'pointer' }}>🔄 Seguir buscando</button>
+        <AvisoModal aviso={aviso} onCerrar={() => setAviso(null)} />
       </div>
     );
   }
@@ -1116,6 +1171,7 @@ const PanelEmergencia = () => (
           <button onClick={confirmarViaje} style={{ flex: 2, padding: '16px', background: 'linear-gradient(135deg, #2ECC71, #27AE60)', border: 'none', borderRadius: '16px', color: '#FFFFFF', fontSize: '17px', fontWeight: '900', cursor: 'pointer' }}>✅ Sí, confirmar</button>
         </div>
         <style>{`@keyframes pulso { from { transform: scale(1); } to { transform: scale(1.12); } }`}</style>
+        <AvisoModal aviso={aviso} onCerrar={() => setAviso(null)} />
       </div>
     );
   }
@@ -1128,6 +1184,7 @@ const PanelEmergencia = () => (
         <p style={{ color: '#6B7280', fontSize: '14px', margin: '0 0 8px', textAlign: 'center' }}>Razón: <span style={{ color: '#FF7A2F' }}>{viaje?.razonCancelacion || 'No especificada'}</span></p>
         <p style={{ color: '#6B7280', fontSize: '13px', margin: '0 0 32px', textAlign: 'center' }}>Puedes solicitar otro viaje</p>
         <button onClick={onVolver} style={{ width: '100%', padding: '18px', background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)', border: 'none', borderRadius: '16px', color: '#1A1A1E', fontSize: '18px', fontWeight: '900', cursor: 'pointer' }}>Volver al inicio</button>
+        <AvisoModal aviso={aviso} onCerrar={() => setAviso(null)} />
       </div>
     );
   }
@@ -1228,6 +1285,7 @@ const PanelEmergencia = () => (
             <button onClick={() => setMostrarCancelacion(true)} style={{ width: '100%', marginTop: '8px', padding: '14px', background: 'transparent', border: '1px solid #ECECEF', borderRadius: '14px', color: '#FF4444', fontSize: '14px', cursor: 'pointer' }}>Cancelar viaje</button>
           </div>
         )}
+        <AvisoModal aviso={aviso} onCerrar={() => setAviso(null)} />
       </div>
     );
   }
@@ -1295,6 +1353,7 @@ const PanelEmergencia = () => (
             </div>
           </div>
         </div>
+        <AvisoModal aviso={aviso} onCerrar={() => setAviso(null)} />
       </div>
     );
   }
@@ -1374,6 +1433,7 @@ const PanelEmergencia = () => (
 
         <div style={{ width: '60px', height: '4px', background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F)', borderRadius: '2px', marginBottom: '16px' }}/>
         <button onClick={() => setMostrarCancelacion(true)} style={{ background: 'transparent', border: '1px solid #ECECEF', borderRadius: '14px', color: '#FF4444', fontSize: '14px', padding: '14px 32px', cursor: 'pointer' }}>Cancelar viaje</button>
+        <AvisoModal aviso={aviso} onCerrar={() => setAviso(null)} />
       </div>
     );
   }
@@ -1504,6 +1564,7 @@ const PanelEmergencia = () => (
             : `Solicitar ${tipo} — $${tarifa.toLocaleString()}`)}
         </button>
       </div>
+      <AvisoModal aviso={aviso} onCerrar={() => setAviso(null)} />
     </div>
   );
 }
