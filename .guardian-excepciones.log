@@ -317,3 +317,65 @@ solo PATCH ni POST en este archivo». Si lo hay: el POST de abrir la sesion. No
 toca la base, pero el comentario mentia. Corregido.
 
 DESPUES DE TODO ESTO: 29 mutantes, 0 vivos. 506 pruebas verdes.
+2026-09-04T23:51:55.869Z	scripts/medir-viajes-colgados.cjs	NEGADO: fuera de la promesa "REGLA 9 en Conductores.js: las 12 escrituras que no dicen nada"
+
+── 4-sep-2026 · AUTORIZADO POR EL DUEÑO · trabajo NUEVO ────────────────────────
+El candado paro la escritura de scripts/medir-viajes-colgados.cjs: la promesa
+vigente era la de Conductores.js y esto es otro trabajo. SE PARO Y SE PREGUNTO,
+que es lo que manda la regla del 27-ago. Contesto: «Si, mide primero».
+
+QUE ABRE: REGLA 9 en guajirago/src/AppConductor.js — la app del CONDUCTOR.
+
+LO QUE SE MIDIO SOLO LEYENDO (auditoria, antes de tocar):
+  · PANEL:    2 escrituras mudas (Superadmin.js r145 y r202). Practicamente cerrado.
+  · ALIADOS:  16
+  · APP DEL PASAJERO Y CONDUCTOR: 57, de las cuales 16 en AppConductor.js.
+
+MI CUENTA ANTERIOR ERA FALSA. Yo tenia anotadas DOS en la app del conductor
+(enviarApelacion y cerrarLlamado). Son DIECISEIS en ese archivo: siete con
+`catch (e) {}` vacio y NUEVE sin catch ninguno. Mismo fallo de metodo de siempre:
+contar buscando catch vacios no ve las que no tienen catch.
+
+LAS QUE PESAN, y por que:
+  r951   conductorEnPunto / fase 'en_punto'  -> «ya llegue» que el pasajero no ve
+  r967   fase 'en_viaje'                     -> arrancar y que no conste
+  r1018  estado 'cancelado_conductor'        -> cancelar y que siga vivo
+  r1038  estado 'finalizado'                 -> TERMINAR Y QUE NO CONSTE (la plata)
+  r353   la contraoferta                     -> ofertar y que nadie la vea
+  r1021 / r1041 / r1195  ocupado:false       -> QUEDARSE OCUPADO PARA SIEMPRE:
+         mientras figure ocupado NO le entran viajes, y nada se lo dice. Pierde
+         trabajo sin saber por que. Es la mas callada de todas.
+
+ESTE PASO SOLO ESCRIBE EL GUION DE MEDIR. No toca AppConductor.js.
+
+── 5-sep-2026 · «Dale» del dueño · REGLA 9 en la app del CONDUCTOR ─────────────
+ALCANCE AUTORIZADO: los botones que deciden si un viaje existe, empieza, termina
+y se cobra, SOLO del lado del conductor. El lado del pasajero (Solicitar.js y
+SolicitarMensajeria.js, los gemelos) queda para el trabajo siguiente, dicho y
+aceptado. Fuera tambien: la llamada, el pedido de comida, los favoritos, las
+preferencias, el GPS (r820/r841: se dispara a cada segundo, avisar ahi es ruido)
+y los chats.
+
+DOS COSAS ENCONTRADAS ANTES DE ESCRIBIR NADA, leyendo:
+
+1. AppConductor.js tiene CUATRO salidas de pantalla, y la ventanita MensajeGrande
+   solo esta pintada en DOS:
+     r1186 fase 'cancelado_pasajero' -> NO la tiene   (ahi vive el soltar viaje)
+     r1202 fase 'recogiendo'/'en_punto' -> SI (r1205)  (llegue, arrancamos)
+     r1305 fase 'en_viaje' -> SI (r1308)               (terminar, cancelar)
+     r1419 la principal, la lista de solicitudes -> NO (ahi vive OFERTAR)
+   Dos de los seis botones estan en pantallas donde el aviso NO SE VERIA NUNCA.
+   Es la misma trampa de Restaurantes.js y de App.js del panel: archivo correcto,
+   sitio equivocado. Van tres veces; esta se caza ANTES de escribir.
+
+2. cancelarViaje (r1025) y cerrarViajeFinal (r1044) hacen `setMensajeGrande(null)`
+   dentro de su limpieza. Poner el aviso y dejar correr la limpieza seria ponerlo
+   y quitarlo — se ve exactamente igual que no avisar. Es el mutante que ya
+   sobrevivio una vez en el panel.
+
+EL CAMBIO DE COMPORTAMIENTO, dicho aparte porque es mas que un aviso:
+cerrarViajeFinal hoy borra el viaje de la pantalla PASE LO QUE PASE. Si la
+escritura falla, el viaje no consta como terminado, el conductor ya no lo tiene
+en pantalla y NO HAY FORMA DE REINTENTAR. Se le dijo al dueño con esas palabras
+antes del «dale». El arreglo: si falla, NO se limpia — el viaje se queda para que
+pueda volver a intentarlo.
