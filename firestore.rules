@@ -1791,6 +1791,93 @@ service cloud.firestore {
     // ESCRIBE A MANO en la pantalla del pedido. O sea que hoy se puede burlar
     // poniendo otro número, y ninguna regla puede impedirlo desde aquí. Es un
     // problema distinto y va aparte.
+
+    // ══════════════════════════════════════════════════════════════════════
+    // LA FICHA DE COBRO DE CADA CLIENTE
+    //
+    // El software de aliados se vende. Aquí vive lo que paga cada cliente: su
+    // precio, su oferta, sus días de prueba y de gracia, y cuándo le toca.
+    //
+    // Palabras del dueño (6-sep-2026): «cada cliente puede tener valores y
+    // ofertas diferentes» y «los datos de prueba y todo lo demás se debe colocar
+    // en el panel de administración de cada cliente». Por eso NADA de esto está
+    // escrito en el código: son datos de cada quien, puestos desde el panel.
+    //
+    // La cuenta de cuánto se cobra vive en guajirago/functions/suscripcion.js —
+    // en el SERVIDOR, porque «la calculadora buena es la del servidor».
+    //
+    // ── LAS TRES DECISIONES QUE HAY AQUÍ ─────────────────────────────────
+    //
+    // 1. EL NEGOCIO LEE LA SUYA. Que un cliente vea qué paga y cuándo le vence
+    //    baja las discusiones a la mitad, y no le cuesta nada a nadie.
+    //
+    // 2. PERO NO PUEDE LISTARLAS. Si pudiera, pediría la colección entera y
+    //    saldría con EL PRECIO DE TODOS SUS COMPETIDORES. Es lo más valioso que
+    //    hay en este cajón y es lo que más fácil se escapa: `allow read` a secas
+    //    incluye el listado, y por eso aquí van `get` y `list` separados.
+    //
+    // 3. NO LA ESCRIBE NADIE MÁS QUE EL PANEL. Si un negocio pudiera tocar su
+    //    propia ficha, se pondría precio cero y fecha de cobro en el año 3000.
+    //    La ficha la escribe quien cobra.
+    match /suscripciones/{negocioId} {
+
+      // El estado tiene que ser uno de los que el sistema conoce. NO es un
+      // capricho: el candado de `negocioPuedeOperar` pregunta por el texto exacto
+      // `bloqueado`, y la calculadora del servidor devuelve esa misma palabra. Un
+      // «Bloqueado» con mayúscula escrito desde el panel dejaría el bloqueo sin
+      // efecto PARA SIEMPRE y nadie lo notaría hasta que un moroso siguiera
+      // trabajando. Aquí se corta esa posibilidad de raíz.
+      function estadoConocido() {
+        return !request.resource.data.keys().hasAny(['estado'])
+          || request.resource.data.estado in
+             ['prueba', 'alDia', 'porVencer', 'vencido', 'bloqueado', 'cancelado'];
+      }
+
+      // Y el dinero tiene que ser dinero. Un precio en texto («80.000») haría que
+      // la calculadora se plantara y ese cliente no se cobraría nunca — en
+      // silencio, que es la peor forma de no cobrar.
+      function plataBuena() {
+        return (!request.resource.data.keys().hasAny(['precio'])
+                || (request.resource.data.precio is number
+                    && request.resource.data.precio >= 0))
+          && (!request.resource.data.keys().hasAny(['diasDeGracia'])
+                || request.resource.data.diasDeGracia is int)
+          && (!request.resource.data.keys().hasAny(['diasDePrueba'])
+                || request.resource.data.diasDePrueba is int)
+          && (!request.resource.data.keys().hasAny(['diasDeAviso'])
+                || request.resource.data.diasDeAviso is int);
+      }
+
+      // ── POR QUÉ `get` Y `list` VAN SEPARADOS Y NO UN `read` ────────────
+      // Se probó: cambiándolos por `allow read: if esAdmin() || esDelNegocio(...)`
+      // el listado SIGUE fallando para un negocio, así que no abre el agujero.
+      // La razón es sutil: en un listado el comodín `{negocioId}` no está atado a
+      // ningún documento, así que `esDelNegocio(negocioId)` no puede ser cierto.
+      //
+      // Se dejan separados AUNQUE DEN LO MISMO, y a propósito: con `read` la
+      // seguridad de esta colección —la más valiosa del sistema comercial—
+      // dependería de que quien la lea mañana conozca esa sutileza. Separados,
+      // dice lo que quiere decir: el negocio LEE LA SUYA, y LISTAR es solo del
+      // dueño.
+      allow get: if esAdmin() || esDelNegocio(negocioId);
+      allow list: if esAdmin();
+      allow create, update: if esAdmin() && estadoConocido() && plataBuena();
+
+      // REGLA 12 del dueño: los borrados dejan lápida. Una ficha de cobro es el
+      // historial comercial de un cliente: si se cancela, se marca cancelada.
+      allow delete: if false;
+
+      // ── EL HISTORIAL DE COBROS ────────────────────────────────────────
+      // Un cobro apuntado es un hecho, no una opinión: una vez escrito NO SE
+      // EDITA NI SE BORRA. Si un cobro se pudiera cambiar después, el historial
+      // no serviría para resolver una discusión — que es su único trabajo.
+      match /cobros/{cobroId} {
+        allow get, list: if esAdmin() || esDelNegocio(negocioId);
+        allow create: if esAdmin();
+        allow update, delete: if false;
+      }
+    }
+
     match /usosPromo/{usoId} {
       function contadorBueno() {
         return request.resource.data.keys().hasOnly(['veces', 'telefono', 'promoId'])

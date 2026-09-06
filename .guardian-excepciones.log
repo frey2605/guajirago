@@ -852,3 +852,36 @@ Por eso la equivalencia se demuestra ejecutando y no razonando: iba a darlo por
 equivalente de cabeza.
 
 13 mutantes, 0 vivos. 632 pruebas verdes.
+
+── 6-sep-2026 · LA FICHA DE COBRO · segunda pieza, una a una ──────────────────
+MEDIDO: 3 negocios necesitarian ficha, CERO existen, y ninguno tiene todavia
+estadoComercial — coherente con el candado en primer tiempo (campo que falta, no
+bloquea).
+
+LA DECISION QUE MAS PESA, y no la habia dicho hasta el paso 3: EL LISTADO. Si un
+negocio pudiera listar la coleccion, saldria con EL PRECIO DE TODOS SUS
+COMPETIDORES. Es lo mas valioso de este cajon y lo que mas facil se escapa,
+porque `allow read` a secas INCLUYE el listado.
+
+DOS CANDADOS DE FORMA, y ninguno es capricho:
+  · El estado tiene que ser uno de los seis conocidos. Un «Bloqueado» con
+    mayuscula escrito desde el panel dejaria el bloqueo SIN EFECTO PARA SIEMPRE,
+    porque el candado pregunta por el texto exacto. Nadie lo notaria hasta que un
+    moroso siguiera trabajando.
+  · El precio tiene que ser un numero. Un «80.000» en texto haria que la
+    calculadora se plantara y ese cliente no se cobraria NUNCA, en silencio.
+
+UN COBRO APUNTADO NO SE EDITA NI SE BORRA. Un cobro es un hecho, no una opinion:
+si se pudiera cambiar despues, el historial no serviria para resolver una
+discusion, que es su unico trabajo.
+
+11 mutantes, 10 muertos. EL QUE SOBREVIVE ES «EL GORDO» que yo mismo marque:
+cambiar `get`+`list` por un `read` a secas. Y NO ES UN AGUJERO: se comprobo
+EJECUTANDO —la prueba que dice «un negocio NO puede listar» siguio pasando bajo el
+mutante, o sea que el listado siguio fallando—. La razon es sutil: en un listado
+el comodin {negocioId} no esta atado a ningun documento, asi que esDelNegocio()
+no puede ser cierto.
+
+SE DEJAN SEPARADOS AUNQUE DEN LO MISMO, y queda escrito por que: con `read`, la
+seguridad de la coleccion mas valiosa del sistema comercial dependeria de que
+quien lo lea mañana conozca esa sutileza.

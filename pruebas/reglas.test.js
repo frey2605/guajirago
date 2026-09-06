@@ -4118,3 +4118,163 @@ describe('SE VENDE · las tres llaves, y que apagar apague', () => {
       { nombre: 'NUEVO NOMBRE', estadoComercial: 'alDia' }));
   });
 });
+
+// ══════════════════════════════════════════════════════════════════════════
+// LA FICHA DE COBRO DE CADA CLIENTE
+//
+// Aquí vive lo que paga cada uno: su precio, su oferta, sus días de prueba y de
+// gracia. Es el cajón más valioso del sistema comercial, y el que más fácil se
+// escapa — porque `allow read` a secas incluye el LISTADO.
+// ══════════════════════════════════════════════════════════════════════════
+describe('SE VENDE · la ficha de cobro de cada cliente', () => {
+  const ficha = (extra) => ({
+    precio: 80000, diasDePrueba: 15, diasDeGracia: 8, diasDeAviso: 5,
+    inicio: '2026-09-01', proximoCobro: '2026-10-01', estado: 'alDia', ...extra,
+  });
+  const poner = async (id, datos) => {
+    const { doc, setDoc } = FS;
+    await entorno.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'suscripciones/' + id), datos);
+    });
+  };
+
+  // ── LO QUE MÁS IMPORTA ────────────────────────────────────────────────
+  it('EL QUE MUERDE · un negocio NO puede listar las fichas de los demás', async () => {
+    // Si pudiera, pediría la colección entera y saldría con EL PRECIO DE TODOS
+    // SUS COMPETIDORES. Es la razón por la que aquí `get` y `list` van separados.
+    const { getDocs, collection } = FS;
+    await poner('r1', ficha());
+    await poner('r2', ficha({ precio: 250000 }));
+    await RUT.assertFails(getDocs(collection(como('r1'), 'suscripciones')),
+      'un negocio listó las fichas de cobro: acaba de ver lo que paga la competencia.');
+    await RUT.assertFails(getDocs(collection(como('pasajero1'), 'suscripciones')));
+    await RUT.assertSucceeds(getDocs(collection(como('eladmin'), 'suscripciones')));
+  });
+
+  it('EL QUE MUERDE · un negocio no puede leer la ficha de OTRO, ni sabiendo su nombre', async () => {
+    const { doc, getDoc } = FS;
+    await poner('r2', ficha({ precio: 250000 }));
+    await RUT.assertFails(getDoc(doc(como('r1'), 'suscripciones/r2')),
+      'un negocio leyó lo que paga el de al lado.');
+    await RUT.assertFails(getDoc(doc(como('pasajero1'), 'suscripciones/r2')));
+  });
+
+  it('el negocio SÍ ve la suya, y su empleado también', async () => {
+    // Que un cliente vea qué paga y cuándo le vence baja las discusiones a la
+    // mitad, y no le cuesta nada a nadie.
+    const { doc, getDoc } = FS;
+    await poner('r1', ficha());
+    await RUT.assertSucceeds(getDoc(doc(como('r1'), 'suscripciones/r1')));
+    await RUT.assertSucceeds(getDoc(doc(como('emp1'), 'suscripciones/r1')));
+  });
+
+  // ── LA ESCRIBE QUIEN COBRA ────────────────────────────────────────────
+  it('EL QUE MUERDE · un negocio NO se escribe su propia ficha', async () => {
+    // Si pudiera, se pondría precio cero y fecha de cobro en el año 3000.
+    const { doc, setDoc, updateDoc } = FS;
+    await poner('r1', ficha());
+    await RUT.assertFails(updateDoc(doc(como('r1'), 'suscripciones/r1'), { precio: 0 }),
+      'un negocio se puso su propio precio.');
+    await RUT.assertFails(updateDoc(doc(como('r1'), 'suscripciones/r1'),
+      { proximoCobro: '3000-01-01' }));
+    await RUT.assertFails(updateDoc(doc(como('r1'), 'suscripciones/r1'), { estado: 'alDia' }));
+    await RUT.assertFails(setDoc(doc(como('r1'), 'suscripciones/r9'), ficha()));
+    await RUT.assertFails(setDoc(doc(como('emp1'), 'suscripciones/r1'), ficha()));
+  });
+
+  it('la administradora la crea y la cambia', async () => {
+    const { doc, setDoc, updateDoc } = FS;
+    await RUT.assertSucceeds(setDoc(doc(como('eladmin'), 'suscripciones/r1'), ficha()));
+    await RUT.assertSucceeds(updateDoc(doc(como('eladmin'), 'suscripciones/r1'),
+      { precio: 90000, oferta: { descripcion: '2 meses', precio: 45000, hasta: '2026-11-01' } }));
+  });
+
+  it('cada cliente puede tener su precio y su oferta', async () => {
+    const { doc, setDoc } = FS;
+    await RUT.assertSucceeds(setDoc(doc(como('eladmin'), 'suscripciones/r1'), ficha({ precio: 50000 })));
+    await RUT.assertSucceeds(setDoc(doc(como('eladmin'), 'suscripciones/r2'),
+      ficha({ precio: 250000, diasDeGracia: 30, oferta: { precio: 0, hasta: '2027-01-01' } })));
+  });
+
+  // ── QUE UN DEDAZO NO DESACTIVE EL BLOQUEO ─────────────────────────────
+  it('EL QUE MUERDE · un estado que el sistema no conoce NO se guarda', async () => {
+    // El candado pregunta por el texto exacto `bloqueado`. Un «Bloqueado» con
+    // mayúscula escrito desde el panel dejaría el bloqueo sin efecto PARA SIEMPRE,
+    // y nadie lo notaría hasta que un moroso siguiera trabajando.
+    const { doc, setDoc } = FS;
+    for (const malo of ['Bloqueado', 'blocked', 'al dia', 'moroso', '']) {
+      await RUT.assertFails(setDoc(doc(como('eladmin'), 'suscripciones/r1'), ficha({ estado: malo })),
+        'se guardó el estado «' + malo + '», que el candado no reconoce.');
+    }
+  });
+
+  it('EL QUE MUERDE · los seis estados buenos SÍ se guardan', async () => {
+    // La otra mitad: si la lista de la regla se quedara corta, el panel no podría
+    // marcar a alguien como pagado.
+    const { doc, setDoc } = FS;
+    for (const bueno of ['prueba', 'alDia', 'porVencer', 'vencido', 'bloqueado', 'cancelado']) {
+      await RUT.assertSucceeds(setDoc(doc(como('eladmin'), 'suscripciones/r1'), ficha({ estado: bueno })),
+        'no dejó guardar el estado «' + bueno + '», que sí es de los buenos.');
+    }
+  });
+
+  it('EL QUE MUERDE · un precio que no es dinero no se guarda', async () => {
+    // Un precio en texto haría que la calculadora se plantara y ese cliente no se
+    // cobraría NUNCA, en silencio — la peor forma de no cobrar.
+    const { doc, setDoc } = FS;
+    await RUT.assertFails(setDoc(doc(como('eladmin'), 'suscripciones/r1'), ficha({ precio: '80.000' })));
+    await RUT.assertFails(setDoc(doc(como('eladmin'), 'suscripciones/r1'), ficha({ precio: -5000 })));
+    await RUT.assertFails(setDoc(doc(como('eladmin'), 'suscripciones/r1'), ficha({ diasDeGracia: 'ocho' })));
+  });
+
+  it('EL QUE MUERDE · una ficha no se borra (REGLA 12)', async () => {
+    const { doc, deleteDoc } = FS;
+    await poner('r1', ficha());
+    await RUT.assertFails(deleteDoc(doc(como('eladmin'), 'suscripciones/r1')));
+    await RUT.assertFails(deleteDoc(doc(como('eljefe'), 'suscripciones/r1')));
+    await RUT.assertFails(deleteDoc(doc(como('r1'), 'suscripciones/r1')));
+  });
+});
+
+describe('SE VENDE · el historial de cobros', () => {
+  const cobro = { fecha: '2026-09-06', monto: 80000, comoPago: 'transferencia' };
+  const ponerCobro = async (id, cid, datos) => {
+    const { doc, setDoc } = FS;
+    await entorno.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'suscripciones/' + id + '/cobros/' + cid), datos);
+    });
+  };
+
+  it('la administradora apunta un cobro, y el cliente lo ve', async () => {
+    const { doc, setDoc, getDocs, collection } = FS;
+    await RUT.assertSucceeds(setDoc(doc(como('eladmin'), 'suscripciones/r1/cobros/c1'), cobro));
+    await RUT.assertSucceeds(getDocs(collection(como('r1'), 'suscripciones/r1/cobros')));
+  });
+
+  it('EL QUE MUERDE · un cobro apuntado NO se edita ni se borra', async () => {
+    // Un cobro es un hecho, no una opinión. Si se pudiera cambiar después, el
+    // historial no serviría para resolver una discusión — que es su único trabajo.
+    const { doc, updateDoc, deleteDoc } = FS;
+    await ponerCobro('r1', 'c1', cobro);
+    await RUT.assertFails(updateDoc(doc(como('eladmin'), 'suscripciones/r1/cobros/c1'), { monto: 10 }),
+      'se pudo cambiar un cobro ya apuntado. El historial deja de servir para nada.');
+    await RUT.assertFails(deleteDoc(doc(como('eladmin'), 'suscripciones/r1/cobros/c1')));
+    await RUT.assertFails(deleteDoc(doc(como('eljefe'), 'suscripciones/r1/cobros/c1')));
+  });
+
+  it('EL QUE MUERDE · el negocio no apunta sus propios cobros', async () => {
+    // Si pudiera, se apuntaría que pagó.
+    const { doc, setDoc } = FS;
+    await RUT.assertFails(setDoc(doc(como('r1'), 'suscripciones/r1/cobros/c9'), cobro),
+      'un negocio se apuntó a sí mismo un pago que nadie recibió.');
+    await RUT.assertFails(setDoc(doc(como('emp1'), 'suscripciones/r1/cobros/c9'), cobro));
+  });
+
+  it('EL QUE MUERDE · nadie ve los cobros de otro negocio', async () => {
+    const { doc, getDoc, getDocs, collection } = FS;
+    await ponerCobro('r2', 'c5', cobro);
+    await RUT.assertFails(getDoc(doc(como('r1'), 'suscripciones/r2/cobros/c5')));
+    await RUT.assertFails(getDocs(collection(como('r1'), 'suscripciones/r2/cobros')));
+    await RUT.assertFails(getDocs(collection(como('pasajero1'), 'suscripciones/r2/cobros')));
+  });
+});
