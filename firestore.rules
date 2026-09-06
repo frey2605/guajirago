@@ -984,7 +984,24 @@ service cloud.firestore {
       // Medido el 25-ago-2026: 8 códigos, 5 usados, 1 anulado, 2 vivos por $50.800.
       // Los escribe el panel: Codigos.js:208 (crear) y :266 (anular).
       allow get, list: if esAdmin();
-      allow create, update: if esAdmin();
+
+      // ── UN CÓDIGO SE CREA UNA VEZ, Y DESPUÉS SOLO SE ANULA (6-sep-2026) ────
+      // `create` y `update` iban juntos en el mismo renglón, y en Firestore
+      // `update` es lo que pasa cuando se escribe ENCIMA de un documento que ya
+      // existe. El panel guarda con setDoc y su campo del código SE PUEDE
+      // TECLEAR: escribir uno que ya existía lo sobrescribía entero, dejándolo
+      // otra vez en `usado: false, anulado: false`. Un código ya cobrado volvía
+      // a valer, por el valor nuevo que se le pusiera.
+      // No es un caso de laboratorio: en la base hay uno tecleado a mano
+      // (PRUEBA50000, $50.000), así que la puerta se usa.
+      //
+      // Lo único que el panel necesita cambiarle a un código vivo es ANULARLO.
+      // Marcarlo como cobrado lo hace `canjearCodigoRecarga` con el SDK de
+      // administrador, que no pasa por estas reglas.
+      allow create: if esAdmin();
+      allow update: if esAdmin()
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['anulado', 'fechaAnulacion']);
       allow delete: if false;
     }
     match /promociones/{promoId} {

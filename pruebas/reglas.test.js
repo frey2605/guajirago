@@ -764,6 +764,39 @@ describe('REGLA 6 · cada quien ve lo suyo', () => {
     await RUT.assertSucceeds(updateDoc(doc(como('eladmin'), 'codigos/cod1'), { anulado: true }));
   });
 
+  // ── EL QUE MUERDE · un código no se escribe ENCIMA de otro (6-sep-2026) ────
+  //  `create` y `update` iban en el mismo renglón, y en Firestore `update` es lo
+  //  que pasa cuando se escribe encima de un documento que YA existe. El panel
+  //  guarda con setDoc y su campo del código SE PUEDE TECLEAR: reescribir uno ya
+  //  cobrado lo devolvía a `usado: false`, por el valor nuevo que se le pusiera.
+  //  No es un caso de laboratorio — en la base hay uno tecleado a mano
+  //  (PRUEBA50000, $50.000), así que esa puerta se usa.
+  it('EL QUE MUERDE · ni el PANEL escribe encima de un código ya cobrado', async () => {
+    await entorno.withSecurityRulesDisabled(async (ctx) => {
+      const { doc, setDoc } = FS;
+      await setDoc(doc(ctx.firestore(), 'codigos/GGO-COBRADO'), {
+        valor: 50000, usado: true, usadoPor: 'conductor1', anulado: false,
+      });
+    });
+    const { doc, setDoc } = FS;
+    await RUT.assertFails(setDoc(doc(como('eladmin'), 'codigos/GGO-COBRADO'), {
+      valor: 90000, usado: false, anulado: false,
+    }), 'Reescribir un código ya cobrado lo deja otra vez en usado:false y se cobra de nuevo.');
+  });
+
+  it('EL QUE MUERDE · el panel tampoco le sube el VALOR a un código vivo', async () => {
+    const { doc, updateDoc } = FS;
+    await RUT.assertFails(updateDoc(doc(como('eladmin'), 'codigos/cod1'), { valor: 9000000 }),
+      'Un código vivo solo se anula. Subirle el valor es fabricar plata desde el panel.');
+  });
+
+  it('y anularlo sigue funcionando CON su fecha, que es lo que escribe el panel', async () => {
+    const { doc, updateDoc } = FS;
+    await RUT.assertSucceeds(updateDoc(doc(como('eladmin'), 'codigos/cod1'), {
+      anulado: true, fechaAnulacion: '2026-09-06T12:00:00.000Z',
+    }));
+  });
+
   it('un cualquiera NO puede pedir la LISTA de códigos', async () => {
     const { collection, getDocs } = FS;
     await RUT.assertFails(getDocs(collection(como('pasajero1'), 'codigos')));

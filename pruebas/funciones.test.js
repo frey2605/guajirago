@@ -296,6 +296,68 @@ describe('REGLA 7 · canjearCodigoRecarga', () => {
     const r = await llamarA('canjearCodigoRecarga', 'elcond', { codigo: '  bueno50  ' });
     assert.strictEqual(r.cuerpo?.result?.valor, 50000, 'no acepto el codigo en minusculas');
   });
+
+  // ── EL QUE MUERDE · el codigo ANULADO no se cobra (6-sep-2026) ────────────
+  //  El panel escribe `anulado: true` al pulsar Anular, y esa palabra NO llegaba
+  //  hasta esta funcion: aqui solo se miraba `usado`. O sea que anular cambiaba
+  //  como se veia la lista en la pantalla del dueño, y nada mas.
+  //  MEDIDO contra la nube ese dia: GGO-CHSGYH, $50.000, Nequi, anulado el
+  //  29-jun y SIN USAR. El servidor se lo habria entregado a quien lo escribiera.
+  test('EL QUE MUERDE · un codigo ANULADO no se cobra', async () => {
+    await sembrar('codigos/ANULADO50', {
+      valor: num(50000), usado: { booleanValue: false }, anulado: { booleanValue: true },
+    });
+    const r = await llamarA('canjearCodigoRecarga', 'elcond', { codigo: 'ANULADO50' });
+    assert.strictEqual(r.cuerpo?.error?.status, 'FAILED_PRECONDITION',
+      'el codigo anulado se cobro igual: el boton de anular no anula nada');
+    assert.strictEqual(await saldoDe('elcond'), SALDO_INICIAL,
+      'entro plata de un codigo que el dueño habia cancelado');
+    assert.strictEqual((await leer('codigos/ANULADO50')).usado.booleanValue, false,
+      'lo marco como usado aunque estaba anulado');
+  });
+
+  // ── EL QUE MUERDE · el codigo es de quien es ──────────────────────────────
+  //  El panel ATA cada codigo a un conductor: exige su documento, lo busca y
+  //  guarda `conductorId`. Esta funcion le acreditaba el saldo A QUIEN LLAMARA,
+  //  sin comparar nunca los dos. Un codigo que llegara a otras manos —reenviado,
+  //  pasado por WhatsApp— lo cobraba el otro, y el que hizo la transferencia se
+  //  quedaba sin su recarga y sin nada que reclamar.
+  test('EL QUE MUERDE · un codigo de OTRO conductor no se cobra', async () => {
+    await sembrar('usuarios/otrocond', { tipo: txt('conductor'), creditos: num(0) });
+    await sembrar('codigos/DEOTRO50', {
+      valor: num(50000), usado: { booleanValue: false }, conductorId: txt('otrocond'),
+    });
+    const r = await llamarA('canjearCodigoRecarga', 'elcond', { codigo: 'DEOTRO50' });
+    assert.strictEqual(r.cuerpo?.error?.status, 'PERMISSION_DENIED',
+      'cualquiera cobra el codigo de cualquiera');
+    assert.strictEqual(await saldoDe('elcond'), SALDO_INICIAL, 'se llevo la recarga de otro');
+    assert.strictEqual(await saldoDe('otrocond'), 0, 'y al que pago no le entro nada');
+    assert.strictEqual((await leer('codigos/DEOTRO50')).usado.booleanValue, false,
+      'ademas se lo quemo: el dueño ya no podria cobrarlo');
+  });
+
+  test('su DUEÑO si lo cobra', async () => {
+    await sembrar('codigos/MIO50', {
+      valor: num(50000), usado: { booleanValue: false }, conductorId: txt('elcond'),
+    });
+    const r = await llamarA('canjearCodigoRecarga', 'elcond', { codigo: 'MIO50' });
+    assert.strictEqual(r.cuerpo?.result?.valor, 50000, 'el dueño no pudo cobrar el suyo');
+    assert.strictEqual(await saldoDe('elcond'), SALDO_INICIAL + 50000);
+  });
+
+  // ── Y LOS VIEJOS SE SIGUEN COBRANDO ───────────────────────────────────────
+  //  El candado de arriba SOLO muerde si el codigo trae dueño apuntado, y eso no
+  //  es pereza: MEDIDO el 6-sep-2026, de los 3 codigos cobrables de la nube DOS
+  //  son viejos y no lo traen (GGO-4PZKAT, por $50.000). Exigirlo a secas habria
+  //  dejado sin cobrar una recarga que alguien ya pago.
+  //  Esta prueba se pone ROJA si alguien endurece el candado sin mirar los datos.
+  test('un codigo VIEJO sin dueño apuntado se sigue cobrando: no se deja a nadie fuera', async () => {
+    assert.strictEqual((await leer('codigos/BUENO50')).conductorId, undefined,
+      'este codigo tiene que estar SIN dueño para que la prueba valga');
+    const r = await llamarA('canjearCodigoRecarga', 'elcond', { codigo: 'BUENO50' });
+    assert.strictEqual(r.cuerpo?.result?.valor, 50000,
+      'el candado del dueño dejo sin cobrar un codigo viejo, y esa es plata de alguien');
+  });
 });
 
 describe('REGLA 7 · reclamarPromocion', () => {

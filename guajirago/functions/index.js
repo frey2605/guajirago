@@ -537,6 +537,36 @@ exports.canjearCodigoRecarga = onCall(async (request) => {
       if (!snapCodigo.exists) throw new HttpsError("not-found", "Ese código no existe. Verifícalo");
       const datos = snapCodigo.data() || {};
       if (datos.usado === true) throw new HttpsError("already-exists", "Ese código ya fue usado");
+
+      // ── EL CÓDIGO ANULADO NO SE COBRA (6-sep-2026) ──────────────────────────
+      // El panel escribe `anulado: true` (Codigos.js, botón de anular) y esa
+      // palabra NO llegaba hasta aquí: esta función se fiaba de `usado` y de nada
+      // más. O sea que anular solo cambiaba cómo se veía la lista en la pantalla
+      // del dueño; el código se seguía cobrando igual.
+      // MEDIDO contra la nube el 6-sep-2026: GGO-CHSGYH, $50.000, Nequi, anulado
+      // el 29-jun y SIN USAR. El servidor se lo habría entregado a quien lo
+      // escribiera.
+      if (datos.anulado === true) {
+        throw new HttpsError("failed-precondition", "Ese código fue anulado. Pide uno nuevo");
+      }
+
+      // ── Y ES DE QUIEN ES ────────────────────────────────────────────────────
+      // El panel ATA cada código a un conductor: exige su documento, lo busca y
+      // guarda `conductorId`. Aquí se le acreditaba el saldo A QUIEN LLAMARA, sin
+      // comparar nunca los dos. Un código que llegara a otras manos —reenviado,
+      // pasado por WhatsApp, leído por encima del hombro— lo cobraba el otro, y
+      // el que hizo la transferencia se quedaba sin su recarga.
+      //
+      // SOLO MUERDE SI EL CÓDIGO TRAE DUEÑO, y eso no es pereza: MEDIDO el
+      // 6-sep-2026, de los 3 códigos cobrables DOS son viejos y no lo traen
+      // (GGO-4PZKAT por $50.000, y GGO-CHSGYH que ya cae por anulado arriba).
+      // Exigirlo a secas habría dejado sin cobrar una recarga que alguien pagó.
+      // Los que nacen hoy lo traen SIEMPRE: el panel no deja crear uno sin el
+      // documento del conductor.
+      if (datos.conductorId && datos.conductorId !== request.auth.uid) {
+        throw new HttpsError("permission-denied", "Ese código es de otro conductor");
+      }
+
       const valor = datos.valor || 0;
       if (valor <= 0) throw new HttpsError("invalid-argument", "Código inválido");
 

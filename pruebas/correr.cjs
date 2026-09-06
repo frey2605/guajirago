@@ -66,14 +66,28 @@ const r = spawnSync(
     '--yes',
     'firebase-tools@15',
     'emulators:exec',
-    '--only', 'firestore',
+    // TAMBIÉN el emulador de FUNCIONES (6-sep-2026). Antes solo se levantaba
+    // firestore, y por eso `pruebas/funciones.test.js` llevaba meses HUÉRFANA:
+    // existía, tenía 47 pruebas que ENCIENDEN las funciones de verdad —incluidas
+    // las 7 del canje de un código de recarga, que mueve dinero— y no la corría
+    // nadie. Levantar funciones añade ~20 segundos. Una prueba que hay que
+    // acordarse de correr aparte es una prueba que no existe.
+    '--only', 'firestore,functions',
     '--project', 'demo-guajirago',
     // Va entre comillas a propósito: con shell, Windows lo partiría en trozos
     // y `firebase` creería que --test es una opción suya.
     // tarifas.test.js no necesita el emulador (es aritmética), pero se corre aquí
     // igual para que `npm test` sea UN solo comando: una prueba que hay que
     // acordarse de correr aparte es una prueba que nadie corre.
-    '"node --test pruebas/reglas.test.js pruebas/tarifas.test.js pruebas/descuentos.test.js pruebas/codigoSeguridad.test.js pruebas/viajeNuevo.test.js pruebas/compartidos.test.js pruebas/avisoCalificacion.test.js pruebas/avisosPanel.test.js pruebas/avisosConductor.test.js pruebas/gemelosSolicitar.test.js pruebas/tipoNegocio.test.js pruebas/avisosPasajero.test.js pruebas/suscripcion.test.js pruebas/cobros.test.js pruebas/cobrosPanel.test.js pruebas/filtroChat.test.js pruebas/amarres.test.js pruebas/vaciado.test.js"',
+    //
+    // DOS TANDAS, Y NO ES CAPRICHO: `node --test` corre los archivos EN PARALELO,
+    // y `reglas.test.js` VACÍA la base entera antes de cada prueba
+    // (`clearFirestore`). `funciones.test.js` siembra sus códigos y sus saldos y
+    // luego los lee: corriendo a la vez, el vaciado de una le borra los datos a
+    // la otra a mitad, y los fallos salen distintos en cada corrida. Encadenadas
+    // con && la segunda arranca cuando la primera ya terminó — y si la primera
+    // falla, la segunda ni corre y el código de salida sigue siendo el malo.
+    '"node --test pruebas/reglas.test.js pruebas/tarifas.test.js pruebas/descuentos.test.js pruebas/codigoSeguridad.test.js pruebas/viajeNuevo.test.js pruebas/compartidos.test.js pruebas/avisoCalificacion.test.js pruebas/avisosPanel.test.js pruebas/avisosConductor.test.js pruebas/gemelosSolicitar.test.js pruebas/tipoNegocio.test.js pruebas/avisosPasajero.test.js pruebas/suscripcion.test.js pruebas/cobros.test.js pruebas/cobrosPanel.test.js pruebas/filtroChat.test.js pruebas/amarres.test.js pruebas/vaciado.test.js && node --test pruebas/funciones.test.js"',
   ],
   { cwd: RAIZ, env: entorno, stdio: 'inherit', shell: true }
 );
