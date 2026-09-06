@@ -776,3 +776,42 @@ LO QUE SIGUE VIVO Y ES HONESTO QUE ASI SEA: dos mutantes en el bucle que habla c
 la red —el interruptor --aplicar invertido, que se delata solo porque imprime
 «APLICANDO DE VERDAD», y `val()` cegada—. Viven donde no se puede probar sin
 fingir la conexion. Es una limitacion dicha, no un descuido.
+
+── 6-sep-2026 · LAS TRES LLAVES · que apagar apague de verdad ─────────────────
+MEDIDO antes de tocar: apagar NO APAGABA NADA.
+  · El `activo` DEL NEGOCIO no lo leia NADIE. Un interruptor protegido por las
+    reglas y desconectado de todo.
+  · «No aprobado» solo pintaba un cartel abajo (aliados/App.js:397): el negocio
+    seguia tomando pedidos igual.
+  · Las reglas de los pedidos solo comprobaban que el negocio EXISTIERA — ni
+    aprobado, ni activo, ni nada.
+
+TRES CAMPOS, NO UNO, porque son tres preguntas distintas:
+  visibleEnEscaparate · estadoComercial · activo
+
+EL PRIMER TIEMPO, y es una decision, no un descuido: el candado bloquea SOLO a
+quien esta EXPRESAMENTE bloqueado o suspendido. Un campo que falta NO bloquea.
+Porque 2 de los 3 negocios de hoy no tienen el campo de aprobacion, y preguntar
+«¿esta expresamente al dia?» los dejaria fuera el mismo dia. El riesgo caro de
+todo esto es dejar fuera a un negocio QUE SI PAGO.
+SEGUNDO TIEMPO, antes del primer cliente que pague: apretarlo a «solo opera quien
+esta expresamente al dia», y eso exige que todos tengan el campo.
+
+LO MAS IMPORTANTE DE LAS TRES: estadoComercial y visibleEnEscaparate entraron en
+camposDelPanel() EL MISMO DIA que se inventaron. Si un negocio pudiera escribirse
+`estadoComercial: alDia`, el bloqueo se desharia con una linea desde el navegador.
+
+DOS DECISIONES DE DISEÑO QUE SE PROBARON EXPRESAMENTE:
+  · El CLIENTE no puede pedirle a un negocio bloqueado — pagaria por comida que
+    nadie va a cocinar. Bloquear a un moroso no puede ser un problema para SUS
+    clientes.
+  · Pero SI puede cancelar el pedido que ya tenia: a nadie se le atrapa un pedido
+    por una deuda que no es suya.
+  · Y el negocio bloqueado SIGUE VIENDO lo suyo. Se corta la operacion, no el
+    acceso a sus datos.
+
+12 pruebas nuevas contra el emulador. 8 mutantes, 8 muertos — los dos marcados
+PELIGRO son los que mas importan: si el candado dejara fuera a quien no tiene el
+campo, 33 pruebas se ponen rojas; si le cortara la LECTURA al bloqueado, 3.
+
+604 pruebas verdes.

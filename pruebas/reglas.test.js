@@ -3969,3 +3969,152 @@ describe('SE VENDE · un negocio no se cambia su propio paquete', () => {
       { nombre: 'EL FOGON DE JUAN', abierto: false, demoraMin: 25 }));
   });
 });
+
+// ══════════════════════════════════════════════════════════════════════════
+// LAS TRES LLAVES · QUE APAGAR UN NEGOCIO LO APAGUE DE VERDAD
+//
+// Palabras del dueño: quiere poder apagar a un cliente desde el panel. Medido el
+// 6-sep-2026, apagar NO APAGABA NADA: el `activo` del negocio no lo leía nadie,
+// «no aprobado» solo pintaba un cartel, y las reglas de los pedidos solo
+// comprobaban que el negocio EXISTIERA.
+//
+// PRIMER TIEMPO: se bloquea SOLO a quien está EXPRESAMENTE bloqueado o
+// suspendido. Un campo que falta no bloquea a nadie — porque el riesgo caro de
+// todo esto es dejar fuera a un negocio QUE SÍ PAGÓ.
+// ══════════════════════════════════════════════════════════════════════════
+describe('SE VENDE · las tres llaves, y que apagar apague', () => {
+  const alDia = { nombre: 'AL DIA', tipoNegocio: 'restaurante', rol: 'dueno' };
+  const bloqueado = { ...alDia, nombre: 'BLOQUEADO', estadoComercial: 'bloqueado' };
+  const suspendido = { ...alDia, nombre: 'SUSPENDIDO', activo: false };
+
+  const poner = async (id, datos) => {
+    const { doc, setDoc } = FS;
+    await entorno.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'restaurantes/' + id), datos);
+    });
+  };
+
+  // ── LO QUE MÁS IMPORTA: NO DEJAR FUERA A QUIEN SÍ PAGÓ ──────────────────
+  it('EL QUE MUERDE · a un negocio SIN los campos nuevos no se le bloquea nada', async () => {
+    // Los 2 de 3 negocios de hoy no tienen el campo de aprobación. Si el candado
+    // preguntara «¿está expresamente al día?», se quedarían fuera el mismo día que
+    // se aplique. Eso es lo único que este trabajo no se puede permitir.
+    const { doc, setDoc } = FS;
+    await poner('r1', { nombre: 'EL DE SIEMPRE', tipoNegocio: 'restaurante', rol: 'dueno' });
+    await RUT.assertSucceeds(setDoc(doc(como('r1'), 'pedidosRestaurantes/p1'),
+      { restauranteId: 'r1', tipo: 'local', mesa: 3, estado: 'tomado', total: 20000 }));
+    await RUT.assertSucceeds(setDoc(doc(como('r1'), 'mesasInfo/r1_3'), { comensales: 2 }));
+    await RUT.assertSucceeds(setDoc(doc(como('r1'), 'visitasDiarias/r1_2026-09-06'), { visitas: 5 }));
+  });
+
+  it('un negocio al día opera con normalidad', async () => {
+    const { doc, setDoc } = FS;
+    await poner('r1', { ...alDia, estadoComercial: 'alDia', activo: true });
+    await RUT.assertSucceeds(setDoc(doc(como('r1'), 'pedidosRestaurantes/p2'),
+      { restauranteId: 'r1', tipo: 'local', mesa: 1, estado: 'tomado', total: 10000 }));
+  });
+
+  // ── Y AHORA SÍ: QUE APAGAR APAGUE ───────────────────────────────────────
+  it('EL QUE MUERDE · un negocio BLOQUEADO no puede tomar pedidos', async () => {
+    const { doc, setDoc } = FS;
+    await poner('r1', bloqueado);
+    await RUT.assertFails(setDoc(doc(como('r1'), 'pedidosRestaurantes/p3'),
+      { restauranteId: 'r1', tipo: 'local', mesa: 2, estado: 'tomado', total: 15000 }),
+      'un negocio bloqueado por no pagar sigue tomando pedidos. Apagar no apaga.');
+  });
+
+  it('EL QUE MUERDE · un negocio bloqueado tampoco mueve mesas, visitas ni compras', async () => {
+    const { doc, setDoc } = FS;
+    await poner('r1', bloqueado);
+    await RUT.assertFails(setDoc(doc(como('r1'), 'mesasInfo/r1_5'), { comensales: 4 }));
+    await RUT.assertFails(setDoc(doc(como('r1'), 'visitasDiarias/r1_2026-09-07'), { visitas: 9 }));
+    await RUT.assertFails(setDoc(doc(como('r1'), 'comprasInsumos/c20'),
+      { restauranteId: 'r1', que: 'tomate', costo: 5000 }));
+  });
+
+  it('EL QUE MUERDE · un negocio SUSPENDIDO a mano tampoco opera', async () => {
+    // La otra llave: usted lo apagó por un motivo que no es la plata.
+    const { doc, setDoc } = FS;
+    await poner('r1', suspendido);
+    await RUT.assertFails(setDoc(doc(como('r1'), 'pedidosRestaurantes/p4'),
+      { restauranteId: 'r1', tipo: 'local', mesa: 2, estado: 'tomado', total: 15000 }));
+  });
+
+  it('EL QUE MUERDE · su EMPLEADO tampoco puede operar por él', async () => {
+    // Si el bloqueo solo mirara al dueño, el negocio seguiría trabajando con la
+    // cuenta del mesero. `emp1` es empleado de r1.
+    const { doc, setDoc } = FS;
+    await poner('r1', bloqueado);
+    await RUT.assertFails(setDoc(doc(como('emp1'), 'pedidosRestaurantes/p5'),
+      { restauranteId: 'r1', tipo: 'local', mesa: 6, estado: 'tomado', total: 8000 }));
+    await RUT.assertFails(setDoc(doc(como('emp1'), 'mesasInfo/r1_6'), { comensales: 3 }));
+  });
+
+  it('EL QUE MUERDE · un CLIENTE no puede pedirle a un negocio bloqueado', async () => {
+    // Si pudiera, pagaría por comida que nadie va a cocinar. Bloquear a un cliente
+    // que no paga no puede convertirse en un problema para SUS clientes.
+    const { doc, setDoc } = FS;
+    await poner('r1', bloqueado);
+    await RUT.assertFails(setDoc(doc(como('pasajero1'), 'pedidosRestaurantes/p6'),
+      { restauranteId: 'r1', clienteId: 'pasajero1', tipo: 'domicilio', estado: 'nuevo', total: 30000 }));
+  });
+
+  it('EL QUE MUERDE · el cliente SÍ puede cancelar el pedido que ya tenía', async () => {
+    // A nadie se le atrapa un pedido por una deuda que no es suya.
+    const { doc, setDoc, updateDoc } = FS;
+    await poner('r1', bloqueado);
+    await entorno.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'pedidosRestaurantes/p7'),
+        { restauranteId: 'r1', clienteId: 'pasajero1', tipo: 'domicilio', estado: 'nuevo', total: 30000 });
+    });
+    await RUT.assertSucceeds(updateDoc(doc(como('pasajero1'), 'pedidosRestaurantes/p7'),
+      { estado: 'cancelado' }));
+  });
+
+  it('EL QUE MUERDE · un negocio bloqueado SIGUE VIENDO lo suyo', async () => {
+    // Decisión del dueño: se corta la operación, no el acceso a sus datos. Es lo
+    // que evita que un moroso se convierta en enemigo.
+    const { doc, setDoc, getDoc, getDocs, collection, query, where } = FS;
+    await poner('r1', bloqueado);
+    await entorno.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'pedidosRestaurantes/p8'),
+        { restauranteId: 'r1', tipo: 'local', estado: 'cerrado', total: 50000 });
+      await setDoc(doc(ctx.firestore(), 'comprasInsumos/c21'),
+        { restauranteId: 'r1', que: 'queso', costo: 40000 });
+    });
+    await RUT.assertSucceeds(getDoc(doc(como('r1'), 'pedidosRestaurantes/p8')));
+    await RUT.assertSucceeds(getDocs(query(collection(como('r1'), 'pedidosRestaurantes'),
+      where('restauranteId', '==', 'r1'))));
+    await RUT.assertSucceeds(getDoc(doc(como('r1'), 'comprasInsumos/c21')));
+  });
+
+  it('la administradora puede seguir arreglándole cosas a un bloqueado', async () => {
+    const { doc, setDoc, updateDoc } = FS;
+    await poner('r1', bloqueado);
+    await RUT.assertSucceeds(updateDoc(doc(como('eladmin'), 'restaurantes/r1'),
+      { estadoComercial: 'alDia' }));
+    await RUT.assertSucceeds(setDoc(doc(como('eladmin'), 'mesasInfo/r1_9'), { comensales: 1 }));
+  });
+
+  // ── LA LLAVE LA GUARDA QUIEN COBRA ──────────────────────────────────────
+  it('EL QUE MUERDE · un negocio NO se pone a sí mismo «al día»', async () => {
+    // Si pudiera, el bloqueo por no pagar se desharía con una línea desde el
+    // navegador. Es lo más importante de las tres llaves.
+    const { doc, updateDoc } = FS;
+    await poner('r1', bloqueado);
+    await RUT.assertFails(updateDoc(doc(como('r1'), 'restaurantes/r1'),
+      { estadoComercial: 'alDia' }),
+      'un negocio se desbloqueó a sí mismo. La llave la guarda quien cobra.');
+    await RUT.assertFails(updateDoc(doc(como('r1'), 'restaurantes/r1'), { activo: true }));
+    await RUT.assertFails(updateDoc(doc(como('r1'), 'restaurantes/r1'),
+      { visibleEnEscaparate: true }),
+      'un negocio se metió solo en el escaparate de GuajiraGo.');
+  });
+
+  it('EL QUE MUERDE · ni escondiéndolo entre cambios legítimos', async () => {
+    const { doc, updateDoc } = FS;
+    await poner('r1', bloqueado);
+    await RUT.assertFails(updateDoc(doc(como('r1'), 'restaurantes/r1'),
+      { nombre: 'NUEVO NOMBRE', estadoComercial: 'alDia' }));
+  });
+});

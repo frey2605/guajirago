@@ -39,6 +39,45 @@ service cloud.firestore {
     // del negocio sin pasar por la app. Medido: la única ficha real (JUAN) tiene
     // activo:true, así que esto no le quita nada a nadie que trabaje hoy. El
     // valor por defecto es 'true' para que una ficha vieja sin el campo entre.
+    // ── LAS TRES LLAVES · QUE APAGAR UN NEGOCIO LO APAGUE DE VERDAD ────────
+    // El software de aliados se vende. Palabras del dueño: quiere poder apagar a
+    // un cliente desde el panel.
+    //
+    // Medido el 6-sep-2026, apagar NO APAGABA NADA:
+    //   · el `activo` del negocio NO LO LEÍA NADIE — un interruptor protegido por
+    //     las reglas y desconectado de todo.
+    //   · «no aprobado» solo pintaba un cartel abajo (aliados/App.js:397) y el
+    //     negocio seguía tomando pedidos igual.
+    //   · las reglas de los pedidos solo comprobaban que el negocio EXISTIERA.
+    //
+    // Son TRES cosas distintas y por eso son tres campos, no uno:
+    //   · `visibleEnEscaparate`  ¿sale en la app de clientes? Un restaurante de
+    //     otra ciudad compró el programa, está al día, y NO sale: allí no hay
+    //     conductores que lleven el domicilio.
+    //   · `estadoComercial`      ¿pagó? Lo mueve el sistema por fecha.
+    //   · `activo`               ¿lo suspendió el dueño a mano, por otro motivo?
+    // Si fueran un solo campo, apagar a uno por no pagar obligaría a acordarse de
+    // qué más estaba apagado y por qué.
+    //
+    // ── PRIMER TIEMPO, Y ESTO IMPORTA ─────────────────────────────────────
+    // Este candado bloquea SOLO a quien está EXPRESAMENTE bloqueado o suspendido.
+    // Un campo que falta NO bloquea a nadie.
+    //
+    // No es descuido: 2 de los 3 negocios de hoy no tienen el campo de
+    // aprobación, y preguntar «¿está expresamente al día?» los dejaría fuera el
+    // mismo día. El riesgo caro de todo este trabajo es dejar fuera a un negocio
+    // QUE SÍ PAGÓ, y así no puede pasar.
+    //
+    // SEGUNDO TIEMPO, antes del primer cliente que pague: apretarlo a «solo opera
+    // quien está expresamente al día». Eso exige que todos tengan el campo.
+    function negocioPuedeOperar(negocioId) {
+      return negocioId != null && negocioId != ''
+        && get(/databases/$(database)/documents/restaurantes/$(negocioId))
+             .data.get('activo', true) != false
+        && get(/databases/$(database)/documents/restaurantes/$(negocioId))
+             .data.get('estadoComercial', 'alDia') != 'bloqueado';
+    }
+
     function esDelNegocio(negocioId) {
       return request.auth != null && (
         request.auth.uid == negocioId ||
@@ -1160,9 +1199,14 @@ service cloud.firestore {
       //
       // Y NO ROMPE NADA MÁS: medido el 6-sep-2026, NINGUNA de las tres apps
       // cambia `tipoNegocio` después de crear el negocio. Ni el panel.
+      // `estadoComercial` y `visibleEnEscaparate` entran aquí EL MISMO DÍA que se
+      // inventan, y es lo más importante de las tres llaves: si un negocio pudiera
+      // escribirse `estadoComercial: 'alDia'`, el bloqueo por no pagar se
+      // desharía con una línea desde el navegador. La llave la guarda quien cobra.
       function camposDelPanel() {
         return ['aprobado', 'estadoAprobacion', 'activo', 'creditos', 'rol',
-                'fechaAprobacion', 'fechaRechazo', 'tipoNegocio'];
+                'fechaAprobacion', 'fechaRechazo', 'tipoNegocio',
+                'estadoComercial', 'visibleEnEscaparate'];
       }
 
       // LO QUE NO PUEDE VOLVER AL ESCAPARATE (tanda 2, 24-ago-2026).
@@ -1434,12 +1478,18 @@ service cloud.firestore {
       //   · el cliente de la app (Restaurantes.js) — pone su propio clienteId.
       //   · el restaurante tomando una mesa (Mesero.js) — es del negocio, y por
       //     eso ÉL sí puede crear un pedido ya 'tomado': es su propio trabajo.
+      // EL CANDADO VA EN LOS DOS CAMINOS, y el del cliente no es un extra:
+      // si un negocio bloqueado siguiera recibiendo pedidos, el cliente pagaría
+      // por comida que nadie va a cocinar. Bloquear a un cliente que no paga no
+      // puede convertirse en un problema para SUS clientes.
       allow create: if esAdmin() ||
-        esDelNegocio(request.resource.data.restauranteId) ||
+        (esDelNegocio(request.resource.data.restauranteId) &&
+         negocioPuedeOperar(request.resource.data.restauranteId)) ||
         (request.auth != null &&
          request.resource.data.get('clienteId', '') == request.auth.uid &&
          request.resource.data.get('estado', '') == 'nuevo' &&
-         exists(/databases/$(database)/documents/restaurantes/$(request.resource.data.restauranteId)));
+         exists(/databases/$(database)/documents/restaurantes/$(request.resource.data.restauranteId)) &&
+         negocioPuedeOperar(request.resource.data.restauranteId));
 
       // Lo único que el cliente puede hacerle al estado de SU pedido: dejarlo
       // como está, o cancelarlo. Todo lo demás lo mueve el restaurante.
@@ -1452,8 +1502,12 @@ service cloud.firestore {
       // puede cambiar de dueño ni de restaurante por el camino: si pudiera, la
       // firma de arriba no valdría nada — bastaría crear uno propio y después
       // apuntarlo al negocio ajeno para colarse dentro.
+      // El negocio bloqueado no mueve pedidos. Pero SU CLIENTE sigue pudiendo
+      // cancelar el suyo: a nadie se le atrapa un pedido por una deuda que no es
+      // suya, y cancelarlo es justo lo que va a querer hacer.
       allow update: if (esAdmin() ||
-          esDelNegocio(resource.data.restauranteId) ||
+          (esDelNegocio(resource.data.restauranteId) &&
+           negocioPuedeOperar(resource.data.restauranteId)) ||
           (request.auth != null &&
            resource.data.get('clienteId', '') == request.auth.uid &&
            elClienteNoMueveElPedido())) &&
@@ -1653,12 +1707,16 @@ service cloud.firestore {
 
     match /visitasDiarias/{docId} {
       allow read: if esAdmin() || esDelNegocio(elNegocioDelNombre(docId));
-      allow create, update: if esAdmin() || esDelNegocio(elNegocioDelNombre(docId));
+      allow create, update: if esAdmin()
+        || (esDelNegocio(elNegocioDelNombre(docId))
+            && negocioPuedeOperar(elNegocioDelNombre(docId)));
       allow delete: if false;
     }
     match /mesasInfo/{docId} {
       allow read: if esAdmin() || esDelNegocio(elNegocioDelNombre(docId));
-      allow create, update: if esAdmin() || esDelNegocio(elNegocioDelNombre(docId));
+      allow create, update: if esAdmin()
+        || (esDelNegocio(elNegocioDelNombre(docId))
+            && negocioPuedeOperar(elNegocioDelNombre(docId)));
       allow delete: if false;
     }
 
@@ -1702,9 +1760,13 @@ service cloud.firestore {
     match /comprasInsumos/{compraId} {
       allow get: if esAdmin() || esDelNegocio(resource.data.get('restauranteId', ''));
       allow list: if esAdmin() || esDelNegocio(resource.data.get('restauranteId', ''));
-      allow create: if esAdmin() || esDelNegocio(request.resource.data.get('restauranteId', ''));
+      allow create: if esAdmin()
+        || (esDelNegocio(request.resource.data.get('restauranteId', ''))
+            && negocioPuedeOperar(request.resource.data.get('restauranteId', '')));
       // No se puede mudar una compra de un negocio a otro.
-      allow update: if (esAdmin() || esDelNegocio(resource.data.get('restauranteId', '')))
+      allow update: if (esAdmin()
+          || (esDelNegocio(resource.data.get('restauranteId', ''))
+              && negocioPuedeOperar(resource.data.get('restauranteId', ''))))
         && request.resource.data.get('restauranteId', '') == resource.data.get('restauranteId', '');
       allow delete: if false;
     }
