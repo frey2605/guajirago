@@ -24,7 +24,12 @@
  */
 const { describe, it } = require('node:test');
 const assert = require('node:assert');
-const { leer, soloCodigo, sinTextos, cuerpoDelCatch, cuerpoDeLaFuncion } = require('./cargar.cjs');
+const {
+  leer, soloCodigo, sinTextos, cuerpoDelCatch, cuerpoDeLaFuncion,
+  // Los tres del barrido se mudaron a cargar.cjs el 5-sep-2026: los usan también
+  // las pruebas de la app del conductor, y dos copias se separan (SEGUNDA LEY).
+  trozoDelTry, dentroDeTry, tieneCatchPropio, catchQueProtege,
+} = require('./cargar.cjs');
 
 // Los dieciséis botones. `registrarLog` NO está aquí a propósito: es el rastro de
 // auditoría que se escribe DENTRO de otras acciones, y sacarle una ventanita al
@@ -316,47 +321,6 @@ describe('REGLA 9 · los botones sin nombre de Conductores.js', () => {
   // NO VALE «el primer catch que venga después»: en este archivo los botones están
   // pegados unos a otros y se leería el del vecino, que es el fallo contra el que
   // ya avisa cuerpoDelCatch en cargar.cjs. Aquí se sube primero y se baja después.
-  //
-  // Y SE PARA EN LA PUERTA DE LA FUNCIÓN. Sin ese tope, un `try` puesto en un
-  // ancestro —por ejemplo alrededor del `.map()` que dibuja el botón— se daría por
-  // bueno, y en marcha ese try no protege NADA: el dibujo terminó mucho antes de
-  // que el `onClick` asíncrono falle. Lo señaló la segunda opinión.
-  const catchQueProtege = (codigo, pos) => {
-    const seguro = sinTextos(codigo);
-    let hondo = 0;
-    let abreTry = -1;
-    for (let i = pos - 1; i >= 0; i -= 1) {
-      if (seguro[i] === '}') hondo += 1;
-      else if (seguro[i] === '{') {
-        if (hondo > 0) { hondo -= 1; continue; }
-        if (/\btry\s*$/.test(seguro.slice(Math.max(0, i - 8), i))) { abreTry = i; break; }
-        // Esta llave abierta no es un try. Si es la de una FUNCIÓN, se acabó:
-        // lo que haya más arriba pertenece a otra ejecución.
-        const delante = seguro.slice(Math.max(0, i - 40), i);
-        if (/=>\s*$/.test(delante) || /\)\s*$/.test(delante)) return null;
-      }
-    }
-    if (abreTry < 0) return null;
-    // De la llave del try hasta la suya de cierre.
-    let j = abreTry + 1;
-    let h = 1;
-    while (j < seguro.length && h > 0) {
-      if (seguro[j] === '{') h += 1;
-      else if (seguro[j] === '}') h -= 1;
-      j += 1;
-    }
-    const m = /^\s*catch\s*(\([^)]*\))?\s*\{/.exec(seguro.slice(j));
-    if (!m) return null;
-    let k = j + m[0].length;
-    const ini = k;
-    h = 1;
-    while (k < seguro.length && h > 0) {
-      if (seguro[k] === '{') h += 1;
-      else if (seguro[k] === '}') h -= 1;
-      k += 1;
-    }
-    return codigo.slice(ini, k - 1);
-  };
 
   for (const [ancla, veces, que] of SIN_NOMBRE) {
     it('EL QUE MUERDE · «' + que + '» avisa si el servidor dice que no', () => {
@@ -478,34 +442,7 @@ describe('REGLA 9 · en el panel no queda NINGUNA escritura muda', () => {
   // eso ya cumple la REGLA 9 y NO se toca (PRIMERA LEY: lo que funciona, quieto).
   const AVISA = /setAviso|setError|setErrorAsignar|alert\s*\(/;
 
-  // El try que va justo antes de un catch, contando llaves hacia atrás.
-  const trozoDelTry = (codigo, posCatch) => {
-    const seguro = sinTextos(codigo);
-    let i = seguro.lastIndexOf('}', posCatch);
-    let hondo = 1;
-    i -= 1;
-    while (i >= 0 && hondo > 0) {
-      if (seguro[i] === '}') hondo += 1;
-      else if (seguro[i] === '{') hondo -= 1;
-      i -= 1;
-    }
-    return codigo.slice(i + 2, posCatch);
-  };
 
-  // ¿Esta posición está dentro de algún `try {`? Se cuenta hacia atrás: cada llave
-  // que se abre y no se cierra es un bloque que nos contiene; si alguno lleva
-  // `try` delante, estamos protegidos.
-  const dentroDeTry = (seguro, pos) => {
-    let hondo = 0;
-    for (let i = pos - 1; i >= 0; i -= 1) {
-      if (seguro[i] === '}') hondo += 1;
-      else if (seguro[i] === '{') {
-        if (hondo > 0) hondo -= 1;
-        else if (/\btry\s*$/.test(seguro.slice(Math.max(0, i - 8), i))) return true;
-      }
-    }
-    return false;
-  };
 
   for (const archivo of [...new Set(BOTONES.map((b) => b[0]))]) {
     it('EL QUE MUERDE · «' + archivo.split('/').pop() + '» no tiene ninguna escritura muda', () => {

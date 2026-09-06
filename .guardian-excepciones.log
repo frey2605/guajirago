@@ -379,3 +379,95 @@ escritura falla, el viaje no consta como terminado, el conductor ya no lo tiene
 en pantalla y NO HAY FORMA DE REINTENTAR. Se le dijo al dueño con esas palabras
 antes del «dale». El arreglo: si falla, NO se limpia — el viaje se queda para que
 pueda volver a intentarlo.
+
+── 5-sep-2026 · AUTORIZADO · guajirago/src/avisoRechazo.js (archivo NUEVO) ─────
+Se pidio permiso para un archivo que no estaba en la foto. Contesto: «El mismo
+texto que ya usan las otras dos».
+
+POR QUE HACIA FALTA: los seis botones del viaje no tienen con que decir nada. La
+app del cliente solo tiene avisoCalificacion.js, y sus palabras son de una
+calificacion que no entro — no sirven para «no se pudo cerrar el viaje».
+
+QUE SE HACE: avisoRechazo.js pasa a estar TRES veces, las tres identicas byte a
+byte (panel, aliados y ahora la app del cliente). No es duplicar por comodidad:
+los tres repos son APARTE y no hay forma de importar de uno a otro. Es el mismo
+patron que ya siguen guardarRechazo.js y las cabeceras que se nombran unas a
+otras, y pruebas/amarres.test.js ejecuta los tres lados con los mismos fallos
+para que no se separen.
+
+HAY QUE TOCAR LAS CABECERAS de las otras dos copias: hoy dicen «ESTE ARCHIVO ESTA
+DOS VECES» y nombran dos rutas. Ahora son tres. Dejarlo sin tocar seria dejar un
+comentario que miente — y ese error exacto ya se cazo una vez en este archivo
+(decia «gemelo exacto de guajirago-admin» y al copiarlo se señalaba a si mismo).
+Se toca SOLO ese parrafo de cabecera, ni un renglon de codigo.
+
+── 5-sep-2026 · AUTORIZADO · mudar los ayudantes del barrido a cargar.cjs ──────
+Se pregunto y contesto: «Mudarla a la casa comun». Es la TERCERA vez que se
+autoriza lo mismo por la misma razon, siempre preguntando antes.
+
+QUE SE MUDA, de pruebas/avisosPanel.test.js a pruebas/cargar.cjs:
+  · trozoDelTry      — el try que va justo antes de un catch
+  · dentroDeTry      — ¿esta posicion esta dentro de algun try?
+  · catchQueProtege  — el catch que protege una escritura sin nombre de funcion
+
+POR QUE: la prueba nueva de la app del conductor necesita exactamente eso. Copiarlo
+seria una segunda version del mismo proceso — lo que prohibe la SEGUNDA LEY.
+
+Y UN FALLO DE ESOS AYUDANTES, encontrado al re-auditar el arreglo de hoy: dan por
+MUDA una escritura protegida con `.catch((e) => { … })`. Solo reconocen `try`. Con
+eso, los cuatro botones que se arreglaron asi hoy —aceptarOEnviar y los tres
+«soltar el viaje»— salian como si siguieran mudos. Es un FALSO POSITIVO: la prueba
+se pondria roja sobre codigo sano, que es el peor fallo que puede tener una prueba
+porque enseña a desconfiar de ella. Ya paso una vez con Codigos.js:122. Se arregla
+en la mudanza, que es cuando toca mirarlos.
+
+── 5-sep-2026 · LO QUE ENCONTRO LA SEGUNDA OPINION ─────────────────────────────
+De 30 mutantes que solto, DIECINUEVE sobrevivieron. Las pruebas eran mucho mas
+flojas de lo que parecian. Y encontro DOS FALLOS DE VERDAD que introduje YO:
+
+1. EL AVISO SALIA CON EL TITULO EQUIVOCADO. Reuse MensajeGrande, que es la
+   ventanita de los mensajes del PASAJERO y lleva el encabezado «MENSAJE DEL
+   PASAJERO» fijo. El conductor habria leido «MENSAJE DEL PASAJERO — No hay
+   internet, no se pudo cerrar el viaje».
+2. EL AVISO QUEDABA TAPADO. Al tocar «Omitir» en el codigo de descuento, mi
+   `return` se saltaba el cierre de ese modal, que esta a zIndex 99999. El
+   conductor tocaba, fallaba, y no veia NADA. Ese fallo lo cree yo con el return.
+
+ARREGLADO, con permiso del dueño («su propia ventanita, como el panel»):
+AvisoModal.js llega a la app del cliente, copia exacta de la del panel. Y el
+catch de cerrarViajeFinal cierra el modal del descuento antes de avisar.
+
+AGUJEROS DE LAS PRUEBAS, cerrados los siete que importaban:
+  · sin `await` el catch no se entera — deshacia el arreglo entero, 3 mutantes
+  · calcular el motivo y NO enseñarlo pasaba verde (solo miraba las palabras)
+  · el aviso puesto y borrado con cadena vacia
+  · la ventanita anidada con la condicion en el renglon DE ARRIBA: la
+    comprobacion buscaba la llave en la misma linea y se saltaba el caso EN
+    SILENCIO. Una comprobacion que se calla cuando no entiende no comprueba nada.
+  · el `return` valia en cualquier sitio: puesto ANTES del aviso corta y no dice
+    nada; dentro de una funcion suelta no corta nada. Ahora tiene que ser lo ULTIMO.
+  · la pantalla avanzando ANTES del try: avisa, corta, y avanza igual
+  · faltaba el barrido en negativo: nacia un septimo boton mudo en verde
+Despues: 15 de 15 mutantes muertos.
+
+TRES AFIRMACIONES MIAS QUE ERAN FALSAS, corregidas aqui:
+  · Dije «los 6 que no reaparecen son la firma y CUATRO catch vacios». Son CINCO
+    catch vacios (los cuatro `.catch(() => {})` MAS el `} catch (err) {}`). El
+    total de 6 era correcto; el reparto no.
+  · Dije que se mudaron CINCO ayudantes a cargar.cjs. Se mudaron TRES.
+    `tieneCatchPropio` y `catchPropioDe` son codigo NUEVO escrito hoy — y hay que
+    revisarlo como nuevo, no darlo por bueno «porque ya funcionaba».
+  · Dije que amarres.test.js amarra las TRES copias de avisoRechazo.js. Solo
+    ejecuta DOS (aliados y panel). La tercera se amarra por igualdad byte a byte
+    en avisosConductor.test.js.
+
+ANOTADO, NO ARREGLADO (fuera del alcance autorizado):
+  · AppConductor.js r649 — retirar tus propias ofertas cuando gana otro conductor.
+  · AppConductor.js r855 — APAGARSE para dejar de recibir viajes. El conductor
+    cree que se desconecto y puede no haberse desconectado.
+  · catchPropioDe da un FALSO POSITIVO con `.then(...).catch(...)`: exige el
+    `.catch` pegado al cierre de la llamada. Hoy no hay ninguno asi en el codigo
+    revisado, pero el dia que lo haya se pondra rojo sobre codigo sano.
+  · Si lo unico que falla es el `ocupado:false` al terminar bien, el aviso llega
+    despues de la pantalla de calificacion, que no tiene ventanita. Se ve, pero
+    tarde.

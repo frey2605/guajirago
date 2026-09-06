@@ -10,6 +10,10 @@ import { CONFIG_COMPARTIDA } from './configApp';
 import { ESTADOS_MERCADO } from './estadosViaje';
 // Los datos que comparten las pantallas salen de archivos únicos (SEGUNDA LEY).
 import { centroRiohacha } from './riohacha';
+// REGLA 9 · qué se le dice al conductor cuando el servidor dice que no. Mismo
+// archivo que usan el panel y aliados, copia idéntica byte a byte.
+import { motivoDeRechazo, apuntarRechazo } from './avisoRechazo';
+import AvisoModal from './AvisoModal';
 import { calcularDistanciaKm } from './distancia';
 import { RAZONES_CANCELACION_CONDUCTOR } from './textosViaje';
 import Calificacion from './Calificacion';
@@ -310,7 +314,11 @@ function HistorialConductor({ onVolver }) {
   );
 }
 
-function TarjetaSolicitud({ solicitud, nombre, telefono, placa, vehiculo, tipoVehiculo, fotoConductor, colorConductor, saldoCreditos, configApp, descartadosRef, agregarViajeEscuchando, onRechazar }) {
+// `onAviso` es de la REGLA 9: esta tarjeta vive DENTRO de AppConductor pero es un
+// componente aparte, así que no alcanza su ventanita. Se le pasa por prop, como ya
+// se le pasa onRechazar. Sin esto, la oferta que el servidor rechaza se quedaría
+// muda — y la tarjeta diría «oferta enviada» igual.
+function TarjetaSolicitud({ solicitud, nombre, telefono, placa, vehiculo, tipoVehiculo, fotoConductor, colorConductor, saldoCreditos, configApp, descartadosRef, agregarViajeEscuchando, onRechazar, onAviso }) {
   const [tarifaModificada, setTarifaModificada] = useState(solicitud.tarifaValor || TARIFA_MINIMA);
   const [tarifaCambiada, setTarifaCambiada] = useState(false);
   const [ofertaEnviada, setOfertaEnviada] = useState(null); // monto que ya oferté en este viaje (para poder ajustar)
@@ -363,7 +371,14 @@ function TarjetaSolicitud({ solicitud, nombre, telefono, placa, vehiculo, tipoVe
       montoValor: monto,
       creado: new Date().toISOString(),
       vigente: true,
-    }, { merge: true }).catch(() => {});
+      // REGLA 9. Antes: `.catch(() => {})`. La oferta no salía, la tarjeta decía
+      // «oferta enviada» igual, y el conductor se quedaba esperando una respuesta
+      // a algo que el pasajero nunca vio. Ahora se deshace el «enviada» y se dice.
+    }, { merge: true }).catch((e) => {
+      apuntarRechazo('AppConductor.js (aceptarOEnviar)', e);
+      setOfertaEnviada(null);
+      if (onAviso) onAviso(motivoDeRechazo(e, 'enviar tu oferta'));
+    });
     setOfertaEnviada(monto);
   };
 
@@ -430,6 +445,11 @@ function AppConductor({ nombre, telefono, placa, vehiculo, tipoVehiculo, onCerra
   const [distancia, setDistancia] = useState(null);
   const [respuestaPasajero, setRespuestaPasajero] = useState(null);
   const [mensajeGrande, setMensajeGrande] = useState(null);
+  // REGLA 9 · el aviso de «no se pudo» tiene su PROPIA ventanita. Reusar la de
+  // los mensajes del pasajero le ponia encima el encabezado «MENSAJE DEL
+  // PASAJERO», y ademas se quedaba TAPADA por el modal del codigo de descuento
+  // (los dos a zIndex 9998, y el otro se pinta despues). AvisoModal va a 10000.
+  const [aviso, setAviso] = useState(null);
   const [mostrarCancelacion, setMostrarCancelacion] = useState(false);
   const [mostrarCodigo, setMostrarCodigo] = useState(false);
   const [codigoIngresado, setCodigoIngresado] = useState('');
@@ -946,9 +966,19 @@ const cargarSaldo = useCallback(async (uid) => {
     }
   };
 
+  // REGLA 9. Este aviso NO es de cortesía: `conductorEnPunto` es justo lo que
+  // escucha la app del pasajero para enseñarle «tu conductor llegó»
+  // (Solicitar.js:618). Si esta escritura falla y nadie lo dice, el conductor está
+  // en la puerta y el pasajero sigue esperando dentro sin saberlo.
   const llegueAlPunto = async () => {
     if (!viajeActual) return;
-    await updateDoc(doc(db, 'viajes', viajeActual.id), { conductorEnPunto: true, fase: 'en_punto', tiempoEspera: new Date().toISOString() });
+    try {
+      await updateDoc(doc(db, 'viajes', viajeActual.id), { conductorEnPunto: true, fase: 'en_punto', tiempoEspera: new Date().toISOString() });
+    } catch (e) {
+      apuntarRechazo('AppConductor.js (llegueAlPunto)', e);
+      setAviso(motivoDeRechazo(e, 'avisar que llegaste'));
+      return;
+    }
     setRespuestaPasajero(null);
     setFase('en_punto');
     setContador(configApp.tiempoEsperaConductor || 240);
@@ -961,10 +991,20 @@ const cargarSaldo = useCallback(async (uid) => {
     }, 1000);
   };
 
+  // REGLA 9. `fase: 'en_viaje'` es lo que mira la app del pasajero para pasar a la
+  // pantalla del viaje en marcha (Solicitar.js:627), y lo que el panel enseña como
+  // «En viaje» (admin/Viajes.js:63). Si falla callado, el viaje ha empezado para
+  // el conductor y para nadie más.
   const iniciarViaje = async () => {
     if (!viajeActual) return;
     clearInterval(contadorRef.current);
-    await updateDoc(doc(db, 'viajes', viajeActual.id), { fase: 'en_viaje' });
+    try {
+      await updateDoc(doc(db, 'viajes', viajeActual.id), { fase: 'en_viaje' });
+    } catch (e) {
+      apuntarRechazo('AppConductor.js (iniciarViaje)', e);
+      setAviso(motivoDeRechazo(e, 'iniciar el viaje'));
+      return;
+    }
     setFase('en_viaje');
     geocodificarDestino(viajeActual.destino);
   };
@@ -1012,13 +1052,23 @@ const cargarSaldo = useCallback(async (uid) => {
     }
   };
 
+  // REGLA 9, y con la misma cautela que cerrarViajeFinal: si la cancelación no
+  // entra, NO se limpia la pantalla. Limpiarla dejaría el viaje vivo en el
+  // servidor —el pasajero seguiría esperando a un conductor que ya se fue— y sin
+  // forma de reintentar, porque el viaje ya no estaría delante.
   const cancelarViaje = async (razon) => {
     clearInterval(contadorRef.current);
     if (viajeActual) {
-      await updateDoc(doc(db, 'viajes', viajeActual.id), { estado: 'cancelado_conductor', canceladoPor: 'conductor', razonCancelacion: razon });
+      try {
+        await updateDoc(doc(db, 'viajes', viajeActual.id), { estado: 'cancelado_conductor', canceladoPor: 'conductor', razonCancelacion: razon });
+      } catch (e) {
+        apuntarRechazo('AppConductor.js (cancelarViaje)', e);
+        setAviso(motivoDeRechazo(e, 'cancelar el viaje'));
+        return;
+      }
     }
     const user = auth.currentUser;
-    if (user) setDoc(doc(db, 'conductores', user.uid), { ocupado: false, enViajeId: null }, { merge: true }).catch(() => {});
+    if (user) setDoc(doc(db, 'conductores', user.uid), { ocupado: false, enViajeId: null }, { merge: true }).catch((e) => { apuntarRechazo('AppConductor.js (soltar el viaje)', e); setAviso(motivoDeRechazo(e, 'liberarte para recibir viajes')); });
     setMostrarCancelacion(false);
     setFase(null); faseRef.current = null;
     setViajeActual(null); setTiempoLlegada(null); setDistancia(null);
@@ -1030,15 +1080,37 @@ const cargarSaldo = useCallback(async (uid) => {
   const [codigoDescuentoIngresado, setCodigoDescuentoIngresado] = useState('');
   const [errorCodigoDescuento, setErrorCodigoDescuento] = useState('');
 
+  // REGLA 9 · «Nada se rechaza en silencio». Y aquí hace falta MÁS que avisar.
+  //
+  // Hasta el 5-sep-2026 esto se tragaba el fallo con `catch (err) {}` Y LIMPIABA
+  // LA PANTALLA IGUAL. O sea: el viaje NO quedaba marcado como terminado en el
+  // servidor, el conductor ya no lo tenía delante, y no había ningún botón para
+  // volver a intentarlo. El viaje se quedaba colgado para siempre y el conductor
+  // se iba creyendo que había cobrado. Es la peor de las 16 de este archivo, y no
+  // por poco: las otras callan; esta además borra la forma de arreglarlo.
+  //
+  // Por eso, si falla, se AVISA y se SALE SIN LIMPIAR: el viaje se queda en la
+  // pantalla y el botón sigue ahí. Volver a tocarlo lo reintenta.
   const cerrarViajeFinal = async () => {
     if (viajeActual) {
       try {
         await updateDoc(doc(db, 'viajes', viajeActual.id), { estado: 'finalizado', fase: 'finalizado' });
         setDatosCalificacion({ viajeId: viajeActual.id, nombrePasajero: viajeActual.pasajeroNombre || 'Pasajero', pasajeroId: viajeActual.pasajeroId || '' });
-      } catch (err) {}
+      } catch (err) {
+        apuntarRechazo('AppConductor.js (cerrarViajeFinal)', err);
+        // El modal del código de descuento («ANTES DE FINALIZAR») está a zIndex
+        // 99999 y la ventanita a 10000: si se queda abierto, TAPA el aviso. Se
+        // llega aquí desde su botón «Omitir», así que hay que cerrarlo antes. Sin
+        // esto, el conductor toca «Omitir», falla el cierre del viaje y no ve nada
+        // — reintenta a ciegas, que es justo lo que la REGLA 9 quiere evitar. Lo
+        // encontró la segunda opinión sobre este mismo arreglo a medio hacer.
+        setMostrarCodigoDescuento(false);
+        setAviso(motivoDeRechazo(err, 'cerrar el viaje'));
+        return;
+      }
     }
     const user = auth.currentUser;
-    if (user) setDoc(doc(db, 'conductores', user.uid), { ocupado: false, enViajeId: null }, { merge: true }).catch(() => {});
+    if (user) setDoc(doc(db, 'conductores', user.uid), { ocupado: false, enViajeId: null }, { merge: true }).catch((e) => { apuntarRechazo('AppConductor.js (soltar el viaje)', e); setAviso(motivoDeRechazo(e, 'liberarte para recibir viajes')); });
     setFase(null); faseRef.current = null;
     setViajeActual(null); setTiempoLlegada(null); setDistancia(null);
     setRespuestaPasajero(null); setMensajeGrande(null); ultimoMensajeRef.current = null;
@@ -1186,13 +1258,20 @@ useEffect(() => {
   if (fase === 'cancelado_pasajero') {
     return (
       <div style={{ backgroundColor: '#FFFFFF', minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px 24px' }}>
+        {/* REGLA 9 · aquí vive el botón de soltar el viaje, y hasta el 5-sep-2026
+            esta pantalla NO tenía dónde pintar el aviso. El botón podía fallar y
+            dejar al conductor marcado «ocupado» —sin recibir viajes— sin que nada
+            se lo dijera. Es la tercera vez que muerde lo mismo: archivo correcto,
+            pantalla equivocada. */}
+        <AvisoModal aviso={aviso} onCerrar={() => setAviso(null)} />
+        {mensajeGrande && <MensajeGrande mensaje={mensajeGrande} onCerrar={() => setMensajeGrande(null)} />}
         <div style={{ fontSize: '80px', marginBottom: '24px' }}>😕</div>
         <h2 style={{ color: '#1A1A1E', fontSize: '24px', fontWeight: '900', margin: '0 0 12px', textAlign: 'center' }}>El pasajero canceló el viaje</h2>
         <p style={{ color: '#6B7280', fontSize: '14px', margin: '0 0 8px', textAlign: 'center' }}>Razón: <span style={{ color: '#FF7A2F' }}>{viajeActual?.razonCancelacion || 'No especificada'}</span></p>
         <p style={{ color: '#6B7280', fontSize: '13px', margin: '0 0 32px', textAlign: 'center' }}>Puedes activarte para recibir nuevos viajes</p>
         <button onClick={() => {
           const user = auth.currentUser;
-          if (user) setDoc(doc(db, 'conductores', user.uid), { ocupado: false, enViajeId: null }, { merge: true }).catch(() => {});
+          if (user) setDoc(doc(db, 'conductores', user.uid), { ocupado: false, enViajeId: null }, { merge: true }).catch((e) => { apuntarRechazo('AppConductor.js (soltar el viaje)', e); setAviso(motivoDeRechazo(e, 'liberarte para recibir viajes')); });
           setFase(null); faseRef.current = null; setViajeActual(null); setUbicacionPasajero(null); setDestinoCoords(null); setActivo(true);
         }} style={{ width: '100%', padding: '18px', background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)', border: 'none', borderRadius: '16px', color: '#FFFFFF', fontSize: '18px', fontWeight: '900', cursor: 'pointer' }}>Volver al inicio</button>
       </div>
@@ -1202,6 +1281,7 @@ useEffect(() => {
   if (fase === 'recogiendo' || fase === 'en_punto') {
     return (
       <div style={{ backgroundColor: '#FFFFFF', minHeight: '100vh', position: 'relative' }}>
+        <AvisoModal aviso={aviso} onCerrar={() => setAviso(null)} />
         {mensajeGrande && <MensajeGrande mensaje={mensajeGrande} onCerrar={() => setMensajeGrande(null)} />}
         {mostrarCancelacion && <ModalCancelacion razones={RAZONES_CANCELACION_CONDUCTOR} onConfirmar={cancelarViaje} onCerrar={() => setMostrarCancelacion(false)} />}
         {mostrarCodigo && (
@@ -1305,6 +1385,7 @@ useEffect(() => {
   if (fase === 'en_viaje' && viajeActual) {
     return (
       <div style={{ backgroundColor: '#FFFFFF', minHeight: '100vh', position: 'relative' }}>
+        <AvisoModal aviso={aviso} onCerrar={() => setAviso(null)} />
         {mensajeGrande && <MensajeGrande mensaje={mensajeGrande} onCerrar={() => setMensajeGrande(null)} />}
         {mostrarCodigoDescuento && (
           <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.92)', zIndex: 9998, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
@@ -1418,6 +1499,13 @@ if (llamadoAtencion && !fase) return (
   );
   return (
     <div style={{ backgroundColor: '#FFFFFF', minHeight: '100vh', fontFamily: 'Arial, sans-serif' }}>
+      {/* REGLA 9 · esta es la pantalla de la lista de solicitudes: aquí es donde el
+          conductor OFERTA. Tampoco tenía dónde pintar el aviso, así que una oferta
+          rechazada por el servidor se quedaba muda y la tarjeta decía «enviada»
+          igual. Va aquí arriba, sin condición delante: `{algo && <MensajeGrande` lo
+          haría depender de que ese «algo» se cumpla. */}
+      <AvisoModal aviso={aviso} onCerrar={() => setAviso(null)} />
+        {mensajeGrande && <MensajeGrande mensaje={mensajeGrande} onCerrar={() => setMensajeGrande(null)} />}
       <div style={{ background: '#FFFFFF', borderBottom: '1.5px solid #ECECEF', padding: '24px 20px', position: 'relative' }}>
         <Logo size={30} style={{ position: 'absolute', top: '14px', right: '16px', zIndex: 6 }} />
         <MenuLateral nombre={nombre} foto={fotoConductor} onIrPerfil={() => setVerPerfil(true)} onIrCreditos={() => setVerCreditos(true)} onIrViajes={() => setVerHistorial(true)} onIrGanancias={() => setVerGanancias(true)} onIrSeguridad={() => setVerSeguridad(true)} onIrAyuda={() => setVerAyuda(true)} onIrConfig={() => setVerConfig(true)} onIrPromociones={() => setVerPromociones(true)} onCerrarSesion={cerrarSesion} />
@@ -1492,6 +1580,7 @@ if (llamadoAtencion && !fase) return (
                 descartadosRef={descartadosRef}
                 agregarViajeEscuchando={agregarViajeEscuchando}
                 onRechazar={rechazarSolicitud}
+                onAviso={setAviso}
               />
             ))}
           </div>

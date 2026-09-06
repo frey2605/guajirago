@@ -160,4 +160,147 @@ function cuerpoDelCatch(codigo, desde) {
   return codigo.slice(ini, i - 1);
 }
 
-module.exports = { RAIZ, leer, cargarDeLaApp, soloCodigo, sinTextos, cuerpoDeLaFuncion, cuerpoDelCatch };
+/**
+ * ── EL BARRIDO DE LA REGLA 9 · ¿ESTA ESCRITURA SE TRAGA EL FALLO? ───────────
+ *
+ * Estos tres vivían dentro de pruebas/avisosPanel.test.js. Se mudan aquí el
+ * 5-sep-2026, con permiso del dueño, porque las pruebas de la app del conductor
+ * necesitan exactamente lo mismo y copiarlos habría sido una SEGUNDA versión del
+ * mismo proceso (SEGUNDA LEY). Es la tercera vez que se autoriza una mudanza así,
+ * siempre preguntando antes.
+ */
+
+/**
+ * El trozo de `try` que va justo ANTES de un catch, contando llaves hacia atrás.
+ * Sirve para saber QUÉ protegía ese catch: si dentro había una escritura o no.
+ */
+function trozoDelTry(codigo, posCatch) {
+  const seguro = sinTextos(codigo);
+  let i = seguro.lastIndexOf('}', posCatch);
+  let hondo = 1;
+  i -= 1;
+  while (i >= 0 && hondo > 0) {
+    if (seguro[i] === '}') hondo += 1;
+    else if (seguro[i] === '{') hondo -= 1;
+    i -= 1;
+  }
+  return codigo.slice(i + 2, posCatch);
+}
+
+/**
+ * ¿Está esta posición dentro de algún `try {`? Se cuenta hacia atrás: cada llave
+ * que se abre y no se cierra es un bloque que nos contiene; si alguno lleva `try`
+ * delante, estamos protegidos.
+ */
+function dentroDeTry(seguro, pos) {
+  let hondo = 0;
+  for (let i = pos - 1; i >= 0; i -= 1) {
+    if (seguro[i] === '}') hondo += 1;
+    else if (seguro[i] === '{') {
+      if (hondo > 0) hondo -= 1;
+      else if (/\btry\s*$/.test(seguro.slice(Math.max(0, i - 8), i))) return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * ¿Lleva la llamada que empieza en `pos` un `.catch(...)` propio, CON algo dentro?
+ *
+ * NO SOBRA, y lo demuestra un fallo de verdad: el 5-sep-2026 se arreglaron cuatro
+ * botones de AppConductor.js poniéndoles `.catch((e) => { … })` en vez de un try,
+ * porque son escrituras disparadas a propósito sin esperar (convertirlas en `await`
+ * habría dejado la pantalla colgada esperando a la red). El barrido, que solo sabía
+ * de `try`, los daba por MUDOS: se habría puesto ROJO SOBRE CÓDIGO SANO. Ese es el
+ * peor fallo que puede tener una prueba, porque enseña a desconfiar de ella — ya
+ * pasó una vez señalando a Codigos.js:122.
+ *
+ * Un `.catch(() => {})` vacío NO cuenta: eso es tragarse el fallo con otra cara.
+ */
+function catchPropioDe(codigo, pos) {
+  const seguro = sinTextos(codigo);
+  const abre = seguro.indexOf('(', pos);
+  if (abre < 0) return null;
+  let i = abre + 1;
+  let hondo = 1;
+  while (i < seguro.length && hondo > 0) {
+    if (seguro[i] === '(') hondo += 1;
+    else if (seguro[i] === ')') hondo -= 1;
+    i += 1;
+  }
+  const m = /^\s*\.catch\s*\(/.exec(seguro.slice(i, i + 40));
+  if (!m) return null;
+  // El cuerpo del manejador, contando llaves desde la suya. NO se lee «los 700
+  // caracteres siguientes»: la escritura de la contraoferta ocupa más que eso y la
+  // ventana fija se quedaba corta, dando por muda una escritura bien protegida.
+  // Es el mismo fallo de ventana fija que ya señaló a Codigos.js:122 por error.
+  const llave = seguro.indexOf('{', i + m[0].length);
+  if (llave < 0) return null;
+  let j = llave + 1;
+  let h = 1;
+  while (j < seguro.length && h > 0) {
+    if (seguro[j] === '{') h += 1;
+    else if (seguro[j] === '}') h -= 1;
+    j += 1;
+  }
+  return codigo.slice(llave + 1, j - 1);
+}
+
+// `.catch(() => {})` es un catch de mentira: se traga el fallo con otra cara.
+function tieneCatchPropio(codigo, pos) {
+  const cuerpo = catchPropioDe(codigo, pos);
+  return !!(cuerpo && cuerpo.trim());
+}
+
+/**
+ * El catch que protege la posición `pos`, para escrituras que NO están dentro de
+ * una función con nombre (las de `onClick={async () => { … }}`). Se sube contando
+ * llaves hasta dar con el `try {` que nos envuelve, y desde su llave de cierre se
+ * lee el catch.
+ *
+ * NO VALE «el primer catch que venga después»: los botones están pegados unos a
+ * otros y se leería el del vecino. Aquí se sube primero y se baja después.
+ *
+ * Y SE PARA EN LA PUERTA DE LA FUNCIÓN. Sin ese tope, un `try` puesto en un
+ * ancestro —por ejemplo alrededor del `.map()` que dibuja el botón— se daría por
+ * bueno, y en marcha ese try no protege NADA: el dibujo terminó mucho antes de que
+ * el `onClick` asíncrono falle. Lo señaló la segunda opinión.
+ */
+function catchQueProtege(codigo, pos) {
+  const seguro = sinTextos(codigo);
+  let hondo = 0;
+  let abreTry = -1;
+  for (let i = pos - 1; i >= 0; i -= 1) {
+    if (seguro[i] === '}') hondo += 1;
+    else if (seguro[i] === '{') {
+      if (hondo > 0) { hondo -= 1; continue; }
+      if (/\btry\s*$/.test(seguro.slice(Math.max(0, i - 8), i))) { abreTry = i; break; }
+      const delante = seguro.slice(Math.max(0, i - 40), i);
+      if (/=>\s*$/.test(delante) || /\)\s*$/.test(delante)) return null;
+    }
+  }
+  if (abreTry < 0) return null;
+  let j = abreTry + 1;
+  let h = 1;
+  while (j < seguro.length && h > 0) {
+    if (seguro[j] === '{') h += 1;
+    else if (seguro[j] === '}') h -= 1;
+    j += 1;
+  }
+  const m = /^\s*catch\s*(\([^)]*\))?\s*\{/.exec(seguro.slice(j));
+  if (!m) return null;
+  let k = j + m[0].length;
+  const ini = k;
+  h = 1;
+  while (k < seguro.length && h > 0) {
+    if (seguro[k] === '{') h += 1;
+    else if (seguro[k] === '}') h -= 1;
+    k += 1;
+  }
+  return codigo.slice(ini, k - 1);
+}
+
+module.exports = {
+  RAIZ, leer, cargarDeLaApp, soloCodigo, sinTextos, cuerpoDeLaFuncion, cuerpoDelCatch,
+  trozoDelTry, dentroDeTry, tieneCatchPropio, catchPropioDe, catchQueProtege,
+};
