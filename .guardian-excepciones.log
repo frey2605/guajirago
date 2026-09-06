@@ -815,3 +815,40 @@ PELIGRO son los que mas importan: si el candado dejara fuera a quien no tiene el
 campo, 33 pruebas se ponen rojas; si le cortara la LECTURA al bloqueado, 3.
 
 604 pruebas verdes.
+
+── 6-sep-2026 · LA CALCULADORA DEL COBRO · primera pieza, una a una ───────────
+El dueño pregunto si hacer las tres piezas juntas o una a una. Se le contesto con
+los numeros de esta misma sesion: en las tres piezas anteriores sobrevivieron
+19/30, 18/29 y 14/18 mutantes en la PRIMERA pasada. Ninguna salio bien de una.
+Contesto: uno a uno. Esta es la primera pieza.
+
+DECISION DE DISEÑO, enseñada antes de escribir: la calculadora vive EN EL
+SERVIDOR, no en el panel. Es lo que dicen sus propias leyes —«la calculadora buena
+es la del servidor; el celular puede ENSEÑAR el numero, nunca DECIDIRLO»— y hay
+precedente de lo contrario en esta casa: la comision del viaje vive HOY en TRES
+sitios (comisiones.js, el calculo a mano de functions/index.js:279, y un
+`COMISION_POR_VIAJE = 800` escrito a pelo en admin/App.js:20) y no dan lo mismo.
+La prueba de amarre solo vigila los valores de RESPALDO, no el calculo.
+
+NI UN NUMERO ESCRITO EN EL CODIGO: precio, dias de prueba, de gracia y de aviso
+son campos de la ficha de CADA cliente. Palabras del dueño: «cada cliente puede
+tener valores y ofertas diferentes» y «los datos de prueba y todo lo demas se debe
+colocar en el panel de administracion de cada cliente».
+
+LO QUE MAS SE VIGILA ES LO QUE **NO** HACE, porque los dos errores posibles son
+caros en direcciones opuestas: inventarse un numero le cobra de mas o le regala el
+mes; inventarse una fecha BLOQUEA A ALGUIEN QUE PAGO. Sin precio no devuelve cero,
+sin fecha no decide estado. Una oferta a medio escribir PARA el cobro en vez de
+ignorarla — si se ignorara, se le cobraria el precio normal a alguien a quien se le
+prometio otro y nadie sabria por que.
+
+UN MUTANTE QUE IBA A LLAMAR EQUIVALENTE Y NO LO ERA. Sumar 0.5 dias parecia no
+cambiar nada —JavaScript trunca las fracciones— pero al COMPROBARLO EJECUTANDO
+difiere en 87 de 2.646 combinaciones: trunca HACIA CERO, asi que con dias
+negativos da otro dia. Media funcion sin probar. Hoy nadie la llama con negativos,
+pero esta exportada y la pantalla del panel la va a usar asi. Cerrado con pruebas.
+
+Por eso la equivalencia se demuestra ejecutando y no razonando: iba a darlo por
+equivalente de cabeza.
+
+13 mutantes, 0 vivos. 632 pruebas verdes.
