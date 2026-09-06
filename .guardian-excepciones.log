@@ -703,3 +703,51 @@ DE ONCE PERMISOS ABIERTOS QUEDAN DOS, y los dos aprobados a conciencia:
     visible para nadie.
   · usosPromo/* get — hay que saber ya el telefono Y la promocion para sacar un
     dato de poco valor. La lista, que era el daño de verdad, esta cerrada.
+
+── 6-sep-2026 · EL ESQUELETO · lo que encontro la segunda opinion ─────────────
+Se le pidio revisar el guion ANTES de dejarlo escribir en produccion. De 18
+mutantes que solto, sobrevivieron 14 — SIETE en la parte que ESCRIBE.
+
+MIS PRUEBAS CUBRIAN LA DECISION Y NI UN RENGLON DE LA ESCRITURA. Pasaban en verde:
+  · quitar el `updateMask` -> el PATCH REEMPLAZA EL DOCUMENTO ENTERO: al negocio de
+    un cliente que paga se le borra el menu, el horario y las mesas.
+  · invertir el interruptor --aplicar -> el simulacro escribiria de verdad.
+  · apuntar a otra coleccion; escribir siempre «restaurante»; colar un campo de mas.
+Cerrado: la escritura se saco a dos funciones puras (direccionDeEscritura,
+cuerpoDeEscritura) y ahora tiene SEIS pruebas propias.
+
+UNA DEUDA QUE CREE YO, DE LA LEY QUE MAS CITO. medir-esqueleto.cjs y
+poner-tipo-negocio.cjs tenian LISTAS DE SEÑALES DISTINTAS —la de medir llevaba
+`costoEnvio` y la de poner no— asi que daban razones distintas para el mismo
+negocio. Y el PASO 10 manda re-correr el de MEDIR para comprobar lo que escribio
+el de PONER: se habria comprobado con OTRA CALCULADORA. Ahora hay una sola, y una
+prueba lo amarra.
+
+UN NUMERO MIO QUE ERA FALSO, y estaba en lo que el simulacro le IMPRIME AL DUEÑO:
+dije «los CINCO sitios que leen tipoNegocio». Son OCHO. Faltaban aliados/App.js:91
+y :97 y admin/AliadosPendientes.js:93 y :96. Ninguna cambia de comportamiento —la
+conclusion aguanta— pero el numero no. Corregido en los tres sitios donde estaba.
+El revisor señalo POR QUE se me escaparon: guajirago-admin/ y guajirago-aliados/
+estan en .gitignore y una busqueda normal SE LAS SALTA EN SILENCIO.
+
+UNA SEÑAL FALSA QUE PASABA EN VERDE Y CAMBIABA LA DECISION REAL: metiendo `logo`
+como señal de turismo, las 10 pruebas seguian verdes y los DOS restaurantes reales
+pasaban a «señales contradictorias». Mi prueba solo exigia que el campo lo
+escribiera alguna pantalla, y `logo` lo escriben LAS DOS. Ahora se exige que sea
+EXCLUSIVA de su tipo, y la lista se fija para que cambiarla sea consciente.
+
+ANOTADO, NO ARREGLADO:
+  · `tipoNegocio` NO esta en camposDelPanel() de firestore.rules: hoy un negocio
+    PUEDE CAMBIARSE SU PROPIO TIPO desde su app. Si ese campo va a decidir que
+    modulos vienen encendidos, un cliente se enciende los caros el solo. HAY QUE
+    CERRARLO ANTES DE VENDER.
+  · aliados/App.js:97 lee tipoNegocio del documento del EMPLEADO, otra coleccion:
+    un empleado puede ver un menu distinto al de su negocio. Ya roto hoy.
+  · El guion solo conoce restaurante y turismo. Cuando lleguen HOTELES y
+    PELUQUERIAS hay que añadir sus señales ANTES de re-correrlo, o le escribira
+    «restaurante» a un hotel. Dicho en la cabecera y fijado por una prueba.
+  · No maneja paginacion: con mas de 300 negocios se saltaria el resto en silencio.
+  · La escritura no lleva precondicion: si alguien pone su tipo entre la lectura y
+    la escritura, se le pisa. Ventana de segundos.
+
+Despues de todo esto: 17 mutantes, 0 vivos. 584 pruebas verdes.
