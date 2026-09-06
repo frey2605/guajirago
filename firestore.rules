@@ -1445,9 +1445,21 @@ service cloud.firestore {
 
       allow delete: if false;
     }
+    // ── LA LISTA DE EMPLEADOS VIEJA · UNA PUERTA QUE NO DA A NINGUNA PARTE ──
+    // Esta subcolección está MUERTA. Medido el 6-sep-2026 buscando en las tres
+    // apps y en las funciones: NADIE la lee ni la escribe. El sistema de empleados
+    // que funciona es la colección `empleados/{uid}` de más abajo, y ese sí está
+    // cerrado desde el 24-ago. Aquí dentro solo queda un registro huérfano que la
+    // REGLA 12 no deja borrar.
+    //
+    // Estaba abierta a lectura Y ESCRITURA para cualquiera que hubiera entrado. No
+    // era una escalada —`esDelNegocio()` pregunta a la colección buena, no a
+    // esta— pero en un software que se VENDE una puerta abierta que no da a
+    // ninguna parte sigue siendo una puerta abierta. Se cierra porque no cuesta
+    // nada y porque nadie la usa: no puede romper lo que nadie llama.
     match /restaurantes/{restauranteId}/empleados/{empleadoId} {
-      allow read: if request.auth != null;
-      allow create, update: if request.auth != null;
+      allow read: if esAdmin();
+      allow create, update: if false;
       allow delete: if false;
     }
     // ── REGLA 9 · LA FICHA DE EMPLEADO YA NO SE LA ESCRIBE CUALQUIERA ───────
@@ -1624,12 +1636,12 @@ service cloud.firestore {
 
     match /visitasDiarias/{docId} {
       allow read: if esAdmin() || esDelNegocio(elNegocioDelNombre(docId));
-      allow create, update: if esDelNegocio(elNegocioDelNombre(docId));
+      allow create, update: if esAdmin() || esDelNegocio(elNegocioDelNombre(docId));
       allow delete: if false;
     }
     match /mesasInfo/{docId} {
       allow read: if esAdmin() || esDelNegocio(elNegocioDelNombre(docId));
-      allow create, update: if esDelNegocio(elNegocioDelNombre(docId));
+      allow create, update: if esAdmin() || esDelNegocio(elNegocioDelNombre(docId));
       allow delete: if false;
     }
 
@@ -1673,9 +1685,9 @@ service cloud.firestore {
     match /comprasInsumos/{compraId} {
       allow get: if esAdmin() || esDelNegocio(resource.data.get('restauranteId', ''));
       allow list: if esAdmin() || esDelNegocio(resource.data.get('restauranteId', ''));
-      allow create: if esDelNegocio(request.resource.data.get('restauranteId', ''));
+      allow create: if esAdmin() || esDelNegocio(request.resource.data.get('restauranteId', ''));
       // No se puede mudar una compra de un negocio a otro.
-      allow update: if esDelNegocio(resource.data.get('restauranteId', ''))
+      allow update: if (esAdmin() || esDelNegocio(resource.data.get('restauranteId', '')))
         && request.resource.data.get('restauranteId', '') == resource.data.get('restauranteId', '');
       allow delete: if false;
     }
@@ -1711,12 +1723,30 @@ service cloud.firestore {
       }
       allow get: if request.auth != null;
       allow list: if esAdmin();
-      allow create: if request.auth != null && contadorBueno()
-        && request.resource.data.veces == 1;
-      allow update: if request.auth != null && contadorBueno()
+
+      // EL CLIENTE solo puede empezar en uno y subir de uno en uno. Eso es lo que
+      // impide la trampa de ponerse el contador a cero para volver a gastar la
+      // promoción.
+      //
+      // LA ADMINISTRADORA SÍ PUEDE BAJARLO, y esto lo decidió el dueño el
+      // 6-sep-2026 después de que se le enseñaran las dos opciones. El caso real
+      // que lo justifica: un fallo deja el contador de un cliente en 3 cuando solo
+      // usó la promoción una vez, el cliente se queja de que no le deja usarla, y
+      // sin esto habría que entrar a mano por la consola de Firebase.
+      //
+      // Al admin se le pide igual que el documento tenga la forma correcta: poder
+      // corregir no es poder escribir cualquier cosa.
+      allow create: if contadorBueno() && (
+        esAdmin() || (request.auth != null && request.resource.data.veces == 1)
+      );
+      allow update: if contadorBueno()
         && request.resource.data.telefono == resource.data.telefono
         && request.resource.data.promoId == resource.data.promoId
-        && request.resource.data.veces == resource.data.veces + 1;
+        && (
+          esAdmin()
+          || (request.auth != null
+              && request.resource.data.veces == resource.data.veces + 1)
+        );
       allow delete: if false;
     }
   }

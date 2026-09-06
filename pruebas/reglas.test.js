@@ -3760,3 +3760,140 @@ describe('SE VENDE · un negocio no puede tocar los datos de otro', () => {
     }
   });
 });
+
+// ── LA ADMINISTRADORA PUEDE ARREGLARLE COSAS A UN CLIENTE ──────────────────
+// Decisión del dueño, 6-sep-2026, después de que se le enseñaran las dos
+// opciones con lo que gana y lo que cuesta cada una.
+//
+// La primera versión la dejaba MIRANDO SIN TOCAR, y esa decisión se tomó sin
+// enseñársela. Cuando la vio dijo: «Sí, quiero poder arreglarles cosas» — el caso
+// que la justifica es un cliente llamando porque apuntó una compra al negocio
+// equivocado, o porque un contador le quedó mal y no le deja usar su promoción.
+//
+// Lo que NO cambia: el cliente normal y el negocio de al lado siguen fuera. Poder
+// corregir es de la administradora, no de cualquiera.
+describe('SE VENDE · la administradora puede corregirle los datos a un cliente', () => {
+  it('EL QUE MUERDE · arregla una compra mal apuntada', async () => {
+    const { doc, setDoc, updateDoc } = FS;
+    await entorno.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'comprasInsumos/c5'),
+        { restauranteId: 'r1', que: 'harina', costo: 5000 });
+    });
+    await RUT.assertSucceeds(updateDoc(doc(como('eladmin'), 'comprasInsumos/c5'), { costo: 4500 }));
+    await RUT.assertSucceeds(setDoc(doc(como('eladmin'), 'comprasInsumos/c6'),
+      { restauranteId: 'r1', que: 'aceite', costo: 9000 }));
+  });
+
+  it('EL QUE MUERDE · arregla las visitas y las mesas', async () => {
+    const { doc, setDoc } = FS;
+    await RUT.assertSucceeds(setDoc(doc(como('eladmin'), 'visitasDiarias/r1_2026-09-06'), { visitas: 7 }));
+    await RUT.assertSucceeds(setDoc(doc(como('eladmin'), 'mesasInfo/r1_4'), { comensales: 1 }));
+  });
+
+  it('EL QUE MUERDE · BAJA un contador de promoción que quedó mal', async () => {
+    // El caso de verdad: un fallo dejó al cliente en 3 usos cuando solo gastó 1, y
+    // la promoción no le deja usarla. Sin esto habría que entrar a mano por la
+    // consola de Firebase.
+    const { doc, setDoc } = FS;
+    const suNombre = 'usosPromo/promoA__3001112233';
+    await entorno.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), suNombre), { veces: 3, telefono: '3001112233', promoId: 'promoA' });
+    });
+    await RUT.assertSucceeds(setDoc(doc(como('eladmin'), suNombre),
+      { veces: 1, telefono: '3001112233', promoId: 'promoA' }));
+  });
+
+  it('EL QUE MUERDE · pero el CLIENTE sigue sin poder bajarlo (es la trampa que se impide)', async () => {
+    const { doc, setDoc, updateDoc } = FS;
+    const suNombre = 'usosPromo/promoA__3001112233';
+    await entorno.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), suNombre), { veces: 3, telefono: '3001112233', promoId: 'promoA' });
+    });
+    await RUT.assertFails(updateDoc(doc(como('pasajero1'), suNombre), { veces: 0 }));
+    await RUT.assertFails(setDoc(doc(como('pasajero1'), suNombre),
+      { veces: 1, telefono: '3001112233', promoId: 'promoA' }));
+  });
+
+  it('EL QUE MUERDE · corregir no es escribir cualquier cosa, ni para ella', async () => {
+    // Se le pide igual que el documento tenga la forma correcta: si no, un dedazo
+    // desde el panel deja un contador roto que ninguna pantalla sabe leer.
+    //
+    // EL DOCUMENTO SE CREA PRIMERO A PROPÓSITO. La primera versión de esta prueba
+    // escribía sobre uno que no existía, así que probaba la CREACIÓN y dejaba la
+    // CORRECCIÓN sin comprobar: se le podía dar al admin permiso para escribir
+    // cualquier cosa al corregir y esto seguía verde. Lo cazó la cacería.
+    const { doc, setDoc } = FS;
+    await entorno.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'usosPromo/promoA__3001112233'),
+        { veces: 2, telefono: '3001112233', promoId: 'promoA' });
+    });
+    await RUT.assertFails(setDoc(doc(como('eladmin'), 'usosPromo/promoA__3001112233'),
+      { veces: 'muchas', telefono: '3001112233', promoId: 'promoA' }));
+    await RUT.assertFails(setDoc(doc(como('eladmin'), 'usosPromo/promoA__3001112233'),
+      { veces: 1, telefono: '3001112233', promoId: 'promoA', inventado: true }));
+    // Y el nombre sigue teniendo que cuadrar con lo de dentro.
+    await RUT.assertFails(setDoc(doc(como('eladmin'), 'usosPromo/promoA__3009998877'),
+      { veces: 1, telefono: '3001112233', promoId: 'promoA' }));
+  });
+
+  it('EL QUE MUERDE · el negocio de al lado sigue fuera, esto no le abrió la puerta a nadie más', async () => {
+    const { doc, setDoc, getDoc } = FS;
+    await entorno.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'comprasInsumos/c7'),
+        { restauranteId: 'r1', que: 'tomate', costo: 1000 });
+    });
+    await RUT.assertFails(getDoc(doc(como('r2'), 'comprasInsumos/c7')));
+    await RUT.assertFails(setDoc(doc(como('r2'), 'visitasDiarias/r1_2026-09-06'), { visitas: 0 }));
+    await RUT.assertFails(setDoc(doc(como('pasajero1'), 'mesasInfo/r1_4'), { comensales: 0 }));
+  });
+});
+
+// ── LA LISTA DE EMPLEADOS VIEJA, CERRADA ───────────────────────────────────
+// Subcolección muerta: ninguna de las tres apps la lee ni la escribe (medido el
+// 6-sep-2026). Estaba abierta a lectura y ESCRITURA para cualquiera. No era una
+// escalada —esDelNegocio() pregunta a la colección buena— pero en un software
+// que se vende, una puerta abierta que no da a ninguna parte sigue siendo una
+// puerta abierta.
+describe('SE VENDE · la lista de empleados vieja ya no la escribe nadie', () => {
+  const vieja = 'restaurantes/r1/empleados/JUAN';
+
+  it('EL QUE MUERDE · NADIE puede escribirla, ni el propio negocio', async () => {
+    const { doc, setDoc, updateDoc } = FS;
+    await RUT.assertFails(setDoc(doc(como('r1'), vieja), { nombre: 'JUAN', roles: {} }));
+    await RUT.assertFails(setDoc(doc(como('r2'), vieja), { nombre: 'COLADO', roles: {} }));
+    await RUT.assertFails(setDoc(doc(como('pasajero1'), vieja), { nombre: 'COLADO', roles: {} }));
+    // Ni la administradora: está muerta, no se escribe.
+    await RUT.assertFails(setDoc(doc(como('eladmin'), vieja), { nombre: 'JUAN', roles: {} }));
+    await entorno.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), vieja), { nombre: 'JUAN' });
+    });
+    await RUT.assertFails(updateDoc(doc(como('r1'), vieja), { nombre: 'OTRO' }));
+  });
+
+  it('EL QUE MUERDE · solo la administradora la puede mirar', async () => {
+    const { doc, setDoc, getDoc } = FS;
+    await entorno.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), vieja), { nombre: 'JUAN' });
+    });
+    await RUT.assertSucceeds(getDoc(doc(como('eladmin'), vieja)));
+    await RUT.assertFails(getDoc(doc(como('r1'), vieja)));
+    await RUT.assertFails(getDoc(doc(como('r2'), vieja)));
+    await RUT.assertFails(getDoc(doc(como('pasajero1'), vieja)));
+  });
+
+  it('EL QUE MUERDE · y el sistema de empleados BUENO sigue funcionando', async () => {
+    // Lo importante de cerrar una puerta muerta es no cerrar la viva por error.
+    // `empleados/{uid}` es la que usan las tres apps, y tiene que seguir igual.
+    const { doc, getDoc } = FS;
+    await RUT.assertSucceeds(getDoc(doc(como('r1'), 'empleados/emp1')));
+  });
+
+  it('EL QUE MUERDE · nadie borra nada de ahí tampoco (REGLA 12)', async () => {
+    const { doc, setDoc, deleteDoc } = FS;
+    await entorno.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), vieja), { nombre: 'JUAN' });
+    });
+    await RUT.assertFails(deleteDoc(doc(como('eladmin'), vieja)));
+    await RUT.assertFails(deleteDoc(doc(como('eljefe'), vieja)));
+  });
+});
