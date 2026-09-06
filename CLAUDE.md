@@ -178,8 +178,18 @@ las reglas de Firestore**. Lo que se blinde en las reglas hay que moverlo allí,
   comparaba contra un `origin/main` viejo que nunca refrescó.
 - **(23-ago-2026) Dentro de la copia buena hay otro repo anidado** en `guajirago/`, rama `v2.1`
   (HEAD `12a0de9`, 6-jul). No contiene el trabajo de taxi de julio: **no se trabaja desde ahí**.
-  Y ojo — ese HEAD y sus **3 stashes NO están en GitHub**: es lo único del proyecto que vive
-  solo en este disco.
+  · **(5-sep-2026, medido) Ese HEAD SÍ está en GitHub.** Esta trampa decía que ni él ni sus
+    3 stashes estaban, y era **falso**: `12a0de9` es exactamente la rama `respaldo-v2.1-23ago`.
+    Alguien lo subió el 23-ago y nadie corrigió el aviso. Se comprobó con `git ls-remote`.
+  · **De los 3 stashes, DOS ya están guardados** (5-sep-2026): `respaldo-stash-1-estable-antes-v2.0`
+    y `respaldo-stash-2-splash-original`.
+  · **El tercero, `stash@{0}`, NO se puede subir: lleva una credencial dentro.** GitHub lo
+    rechaza por protección de secretos — un *Twilio Account SID* en `functions/index.js:137`.
+    **No se fuerza**: forzarlo publicaría la credencial. Comprobado el 5-sep-2026: esa
+    credencial **NO está** en `main`, ni en `v2.1`, ni en `respaldo-v2.1-23ago`, ni en
+    `rediseno-tema-claro`, ni en ninguno de los 14 commits del historial de `functions/index.js`
+    — y el código de HOY no la tiene. O sea: **vive solo en ese stash, en este disco**.
+    Para guardarlo hay que rotar antes esa credencial en Twilio, o quitarla del stash.
 - **(23-ago-2026) Las reglas de Firestore no estaban en el repo.** Vivían solo en la consola,
   sin historial. La copia bajada del servidor quedó en `firestore.rules.LIVE`.
 - **(23-ago-2026) `firebase` no tiene comando para LEER reglas.** Se bajan con la API

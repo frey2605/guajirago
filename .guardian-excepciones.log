@@ -494,3 +494,39 @@ LO QUE SIGUE SIN RESPALDAR, y es lo unico: los TRES STASHES del repo anidado.
   stash@{1}: WIP on v2.1: version estable antes de v2.0
   stash@{2}: WIP on main: restaurar splash version original
 Los stashes NO se empujan nunca. Viven solo en este disco. Se le dice al dueño.
+
+── 5-sep-2026 · GUARDAR LOS STASHES · UN HALLAZGO DE SEGURIDAD ────────────────
+El dueño pidio guardar los 3 stashes del repo anidado y corregir la trampa de
+CLAUDE.md. Se hicieron las dos, pero el primero destapo algo.
+
+LOS STASHES SE SUBEN SIN TOCAR EL DISCO: se empuja el commit del stash tal cual
+(`git push origin <sha>:refs/heads/<nombre>`). No se hace pop, ni checkout, ni se
+toca el arbol de trabajo del repo anidado.
+
+  respaldo-stash-1-estable-antes-v2.0   dd319df   SUBIDO
+  respaldo-stash-2-splash-original      a166950   SUBIDO
+  stash@{0} (conductor activo)          239bc54   *** RECHAZADO ***
+
+POR QUE SE RECHAZO: la proteccion de secretos de GitHub lo paro. Lleva un
+*Twilio Account SID* en functions/index.js:137.
+
+NO SE FORZO, y no se va a forzar sin que el dueño lo diga: GitHub ofrece un enlace
+para permitir el secreto, y usarlo PUBLICARIA la credencial en un repositorio.
+Saltarse una proteccion de secretos no es un tramite.
+
+QUE SE MIDIO ANTES DE ALARMAR (sin imprimir el valor en ningun sitio):
+  · El codigo de HOY: CERO menciones a Twilio en guajirago/functions/index.js.
+  · Las ramas que YA estan en GitHub —main, v2.1, respaldo-v2.1-23ago,
+    rediseno-tema-claro—: CERO.
+  · Los 14 commits del historial de functions/index.js en main: CERO.
+  O sea: la credencial NO esta publicada. Vive solo en ese stash, en este disco.
+  La proteccion de GitHub hizo justo lo que tenia que hacer.
+
+QUE HACE FALTA PARA GUARDAR ESE TERCERO: rotar la credencial en Twilio (y
+entonces la vieja ya no vale y da igual), o sacarla del stash antes de subirlo.
+Lo decide el dueño.
+
+Y SE CORRIGIO CLAUDE.md, solo el parrafo de la trampa: decia que el HEAD del repo
+anidado y sus stashes no estaban en GitHub. El HEAD SI esta —es la rama
+respaldo-v2.1-23ago, subida el 23-ago— y nadie habia corregido el aviso. Un aviso
+que miente manda a buscar donde no es.
