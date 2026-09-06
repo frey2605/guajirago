@@ -24,6 +24,10 @@ admin.initializeApp();
 // pedidos sin un solo error en ningún registro.
 const NEGOCIO_PRIVADO = "restaurantesPrivado";
 
+// La decisión de qué hacerle a cada cliente vive aparte y pura, para poder
+// probarla sin base de datos (ver cobros.cjs).
+const { queHacerCon, loQueSeEscribe, hoyEnColombia } = require('./cobros.cjs');
+
 // Distancia en km entre dos coordenadas (Haversine)
 function distanciaKm(lat1, lng1, lat2, lng2) {
   const R = 6371;
@@ -815,3 +819,144 @@ exports.consumirDescuentoViaje = onCall(async (request) => {
 
   return { monto: resultado.monto, saldo: resultado.saldo };
 });
+
+// ══════════════════════════════════════════════════════════════════════════
+// LA RUTINA DE COBROS · cada madrugada, avisa y bloquea sola
+//
+// El software de aliados se vende. Esta es la ÚNICA parte del sistema que puede
+// APAGARLE EL NEGOCIO A UN CLIENTE sin que nadie pulse un botón.
+//
+// LA DECISIÓN NO ESTÁ AQUÍ, Y LO QUE SE ESCRIBE TAMPOCO: están en ./cobros.cjs,
+// en funciones puras que se prueban enteras sin base de datos ni red. Aquí solo
+// queda el ir y venir. Es a propósito: hace dos días, un guion de este mismo
+// proyecto tenía SIETE mutantes vivos en su plomería porque las pruebas solo
+// miraban la decisión. Uno de ellos borraba el documento entero de un negocio.
+//
+// SE DESPLIEGA POR NOMBRE:
+//     firebase deploy --only functions:rutinaDeCobros --project guajirago
+// Un despliegue completo de funciones BORRARÍA getTurnCredentials y
+// notificarConductorEnPunto, cuyo código ya no existe. Está en las leyes del
+// proyecto.
+// ══════════════════════════════════════════════════════════════════════════
+const FICHAS_POR_NOCHE = 500;
+
+exports.rutinaDeCobros = onSchedule(
+  { schedule: "every day 03:30", timeZone: "America/Bogota", timeoutSeconds: 540, memory: "256MiB" },
+  async () => {
+    const db = admin.firestore();
+    const hoy = hoyEnColombia(new Date());
+    let tocados = 0; let avisados = 0; const paraRevisar = [];
+
+    const fichas = await db.collection("suscripciones").limit(FICHAS_POR_NOCHE).get();
+
+    // Si se llenó el cupo, hay clientes que NO se miraron esta noche — y, como el
+    // orden es siempre el mismo, serían SIEMPRE LOS MISMOS: nunca se les cobraría
+    // ni se les bloquearía, y en el registro no se notaría nada raro. Se dice.
+    if (fichas.size >= FICHAS_POR_NOCHE) {
+      paraRevisar.push({
+        negocioId: "(todos)",
+        porQue: "se llegó al tope de " + FICHAS_POR_NOCHE + " fichas por noche: hay "
+          + "clientes que NO se revisaron. Hay que paginar esta rutina.",
+      });
+    }
+
+    for (const docu of fichas.docs) {
+      const negocioId = docu.id;
+      try {
+        const ficha = docu.data() || {};
+        const negSnap = await db.collection("restaurantes").doc(negocioId).get();
+        if (!negSnap.exists) {
+          paraRevisar.push({ negocioId, porQue: "tiene ficha de cobro pero el negocio no existe" });
+          continue;
+        }
+        const decision = queHacerCon(ficha, negSnap.data() || {}, hoy);
+
+        // ANTE LA DUDA, NO SE TOCA. A este cliente no se le cambia nada: se
+        // apunta para que el dueño lo mire.
+        if (decision.hacer === "revisar") {
+          paraRevisar.push({ negocioId, porQue: decision.porQue });
+          continue;
+        }
+        if (decision.hacer !== "actualizar") continue;
+
+        // EL AVISO VA ANTES DE ESCRIBIR, a propósito: el sello «ya se le avisó»
+        // solo se pone si el mensaje salió de verdad. Al revés, la ficha juraría
+        // haber avisado a alguien que nunca recibió nada.
+        let avisoQueSalio = false;
+        if (decision.avisar && decision.mensaje) {
+          const salida = await avisarAlNegocio(negocioId, decision.mensaje);
+          avisoQueSalio = salida.salio;
+          if (salida.salio) avisados++;
+          else {
+            // A este cliente se le está contando el plazo SIN poder avisarle.
+            // Que no se le apague nunca sin que el dueño lo sepa.
+            paraRevisar.push({
+              negocioId,
+              porQue: "quedó «" + decision.estado + "» y NO se le pudo avisar: " + salida.porQue,
+            });
+          }
+        }
+
+        // El estado va en la ficha Y el interruptor en el negocio. Se escriben
+        // JUNTOS: si se quedaran descuadrados, un cliente bloqueado seguiría
+        // trabajando, o uno al día se quedaría apagado.
+        const escribir = loQueSeEscribe(decision, hoy, avisoQueSalio);
+        const lote = db.batch();
+        // `merge: true` en las dos: la rutina de cobros toca SU campo y nada más.
+        // Sin él, un `set` reemplazaría el documento entero del negocio.
+        lote.set(docu.ref, escribir.ficha, { merge: true });
+        lote.set(negSnap.ref, escribir.negocio, { merge: true });
+        await lote.commit();
+        tocados++;
+      } catch (e) {
+        // Que un cliente falle no puede dejar a los demás sin revisar.
+        paraRevisar.push({ negocioId, porQue: "falló al procesarlo: " + (e && e.message) });
+      }
+    }
+
+    // EN SU PROPIA COLECCIÓN, no en `logs`: `logs` es la bitácora de acciones de
+    // PERSONAS que pinta el superadmin, y una fila automática cada noche —sin
+    // `accion` ni `detalle`— saldría en blanco y en cien noches echaría de la
+    // pantalla las acciones de verdad.
+    //
+    // El rastro va SIEMPRE, aunque no se haya tocado a nadie: saber que la rutina
+    // corrió y no hizo nada vale tanto como saber qué hizo.
+    await db.collection("logsCobros").add({
+      tipo: "rutinaDeCobros",
+      fecha: new Date().toISOString(),
+      hoy,
+      fichasMiradas: fichas.size,
+      tocados,
+      avisados,
+      paraRevisar,
+    });
+  },
+);
+
+/**
+ * LE MANDA EL AVISO AL DUEÑO DEL NEGOCIO.
+ * Devuelve `{ salio, porQue }` — nunca lanza. Que no se pueda avisar a uno no
+ * puede dejar a los demás sin revisar, pero TAMPOCO puede pasar en silencio: el
+ * que lo llama lo apunta para el dueño.
+ */
+async function avisarAlNegocio(negocioId, mensaje) {
+  try {
+    const priv = await admin.firestore().collection(NEGOCIO_PRIVADO).doc(negocioId).get();
+    const token = priv.exists && priv.data().fcmToken;
+    // Aliados es una app web: si el dueño nunca aceptó las notificaciones en su
+    // navegador, no hay token. A ese cliente no se le puede avisar por aquí.
+    if (!token) return { salio: false, porQue: "no tiene notificaciones activadas" };
+    const r = await admin.messaging().sendEachForMulticast({
+      tokens: [token],
+      notification: { title: mensaje.titulo, body: mensaje.texto },
+    });
+    // OJO: esto NO lanza con un token caducado, devuelve `failureCount`. Si no se
+    // mirara, se contaría como avisado un mensaje que no llegó a ninguna parte.
+    if (r && r.failureCount > 0) {
+      return { salio: false, porQue: "su teléfono rechazó el aviso (token vencido)" };
+    }
+    return { salio: true, porQue: "" };
+  } catch (e) {
+    return { salio: false, porQue: "falló el envío: " + (e && e.message) };
+  }
+}
