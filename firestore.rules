@@ -1600,14 +1600,36 @@ service cloud.firestore {
 
       allow delete: if false;
     }
+    // ── EL SOFTWARE SE VA A VENDER · CADA NEGOCIO EN SU CAJÓN ───────────────
+    // Palabras del dueño (6-sep-2026): «Lo voy a vender.» Eso cambia lo que hay
+    // que exigirle a estas reglas. Con UN solo dueño, «cualquiera que haya
+    // entrado» son sus propios empleados y clientes. Vendiéndolo a varios
+    // negocios, «cualquiera que haya entrado» son TAMBIÉN los otros negocios que
+    // lo compraron — y un competidor de la misma calle no tiene que abrir nada:
+    // se mete por la consola del navegador y pide los datos del vecino.
+    //
+    // Auditado ese día: había ONCE permisos abiertos y CUATRO colecciones enteras
+    // que cualquier usuario registrado de las TRES apps podía leer y escribir.
+    // Estas dos van juntas porque comparten el truco que las hace fáciles: el
+    // negocio va en el NOMBRE del documento, `restauranteId_loQueSea`
+    // (Mesero.js:114, :273, :316, :318). La regla lo lee de ahí sin abrir nada.
+    //
+    // MEDIDO ANTES DE CERRAR (scripts/medir-cajones-abiertos.cjs): 2 documentos en
+    // visitasDiarias y 1 en mesasInfo, TODOS de un mismo negocio y todos con el
+    // nombre bien puesto. CERO huérfanos. Así que la regla puede nacer estricta:
+    // no hay nada viejo que se quede fuera.
+    function elNegocioDelNombre(docId) {
+      return docId.split('_')[0];
+    }
+
     match /visitasDiarias/{docId} {
-      allow read: if request.auth != null;
-      allow create, update: if request.auth != null;
+      allow read: if esAdmin() || esDelNegocio(elNegocioDelNombre(docId));
+      allow create, update: if esDelNegocio(elNegocioDelNombre(docId));
       allow delete: if false;
     }
     match /mesasInfo/{docId} {
-      allow read: if request.auth != null;
-      allow create, update: if request.auth != null;
+      allow read: if esAdmin() || esDelNegocio(elNegocioDelNombre(docId));
+      allow create, update: if esDelNegocio(elNegocioDelNombre(docId));
       allow delete: if false;
     }
 
@@ -1638,14 +1660,63 @@ service cloud.firestore {
 
       allow delete: if false;
     }
+    // ── LO QUE LE CUESTA LA MERCANCÍA A CADA NEGOCIO ────────────────────────
+    // El más grave de los cuatro: son los COSTOS. Estaba abierto a lectura y a
+    // escritura para cualquier usuario registrado de las tres apps.
+    //
+    // Aquí el negocio no va en el nombre —los documentos nacen con nombre
+    // automático (Inventario.js:117)— sino en el campo `restauranteId`, y la
+    // pantalla ya busca por él (Inventario.js:90). Así que se cierra igual que los
+    // pedidos: `esDelNegocio(...)`, que es el ayudante que ya usa medio archivo.
+    //
+    // MEDIDO ANTES DE CERRAR: CERO documentos. Cerrarlo no puede romper nada.
     match /comprasInsumos/{compraId} {
-      allow read: if request.auth != null;
-      allow create, update: if request.auth != null;
+      allow get: if esAdmin() || esDelNegocio(resource.data.get('restauranteId', ''));
+      allow list: if esAdmin() || esDelNegocio(resource.data.get('restauranteId', ''));
+      allow create: if esDelNegocio(request.resource.data.get('restauranteId', ''));
+      // No se puede mudar una compra de un negocio a otro.
+      allow update: if esDelNegocio(resource.data.get('restauranteId', ''))
+        && request.resource.data.get('restauranteId', '') == resource.data.get('restauranteId', '');
       allow delete: if false;
     }
+
+    // ── EL CONTADOR DE PROMOCIONES ──────────────────────────────────────────
+    // Este NO es del negocio: lo escribe el CLIENTE desde la app del pasajero
+    // (Restaurantes.js:315 y :358) para que no use la misma promoción más veces
+    // de las que el restaurante permitió. El nombre es `promoId__telefono`.
+    //
+    // Lo que de verdad hay que impedir aquí es que alguien PONGA SU CONTADOR A
+    // CERO para volver a gastar la promoción. Por eso el contador solo puede subir
+    // de uno en uno — el mismo candado que ya lleva la bandeja de rechazos.
+    //
+    // Y se quita el LISTADO: nadie lista esto (comprobado en las tres apps y en
+    // las funciones; solo se lee de uno en uno por su nombre). Dejarlo abierto
+    // permitía barrer la colección entera y salir con los TELÉFONOS de todos los
+    // clientes, que es de lo poco que hay aquí que vale para hacer daño.
+    //
+    // MEDIDO ANTES DE CERRAR: CERO documentos.
+    //
+    // ANOTADO, NO ARREGLADO: el límite se lleva por teléfono y el teléfono se
+    // ESCRIBE A MANO en la pantalla del pedido. O sea que hoy se puede burlar
+    // poniendo otro número, y ninguna regla puede impedirlo desde aquí. Es un
+    // problema distinto y va aparte.
     match /usosPromo/{usoId} {
-      allow read: if request.auth != null;
-      allow create, update: if request.auth != null;
+      function contadorBueno() {
+        return request.resource.data.keys().hasOnly(['veces', 'telefono', 'promoId'])
+          && request.resource.data.keys().hasAll(['veces', 'telefono', 'promoId'])
+          && request.resource.data.veces is int
+          && request.resource.data.telefono is string
+          && request.resource.data.promoId is string
+          && usoId == request.resource.data.promoId + '__' + request.resource.data.telefono;
+      }
+      allow get: if request.auth != null;
+      allow list: if esAdmin();
+      allow create: if request.auth != null && contadorBueno()
+        && request.resource.data.veces == 1;
+      allow update: if request.auth != null && contadorBueno()
+        && request.resource.data.telefono == resource.data.telefono
+        && request.resource.data.promoId == resource.data.promoId
+        && request.resource.data.veces == resource.data.veces + 1;
       allow delete: if false;
     }
   }

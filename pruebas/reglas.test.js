@@ -3578,3 +3578,185 @@ describe('REGLA 9 · la bandeja de rechazos', () => {
     await RUT.assertFails(deleteDoc(doc(como('eljefe'), d)));
   });
 });
+
+// ══════════════════════════════════════════════════════════════════════════
+// EL SOFTWARE SE VA A VENDER · CADA NEGOCIO EN SU CAJÓN
+//
+// Palabras del dueño (6-sep-2026): «Lo voy a vender.»
+//
+// Eso cambia lo que hay que exigirle a estas reglas. Con UN dueño, «cualquiera
+// que haya entrado» son sus empleados y sus clientes. Vendiéndolo a varios
+// negocios, son TAMBIÉN los otros negocios que lo compraron. Un competidor de la
+// misma calle no tiene que forzar nada: abre la consola del navegador y pide.
+//
+// Auditado ese día: ONCE permisos abiertos, y CUATRO colecciones enteras que
+// cualquier usuario registrado de las TRES apps podía leer Y escribir:
+//   comprasInsumos (los COSTOS) · visitasDiarias · mesasInfo · usosPromo
+//
+// Estas pruebas corren contra el emulador de verdad: no leen el archivo de
+// reglas, lo EJECUTAN. Es la única forma de saber que una regla hace lo que dice.
+// ══════════════════════════════════════════════════════════════════════════
+describe('SE VENDE · un negocio no puede tocar los datos de otro', () => {
+  // `r1` y `r2` son dos negocios distintos. `emp1` es empleado de r1.
+  // `pasajero1` es un cliente cualquiera de la app del taxi — que también tiene
+  // cuenta, y por eso entraba en «cualquiera que haya entrado».
+
+  describe('visitasDiarias · cuánta gente entra cada día', () => {
+    const suyo = 'visitasDiarias/r1_2026-09-06';
+    const ajeno = 'visitasDiarias/r2_2026-09-06';
+
+    it('el negocio SÍ apunta y lee las suyas', async () => {
+      const { doc, setDoc, getDoc } = FS;
+      await RUT.assertSucceeds(setDoc(doc(como('r1'), suyo), { visitas: 3 }));
+      await RUT.assertSucceeds(getDoc(doc(como('r1'), suyo)));
+    });
+
+    it('EL QUE MUERDE · OTRO NEGOCIO no las lee ni las toca', async () => {
+      const { doc, setDoc, getDoc } = FS;
+      await entorno.withSecurityRulesDisabled(async (ctx) => {
+        await setDoc(doc(ctx.firestore(), suyo), { visitas: 3 });
+      });
+      await RUT.assertFails(getDoc(doc(como('r2'), suyo)));
+      await RUT.assertFails(setDoc(doc(como('r2'), suyo), { visitas: 999 }));
+      // Y al revés, para que no sea casualidad del nombre.
+      await RUT.assertFails(setDoc(doc(como('r1'), ajeno), { visitas: 999 }));
+    });
+
+    it('EL QUE MUERDE · un cliente cualquiera de la app tampoco', async () => {
+      const { doc, setDoc, getDoc } = FS;
+      await entorno.withSecurityRulesDisabled(async (ctx) => {
+        await setDoc(doc(ctx.firestore(), suyo), { visitas: 3 });
+      });
+      await RUT.assertFails(getDoc(doc(como('pasajero1'), suyo)));
+      await RUT.assertFails(setDoc(doc(como('pasajero1'), suyo), { visitas: 0 }));
+      await RUT.assertFails(getDoc(doc(sinCuenta(), suyo)));
+    });
+
+    it('el EMPLEADO del negocio sí, porque es quien las apunta', async () => {
+      const { doc, setDoc } = FS;
+      await RUT.assertSucceeds(setDoc(doc(como('emp1'), suyo), { visitas: 4 }));
+    });
+  });
+
+  describe('mesasInfo · las mesas', () => {
+    const suyo = 'mesasInfo/r1_4';
+
+    it('el negocio y su empleado sí', async () => {
+      const { doc, setDoc } = FS;
+      await RUT.assertSucceeds(setDoc(doc(como('r1'), suyo), { comensales: 2 }));
+      await RUT.assertSucceeds(setDoc(doc(como('emp1'), suyo), { comensales: 3 }));
+    });
+
+    it('EL QUE MUERDE · otro negocio no ve cómo llena las mesas el vecino', async () => {
+      const { doc, setDoc, getDoc } = FS;
+      await entorno.withSecurityRulesDisabled(async (ctx) => {
+        await setDoc(doc(ctx.firestore(), suyo), { comensales: 2 });
+      });
+      await RUT.assertFails(getDoc(doc(como('r2'), suyo)));
+      await RUT.assertFails(setDoc(doc(como('r2'), suyo), { comensales: 0 }));
+    });
+  });
+
+  describe('comprasInsumos · LO QUE LE CUESTA LA MERCANCÍA (el más grave)', () => {
+    it('el negocio apunta y lee sus propias compras', async () => {
+      const { doc, setDoc, getDoc } = FS;
+      await RUT.assertSucceeds(setDoc(doc(como('r1'), 'comprasInsumos/c1'),
+        { restauranteId: 'r1', que: 'tomate', costo: 12000 }));
+      await RUT.assertSucceeds(getDoc(doc(como('r1'), 'comprasInsumos/c1')));
+    });
+
+    it('EL QUE MUERDE · el de la misma calle NO le ve los costos', async () => {
+      const { doc, setDoc, getDoc, getDocs, collection, query, where } = FS;
+      await entorno.withSecurityRulesDisabled(async (ctx) => {
+        await setDoc(doc(ctx.firestore(), 'comprasInsumos/c1'),
+          { restauranteId: 'r1', que: 'tomate', costo: 12000 });
+      });
+      await RUT.assertFails(getDoc(doc(como('r2'), 'comprasInsumos/c1')));
+      // Ni de uno en uno, ni barriendo la colección entera.
+      await RUT.assertFails(getDocs(query(collection(como('r2'), 'comprasInsumos'),
+        where('restauranteId', '==', 'r1'))));
+      await RUT.assertFails(getDocs(collection(como('r2'), 'comprasInsumos')));
+      await RUT.assertFails(getDoc(doc(como('pasajero1'), 'comprasInsumos/c1')));
+    });
+
+    it('EL QUE MUERDE · nadie apunta una compra a nombre de otro negocio', async () => {
+      const { doc, setDoc } = FS;
+      await RUT.assertFails(setDoc(doc(como('r2'), 'comprasInsumos/c9'),
+        { restauranteId: 'r1', que: 'inventado', costo: 1 }));
+      await RUT.assertFails(setDoc(doc(como('pasajero1'), 'comprasInsumos/c9'),
+        { restauranteId: 'r1', que: 'inventado', costo: 1 }));
+    });
+
+    it('EL QUE MUERDE · una compra no se muda de un negocio a otro', async () => {
+      const { doc, setDoc, updateDoc } = FS;
+      await entorno.withSecurityRulesDisabled(async (ctx) => {
+        await setDoc(doc(ctx.firestore(), 'comprasInsumos/c2'),
+          { restauranteId: 'r1', que: 'queso', costo: 30000 });
+      });
+      await RUT.assertFails(updateDoc(doc(como('r1'), 'comprasInsumos/c2'), { restauranteId: 'r2' }));
+      await RUT.assertSucceeds(updateDoc(doc(como('r1'), 'comprasInsumos/c2'), { costo: 31000 }));
+    });
+  });
+
+  describe('usosPromo · el contador que impide repetir una promoción', () => {
+    // Este no es del negocio: lo escribe el CLIENTE desde la app del pasajero.
+    // Lo que hay que impedir es que se ponga el contador a cero para volver a
+    // gastar la promoción, y que alguien barra la colección y salga con los
+    // teléfonos de todos los clientes.
+    const uso = (veces) => ({ veces, telefono: '3001112233', promoId: 'promoA' });
+    const suNombre = 'usosPromo/promoA__3001112233';
+
+    it('el cliente apunta su primer uso', async () => {
+      const { doc, setDoc } = FS;
+      await RUT.assertSucceeds(setDoc(doc(como('pasajero1'), suNombre), uso(1)));
+    });
+
+    it('EL QUE MUERDE · no se puede nacer con el contador ya gastado', async () => {
+      const { doc, setDoc } = FS;
+      await RUT.assertFails(setDoc(doc(como('pasajero1'), suNombre), uso(0)));
+      await RUT.assertFails(setDoc(doc(como('pasajero1'), suNombre), uso(99)));
+    });
+
+    it('EL QUE MUERDE · el contador NO se puede poner a cero para repetir', async () => {
+      const { doc, setDoc, updateDoc } = FS;
+      await entorno.withSecurityRulesDisabled(async (ctx) => {
+        await setDoc(doc(ctx.firestore(), suNombre), uso(3));
+      });
+      await RUT.assertFails(updateDoc(doc(como('pasajero1'), suNombre), { veces: 0 }));
+      await RUT.assertFails(updateDoc(doc(como('pasajero1'), suNombre), { veces: 1 }));
+      // Solo puede subir de uno en uno.
+      await RUT.assertSucceeds(setDoc(doc(como('pasajero1'), suNombre), uso(4)));
+    });
+
+    it('EL QUE MUERDE · nadie barre la colección y se lleva los teléfonos', async () => {
+      const { getDocs, collection, doc, setDoc } = FS;
+      await entorno.withSecurityRulesDisabled(async (ctx) => {
+        await setDoc(doc(ctx.firestore(), suNombre), uso(1));
+      });
+      await RUT.assertFails(getDocs(collection(como('pasajero1'), 'usosPromo')));
+      await RUT.assertFails(getDocs(collection(como('r1'), 'usosPromo')));
+      await RUT.assertSucceeds(getDocs(collection(como('eladmin'), 'usosPromo')));
+    });
+
+    it('EL QUE MUERDE · el nombre tiene que cuadrar con lo que dice dentro', async () => {
+      const { doc, setDoc } = FS;
+      // Apuntarle el uso a OTRO teléfono para gastarle su promoción.
+      await RUT.assertFails(setDoc(doc(como('pasajero1'), 'usosPromo/promoA__3009998877'), uso(1)));
+    });
+  });
+
+  it('EL QUE MUERDE · nadie borra nada de los cuatro cajones (REGLA 12)', async () => {
+    const { doc, setDoc, deleteDoc } = FS;
+    const cuatro = ['visitasDiarias/r1_2026-09-06', 'mesasInfo/r1_4',
+      'comprasInsumos/c1', 'usosPromo/promoA__3001112233'];
+    await entorno.withSecurityRulesDisabled(async (ctx) => {
+      for (const d of cuatro) {
+        await setDoc(doc(ctx.firestore(), d), { restauranteId: 'r1', veces: 1 });
+      }
+    });
+    for (const d of cuatro) {
+      await RUT.assertFails(deleteDoc(doc(como('r1'), d)));
+      await RUT.assertFails(deleteDoc(doc(como('eljefe'), d)));
+    }
+  });
+});
