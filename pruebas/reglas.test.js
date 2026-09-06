@@ -3897,3 +3897,75 @@ describe('SE VENDE · la lista de empleados vieja ya no la escribe nadie', () =>
     await RUT.assertFails(deleteDoc(doc(como('eljefe'), vieja)));
   });
 });
+
+// ── EL PAQUETE COMERCIAL NO SE LO CAMBIA EL CLIENTE ────────────────────────
+//
+// El dueño va a VENDER este software con UN solo programa y módulos por negocio,
+// y `tipoNegocio` es el paquete comercial que decide qué módulos vienen
+// encendidos. Hasta el 6-sep-2026 ese campo no estaba cerrado: un negocio podía
+// cambiárselo desde su app y encenderse los módulos caros él solo.
+//
+// Lo destapó la segunda opinión revisando el guion que puso ese campo.
+describe('SE VENDE · un negocio no se cambia su propio paquete', () => {
+  it('EL QUE MUERDE · el negocio NO puede cambiarse el tipo', async () => {
+    const { doc, setDoc, updateDoc } = FS;
+    await entorno.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'restaurantes/r1'),
+        { nombre: 'EL FOGON', tipoNegocio: 'restaurante', aprobado: true, rol: 'dueno' });
+    });
+    await RUT.assertFails(updateDoc(doc(como('r1'), 'restaurantes/r1'), { tipoNegocio: 'hotel' }),
+      'un negocio se cambió su propio paquete comercial. Si el tipo decide qué '
+      + 'módulos vienen encendidos, acaba de encenderse los caros él solo.');
+    // Ni poniéndolo junto a un cambio legítimo, que es como se cuelan estas cosas.
+    await RUT.assertFails(updateDoc(doc(como('r1'), 'restaurantes/r1'),
+      { nombre: 'EL FOGON DE JUAN', tipoNegocio: 'hotel' }));
+  });
+
+  it('EL QUE MUERDE · ni otro negocio, ni un cliente de la app', async () => {
+    const { doc, setDoc, updateDoc } = FS;
+    await entorno.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'restaurantes/r1'),
+        { nombre: 'EL FOGON', tipoNegocio: 'restaurante', rol: 'dueno' });
+    });
+    await RUT.assertFails(updateDoc(doc(como('r2'), 'restaurantes/r1'), { tipoNegocio: 'hotel' }));
+    await RUT.assertFails(updateDoc(doc(como('pasajero1'), 'restaurantes/r1'), { tipoNegocio: 'hotel' }));
+  });
+
+  it('la administradora SÍ puede cambiárselo', async () => {
+    // Es quien vende el paquete: si un restaurante le compra el módulo de
+    // hospedaje, ella tiene que poder pasarlo a hotel.
+    const { doc, setDoc, updateDoc } = FS;
+    await entorno.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'restaurantes/r1'),
+        { nombre: 'EL FOGON', tipoNegocio: 'restaurante', rol: 'dueno' });
+    });
+    await RUT.assertSucceeds(updateDoc(doc(como('eladmin'), 'restaurantes/r1'), { tipoNegocio: 'hotel' }));
+  });
+
+  it('EL QUE MUERDE · EL REGISTRO NO SE ROMPE: al nacer sí elige su tipo', async () => {
+    // Esta es la que evita que cerrar la puerta deje fuera a los clientes nuevos.
+    // Un negocio se crea con `setDoc` sobre un documento que no existe: eso pasa
+    // por `allow create`, no por `allow update`. Elegir el tipo al nacer sigue
+    // siendo suyo.
+    const { doc, setDoc } = FS;
+    await RUT.assertSucceeds(setDoc(doc(como('nuevoNegocio'), 'restaurantes/nuevoNegocio'), {
+      nombre: 'PELUQUERIA NUEVA',
+      tipoNegocio: 'turismo',
+      aprobado: false,
+      estadoAprobacion: 'pendiente',
+      rol: 'dueno',
+    }));
+  });
+
+  it('el negocio sigue pudiendo cambiar LO SUYO', async () => {
+    // Cerrar una puerta no puede cerrar las de al lado: el horario, el nombre y
+    // el logo son suyos y tiene que poder tocarlos.
+    const { doc, setDoc, updateDoc } = FS;
+    await entorno.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'restaurantes/r1'),
+        { nombre: 'EL FOGON', tipoNegocio: 'restaurante', rol: 'dueno', abierto: true });
+    });
+    await RUT.assertSucceeds(updateDoc(doc(como('r1'), 'restaurantes/r1'),
+      { nombre: 'EL FOGON DE JUAN', abierto: false, demoraMin: 25 }));
+  });
+});

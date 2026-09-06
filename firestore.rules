@@ -1143,9 +1143,26 @@ service cloud.firestore {
       // toca después de crear el negocio, así que congelarlos no le quita nada
       // a nadie. Lo que el negocio SÍ cambia —el menú, los tours, las mesas, el
       // horario, el logo, `abierto`, `demoraMin`— se queda como estaba.
+      // ── `tipoNegocio` ENTRA AQUÍ EL 6-SEP-2026 · EL SOFTWARE SE VENDE ──────
+      // Hasta hoy un negocio podía CAMBIARSE SU PROPIO TIPO desde su app: el campo
+      // no estaba en ninguna de las dos listas cerradas. Con un solo dueño daba
+      // igual. Vendiéndolo NO: el dueño decidió que sea UN SOLO programa con
+      // módulos, y que `tipoNegocio` sea EL PAQUETE COMERCIAL que decide qué
+      // módulos vienen encendidos. O sea que un cliente se encendía los caros él
+      // solo, cambiándose el tipo desde el navegador. Lo destapó la segunda
+      // opinión al revisar el guion que puso ese campo.
+      //
+      // EL REGISTRO NO SE ROMPE, y se comprobó antes de tocar: el negocio escribe
+      // su tipo al registrarse con `setDoc` sobre un documento que NO EXISTE, o
+      // sea que pasa por `allow create` —otra regla, que no se toca— y no por
+      // este `update`. Elegir el tipo al nacer sigue siendo suyo; cambiarlo
+      // después, no.
+      //
+      // Y NO ROMPE NADA MÁS: medido el 6-sep-2026, NINGUNA de las tres apps
+      // cambia `tipoNegocio` después de crear el negocio. Ni el panel.
       function camposDelPanel() {
         return ['aprobado', 'estadoAprobacion', 'activo', 'creditos', 'rol',
-                'fechaAprobacion', 'fechaRechazo'];
+                'fechaAprobacion', 'fechaRechazo', 'tipoNegocio'];
       }
 
       // LO QUE NO PUEDE VOLVER AL ESCAPARATE (tanda 2, 24-ago-2026).
