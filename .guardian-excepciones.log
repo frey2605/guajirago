@@ -471,3 +471,26 @@ ANOTADO, NO ARREGLADO (fuera del alcance autorizado):
   · Si lo unico que falla es el `ocupado:false` al terminar bien, el aviso llega
     despues de la pantalla de calificacion, que no tiene ventanita. Se ve, pero
     tarde.
+2026-09-06T03:57:00.817Z	scripts/respaldo.cjs	NEGADO: fuera de la promesa "REGLA 9 en la app del conductor: el viaje que no consta"
+
+── 5-sep-2026 · EL CANDADO PARO scripts/respaldo.cjs, y tenia razon ───────────
+Al ir a comprobar el respaldo escribi un guion nuevo que no estaba en la promesa.
+El candado lo nego. NO SE PIDIO PERMISO PARA SALTARSELO: no hacia falta el guion,
+la comprobacion se hace con las ordenes de git directamente. Se hizo asi.
+
+RESULTADO DE LA COMPROBACION (contra el SERVIDOR, no contra el origin local):
+  · raiz            main @ b2f6787   igual en GitHub
+  · panel           main @ b843c3c   igual en GitHub
+  · aliados         main @ 458a13a   igual en GitHub
+  · sin stashes en ninguno de los tres, sin ramas locales sin subir.
+
+Y SE CORRIGE UNA TRAMPA DEL PROPIO CLAUDE.md. Dice: «ese HEAD y sus 3 stashes NO
+estan en GitHub: es lo unico del proyecto que vive solo en este disco». Medido
+hoy: el HEAD del repo anidado (12a0de9, rama v2.1, 6-jul) SI ESTA en GitHub, es
+exactamente la rama `respaldo-v2.1-23ago`. Alguien lo subio el 23-ago.
+
+LO QUE SIGUE SIN RESPALDAR, y es lo unico: los TRES STASHES del repo anidado.
+  stash@{0}: WIP on v2.1: conductor activo por defecto y se mantiene activo
+  stash@{1}: WIP on v2.1: version estable antes de v2.0
+  stash@{2}: WIP on main: restaurar splash version original
+Los stashes NO se empujan nunca. Viven solo en este disco. Se le dice al dueño.
