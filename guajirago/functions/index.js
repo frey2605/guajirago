@@ -27,6 +27,7 @@ const NEGOCIO_PRIVADO = "restaurantesPrivado";
 // La decisión de qué hacerle a cada cliente vive aparte y pura, para poder
 // probarla sin base de datos (ver cobros.cjs).
 const { queHacerCon, loQueSeEscribe, hoyEnColombia } = require('./cobros.cjs');
+const { esFecha } = require('./suscripcion.js');
 
 // Distancia en km entre dos coordenadas (Haversine)
 function distanciaKm(lat1, lng1, lat2, lng2) {
@@ -960,3 +961,86 @@ async function avisarAlNegocio(negocioId, mensaje) {
     return { salio: false, porQue: "falló el envío: " + (e && e.message) };
   }
 }
+
+// ══════════════════════════════════════════════════════════════════════════
+// RECALCULAR EL COBRO DE UN CLIENTE · para la pantalla del panel
+//
+// La administradora cambia el precio o apunta un pago y quiere ver el estado
+// AL MOMENTO, sin esperar a la madrugada.
+//
+// POR QUÉ ESTO EXISTE Y NO SE CALCULA EN EL PANEL: la SEGUNDA LEY dice que un
+// número no se calcula en dos sitios, y que la calculadora buena es la del
+// servidor. Si el panel decidiera por su cuenta en qué estado nace un cliente,
+// habría DOS calculadoras del mismo proceso y algún día darían respuestas
+// distintas — con el dinero de por medio. Esta función usa EXACTAMENTE el mismo
+// `queHacerCon` y el mismo `loQueSeEscribe` que la rutina de madrugada.
+//
+// NO MANDA AVISOS, a propósito. Cambiar un precio no es motivo para despertar a
+// nadie. Como tampoco pone el sello de «ya se le avisó», si el cliente queda en
+// un estado que hay que avisarle, la rutina de esa noche se lo dirá.
+//
+// SE DESPLIEGA POR NOMBRE:
+//     firebase deploy --only functions:recalcularCobro --project guajirago
+// ══════════════════════════════════════════════════════════════════════════
+exports.recalcularCobro = onCall(async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Hay que iniciar sesión");
+
+  const db = admin.firestore();
+
+  // El mismo `esAdmin()` que las reglas: rol `admin` o `superadmin`. Se
+  // comprueba AQUÍ porque las funciones corren con el SDK admin y SE SALTAN las
+  // reglas de Firestore: lo que no se compruebe en este renglón, no se comprueba.
+  const quien = await db.collection("usuarios").doc(request.auth.uid).get();
+  const rol = quien.exists ? (quien.data() || {}).rol : "";
+  if (rol !== "admin" && rol !== "superadmin") {
+    throw new HttpsError("permission-denied", "Esta pantalla es solo para administradores");
+  }
+
+  const negocioId = String((request.data || {}).negocioId || "").trim();
+  if (!negocioId) throw new HttpsError("invalid-argument", "Falta decir de qué negocio");
+
+  const [fichaSnap, negSnap] = await Promise.all([
+    db.collection("suscripciones").doc(negocioId).get(),
+    db.collection("restaurantes").doc(negocioId).get(),
+  ]);
+  if (!fichaSnap.exists) throw new HttpsError("not-found", "Ese cliente no tiene ficha de cobro");
+  if (!negSnap.exists) throw new HttpsError("not-found", "Ese negocio no existe");
+
+  const hoy = hoyEnColombia(new Date());
+  const ficha = fichaSnap.data() || {};
+
+  // `inicio` es la fecha con la que se cuentan los días de prueba. La pone el
+  // SERVIDOR y no el panel: si saliera del reloj del computador de quien abra
+  // la pantalla, una hora mal puesta le acortaría o le alargaría la prueba a un
+  // cliente. Se pone una sola vez, la primera; después no se toca nunca.
+  if (!esFecha(ficha.inicio)) {
+    ficha.inicio = hoy;
+    await fichaSnap.ref.set({ inicio: hoy }, { merge: true });
+  }
+
+  const decision = queHacerCon(ficha, negSnap.data() || {}, hoy);
+
+  // ANTE LA DUDA, NO SE TOCA. Se le devuelve a la pantalla el motivo para que se
+  // lo enseñe a la administradora, y no se le cambia nada al cliente.
+  if (decision.hacer === "revisar") {
+    return { hacer: "revisar", porQue: decision.porQue, hoy };
+  }
+
+  if (decision.hacer === "actualizar") {
+    // `false`: desde aquí no sale ningún aviso, así que no se sella que se avisó.
+    const escribir = loQueSeEscribe(decision, hoy, false);
+    const lote = db.batch();
+    lote.set(fichaSnap.ref, escribir.ficha, { merge: true });
+    lote.set(negSnap.ref, escribir.negocio, { merge: true });
+    await lote.commit();
+  }
+
+  return {
+    hacer: decision.hacer,
+    estado: decision.estado,
+    interruptor: decision.interruptor,
+    porQue: decision.porQue,
+    diasPara: decision.diasPara === undefined ? null : decision.diasPara,
+    hoy,
+  };
+});
