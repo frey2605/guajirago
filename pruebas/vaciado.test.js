@@ -4,7 +4,7 @@
  * `scripts/vaciar-escaparate.cjs` es el único trozo de este proyecto que BORRA.
  * Quita el nombre, el teléfono, el correo y el saldo del dueño de
  * `restaurantes/{id}` —el escaparate, la colección que la app del pasajero se
- * descarga entera— porque esos datos ya viven en `restaurantesPrivado/{id}`.
+ * descarga entera— porque esos datos ya viven en `negociosPrivado/{id}`.
  *
  * Su promesa es una sola: **no borra nada de un negocio si no ha comprobado, campo
  * por campo, que está guardado idéntico en su cuarto de atrás.** Ni siquiera borra

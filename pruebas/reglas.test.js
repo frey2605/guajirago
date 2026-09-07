@@ -2139,11 +2139,11 @@ describe('REGLA 9 · el cuarto de atrás de cada negocio', () => {
   const sembrarCuartos = async () => {
     await entorno.withSecurityRulesDisabled(async (ctx) => {
       const { doc, setDoc } = FS;
-      await setDoc(doc(ctx.firestore(), 'restaurantesPrivado/r1'), {
+      await setDoc(doc(ctx.firestore(), 'negociosPrivado/r1'), {
         duenoNombre: 'MECHE', duenoTelefono: '+573001112233',
         email: 'meche@ejemplo.com', creditos: 0,
       });
-      await setDoc(doc(ctx.firestore(), 'restaurantesPrivado/r2'), {
+      await setDoc(doc(ctx.firestore(), 'negociosPrivado/r2'), {
         duenoNombre: 'EL OTRO', duenoTelefono: '+573009998877',
         email: 'otro@ejemplo.com', creditos: 50000,
       });
@@ -2154,13 +2154,13 @@ describe('REGLA 9 · el cuarto de atrás de cada negocio', () => {
   it('LA FUGA · un cliente cualquiera NO puede leer los datos del dueño', async () => {
     await sembrarCuartos();
     const { doc, getDoc } = FS;
-    await RUT.assertFails(getDoc(doc(como('pasajero1'), 'restaurantesPrivado/r1')));
+    await RUT.assertFails(getDoc(doc(como('pasajero1'), 'negociosPrivado/r1')));
   });
 
   it('LA FUGA · ni pedir la lista entera, que era como llegaban solos', async () => {
     await sembrarCuartos();
     const { collection, getDocs } = FS;
-    await RUT.assertFails(getDocs(collection(como('pasajero1'), 'restaurantesPrivado')));
+    await RUT.assertFails(getDocs(collection(como('pasajero1'), 'negociosPrivado')));
   });
 
   // ── ¿PUEDE EL PANEL PEDIR LA LISTA ENTERA? ───────────────────────────────
@@ -2179,7 +2179,7 @@ describe('REGLA 9 · el cuarto de atrás de cada negocio', () => {
   it('EL PANEL · SÍ puede pedir la lista entera de cuartos', async () => {
     await sembrarCuartos();
     const { collection, getDocs } = FS;
-    const lista = await RUT.assertSucceeds(getDocs(collection(como('eladmin'), 'restaurantesPrivado')));
+    const lista = await RUT.assertSucceeds(getDocs(collection(como('eladmin'), 'negociosPrivado')));
     // Se cuentan los dos a propósito, aunque en Firestore una consulta de lista con
     // un solo documento prohibido falla ENTERA — o sea que esto solo puede ser 0 o 2,
     // nunca 1. Se deja escrito porque leer «size, 2» sin saber eso hace pensar que
@@ -2195,37 +2195,37 @@ describe('REGLA 9 · el cuarto de atrás de cada negocio', () => {
   it('EL PANEL · pero un negocio NO puede pedirla, ni para sacar el suyo', async () => {
     await sembrarCuartos();
     const { collection, getDocs } = FS;
-    await RUT.assertFails(getDocs(collection(como('r1'), 'restaurantesPrivado')));
+    await RUT.assertFails(getDocs(collection(como('r1'), 'negociosPrivado')));
   });
 
   it('un negocio NO puede mirar el cuarto del negocio de al lado', async () => {
     await sembrarCuartos();
     const { doc, getDoc } = FS;
-    await RUT.assertFails(getDoc(doc(como('r1'), 'restaurantesPrivado/r2')));
+    await RUT.assertFails(getDoc(doc(como('r1'), 'negociosPrivado/r2')));
   });
 
   it('ni escribir en él', async () => {
     await sembrarCuartos();
     const { doc, updateDoc } = FS;
-    await RUT.assertFails(updateDoc(doc(como('r1'), 'restaurantesPrivado/r2'), { duenoTelefono: '+570000000000' }));
+    await RUT.assertFails(updateDoc(doc(como('r1'), 'negociosPrivado/r2'), { duenoTelefono: '+570000000000' }));
   });
 
   it('ni crearle uno a un negocio que no es suyo', async () => {
     const { doc, setDoc } = FS;
-    await RUT.assertFails(setDoc(doc(como('r1'), 'restaurantesPrivado/r9'), { duenoNombre: 'ROBADO' }));
+    await RUT.assertFails(setDoc(doc(como('r1'), 'negociosPrivado/r9'), { duenoNombre: 'ROBADO' }));
   });
 
   // ── LA PLATA ─────────────────────────────────────────────────────────────
   it('LA PLATA · el negocio ve su saldo pero NO se lo escribe', async () => {
     await sembrarCuartos();
     const { doc, getDoc, updateDoc } = FS;
-    await RUT.assertSucceeds(getDoc(doc(como('r1'), 'restaurantesPrivado/r1')));
-    await RUT.assertFails(updateDoc(doc(como('r1'), 'restaurantesPrivado/r1'), { creditos: 900000 }));
+    await RUT.assertSucceeds(getDoc(doc(como('r1'), 'negociosPrivado/r1')));
+    await RUT.assertFails(updateDoc(doc(como('r1'), 'negociosPrivado/r1'), { creditos: 900000 }));
   });
 
   it('LA PLATA · ni nace con plata en el bolsillo', async () => {
     const { doc, setDoc } = FS;
-    await RUT.assertFails(setDoc(doc(como('nuevo9'), 'restaurantesPrivado/nuevo9'), {
+    await RUT.assertFails(setDoc(doc(como('nuevo9'), 'negociosPrivado/nuevo9'), {
       duenoNombre: 'TRAMPOSO', creditos: 900000,
     }));
   });
@@ -2233,7 +2233,7 @@ describe('REGLA 9 · el cuarto de atrás de cada negocio', () => {
   it('LA PLATA · pero el panel SÍ se la puede poner', async () => {
     await sembrarCuartos();
     const { doc, updateDoc } = FS;
-    await RUT.assertSucceeds(updateDoc(doc(como('eladmin'), 'restaurantesPrivado/r1'), { creditos: 50000 }));
+    await RUT.assertSucceeds(updateDoc(doc(como('eladmin'), 'negociosPrivado/r1'), { creditos: 50000 }));
   });
 
   // ── LA PUERTA DE ATRÁS A LA REGLA 9-C ────────────────────────────────────
@@ -2247,27 +2247,27 @@ describe('REGLA 9 · el cuarto de atrás de cada negocio', () => {
   it('LA PUERTA DE ATRÁS · el negocio NO se aprueba desde su cuarto', async () => {
     await sembrarCuartos();
     const { doc, updateDoc } = FS;
-    await RUT.assertFails(updateDoc(doc(como('r1'), 'restaurantesPrivado/r1'), { aprobado: true }));
+    await RUT.assertFails(updateDoc(doc(como('r1'), 'negociosPrivado/r1'), { aprobado: true }));
   });
 
   it('LA PUERTA DE ATRÁS · ni cambia su estado de aprobación', async () => {
     await sembrarCuartos();
     const { doc, updateDoc } = FS;
-    await RUT.assertFails(updateDoc(doc(como('r1'), 'restaurantesPrivado/r1'), { estadoAprobacion: 'aprobado' }));
+    await RUT.assertFails(updateDoc(doc(como('r1'), 'negociosPrivado/r1'), { estadoAprobacion: 'aprobado' }));
   });
 
   it('LA PUERTA DE ATRÁS · ni se nombra admin, ni se reactiva', async () => {
     await sembrarCuartos();
     const { doc, updateDoc } = FS;
-    await RUT.assertFails(updateDoc(doc(como('r1'), 'restaurantesPrivado/r1'), { rol: 'admin' }));
-    await RUT.assertFails(updateDoc(doc(como('r1'), 'restaurantesPrivado/r1'), { activo: true }));
+    await RUT.assertFails(updateDoc(doc(como('r1'), 'negociosPrivado/r1'), { rol: 'admin' }));
+    await RUT.assertFails(updateDoc(doc(como('r1'), 'negociosPrivado/r1'), { activo: true }));
   });
 
   // Esta es la que se escapa si solo se congela el UPDATE: no hay ningún campo
   // que cambiar, el cuarto NACE ya con la mentira dentro.
   it('LA PUERTA DE ATRÁS · ni nace el cuarto ya aprobado', async () => {
     const { doc, setDoc } = FS;
-    await RUT.assertFails(setDoc(doc(como('nuevo8'), 'restaurantesPrivado/nuevo8'), {
+    await RUT.assertFails(setDoc(doc(como('nuevo8'), 'negociosPrivado/nuevo8'), {
       duenoNombre: 'TRAMPOSO', aprobado: true, estadoAprobacion: 'aprobado',
     }));
   });
@@ -2277,7 +2277,7 @@ describe('REGLA 9 · el cuarto de atrás de cada negocio', () => {
   // negocio nuevo no podría ni darse de alta.
   it('LA PUERTA DE ATRÁS · pero el negocio nuevo sigue naciendo bien', async () => {
     const { doc, setDoc } = FS;
-    await RUT.assertSucceeds(setDoc(doc(como('nuevo8'), 'restaurantesPrivado/nuevo8'), {
+    await RUT.assertSucceeds(setDoc(doc(como('nuevo8'), 'negociosPrivado/nuevo8'), {
       duenoNombre: 'MERCEDES', duenoTelefono: '+573001112233',
       email: 'meche@ejemplo.com', creditos: 0,
     }));
@@ -2286,7 +2286,7 @@ describe('REGLA 9 · el cuarto de atrás de cada negocio', () => {
   // ── LO QUE TIENE QUE FUNCIONAR ───────────────────────────────────────────
   it('el REGISTRO crea el cuarto del negocio (aliados/Login.js)', async () => {
     const { doc, setDoc } = FS;
-    await RUT.assertSucceeds(setDoc(doc(como('nuevo8'), 'restaurantesPrivado/nuevo8'), {
+    await RUT.assertSucceeds(setDoc(doc(como('nuevo8'), 'negociosPrivado/nuevo8'), {
       duenoNombre: 'ANA', duenoTelefono: '+573001112233',
       email: 'ana@ejemplo.com', creditos: 0,
     }));
@@ -2304,19 +2304,19 @@ describe('REGLA 9 · el cuarto de atrás de cada negocio', () => {
     // El caso que obliga a que el create tolere que falte 'creditos': el cuarto
     // nace con UN solo campo.
     const { doc, setDoc } = FS;
-    await RUT.assertSucceeds(setDoc(doc(como('nuevo7'), 'restaurantesPrivado/nuevo7'), { fcmToken: 'tok1' }, { merge: true }));
+    await RUT.assertSucceeds(setDoc(doc(como('nuevo7'), 'negociosPrivado/nuevo7'), { fcmToken: 'tok1' }, { merge: true }));
   });
 
   it('EL TOKEN · y lo actualiza cuando ya existe', async () => {
     await sembrarCuartos();
     const { doc, setDoc } = FS;
-    await RUT.assertSucceeds(setDoc(doc(como('r1'), 'restaurantesPrivado/r1'), { fcmToken: 'tok2' }, { merge: true }));
+    await RUT.assertSucceeds(setDoc(doc(como('r1'), 'negociosPrivado/r1'), { fcmToken: 'tok2' }, { merge: true }));
   });
 
   it('el dueño sigue pudiendo corregir su nombre y su teléfono', async () => {
     await sembrarCuartos();
     const { doc, updateDoc } = FS;
-    await RUT.assertSucceeds(updateDoc(doc(como('r1'), 'restaurantesPrivado/r1'), {
+    await RUT.assertSucceeds(updateDoc(doc(como('r1'), 'negociosPrivado/r1'), {
       duenoNombre: 'MERCEDES', duenoTelefono: '+573004445566',
     }));
   });
@@ -2324,21 +2324,21 @@ describe('REGLA 9 · el cuarto de atrás de cada negocio', () => {
   it('el PANEL lee el de cualquiera y puede pedir la lista (la necesita para buscar)', async () => {
     await sembrarCuartos();
     const { doc, getDoc, collection, getDocs } = FS;
-    await RUT.assertSucceeds(getDoc(doc(como('eladmin'), 'restaurantesPrivado/r1')));
-    await RUT.assertSucceeds(getDocs(collection(como('eljefe'), 'restaurantesPrivado')));
+    await RUT.assertSucceeds(getDoc(doc(como('eladmin'), 'negociosPrivado/r1')));
+    await RUT.assertSucceeds(getDocs(collection(como('eljefe'), 'negociosPrivado')));
   });
 
   it('nadie borra un cuarto, ni su dueño (REGLA 12)', async () => {
     await sembrarCuartos();
     const { doc, deleteDoc } = FS;
-    await RUT.assertFails(deleteDoc(doc(como('r1'), 'restaurantesPrivado/r1')));
-    await RUT.assertFails(deleteDoc(doc(como('eladmin'), 'restaurantesPrivado/r1')));
+    await RUT.assertFails(deleteDoc(doc(como('r1'), 'negociosPrivado/r1')));
+    await RUT.assertFails(deleteDoc(doc(como('eladmin'), 'negociosPrivado/r1')));
   });
 
   it('y sin sesión no se entra de ninguna forma', async () => {
     await sembrarCuartos();
     const { doc, getDoc } = FS;
-    await RUT.assertFails(getDoc(doc(sinCuenta(), 'restaurantesPrivado/r1')));
+    await RUT.assertFails(getDoc(doc(sinCuenta(), 'negociosPrivado/r1')));
   });
 });
 

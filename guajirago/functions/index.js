@@ -13,7 +13,7 @@ admin.initializeApp();
 // Este nombre está escrito en TRES sitios del proyecto, y ninguno puede importar
 // a los otros:
 //   · guajirago-aliados/src/negocioPrivado.js  ← EL BUENO, la fuente única
-//   · firestore.rules                          ← match /restaurantesPrivado/
+//   · firestore.rules                          ← match /negociosPrivado/
 //   · aquí                                     ← otro repo y otro runtime
 // Los ata pruebas/amarres.test.js, que lee los tres y se pone rojo si dejan de
 // decir lo mismo.
@@ -22,7 +22,7 @@ admin.initializeApp();
 // falla NADA: se busca el token en una colección que no existe, no se encuentra, y
 // la función se va sin mandar el aviso. El dueño dejaría de enterarse de sus
 // pedidos sin un solo error en ningún registro.
-const NEGOCIO_PRIVADO = "restaurantesPrivado";
+const NEGOCIO_PRIVADO = "negociosPrivado";
 
 // La decisión de qué hacerle a cada cliente vive aparte y pura, para poder
 // probarla sin base de datos (ver cobros.cjs).

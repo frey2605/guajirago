@@ -1231,7 +1231,8 @@ service cloud.firestore {
       // Esta colección se la descarga ENTERA la app del pasajero para enseñar
       // dónde pedir (guajirago/src/Restaurantes.js, Turismo.js). Hasta hoy dentro
       // viajaban el nombre, el teléfono y el correo del dueño: le llegaban solos a
-      // cualquiera que abriera esa pantalla. Ya se mudaron a restaurantesPrivado.
+      // cualquiera que abriera esa pantalla. Ya se mudaron al cuarto de atras,
+      // que desde el 7-sep-2026 se llama negociosPrivado.
       //
       // Esto es lo que impide que VUELVAN. Sin ello, vaciarlos es un trabajo de un
       // día: la próxima pantalla que guarde el perfil los mete otra vez y nadie se
@@ -1332,7 +1333,15 @@ service cloud.firestore {
     // Qué campos son privados lo decide UN solo archivo,
     // `guajirago-aliados/src/negocioPrivado.js`, y hay una prueba que carea ese
     // archivo con estas reglas (pruebas/amarres.test.js).
-    match /restaurantesPrivado/{negocioId} {
+    // ── EL NOMBRE CAMBIÓ (7-sep-2026): antes era `restaurantesPrivado` ────────
+    //  Decisión del dueño: aliados va a ser UN software con módulos y va a vender
+    //  a panaderías, peluquerías, hoteles y tiendas — no solo a restaurantes.
+    //  Con el nombre viejo, la base de datos habría dicho que una peluquería es
+    //  un restaurante. Se cambia AHORA porque hay 3 negocios y ningún cliente
+    //  pagando: es el momento más barato que va a existir.
+    //  Este es el ENSAYO del cambio, el más pequeño de los cuatro: 3 documentos
+    //  y cuatro sitios en el código. La lápida del nombre viejo está más abajo.
+    match /negociosPrivado/{negocioId} {
       // LO QUE SOLO ESCRIBE EL PANEL. Son LOS MISMOS SIETE que en `restaurantes`,
       // y eso es a propósito: si aquí fueran menos, este cuarto sería una PUERTA DE
       // ATRÁS a la REGLA 9-C.
@@ -1410,6 +1419,50 @@ service cloud.firestore {
 
       allow delete: if false;
     }
+
+    // ══ ANDAMIO DE LA MUDANZA · SE BORRA EN EL COMMIT SIGUIENTE ══════════════
+    //  Esto es el nombre VIEJO del cuarto de atrás, con los MISMOS permisos que
+    //  el nuevo. Está aquí a propósito y por poco rato.
+    //
+    //  POR QUÉ HACE FALTA. El código y las reglas no se pueden cambiar en el
+    //  mismo instante: entre que se publican estas reglas y que se publican las
+    //  tres apps pasan unos minutos. Durante esos minutos las apps que están en
+    //  la calle todavía piden el nombre VIEJO. Si aquí estuviera la lápida:
+    //
+    //    · `aliados/Login.js:80` escribe el cuarto AL REGISTRARSE, y lo hace sin
+    //      red de seguridad. Se crearía la cuenta, se crearía `restaurantes/{uid}`
+    //      y fallaría el cuarto: un negocio A MEDIO NACER, para siempre — y la
+    //      REGLA 12 prohíbe borrarlo. Al reintentar diría «ese correo ya tiene
+    //      cuenta».
+    //    · El panel se quedaría sin los saldos en la pantalla de cobros.
+    //    · Y el token de avisos del dueño dejaría de guardarse, en silencio.
+    //
+    //  Unos minutos con dos puertas abiertas no le hacen daño a nadie. Un
+    //  negocio a medio nacer, sí. Por eso la lápida va en un SEGUNDO despliegue
+    //  de reglas, cuando las apps ya estén publicadas con el nombre nuevo.
+    //  Lo cazó la segunda opinión: la primera versión ponía la lápida de una vez.
+    match /restaurantesPrivado/{negocioId} {
+      function camposDelPanelViejo() {
+        return ['creditos', 'aprobado', 'estadoAprobacion', 'activo', 'rol',
+                'fechaAprobacion', 'fechaRechazo'];
+      }
+      allow read: if request.auth != null && (
+        request.auth.uid == negocioId || esAdmin()
+      );
+      allow create: if esAdmin() || (
+        request.auth != null &&
+        request.auth.uid == negocioId &&
+        request.resource.data.get('creditos', 0) == 0 &&
+        !request.resource.data.keys().hasAny(camposDelPanelViejo().removeAll(['creditos']))
+      );
+      allow update: if esAdmin() || (
+        request.auth != null &&
+        request.auth.uid == negocioId &&
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny(camposDelPanelViejo())
+      );
+      allow delete: if false;
+    }
+
     // ── REGLA 9 · CADA PEDIDO ES DE SU CLIENTE Y DE SU RESTAURANTE ──────────
     // Hasta el 24-ago-2026 esto decía «allow read: if request.auth != null», o
     // sea: CUALQUIERA con una cuenta podía pedir la lista completa de pedidos.

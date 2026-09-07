@@ -886,3 +886,14 @@ SE DEJAN SEPARADOS AUNQUE DEN LO MISMO, y queda escrito por que: con `read`, la
 seguridad de la coleccion mas valiosa del sistema comercial dependeria de que
 quien lo lea mañana conozca esa sutileza.
 2026-09-06T21:33:44.207Z	scripts/medir-mas-vendidos.cjs	NEGADO: fuera de la promesa "El codigo de recarga: que mire anulado, que compruebe de quien es, y que recrearlo no lo resucite"
+
+2026-09-07 · EXCEPCION AUTORIZADA POR EL DUENO
+Promesa: "ENSAYO del cambio de nombre: restaurantesPrivado pasa a negociosPrivado"
+Fuera de la lista, y se pidio permiso DESPUES de tocarlo (mal hecho, queda dicho):
+  · pruebas/vaciado.test.js                 1 renglon de COMENTARIO
+  · guajirago-aliados/src/Notificaciones.js 1 renglon de COMENTARIO
+Motivo: los dos nombraban `restaurantesPrivado/{id}` en prosa. Al cambiar el
+nombre de la coleccion, dejarlos como estaban los habria vuelto MENTIRA: mandan
+a quien los lea a una carpeta que ahora es una lapida cerrada. Ni una linea de
+codigo cambio en ninguno de los dos.
+Autorizado por Jhon el 7-sep-2026, enseñandole los dos diffs enteros.

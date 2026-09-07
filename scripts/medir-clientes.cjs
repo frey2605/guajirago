@@ -17,7 +17,7 @@
  *    `estadoComercial` (si puede trabajar) y `activo` (si la cuenta está viva)
  *    son TRES cosas distintas a propósito. La pantalla las maneja por separado.
  *  · ¿A quién se le puede avisar de verdad? Los avisos de cobro van por
- *    notificación al `fcmToken` de `restaurantesPrivado`. Un cliente sin token
+ *    notificación al `fcmToken` de `negociosPrivado`. Un cliente sin token
  *    es un cliente al que la rutina le contaría los días SIN poder avisarle.
  *  · ¿Le falta a alguna ficha un dato de los que hacen falta para castigar?
  *    Sin precio, sin días de gracia o sin días de aviso, la rutina NO toca a
@@ -120,7 +120,7 @@ const si = (b) => b ? 'sí' : 'no';
   const t = await token();
   const negocios = await traer(t, 'restaurantes');
   const fichas = await traer(t, 'suscripciones');
-  const privados = await traer(t, 'restaurantesPrivado');
+  const privados = await traer(t, 'negociosPrivado');
   const rastro = await traer(t, 'logsCobros');
 
   if (negocios.error) { console.error('no pude leer los negocios: ' + negocios.error); process.exit(1); }
