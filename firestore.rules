@@ -1420,47 +1420,31 @@ service cloud.firestore {
       allow delete: if false;
     }
 
-    // ══ ANDAMIO DE LA MUDANZA · SE BORRA EN EL COMMIT SIGUIENTE ══════════════
-    //  Esto es el nombre VIEJO del cuarto de atrás, con los MISMOS permisos que
-    //  el nuevo. Está aquí a propósito y por poco rato.
+    // ── LA LÁPIDA DEL NOMBRE VIEJO (7-sep-2026) ──────────────────────────────
+    //  `restaurantesPrivado` fue el nombre de este cuarto hasta hoy. Sus 3
+    //  documentos NO se borraron —REGLA 12 del dueño: «los borrados dejan
+    //  lápida»—: se COPIARON a `negociosPrivado` con
+    //  `scripts/mudar-negocios-privado.cjs`, y los viejos siguen ahí intactos
+    //  por si algún día hubiera que carear. La copia se comprobó releyendo del
+    //  servidor: 3 iguales, 0 distintos.
     //
-    //  POR QUÉ HACE FALTA. El código y las reglas no se pueden cambiar en el
-    //  mismo instante: entre que se publican estas reglas y que se publican las
-    //  tres apps pasan unos minutos. Durante esos minutos las apps que están en
-    //  la calle todavía piden el nombre VIEJO. Si aquí estuviera la lápida:
+    //  AQUÍ ESTUVO EL ANDAMIO. Hasta hace un momento este bloque tenía los
+    //  MISMOS permisos que el nuevo, a propósito: entre que se publicaron las
+    //  reglas y que se publicaron las apps pasaron unos minutos, y en esos
+    //  minutos las apps de la calle todavía pedían el nombre viejo. Se cierra
+    //  AHORA, y solo después de comprobar bajando los dos paquetes del servidor
+    //  que aliados y el panel ya piden `negociosPrivado` y no nombran el viejo.
+    //  Si se hubiera cerrado de una vez, `aliados/Login.js:80` —que escribe el
+    //  cuarto al REGISTRARSE, y sin red de seguridad— habría dejado un negocio a
+    //  medio nacer para siempre, y la REGLA 12 prohíbe borrarlo.
     //
-    //    · `aliados/Login.js:80` escribe el cuarto AL REGISTRARSE, y lo hace sin
-    //      red de seguridad. Se crearía la cuenta, se crearía `restaurantes/{uid}`
-    //      y fallaría el cuarto: un negocio A MEDIO NACER, para siempre — y la
-    //      REGLA 12 prohíbe borrarlo. Al reintentar diría «ese correo ya tiene
-    //      cuenta».
-    //    · El panel se quedaría sin los saldos en la pantalla de cobros.
-    //    · Y el token de avisos del dueño dejaría de guardarse, en silencio.
-    //
-    //  Unos minutos con dos puertas abiertas no le hacen daño a nadie. Un
-    //  negocio a medio nacer, sí. Por eso la lápida va en un SEGUNDO despliegue
-    //  de reglas, cuando las apps ya estén publicadas con el nombre nuevo.
-    //  Lo cazó la segunda opinión: la primera versión ponía la lápida de una vez.
+    //  🔴 Y SIN VENDERLO DE MÁS, que en este archivo ya ha pasado: este bloque
+    //  NO es lo que cierra la puerta. No hay ningún `match /{document=**}` en
+    //  estas reglas, así que lo que no tiene bloque ya está negado por defecto.
+    //  Está escrito para que se LEA la intención —y para que si alguien vuelve a
+    //  añadir un comodín abierto arriba, esto siga negando aquí abajo.
     match /restaurantesPrivado/{negocioId} {
-      function camposDelPanelViejo() {
-        return ['creditos', 'aprobado', 'estadoAprobacion', 'activo', 'rol',
-                'fechaAprobacion', 'fechaRechazo'];
-      }
-      allow read: if request.auth != null && (
-        request.auth.uid == negocioId || esAdmin()
-      );
-      allow create: if esAdmin() || (
-        request.auth != null &&
-        request.auth.uid == negocioId &&
-        request.resource.data.get('creditos', 0) == 0 &&
-        !request.resource.data.keys().hasAny(camposDelPanelViejo().removeAll(['creditos']))
-      );
-      allow update: if esAdmin() || (
-        request.auth != null &&
-        request.auth.uid == negocioId &&
-        !request.resource.data.diff(resource.data).affectedKeys().hasAny(camposDelPanelViejo())
-      );
-      allow delete: if false;
+      allow read, write: if false;
     }
 
     // ── REGLA 9 · CADA PEDIDO ES DE SU CLIENTE Y DE SU RESTAURANTE ──────────
