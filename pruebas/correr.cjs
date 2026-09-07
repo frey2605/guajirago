@@ -72,7 +72,11 @@ const r = spawnSync(
     // las 7 del canje de un código de recarga, que mueve dinero— y no la corría
     // nadie. Levantar funciones añade ~20 segundos. Una prueba que hay que
     // acordarse de correr aparte es una prueba que no existe.
-    '--only', 'firestore,functions',
+    // Y TAMBIÉN el de STORAGE (6-sep-2026), por la misma razón: sus reglas
+    // estaban abiertas de par en par —cualquiera sin cuenta bajaba la foto de
+    // una cédula— y ahora que están cerradas hay que poder comprobarlo
+    // ejecutándolas, no leyéndolas.
+    '--only', 'firestore,functions,storage',
     '--project', 'demo-guajirago',
     // Va entre comillas a propósito: con shell, Windows lo partiría en trozos
     // y `firebase` creería que --test es una opción suya.
@@ -80,19 +84,23 @@ const r = spawnSync(
     // igual para que `npm test` sea UN solo comando: una prueba que hay que
     // acordarse de correr aparte es una prueba que nadie corre.
     //
-    // TRES TANDAS, Y NO ES CAPRICHO: `node --test` corre los archivos EN
-    // PARALELO, y las tres tocan la MISMA base del emulador. `reglas.test.js` la
-    // VACÍA entera antes de cada prueba (`clearFirestore`); `funciones.test.js`
-    // siembra códigos y saldos y luego los lee; `chatRecarga.test.js` siembra
-    // chats y comprueba qué mensajes sobrevivieron. Corriendo a la vez, una le
-    // borra los datos a la otra a mitad y los fallos salen distintos en cada
-    // corrida — el peor tipo de prueba, la que a veces pasa.
+    // CUATRO TANDAS, Y NO ES CAPRICHO: `node --test` corre los archivos EN
+    // PARALELO, y las cuatro tocan la MISMA base del emulador. `reglas.test.js`
+    // la VACÍA entera antes de cada prueba (`clearFirestore`), y
+    // `storage.test.js` también —necesita sembrar sus empleados y su admin,
+    // porque las reglas del almacén le PREGUNTAN a Firestore quién es quién—;
+    // `funciones.test.js` siembra códigos y saldos y luego los lee;
+    // `chatRecarga.test.js` siembra chats y comprueba qué mensajes
+    // sobrevivieron. Corriendo a la vez, una le borra los datos a la otra a
+    // mitad y los fallos salen distintos en cada corrida — el peor tipo de
+    // prueba, la que a veces pasa.
     // Encadenadas con && cada una arranca cuando la anterior terminó; y si una
     // falla, las de después ni corren y el código de salida sigue siendo el malo.
-    // La tercera va aparte de la segunda a propósito: hoy no chocarían porque
-    // usan fichas de nombres distintos, pero eso es una casualidad que nadie
-    // vigila, y `chatRecarga.test.js` además carga las reglas en el emulador.
-    '"node --test pruebas/reglas.test.js pruebas/tarifas.test.js pruebas/descuentos.test.js pruebas/codigoSeguridad.test.js pruebas/viajeNuevo.test.js pruebas/compartidos.test.js pruebas/avisoCalificacion.test.js pruebas/avisosPanel.test.js pruebas/avisosConductor.test.js pruebas/gemelosSolicitar.test.js pruebas/tipoNegocio.test.js pruebas/avisosPasajero.test.js pruebas/suscripcion.test.js pruebas/cobros.test.js pruebas/cobrosPanel.test.js pruebas/filtroChat.test.js pruebas/amarres.test.js pruebas/vaciado.test.js && node --test pruebas/funciones.test.js && node --test pruebas/chatRecarga.test.js"',
+    // Cada una va aparte a propósito: hoy algunas no chocarían porque usan
+    // fichas de nombres distintos, pero eso es una casualidad que nadie vigila,
+    // y `chatRecarga.test.js` además carga las reglas en el emulador —un efecto
+    // global disparado sobre otra suite viva.
+    '"node --test pruebas/reglas.test.js pruebas/tarifas.test.js pruebas/descuentos.test.js pruebas/codigoSeguridad.test.js pruebas/viajeNuevo.test.js pruebas/compartidos.test.js pruebas/avisoCalificacion.test.js pruebas/avisosPanel.test.js pruebas/avisosConductor.test.js pruebas/gemelosSolicitar.test.js pruebas/tipoNegocio.test.js pruebas/avisosPasajero.test.js pruebas/suscripcion.test.js pruebas/cobros.test.js pruebas/cobrosPanel.test.js pruebas/filtroChat.test.js pruebas/amarres.test.js pruebas/vaciado.test.js && node --test pruebas/funciones.test.js && node --test pruebas/chatRecarga.test.js && node --test pruebas/storage.test.js"',
   ],
   { cwd: RAIZ, env: entorno, stdio: 'inherit', shell: true }
 );

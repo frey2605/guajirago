@@ -1,0 +1,245 @@
+rules_version = '2';
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  LAS REGLAS DEL ALMACÉN DE ARCHIVOS (Storage)
+// ═══════════════════════════════════════════════════════════════════════════
+//
+//  POR QUÉ EXISTE ESTE ARCHIVO (6-sep-2026). Hasta hoy estas reglas NO estaban
+//  en el repositorio: vivían solo en la consola, sin historial y sin que nadie
+//  las revisara. Es la misma trampa que ya mordió con las reglas de Firestore
+//  en agosto. Se bajaron del servidor con `node scripts/medir-storage.cjs`.
+//
+//  Y LO QUE DECÍAN ERA ESTO, entero:
+//
+//      match /{allPaths=**} {
+//        allow read: if true;
+//        allow write: if request.auth != null;
+//      }
+//
+//  MEDIDO ESE DÍA, ejecutándolo desde fuera y SIN NINGUNA CREDENCIAL:
+//   · listar el bucket entero .......... se podía (HTTP 200)
+//   · bajar la foto de una cédula ...... se podía (105 kB de una real)
+//  No hacía falta ni adivinar la ruta: se pedía la lista y salían todas.
+//  Había 43 archivos, y 32 en `conductores/` — 16 fotos de CÉDULA y 16 de la
+//  cara, de 15 conductores distintos.
+//  Y con `write: if request.auth != null`, cualquiera con una cuenta podía
+//  sobrescribir el archivo de cualquier otro: la cédula de un conductor, el
+//  logo de un restaurante, los anuncios. O subir lo que quisiera, del tamaño
+//  que quisiera, en la carpeta que quisiera.
+//
+//  LO QUE HACE QUE CERRAR NO ROMPA NADA, y se comprobó antes de tocar: las 14
+//  URLs de foto que las apps guardan en Firestore llevan su propio token
+//  (`?alt=media&token=…`), y ese token funciona al margen de estas reglas. Las
+//  pantallas siguen enseñando las fotos igual. Lo que se cierra es el listado
+//  del bucket y el acceso por ruta, que es por donde entraba cualquiera.
+//
+//  QUIÉN SUBE QUÉ, medido en las tres apps (13 sitios, 7 carpetas):
+//   · conductores/{uid}/          el conductor, su foto y su cédula (App.js:210)
+//   · usuarios/{uid}/             cada quien su foto de perfil (MiPerfil.js:75)
+//   · recargas/{uid}/             el conductor, el comprobante de su recarga
+//   · pedidosRestaurantes/{id}/   el cliente y el restaurante, en el chat del pedido
+//   · restaurantes/{negocioId}/   el negocio: su logo, su menú, sus tours
+//   · comprobantes/{negocioId}/   el negocio: los comprobantes de sus cobros
+//   · anuncios/                   solo la administración
+//
+//  NADIE BORRA. Comprobado en las tres apps: no hay una sola llamada a
+//  `deleteObject`. Va con la REGLA 12 del dueño («los borrados dejan lápida»):
+//  si algún día hace falta borrar, se abre a propósito y con su permiso.
+//
+//  🔴 PERO OJO CON QUÉ ES LO QUE DE VERDAD LO CIERRA, para que nadie se confíe.
+//  Los `allow delete: if false` de abajo NO deniegan nada — se comprobó
+//  quitándolos los ocho y el borrado siguió cerrado igual. En estas reglas los
+//  permisos se SUMAN, y un `if false` no le quita el permiso a un `allow write`
+//  que ya lo dio. Lo que de verdad tumba el borrado es que TODAS las escrituras
+//  exigen `esUnaFoto()`, y en un borrado no hay `request.resource`: la
+//  condición se cae sola.
+//  Están escritos igual porque dicen la intención de un vistazo, pero si mañana
+//  alguien añade un `match` con un `write` que no pase por `esUnaFoto()`, el
+//  borrado se abre ahí y ese `allow delete: if false` no lo va a impedir.
+// ═══════════════════════════════════════════════════════════════════════════
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function haySesion() {
+      return request.auth != null;
+    }
+
+    // ── ¿ES DE LA ADMINISTRACIÓN? ──────────────────────────────────────────
+    //  Se le pregunta a Firestore, igual que hacen las reglas de allá. El rol
+    //  vive en `usuarios/{uid}.rol` y NO se lo puede escribir el propio dueño
+    //  de la ficha: eso lo cerró la REGLA 1 en firestore.rules (`camposDePoder`).
+    //  Sin ese candado, esto sería preguntarle al carnet que rellena el visitante.
+    function esAdmin() {
+      return haySesion()
+        && firestore.exists(/databases/(default)/documents/usuarios/$(request.auth.uid))
+        && firestore.get(/databases/(default)/documents/usuarios/$(request.auth.uid))
+             .data.get('rol', '') in ['admin', 'superadmin'];
+    }
+
+    // ── ¿ES EL NEGOCIO, O UN EMPLEADO SUYO? ────────────────────────────────
+    //  ES LA MISMA CUENTA QUE `esDelNegocio` DE firestore.rules:81, y tiene que
+    //  decir lo mismo. No se puede importar de allá —son dos archivos de reglas
+    //  distintos, cada uno con su servicio— así que la copia se sujeta con una
+    //  prueba (pruebas/storage.test.js) que EJECUTA las dos y se pone roja si se
+    //  separan. Es el trato de siempre en este proyecto para lo que cruza.
+    //
+    //  Y el empleado hace falta de verdad, no es teoría: en la app de aliados el
+    //  MESERO sube comprobantes y el menú lo edita quien tenga el permiso, y
+    //  esas personas entran con SU cuenta, no con la del negocio.
+    function esDelNegocio(negocioId) {
+      return haySesion() && (
+        request.auth.uid == negocioId
+        || (firestore.exists(/databases/(default)/documents/empleados/$(request.auth.uid))
+            && firestore.get(/databases/(default)/documents/empleados/$(request.auth.uid))
+                 .data.get('restauranteId', '') == negocioId
+            && firestore.get(/databases/(default)/documents/empleados/$(request.auth.uid))
+                 .data.get('activo', true) == true)
+      );
+    }
+
+    // ── LO QUE SE PUEDE SUBIR ──────────────────────────────────────────────
+    //  Antes se podía subir CUALQUIER cosa, de CUALQUIER tamaño. El tope de
+    //  10 MB es holgado a propósito: una foto de un celular de hoy pesa 3-5 MB.
+    //  Lo que corta es que alguien suba una película o un archivo de gigas para
+    //  llenar el almacén, que se paga por lo que ocupa.
+    //
+    //  🔴 Y AHORA EL TIPO, QUE TIENE TRAMPA Y CASI ROMPE LA APP.
+    //  La primera versión de esta regla exigía `contentType.matches('image/.*')`
+    //  a secas. MEDIDO contra el emulador antes de aplicarlo: NINGUNA de las 13
+    //  subidas de las tres apps le pasa el `contentType` al SDK — lo saca del
+    //  `File.type` que da el celular. Y cuando ese viene vacío, el SDK manda
+    //  `application/octet-stream`, que NO casa con `image/.*`:
+    //
+    //      subida sin contentType  →  DENEGADO (storage/unauthorized)
+    //
+    //  O sea: una foto buena, de un teléfono que no dice de qué tipo es, se
+    //  habría quedado fuera. Y en silencio, porque los 13 sitios enseñan un
+    //  «error al subir» genérico. Comprobado también que poner `== null` no
+    //  arregla nada: no llega nulo, llega `application/octet-stream`.
+    //
+    //  Por eso se deja pasar TAMBIÉN el «no sé qué tipo es». Lo que se rechaza
+    //  es lo que el navegador SÍ supo nombrar y no es una foto: un PDF, un
+    //  vídeo, un zip. Contra un atacante decidido esto no es un candado —quien
+    //  quiera puede decir que su archivo es `image/jpeg`—; contra un descuido o
+    //  un uso torcido, sí. Lo que de verdad sujeta es el tamaño y el dueño de
+    //  la carpeta.
+    //
+    //  🔧 ANOTADO, NO HECHO: el arreglo bueno es que los 13 sitios manden
+    //  `{ contentType: archivo.type || 'image/jpeg' }`. Son 13 archivos en los
+    //  tres repos y no estaban en lo que se mandó reparar: va aparte, con sus
+    //  diez pasos. El día que se haga, aquí se quita el octet-stream.
+    function esUnaFoto() {
+      return request.resource != null
+        && request.resource.size < 10 * 1024 * 1024
+        && (request.resource.contentType.matches('image/.*')
+            || request.resource.contentType == 'application/octet-stream');
+    }
+
+    // ── LA FICHA DEL CONDUCTOR: SU CARA Y SU CÉDULA ────────────────────────
+    //  Esto es lo que estaba público. La sube él mismo al registrarse
+    //  (App.js:232-233, con `user.uid`), y solo la miran él y la
+    //  administración. El panel las enseña por la URL con token que quedó
+    //  guardada en Firestore, así que no depende de esta lectura.
+    match /conductores/{uid}/{archivo=**} {
+      allow read: if haySesion() && (request.auth.uid == uid || esAdmin());
+      allow write: if haySesion() && request.auth.uid == uid && esUnaFoto();
+      allow delete: if false;
+    }
+
+    // ── LA FOTO DE PERFIL ──────────────────────────────────────────────────
+    match /usuarios/{uid}/{archivo=**} {
+      allow read: if haySesion() && (request.auth.uid == uid || esAdmin());
+      allow write: if haySesion() && request.auth.uid == uid && esUnaFoto();
+      allow delete: if false;
+    }
+
+    // ── EL COMPROBANTE DE LA RECARGA ───────────────────────────────────────
+    //  El conductor paga por Nequi o Daviplata y sube aquí la foto de su
+    //  comprobante para que le den su recarga. Es la prueba de que pagó: la
+    //  ve él y la ve la administración, nadie más.
+    match /recargas/{uid}/{archivo=**} {
+      allow read: if haySesion() && (request.auth.uid == uid || esAdmin());
+      allow write: if haySesion() && request.auth.uid == uid && esUnaFoto();
+      allow delete: if false;
+    }
+
+    // ── LAS FOTOS DEL CHAT DE UN PEDIDO ────────────────────────────────────
+    //  Aquí escriben DOS lados: el cliente (guajirago/src/Restaurantes.js:395)
+    //  y el restaurante (aliados/PedidosDomicilio.js:226), y la carpeta se
+    //  llama por el número del pedido, no por el uid de nadie. Para saber si
+    //  quien sube es de ese pedido habría que ir a leerlo a Firestore en CADA
+    //  subida, y el documento del pedido no siempre existe todavía cuando la
+    //  foto se sube.
+    //  Así que aquí se cierra lo que SÍ se puede cerrar sin romper el chat: hay
+    //  que tener sesión —antes entraba cualquiera SIN cuenta— y tiene que ser
+    //  una foto de tamaño razonable.
+    //
+    //  🔴 LO QUE QUEDA ABIERTO, DICHO ENTERO Y MEDIDO, porque la primera versión
+    //  de este comentario decía menos de lo que hay. Un usuario con cuenta
+    //  cualquiera —un pasajero, un conductor— puede HOY:
+    //    · LISTAR esta carpeta y sacar los números de todos los pedidos.
+    //      `allow read` a secas INCLUYE el listado; no hace falta conocer el
+    //      número, se pide la lista y salen. (Es la misma sutileza que este
+    //      proyecto ya se comió una vez con las reglas de Firestore.)
+    //    · BAJAR las fotos del chat del pedido de otro.
+    //    · SOBRESCRIBIR una de esas fotos con otra suya — y en ese chat es donde
+    //      se resuelven los pagos de un domicilio.
+    //  Sigue siendo mucho mejor que antes (antes esto lo hacía cualquiera SIN
+    //  cuenta, y también en las cédulas), pero no está cerrado.
+    //
+    //  🔧 ANOTADO, NO HECHO: cerrarlo bien es preguntarle a Firestore si quien
+    //  sube es el cliente de ese pedido o su restaurante. Se puede —las dos
+    //  pantallas suben cuando el pedido YA existe— pero es un arreglo aparte,
+    //  con sus diez pasos, y hay que mirar antes cómo nace ese documento.
+    match /pedidosRestaurantes/{pedidoId}/{archivo=**} {
+      allow read: if haySesion();
+      allow write: if haySesion() && esUnaFoto();
+      allow delete: if false;
+    }
+
+    // ── LO DEL NEGOCIO: SU LOGO, SU MENÚ, SUS TOURS ────────────────────────
+    //  Lo suyo lo toca él y sus empleados en activo. Se lee con sesión porque
+    //  el menú y el logo salen en la app del cliente; el escaparate los pinta
+    //  por la URL con token, así que esto no es lo que los enseña.
+    match /restaurantes/{negocioId}/{archivo=**} {
+      allow read: if haySesion();
+      allow write: if esDelNegocio(negocioId) && esUnaFoto();
+      allow delete: if false;
+    }
+
+    // ── LOS COMPROBANTES DE COBRO DEL NEGOCIO ──────────────────────────────
+    //  Estos son de plata, así que no los lee cualquiera con sesión: solo el
+    //  propio negocio y la administración.
+    match /comprobantes/{negocioId}/{archivo=**} {
+      allow read: if esDelNegocio(negocioId) || esAdmin();
+      allow write: if esDelNegocio(negocioId) && esUnaFoto();
+      allow delete: if false;
+    }
+
+    // ── LOS ANUNCIOS ───────────────────────────────────────────────────────
+    //  Los sube la administración (Superadmin.js:463) y se los enseña a todo el
+    //  mundo en la app, por su URL con token.
+    match /anuncios/{archivo=**} {
+      allow read: if haySesion();
+      allow write: if esAdmin() && esUnaFoto();
+      allow delete: if false;
+    }
+
+    // ── Y TODO LO DEMÁS, CERRADO ───────────────────────────────────────────
+    //  Las siete carpetas de arriba son las que existen hoy, medidas. Cualquier
+    //  otra ruta queda cerrada: si mañana hace falta una nueva, se abre aquí a
+    //  propósito, no por descuido.
+    //
+    //  OJO CON CÓMO FUNCIONA ESTO, para que nadie se confíe: en estas reglas los
+    //  permisos se SUMAN. Un `if false` NO le quita el permiso a otro `match`
+    //  que sí lo dé — si dos reglas alcanzan la misma ruta, basta con que una
+    //  diga que sí. Así que este renglón no «tapa» nada por sí solo: lo que
+    //  cerró el agujero fue QUITAR el `allow read: if true` de aquí. Lo que se
+    //  queda sin ninguna regla que lo permita ya está cerrado por defecto.
+    //  Esto está escrito para que se lea la intención, no como candado.
+    match /{allPaths=**} {
+      allow read, write, delete: if false;
+    }
+  }
+}
