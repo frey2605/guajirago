@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { db, auth, storage } from './firebase';
 import Logo from './Logo';
 // runTransaction salió con la REGLA 7: el canje del código lo hace el servidor.
-import { doc, getDoc, updateDoc, onSnapshot } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, onSnapshot, arrayUnion } from 'firebase/firestore';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 // El filtro anti-datos vive en filtroChat.js: un solo sitio para todos los
@@ -49,10 +49,29 @@ function Creditos({ onVolver }) {
     if (!user) return;
     try {
       const nuevoMensaje = { texto: textoChatRecarga.trim(), autor: 'conductor', fecha: new Date().toISOString() };
-      const previos = mensajesRecarga || [];
-      await updateDoc(doc(db, 'usuarios', user.uid), { mensajesRecarga: [...previos, nuevoMensaje] });
+      // ── UNA RESPUESTA NO PUEDE BORRAR UN MENSAJE (6-sep-2026) ──────────────
+      // Esto leía la lista entera, le pegaba el mensaje nuevo y SUBÍA LA LISTA
+      // COMPLETA otra vez. Y a esta misma lista le escriben CINCO sitios: dos
+      // aquí y tres en el panel. El que subiera de segundo, con la copia que
+      // había leído ANTES, borraba lo que el otro acababa de mandar. Sin error
+      // y sin rastro: el mensaje simplemente ya no está.
+      // Lo que se pierde aquí no es charla — es la FOTO DEL COMPROBANTE que el
+      // conductor sube para que le den su recarga.
+      // `arrayUnion` le pega el mensaje EN EL SERVIDOR, sin leer nada, así que
+      // ningún escritor puede pisar a otro. Es lo que ya hace el otro chat de la
+      // casa, el del cliente con el restaurante (Restaurantes.js:414).
+      // OJO CON SU ÚNICA CARA: `arrayUnion` descarta elementos IDÉNTICOS campo
+      // por campo. Aquí no puede pasar porque cada mensaje lleva `fecha` con
+      // milisegundos. MEDIDO el 6-sep-2026 sobre los 9 mensajes que hay en la
+      // nube: CERO idénticos y CERO sin fecha.
+      await updateDoc(doc(db, 'usuarios', user.uid), { mensajesRecarga: arrayUnion(nuevoMensaje) });
       setTextoChatRecarga('');
-    } catch (e) {}
+    } catch (e) {
+      // REGLA 9: nada se rechaza en silencio. Antes: `catch (e) {}` — si el
+      // mensaje no salía, el conductor lo veía irse de la caja de texto y creía
+      // que había llegado. Se avisa igual que su función hermana de abajo.
+      setErrorChatRecarga('No se pudo enviar el mensaje. Intenta de nuevo');
+    }
   };
 
   const enviarComprobante = async (archivo) => {
@@ -66,8 +85,11 @@ function Creditos({ onVolver }) {
       await uploadBytes(refArchivo, archivo);
       const url = await getDownloadURL(refArchivo);
       const nuevoMensaje = { tipo: 'imagen', url, autor: 'conductor', fecha: new Date().toISOString() };
-      const previos = mensajesRecarga || [];
-      await updateDoc(doc(db, 'usuarios', user.uid), { mensajesRecarga: [...previos, nuevoMensaje] });
+      // EL COMPROBANTE, por el mismo camino seguro que el texto de arriba: se le
+      // pega a la lista EN EL SERVIDOR. Antes, si el dueño contestaba en ese
+      // mismo momento, su respuesta subía la lista de ANTES de la foto y la foto
+      // desaparecía — justo la prueba de que el conductor pagó.
+      await updateDoc(doc(db, 'usuarios', user.uid), { mensajesRecarga: arrayUnion(nuevoMensaje) });
     } catch (e) {
       setErrorChatRecarga('No se pudo subir el comprobante. Intenta de nuevo');
     }

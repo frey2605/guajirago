@@ -80,14 +80,19 @@ const r = spawnSync(
     // igual para que `npm test` sea UN solo comando: una prueba que hay que
     // acordarse de correr aparte es una prueba que nadie corre.
     //
-    // DOS TANDAS, Y NO ES CAPRICHO: `node --test` corre los archivos EN PARALELO,
-    // y `reglas.test.js` VACÍA la base entera antes de cada prueba
-    // (`clearFirestore`). `funciones.test.js` siembra sus códigos y sus saldos y
-    // luego los lee: corriendo a la vez, el vaciado de una le borra los datos a
-    // la otra a mitad, y los fallos salen distintos en cada corrida. Encadenadas
-    // con && la segunda arranca cuando la primera ya terminó — y si la primera
-    // falla, la segunda ni corre y el código de salida sigue siendo el malo.
-    '"node --test pruebas/reglas.test.js pruebas/tarifas.test.js pruebas/descuentos.test.js pruebas/codigoSeguridad.test.js pruebas/viajeNuevo.test.js pruebas/compartidos.test.js pruebas/avisoCalificacion.test.js pruebas/avisosPanel.test.js pruebas/avisosConductor.test.js pruebas/gemelosSolicitar.test.js pruebas/tipoNegocio.test.js pruebas/avisosPasajero.test.js pruebas/suscripcion.test.js pruebas/cobros.test.js pruebas/cobrosPanel.test.js pruebas/filtroChat.test.js pruebas/amarres.test.js pruebas/vaciado.test.js && node --test pruebas/funciones.test.js"',
+    // TRES TANDAS, Y NO ES CAPRICHO: `node --test` corre los archivos EN
+    // PARALELO, y las tres tocan la MISMA base del emulador. `reglas.test.js` la
+    // VACÍA entera antes de cada prueba (`clearFirestore`); `funciones.test.js`
+    // siembra códigos y saldos y luego los lee; `chatRecarga.test.js` siembra
+    // chats y comprueba qué mensajes sobrevivieron. Corriendo a la vez, una le
+    // borra los datos a la otra a mitad y los fallos salen distintos en cada
+    // corrida — el peor tipo de prueba, la que a veces pasa.
+    // Encadenadas con && cada una arranca cuando la anterior terminó; y si una
+    // falla, las de después ni corren y el código de salida sigue siendo el malo.
+    // La tercera va aparte de la segunda a propósito: hoy no chocarían porque
+    // usan fichas de nombres distintos, pero eso es una casualidad que nadie
+    // vigila, y `chatRecarga.test.js` además carga las reglas en el emulador.
+    '"node --test pruebas/reglas.test.js pruebas/tarifas.test.js pruebas/descuentos.test.js pruebas/codigoSeguridad.test.js pruebas/viajeNuevo.test.js pruebas/compartidos.test.js pruebas/avisoCalificacion.test.js pruebas/avisosPanel.test.js pruebas/avisosConductor.test.js pruebas/gemelosSolicitar.test.js pruebas/tipoNegocio.test.js pruebas/avisosPasajero.test.js pruebas/suscripcion.test.js pruebas/cobros.test.js pruebas/cobrosPanel.test.js pruebas/filtroChat.test.js pruebas/amarres.test.js pruebas/vaciado.test.js && node --test pruebas/funciones.test.js && node --test pruebas/chatRecarga.test.js"',
   ],
   { cwd: RAIZ, env: entorno, stdio: 'inherit', shell: true }
 );
