@@ -78,8 +78,14 @@ const raya = (t) => console.log('\n' + t + '\n' + '─'.repeat(t.length));
     fuente = ((rs.source && rs.source.files) || []).map((f) => f.content).join('\n');
     console.log('  publicadas el: ' + (rel.updateTime || '?'));
     console.log('  renglones: ' + fuente.split('\n').length);
+    // SIN LOS COMENTARIOS. La cabecera de `storage.rules` CITA las reglas
+    // viejas para explicar qué se vino a tapar, y la primera versión de esta
+    // línea encontraba la cita y cantaba «✋ SÍ, sigue el agujero» con el
+    // agujero ya cerrado. Un medidor que grita en falso deja de mirarse, y
+    // entonces no avisa el día que sea verdad.
+    const sinComentarios = fuente.split('\n').filter((l) => !/^\s*\/\//.test(l)).join('\n');
     console.log('  ¿sigue el agujero `allow read: if true`? ... '
-      + (/allow read:\s*if true/.test(fuente) ? '✋ SÍ' : 'no'));
+      + (/allow read:\s*if true/.test(sinComentarios) ? '✋ SÍ' : 'no'));
     if (SALIDA) { fs.writeFileSync(SALIDA, fuente, 'utf8'); console.log('  guardadas en ' + SALIDA); }
   }
 
