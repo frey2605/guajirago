@@ -1570,6 +1570,86 @@ service cloud.firestore {
 
       allow delete: if false;
     }
+
+    // ══ EL NOMBRE NUEVO: `pedidos` (7-sep-2026) ══════════════════════════════
+    //  Segundo pedazo del cambio de nombre de «restaurante» a «negocio». Este
+    //  trabajo prepara SOLO EL TERRENO: las reglas y las pruebas aprenden el
+    //  nombre nuevo, y NO se toca ni una app, ni una función, ni un dato. Hoy
+    //  esta colección está VACÍA y ninguna pantalla escribe aquí: todo sigue
+    //  entrando por `pedidosRestaurantes`, arriba, exactamente igual que ayer.
+    //
+    //  LAS DOS PUERTAS VIVEN A LA VEZ A PROPÓSITO, y esa lección salió del
+    //  ensayo del cuarto de atrás: el código y las reglas no se pueden cambiar
+    //  en el mismo instante. Cuando las apps se muden, se despliegan sabiendo
+    //  que aquí ya las están esperando. La de arriba se retira al final.
+    //
+    //  ES LA MISMA REGLA, PALABRA POR PALABRA — y eso se puede carear letra a
+    //  letra a propósito. Si alguien cambia una de las dos y no la otra, un
+    //  pedido tendría permisos distintos según por qué puerta entrara, y eso es
+    //  el gemelo que prohíbe la SEGUNDA LEY. Mientras las dos existan lo vigila
+    //  `pruebas/reglas.test.js`, que corre la MISMA batería contra las dos.
+    //
+    //  ══ 🔴 EL AVISO QUE NO SE PUEDE PERDER, PARA LA FASE SIGUIENTE ══════════
+    //  ESTA COLECCIÓN ESTÁ VACÍA, Y ESO LA HACE FALSIFICABLE. El `allow create`
+    //  de aquí abajo deja que cualquiera con cuenta cree `pedidos/{el id que
+    //  él elija}` poniéndose de cliente — igual que el de arriba, y ahí está
+    //  bien, porque allí los números ya están ocupados y no se puede crear
+    //  encima de un documento que existe.
+    //
+    //  🔴 POR ESO `storage.rules` NO PUEDE MIRAR AQUÍ TODAVÍA. La regla de las
+    //  fotos del chat le pregunta a Firestore de quién es el pedido. Se probó a
+    //  hacer que mirara las dos colecciones, y se REPRODUJO el agujero contra el
+    //  emulador: un extraño fabricaba `pedidos/{numero-del-pedido-ajeno}` con su
+    //  propio nombre, y con eso se bajaba el COMPROBANTE DE PAGO de la víctima —
+    //  y encima podía meter fotos en su chat. Se quitó.
+    //
+    //  Y LO PEOR: ese pedido falso sería INVISIBLE. Las dos funciones que avisan
+    //  —`notificarNuevoPedidoRestaurante` y `notificarClientePedido`— escuchan la
+    //  colección VIEJA, así que no se dispararía ninguna; y ninguna pantalla lee
+    //  esta colección todavía, así que no saldría en ningún sitio. Se quedaría
+    //  ahí callado, dándole la llave del chat ajeno a quien lo puso.
+    //  Este proyecto tiene una ley contra negar en silencio. Esto era abrir en
+    //  silencio, que es peor.
+    //
+    //  CUÁNDO SE PUEDE: solo DESPUÉS de mudar los 29 documentos aquí. Con los
+    //  números ya ocupados, fabricar un gemelo deja de ser posible. O sea que en
+    //  la fase siguiente el orden es: primero los datos, y solo entonces
+    //  `storage.rules`. Nunca al revés.
+    match /pedidos/{pedidoId} {
+      allow get: if request.auth != null && (
+        resource.data.get('clienteId', '') == request.auth.uid ||
+        esDelNegocio(resource.data.restauranteId) ||
+        esAdmin()
+      );
+
+      allow list: if esAdmin() || esDelNegocio(resource.data.restauranteId);
+
+      allow create: if esAdmin() ||
+        (esDelNegocio(request.resource.data.restauranteId) &&
+         negocioPuedeOperar(request.resource.data.restauranteId)) ||
+        (request.auth != null &&
+         request.resource.data.get('clienteId', '') == request.auth.uid &&
+         request.resource.data.get('estado', '') == 'nuevo' &&
+         exists(/databases/$(database)/documents/restaurantes/$(request.resource.data.restauranteId)) &&
+         negocioPuedeOperar(request.resource.data.restauranteId));
+
+      function elClienteNoMueveElPedido() {
+        return request.resource.data.get('estado', '') == resource.data.get('estado', '')
+            || request.resource.data.get('estado', '') == 'cancelado';
+      }
+
+      allow update: if (esAdmin() ||
+          (esDelNegocio(resource.data.restauranteId) &&
+           negocioPuedeOperar(resource.data.restauranteId)) ||
+          (request.auth != null &&
+           resource.data.get('clienteId', '') == request.auth.uid &&
+           elClienteNoMueveElPedido())) &&
+        request.resource.data.restauranteId == resource.data.restauranteId &&
+        request.resource.data.get('clienteId', '') == resource.data.get('clienteId', '');
+
+      allow delete: if false;
+    }
+
     // ── LA LISTA DE EMPLEADOS VIEJA · UNA PUERTA QUE NO DA A NINGUNA PARTE ──
     // Esta subcolección está MUERTA. Medido el 6-sep-2026 buscando en las tres
     // apps y en las funciones: NADIE la lee ni la escribe. El sistema de empleados

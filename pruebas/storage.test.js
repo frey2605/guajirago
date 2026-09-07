@@ -311,6 +311,41 @@ describe('STORAGE · el chat del pedido: solo sus dos puntas', () => {
     await RUT.assertFails(uploadBytes(ref(sinCuenta(), 'pedidosRestaurantes/PED1/7.jpg'), foto(), COMO_FOTO));
   });
 
+  // ── EL AGUJERO QUE CASI DEJO ABIERTO, Y AHORA ESTÁ CERRADO CON LLAVE ─────
+  //  La colección de pedidos está cambiando de nombre (`pedidosRestaurantes` →
+  //  `pedidos`). Se probó a que esta regla mirara LAS DOS colecciones, para
+  //  dejar el terreno listo antes de mudar los datos. Parecía inofensivo.
+  //
+  //  🔴 NO LO ERA, y se reprodujo contra el emulador: como `pedidos` estaba
+  //  VACÍA, cualquiera con cuenta podía crear ahí `pedidos/{el número del
+  //  pedido de otro}` poniéndose de cliente. Y con eso la regla del almacén lo
+  //  daba por dueño: se bajaba el COMPROBANTE DE PAGO de la víctima (2.048
+  //  bytes de una foto real) y hasta podía meter fotos en su chat.
+  //
+  //  Se quitó. Esta prueba es lo que impide que vuelva: mientras la regla mire
+  //  SOLO donde de verdad viven los pedidos, fabricar un gemelo no sirve de
+  //  nada. El día que se mude, el orden es PRIMERO LOS DATOS —con los números
+  //  ya ocupados no se puede crear encima— y solo entonces esta regla.
+  it('EL QUE MUERDE · fabricar un pedido falso NO abre el chat de otro', async () => {
+    const { ref, uploadBytes, getBytes } = ST;
+    const { doc, setDoc } = FS;
+    // La víctima tiene su pedido y su comprobante en el chat.
+    const suya = 'pedidosRestaurantes/PED1/' + nueva(5000);
+    await RUT.assertSucceeds(uploadBytes(ref(como('conductor1'), suya), foto(), COMO_FOTO));
+    // El extraño se fabrica el gemelo con EL MISMO NÚMERO, a su nombre.
+    await entorno.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'pedidos/PED1'), {
+        clienteId: 'conductor2', restauranteId: 'negocio1', estado: 'nuevo',
+      });
+    });
+    // Y aun así no entra.
+    await RUT.assertFails(getBytes(ref(como('conductor2'), suya)),
+      'CON UN PEDIDO FALSO SE ENTRÓ AL CHAT DE OTRO. Ahí va el comprobante de un pago.');
+    await RUT.assertFails(uploadBytes(
+      ref(como('conductor2'), 'pedidosRestaurantes/PED1/' + nueva(5001)), foto(), COMO_FOTO),
+    'con un pedido falso se pudo METER una foto en el chat de otro.');
+  });
+
   it('LOS 29 VIEJOS · su restaurante SÍ entra; su cliente no, y está declarado', async () => {
     // Los 29 pedidos de julio son anteriores a la línea que guarda `clienteId`,
     // así que a su cliente esto lo deja fuera. No rompe nada —los 29 están

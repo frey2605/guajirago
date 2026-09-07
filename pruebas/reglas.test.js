@@ -1024,6 +1024,197 @@ describe('REGLA 6 · cada quien ve lo suyo', () => {
 // y en silencio: la pantalla se queda vacía y nadie sabe por qué. Por eso hay
 // dos pruebas del mesero, y son las que más importan de todas estas.
 
+// ── LAS DOS PUERTAS DEL PEDIDO TIENEN QUE ABRIRLE A LOS MISMOS ──────────────
+//  La colección de pedidos está cambiando de nombre: `pedidosRestaurantes` pasa
+//  a `pedidos`, porque aliados va a vender a panaderías y peluquerías y la base
+//  de datos no puede seguir diciendo «restaurante».
+//
+//  Mientras dure la mudanza, las DOS existen a la vez a propósito — el código y
+//  las reglas no se pueden cambiar en el mismo instante, y eso lo enseñó el
+//  ensayo del cuarto de atrás. Pero dos bloques de reglas que dicen lo mismo son
+//  un GEMELO, y la SEGUNDA LEY los prohíbe justamente porque uno de los dos se
+//  queda viejo y nadie lo mira.
+//
+//  Esto no compara los TEXTOS de las dos reglas: las EJECUTA las dos con la
+//  misma gente haciendo lo mismo, y exige la MISMA respuesta. Si alguien toca
+//  una y no la otra, un pedido tendría permisos distintos según por qué puerta
+//  entrara — y aquí se pone rojo.
+//  Cuando las apps se muden y se retire `pedidosRestaurantes`, esta prueba se
+//  borra con él.
+describe('EL CAMBIO DE NOMBRE · `pedidos` abre y cierra igual que `pedidosRestaurantes`', () => {
+  const PEDIDO = {
+    restauranteId: 'r1', clienteId: 'pasajero1', tipo: 'domicilio',
+    estado: 'nuevo', cliente: 'Ana', telefono: '+573001112233',
+    direccion: 'Calle 1 #2-3', total: 30000,
+  };
+  const LAS_DOS = ['pedidosRestaurantes', 'pedidos'];
+
+  const sembrarEnLasDos = async (id, datos) => {
+    await entorno.withSecurityRulesDisabled(async (ctx) => {
+      const { doc, setDoc } = FS;
+      for (const col of LAS_DOS) await setDoc(doc(ctx.firestore(), col + '/' + id), datos);
+    });
+  };
+
+  /**
+   * Corre la misma prueba contra las dos colecciones y exige el mismo resultado.
+   *
+   * EL MENSAJE SE LANZA A MANO, y no es capricho: `assertFails` y
+   * `assertSucceeds` de @firebase/rules-unit-testing reciben UN SOLO argumento y
+   * tiran el segundo. La primera versión de esto les pasaba el mensaje ahí, y no
+   * se imprimía nunca: al ponerse roja solo diría «Expected request to fail» sin
+   * decir POR CUÁL DE LAS DOS PUERTAS, que es lo único que hace falta saber.
+   */
+  const enLasDos = async (que, hacer, debePasar) => {
+    for (const col of LAS_DOS) {
+      try {
+        if (debePasar) await RUT.assertSucceeds(hacer(col));
+        else await RUT.assertFails(hacer(col));
+      } catch (e) {
+        throw new Error('POR LA PUERTA «' + col + '»: ' + (debePasar ? 'NO se pudo ' : 'SÍ se pudo ')
+          + que + ', y por la otra al revés. Las dos reglas del pedido se separaron.\n'
+          + '   (lo de dentro: ' + e.message + ')');
+      }
+    }
+  };
+
+  it('el CLIENTE ve su pedido por las dos puertas', async () => {
+    await sembrarEnLasDos('p1', PEDIDO);
+    const { doc, getDoc } = FS;
+    await enLasDos('leer su pedido',
+      (col) => getDoc(doc(como('pasajero1'), col + '/p1')), true);
+  });
+
+  it('un EXTRAÑO no lo ve por ninguna de las dos', async () => {
+    await sembrarEnLasDos('p1', PEDIDO);
+    const { doc, getDoc } = FS;
+    await enLasDos('leer el pedido de otro',
+      (col) => getDoc(doc(como('conductor1'), col + '/p1')), false);
+  });
+
+  it('NADIE pide la LISTA entera, por ninguna de las dos', async () => {
+    await sembrarEnLasDos('p1', PEDIDO);
+    const { collection, getDocs } = FS;
+    await enLasDos('pedir la lista entera',
+      (col) => getDocs(collection(como('pasajero1'), col)), false);
+  });
+
+  it('el RESTAURANTE y su EMPLEADO ven los suyos por las dos', async () => {
+    await sembrarEnLasDos('p1', PEDIDO);
+    const { doc, getDoc } = FS;
+    await enLasDos('leer como el negocio', (col) => getDoc(doc(como('r1'), col + '/p1')), true);
+    await enLasDos('leer como su empleado', (col) => getDoc(doc(como('emp1'), col + '/p1')), true);
+  });
+
+  it('el cliente CANCELA por las dos, pero no se pone el pedido en «entregado»', async () => {
+    await sembrarEnLasDos('p1', PEDIDO);
+    const { doc, updateDoc } = FS;
+    await enLasDos('cancelar su pedido',
+      (col) => updateDoc(doc(como('pasajero1'), col + '/p1'), { estado: 'cancelado' }), true);
+    await sembrarEnLasDos('p2', PEDIDO);
+    await enLasDos('darse por entregado',
+      (col) => updateDoc(doc(como('pasajero1'), col + '/p2'), { estado: 'entregado' }), false);
+  });
+
+  it('NADIE le cambia el dueño ni el negocio a un pedido, por ninguna de las dos', async () => {
+    await sembrarEnLasDos('p1', PEDIDO);
+    const { doc, updateDoc } = FS;
+    await enLasDos('mudar el pedido a otro negocio',
+      (col) => updateDoc(doc(como('r1'), col + '/p1'), { restauranteId: 'r2' }), false);
+    await enLasDos('cambiarle el cliente',
+      (col) => updateDoc(doc(como('r1'), col + '/p1'), { clienteId: 'otro' }), false);
+  });
+
+  it('NADIE borra un pedido, por ninguna de las dos', async () => {
+    await sembrarEnLasDos('p1', PEDIDO);
+    const { doc, deleteDoc } = FS;
+    await enLasDos('borrar el pedido', (col) => deleteDoc(doc(como('r1'), col + '/p1')), false);
+    await enLasDos('borrar el pedido siendo admin',
+      (col) => deleteDoc(doc(como('eladmin'), col + '/p1')), false);
+  });
+
+  it('SIN CUENTA no se entra por ninguna de las dos', async () => {
+    await sembrarEnLasDos('p1', PEDIDO);
+    const { doc, getDoc } = FS;
+    await enLasDos('leer sin cuenta', (col) => getDoc(doc(sinCuenta(), col + '/p1')), false);
+  });
+
+  // ── CREAR: la condición más larga, y la que faltaba ──────────────────────
+  //  La primera versión de esta batería NO probaba `create` en ninguna de las
+  //  dos. Es la regla con más partes —el cliente tiene que ser él, el pedido
+  //  tiene que nacer «nuevo», el negocio tiene que existir y tiene que poder
+  //  operar— así que era justo la que más falta hacía.
+  it('el CLIENTE hace su pedido por las dos puertas', async () => {
+    const { doc, setDoc } = FS;
+    await enLasDos('hacer un pedido', (col) => setDoc(doc(como('pasajero1'), col + '/nuevo1'),
+      { restauranteId: 'r1', clienteId: 'pasajero1', estado: 'nuevo', total: 12000 }), true);
+  });
+
+  it('pero NO puede hacerlo a nombre de otro, por ninguna de las dos', async () => {
+    const { doc, setDoc } = FS;
+    await enLasDos('hacer un pedido a nombre de otro',
+      (col) => setDoc(doc(como('pasajero1'), col + '/nuevo2'),
+        { restauranteId: 'r1', clienteId: 'otroCliente', estado: 'nuevo', total: 12000 }), false);
+  });
+
+  it('ni nacido ya ENTREGADO, por ninguna de las dos', async () => {
+    const { doc, setDoc } = FS;
+    await enLasDos('hacer un pedido ya entregado',
+      (col) => setDoc(doc(como('pasajero1'), col + '/nuevo3'),
+        { restauranteId: 'r1', clienteId: 'pasajero1', estado: 'entregado', total: 12000 }), false);
+  });
+
+  it('ni a un negocio que NO EXISTE, por ninguna de las dos', async () => {
+    const { doc, setDoc } = FS;
+    await enLasDos('hacer un pedido a un negocio inventado',
+      (col) => setDoc(doc(como('pasajero1'), col + '/nuevo4'),
+        { restauranteId: 'noexiste', clienteId: 'pasajero1', estado: 'nuevo', total: 12000 }), false);
+  });
+
+  // ── LISTAR: se probaba solo el «no». Faltaba el «sí» ─────────────────────
+  //  Si a una de las dos se le cayera el `allow list` entero, la batería vieja
+  //  seguía verde — y el día de la mudanza el panel del negocio se quedaría en
+  //  blanco sin que nada avisara.
+  it('el NEGOCIO sí lista LOS SUYOS por las dos puertas', async () => {
+    await sembrarEnLasDos('p1', PEDIDO);
+    const { collection, getDocs, query, where } = FS;
+    await enLasDos('listar los pedidos de su negocio',
+      (col) => getDocs(query(collection(como('r1'), col), where('restauranteId', '==', 'r1'))), true);
+    await enLasDos('listar como la administración',
+      (col) => getDocs(collection(como('eladmin'), col)), true);
+  });
+
+  it('la ADMINISTRACIÓN ve cualquier pedido por las dos puertas', async () => {
+    await sembrarEnLasDos('p1', PEDIDO);
+    const { doc, getDoc } = FS;
+    await enLasDos('leer como la administración',
+      (col) => getDoc(doc(como('eladmin'), col + '/p1')), true);
+  });
+
+  // ── Y EL CAREO LETRA A LETRA ─────────────────────────────────────────────
+  //  Las de arriba prueban el COMPORTAMIENTO, que es lo que importa. Esta mira
+  //  el TEXTO, y caza lo que a las otras se les escape: una condición nueva que
+  //  alguien añada a una sola de las dos y que ninguna prueba esté mirando
+  //  todavía. Es barata y no se le escapa nada.
+  it('EL QUE MUERDE · los dos bloques son idénticos, letra por letra', () => {
+    const reglas = fs.readFileSync(path.join(RAIZ, 'firestore.rules'), 'utf8')
+      .split('\r\n').join('\n');
+    const trozo = (nombre) => {
+      const i = reglas.indexOf('match /' + nombre + '/{pedidoId} {');
+      assert.ok(i >= 0, 'ya no está el bloque de «' + nombre + '» en las reglas.');
+      return reglas.slice(i, reglas.indexOf('\n    }', i)).split('\n')
+        .filter((l) => !/^\s*\/\//.test(l)).filter((l) => l.trim())
+        .map((l) => l.trim()).join('\n');
+    };
+    // Se tapa el nombre de cada colección para que la comparación sea justa.
+    const viejo = trozo('pedidosRestaurantes').replace(/pedidosRestaurantes/g, 'X');
+    const nuevo = trozo('pedidos').replace(/\bpedidos\b/g, 'X');
+    assert.strictEqual(nuevo, viejo,
+      'los dos bloques de reglas del pedido YA NO dicen lo mismo. Mientras la mudanza '
+      + 'dure, un pedido tendría permisos distintos según por qué puerta entrara.');
+  });
+});
+
 describe('REGLA 9 · los pedidos dejan de ser públicos entre usuarios', () => {
   /** El mundo de dos restaurantes, un empleado y cuatro pedidos. */
   const sembrarPedidos = async () => {
