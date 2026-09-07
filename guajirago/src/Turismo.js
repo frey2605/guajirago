@@ -6,6 +6,9 @@ import { collection, query, where, getDocs, getDoc, addDoc, doc } from 'firebase
 import Logo from './Logo';
 import MenuLateral from './MenuLateral';
 import { obtenerTokenFCM } from './Notificaciones';
+// «¿Quién sale en la app?» se contesta en UN solo sitio (SEGUNDA LEY): el mismo
+// que usa Restaurantes.js. Ahí vive también el interruptor `visibleEnEscaparate`.
+import { lasDeTurismo } from './escaparate';
 
 const AZUL = '#1C8EF9';
 const NARANJA = '#FF7A2F';
@@ -42,7 +45,7 @@ function Turismo({ nombre, foto, onVolver, onCerrarSesion, onIrPerfil, onIrGanan
     (async () => {
       try {
         const snap = await getDocs(query(collection(db, 'restaurantes'), where('tipoNegocio', '==', 'turismo')));
-        const lista = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(a => a.perfilCompleto === true && a.aprobado !== false);
+        const lista = lasDeTurismo(snap.docs.map(d => ({ id: d.id, ...d.data() })));
         setAgencias(lista);
       } catch (e) {}
       setCargando(false);

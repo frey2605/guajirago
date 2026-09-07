@@ -9,6 +9,9 @@ import { contieneInfoSensible } from './filtroChat';
 import { motivoDeRechazo, apuntarRechazo } from './avisoCalificacion';
 // Y la BANDEJA: la otra mitad de la REGLA 9, la que ve el dueño en el panel.
 import { guardarRechazo } from './guardarRechazo';
+// «¿Quién sale en la app?» se contesta en UN solo sitio (SEGUNDA LEY): el mismo
+// que usa Turismo.js. Ahí vive también el interruptor `visibleEnEscaparate`.
+import { losDeComida } from './escaparate';
 import {
   collection,
   onSnapshot,
@@ -110,8 +113,7 @@ function Restaurantes({ nombre, onVolver, foto, onCerrarSesion, onIrPerfil, onIr
     const unsub = onSnapshot(
       collection(db, 'restaurantes'),
       (snap) => {
-        const lista = snap.docs.map((d) => ({ id: d.id, ...d.data() }))
-          .filter((r) => r.tipoNegocio !== 'turismo' && r.aprobado !== false);
+        const lista = losDeComida(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
         setRestaurantes(lista);
         setCargando(false);
       },
