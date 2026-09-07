@@ -1737,6 +1737,49 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // ── EL CONTADOR DE VENTAS POR PLATO, FUERA DEL MENÚ (7-sep-2026) ────────
+    //
+    // POR QUÉ EXISTE ESTA COLECCIÓN. Hasta hoy, «cuántas veces se vendió cada
+    // plato» vivía DENTRO de `restaurantes/{id}.menu[].vecesVendido`, y lo
+    // escribía el cierre de mesa (aliados/Mesero.js). Dos cosas iban mal:
+    //
+    //   1. NO FUNCIONABA para los empleados. La regla de `restaurantes` solo
+    //      deja escribir a `uid == restauranteId`, o sea al dueño. Un mesero
+    //      cerraba la mesa, el servidor le decía que no, y el error caía en un
+    //      `catch (e) {}`. MEDIDO EN LA BASE VIVA el 7-sep-2026 con
+    //      scripts/medir-mas-vendidos.cjs: de 12 mesas cerradas, 9 las cerró un
+    //      empleado. El contador decía 20; lo vendido de verdad eran 34. Los 20
+    //      son EXACTAMENTE las 3 mesas del dueño, y los 14 que faltan son
+    //      EXACTAMENTE lo que vendieron los empleados. Cuadra plato por plato.
+    //
+    //   2. DEJARLE ESCRIBIR `menu` NO ERA LA SALIDA. Las reglas no pueden mirar
+    //      dentro de una lista: quien pueda escribir `menu` puede escribir
+    //      CUALQUIER menú — precios incluidos. Se le enseñaron al dueño los dos
+    //      caminos con lo que gana y lo que cuesta cada uno, y escogió sacar el
+    //      contador del menú. El menú se queda como estaba: solo el dueño.
+    //
+    // POR QUÉ AQUÍ ABAJO Y NO EN UNA SUBCOLECCIÓN: el nombre del documento ES el
+    // id del negocio, así que la regla sabe de quién es SIN leer nada — el mismo
+    // truco que visitasDiarias y mesasInfo, pero sin partir por guion bajo, que
+    // es el apaño que el hallazgo 10 tiene anotado.
+    //
+    // Y LA LECTURA NO ES PÚBLICA, a diferencia del sitio de donde viene. Las
+    // ventas por plato de un negocio estaban en el escaparate —la colección que
+    // la app del pasajero se descarga entera—, así que cualquiera con cuenta veía
+    // cuánto vende el vecino de cada cosa. Aquí ya no.
+    //
+    // LO QUE SIGUE SIN PODERSE COMPROBAR, dicho para que conste: dentro del mapa
+    // `platos` no se puede validar plato por plato. Un empleado del negocio puede
+    // estropear el ranking DE SU PROPIO NEGOCIO. Es un riesgo mucho menor que el
+    // del menú —no hay dinero de por medio, solo un orden— y se acepta a
+    // propósito, no por olvido.
+    match /ventasPorPlato/{negocioId} {
+      allow read: if esAdmin() || esDelNegocio(negocioId);
+      allow create, update: if esAdmin()
+        || (esDelNegocio(negocioId) && negocioPuedeOperar(negocioId));
+      allow delete: if false;
+    }
+
     // ===== NUEVAS (agregadas) =====
     // ── REGLA 9 · CADA RESERVA ES DE SU CLIENTE Y DE SU AGENCIA ─────────────
     // El mismo agujero que los pedidos, y se tapa igual. Con una diferencia que

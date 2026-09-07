@@ -4311,3 +4311,94 @@ describe('SE VENDE · el historial de cobros', () => {
     await RUT.assertFails(getDocs(collection(como('pasajero1'), 'suscripciones/r2/cobros')));
   });
 });
+
+// ── EL CONTADOR DE VENTAS POR PLATO, FUERA DEL MENÚ ────────────────────────
+//
+// El fallo que se arregla, medido en la base viva el 7-sep-2026 con
+// scripts/medir-mas-vendidos.cjs: de 12 mesas cerradas, 9 las cerró un empleado.
+// El contador decía 20 y lo vendido eran 34. Los 20 eran EXACTAMENTE las 3 mesas
+// del dueño; los 14 que faltaban, EXACTAMENTE lo de los empleados.
+//
+// La causa: el contador vivía dentro de `restaurantes/{id}.menu`, y esa colección
+// solo la escribe `uid == restauranteId`. El mesero no. Y el error caía en un
+// `catch (e) {}`.
+//
+// La prueba que de verdad manda aquí es la del EMPLEADO: si un día alguien
+// «simplifica» esta regla y le quita `esDelNegocio`, el fallo vuelve entero y
+// vuelve callado. Y la de al lado, la del menú, es la que impide el arreglo fácil
+// y malo: abrirle `menu` al personal, que le dejaría cambiar precios.
+describe('PUNTO 2 · el contador de ventas por plato', () => {
+  const suyo = 'ventasPorPlato/r1';
+  const ajeno = 'ventasPorPlato/r2';
+
+  it('el negocio apunta y lee sus ventas', async () => {
+    const { doc, setDoc, getDoc } = FS;
+    await RUT.assertSucceeds(setDoc(doc(como('r1'), suyo), { platos: { p1: 3 } }, { merge: true }));
+    await RUT.assertSucceeds(getDoc(doc(como('r1'), suyo)));
+  });
+
+  it('EL QUE MUERDE · el EMPLEADO también puede — esto es el fallo que se arregla', async () => {
+    const { doc, setDoc, getDoc } = FS;
+    await RUT.assertSucceeds(setDoc(doc(como('emp1'), suyo), { platos: { p1: 5 } }, { merge: true }));
+    await RUT.assertSucceeds(getDoc(doc(como('emp1'), suyo)));
+  });
+
+  it('EL QUE MUERDE · el menú SIGUE cerrado: el empleado no lo toca', async () => {
+    // El arreglo fácil era dejarle escribir `menu`. No se hizo, porque las reglas
+    // no pueden mirar dentro de una lista: quien escriba `menu` puede escribir
+    // CUALQUIER menú, precios incluidos. Esta prueba es la que lo impide.
+    const { doc, updateDoc } = FS;
+    await RUT.assertFails(updateDoc(doc(como('emp1'), 'restaurantes/r1'),
+      { menu: [{ id: 'p1', nombre: 'Sancocho', precio: 1 }] }));
+  });
+
+  it('EL QUE MUERDE · el negocio de al lado no lo lee ni lo escribe', async () => {
+    const { doc, setDoc, getDoc } = FS;
+    await entorno.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), ajeno), { platos: { p9: 7 } });
+    });
+    await RUT.assertFails(getDoc(doc(como('r1'), ajeno)));
+    await RUT.assertFails(setDoc(doc(como('r1'), ajeno), { platos: { p9: 0 } }, { merge: true }));
+    await RUT.assertFails(getDoc(doc(como('emp1'), ajeno)));
+  });
+
+  it('EL QUE MUERDE · salió del escaparate: el cliente de la app ya no lo ve', async () => {
+    // Antes esto vivía en `restaurantes/{id}`, que la app del pasajero se descarga
+    // ENTERA. Cualquiera con cuenta veía cuánto vende el vecino de cada plato.
+    const { doc, setDoc, getDoc } = FS;
+    await entorno.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), suyo), { platos: { p1: 3 } });
+    });
+    await RUT.assertFails(getDoc(doc(como('pasajero1'), suyo)));
+    await RUT.assertFails(getDoc(doc(sinCuenta(), suyo)));
+    await RUT.assertFails(setDoc(doc(como('pasajero1'), suyo), { platos: { p1: 999 } }, { merge: true }));
+  });
+
+  it('EL QUE MUERDE · un negocio bloqueado por no pagar no apunta ventas', async () => {
+    // La misma llave que sus vecinas mesasInfo y visitasDiarias. Si esto no
+    // estuviera, un cliente que dejó de pagar seguiría operando por esta puerta.
+    const { doc, setDoc } = FS;
+    await entorno.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'restaurantes/r1'),
+        { nombre: 'La Guajira', activo: true, estadoComercial: 'bloqueado' }, { merge: true });
+    });
+    await RUT.assertFails(setDoc(doc(como('r1'), suyo), { platos: { p1: 1 } }, { merge: true }));
+    await RUT.assertFails(setDoc(doc(como('emp1'), suyo), { platos: { p1: 1 } }, { merge: true }));
+  });
+
+  it('EL QUE MUERDE · nadie lo borra (REGLA 12)', async () => {
+    const { doc, setDoc, deleteDoc } = FS;
+    await entorno.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), suyo), { platos: { p1: 3 } });
+    });
+    await RUT.assertFails(deleteDoc(doc(como('r1'), suyo)));
+    await RUT.assertFails(deleteDoc(doc(como('emp1'), suyo)));
+    await RUT.assertFails(deleteDoc(doc(como('eladmin'), suyo)));
+  });
+
+  it('la administradora sí puede corregirlo', async () => {
+    const { doc, setDoc, getDoc } = FS;
+    await RUT.assertSucceeds(setDoc(doc(como('eladmin'), suyo), { platos: { p1: 34 } }, { merge: true }));
+    await RUT.assertSucceeds(getDoc(doc(como('eladmin'), suyo)));
+  });
+});
