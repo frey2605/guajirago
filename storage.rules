@@ -98,6 +98,35 @@ service firebase.storage {
       );
     }
 
+    // ── ¿ES DE ESTE PEDIDO? ────────────────────────────────────────────────
+    //  Las dos puntas de un domicilio: quien lo pidió y quien lo cocina. El
+    //  documento del pedido las guarda a las dos, así que se le pregunta a él.
+    //
+    //  EL `exists()` VA PRIMERO, y hay que decir exacto lo que hace y lo que NO.
+    //  Se cazó quitándolo: el pedido inventado sale DENEGADO igual, porque el
+    //  almacén también niega cuando la regla se cae. Ninguna prueba distingue
+    //  las dos versiones. Y el caso que de verdad importa —pedir la LISTA de la
+    //  carpeta entera— tampoco lo arregla él: ahí el `pedidoId` viene nulo y la
+    //  regla se cae, y ESO es lo que la cierra.
+    //  Se queda porque es lo que recomienda Firebase y porque deja el «no» como
+    //  una decisión limpia en los registros. No porque tape ningún agujero.
+    //
+    //  QUIEN SUBE TIENE QUE PODER LEER LO SUYO: las dos pantallas piden la URL
+    //  de la foto JUSTO DESPUÉS de subirla (`getDownloadURL`), y eso exige
+    //  permiso de lectura. Por eso la lectura no es más estrecha que la
+    //  escritura: si lo fuera, la foto se subiría y el mensaje se quedaría sin
+    //  ella, en silencio.
+    function esDelPedido(pedidoId) {
+      return haySesion()
+        && firestore.exists(/databases/(default)/documents/pedidosRestaurantes/$(pedidoId))
+        && (
+          firestore.get(/databases/(default)/documents/pedidosRestaurantes/$(pedidoId))
+            .data.get('clienteId', '') == request.auth.uid
+          || esDelNegocio(firestore.get(/databases/(default)/documents/pedidosRestaurantes/$(pedidoId))
+               .data.get('restauranteId', ''))
+        );
+    }
+
     // ── LO QUE SE PUEDE SUBIR ──────────────────────────────────────────────
     //  Antes se podía subir CUALQUIER cosa, de CUALQUIER tamaño. El tope de
     //  10 MB es holgado a propósito: una foto de un celular de hoy pesa 3-5 MB.
@@ -166,35 +195,49 @@ service firebase.storage {
 
     // ── LAS FOTOS DEL CHAT DE UN PEDIDO ────────────────────────────────────
     //  Aquí escriben DOS lados: el cliente (guajirago/src/Restaurantes.js:395)
-    //  y el restaurante (aliados/PedidosDomicilio.js:226), y la carpeta se
-    //  llama por el número del pedido, no por el uid de nadie. Para saber si
-    //  quien sube es de ese pedido habría que ir a leerlo a Firestore en CADA
-    //  subida, y el documento del pedido no siempre existe todavía cuando la
-    //  foto se sube.
-    //  Así que aquí se cierra lo que SÍ se puede cerrar sin romper el chat: hay
-    //  que tener sesión —antes entraba cualquiera SIN cuenta— y tiene que ser
-    //  una foto de tamaño razonable.
+    //  y el restaurante (aliados/PedidosDomicilio.js:226). Es el chat donde se
+    //  manda el comprobante de pago de un domicilio.
     //
-    //  🔴 LO QUE QUEDA ABIERTO, DICHO ENTERO Y MEDIDO, porque la primera versión
-    //  de este comentario decía menos de lo que hay. Un usuario con cuenta
-    //  cualquiera —un pasajero, un conductor— puede HOY:
-    //    · LISTAR esta carpeta y sacar los números de todos los pedidos.
-    //      `allow read` a secas INCLUYE el listado; no hace falta conocer el
-    //      número, se pide la lista y salen. (Es la misma sutileza que este
-    //      proyecto ya se comió una vez con las reglas de Firestore.)
-    //    · BAJAR las fotos del chat del pedido de otro.
-    //    · SOBRESCRIBIR una de esas fotos con otra suya — y en ese chat es donde
-    //      se resuelven los pagos de un domicilio.
-    //  Sigue siendo mucho mejor que antes (antes esto lo hacía cualquiera SIN
-    //  cuenta, y también en las cédulas), pero no está cerrado.
+    //  QUÉ ESTABA ABIERTO, medido el 6-sep-2026: cualquiera CON CUENTA —un
+    //  pasajero, un conductor, alguien de otro restaurante— podía LISTAR esta
+    //  carpeta y sacar los números de todos los pedidos (`allow read` a secas
+    //  INCLUYE el listado; no hacía falta conocer ninguno), BAJAR las fotos del
+    //  chat ajeno, y SOBRESCRIBIRLAS con otra suya.
     //
-    //  🔧 ANOTADO, NO HECHO: cerrarlo bien es preguntarle a Firestore si quien
-    //  sube es el cliente de ese pedido o su restaurante. Se puede —las dos
-    //  pantallas suben cuando el pedido YA existe— pero es un arreglo aparte,
-    //  con sus diez pasos, y hay que mirar antes cómo nace ese documento.
+    //  AHORA SE PREGUNTA DE QUIÉN ES EL PEDIDO, y se puede porque el documento
+    //  guarda las dos puntas: `clienteId` (lo escribe Restaurantes.js:336) y
+    //  `restauranteId` (está en los 29 de la base).
+    //  ES LA MISMA PREGUNTA QUE `firestore.rules:1437` (`allow get` del pedido):
+    //  quien no puede VER el pedido tampoco puede ver ni mandar sus fotos. Aquí
+    //  se repite porque el almacén es otro servicio y no comparte reglas con la
+    //  base; si una de las dos cambia, hay que cambiar la otra a mano.
+    //  LA LECTURA la copia entera, ADMIN INCLUIDO. La ESCRITURA es a propósito
+    //  MÁS ESTRECHA: el panel no manda mensajes en el chat de un pedido, así
+    //  que no tiene por qué poder escribir encima del comprobante de un pago.
+    //
+    //  QUIÉN SE QUEDA FUERA, y no es solo cosa del pasado: los pedidos SIN
+    //  `clienteId` no dejan entrar a su cliente. Son los 29 de julio —anteriores
+    //  a esa línea— y, MEDIDO, también los de MESA: 12 de los 29 son
+    //  `tipo: 'local'` y se siguen creando así, porque a una mesa no la pide una
+    //  cuenta. No rompe nada: los de mesa no tienen chat de cliente, y de los 29
+    //  ninguno está vivo (20 cerrados, 7 cancelados, 2 entregados) y entre todos
+    //  tienen CERO fotos. Su restaurante sigue entrando, que es quien los guarda.
+    //
+    //  Y NO SE SOBRESCRIBE NUNCA: una foto que ya está no se puede cambiar por
+    //  otra. No estorba a nadie porque el nombre del archivo es la hora exacta
+    //  en que se subió, así que siempre es nuevo; y es lo que impide que alguien
+    //  tape un comprobante de pago con otra imagen.
+    //
+    //  🔴 Y OJO CON CÓMO SE ESCRIBE ESO, que no es lo que uno pondría. La forma
+    //  intuitiva —`allow create: if …; allow update: if false;`— NO FUNCIONA
+    //  aquí: se probó contra el emulador subiendo dos veces al mismo sitio y la
+    //  segunda PASÓ igual. En el almacén, una subida encima de un archivo que ya
+    //  existe no se cuenta como `update`. Lo que de verdad lo para es preguntar
+    //  si ahí no había nada: `resource == null`. (Es el mismo engaño que el
+    //  `allow delete: if false` de más abajo: se lee como candado y no lo es.)
     match /pedidosRestaurantes/{pedidoId}/{archivo=**} {
-      allow read: if haySesion();
-      allow write: if haySesion() && esUnaFoto();
+      allow read: if esDelPedido(pedidoId) || esAdmin();
+      allow write: if esDelPedido(pedidoId) && esUnaFoto() && resource == null;
       allow delete: if false;
     }
 

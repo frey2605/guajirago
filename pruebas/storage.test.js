@@ -30,6 +30,16 @@ let entorno;
 const foto = (kb = 4) => new Uint8Array(kb * 1024).fill(7);
 const COMO_FOTO = { contentType: 'image/jpeg' };
 
+// ── UN NOMBRE NUEVO EN CADA CORRIDA, y hace falta de verdad ─────────────────
+//  En el chat de un pedido la regla prohíbe SOBRESCRIBIR (`resource == null`).
+//  Con nombres fijos, la suite solo pasaba la PRIMERA vez: en la segunda, los
+//  archivos de la primera seguían ahí y cuatro pruebas se ponían rojas sin que
+//  nada estuviera mal. Se probó `clearStorage()` del propio Firebase y NO vacía
+//  el emulador, así que el nombre se hace único aquí.
+//  Una prueba que solo pasa la primera vez miente el día que alguien la repita.
+const CORRIDA = Date.now();
+const nueva = (n) => CORRIDA + '_' + n + '.jpg';
+
 const como = (uid) => entorno.authenticatedContext(uid).storage();
 const sinCuenta = () => entorno.unauthenticatedContext().storage();
 
@@ -69,6 +79,14 @@ beforeEach(async () => {
     // Un mesero EN ACTIVO del negocio1, y uno al que ya despidieron.
     await setDoc(doc(db, 'empleados/mesero1'), { restauranteId: 'negocio1', activo: true });
     await setDoc(doc(db, 'empleados/despedido'), { restauranteId: 'negocio1', activo: false });
+    // Dos pedidos: uno de HOY, que guarda quién lo pidió; y uno VIEJO de los
+    // 29 de julio, que no lo guarda porque es anterior a esa línea del código.
+    await setDoc(doc(db, 'pedidosRestaurantes/PED1'), {
+      clienteId: 'conductor1', restauranteId: 'negocio1', estado: 'nuevo',
+    });
+    await setDoc(doc(db, 'pedidosRestaurantes/PEDVIEJO'), {
+      restauranteId: 'negocio1', estado: 'cerrado',
+    });
   });
   // Los archivos que ya existen, sembrados saltándose las reglas.
   await entorno.withSecurityRulesDisabled(async (ctx) => {
@@ -200,22 +218,109 @@ describe('STORAGE · la foto de perfil', () => {
   });
 });
 
-describe('STORAGE · el chat del pedido, con el hueco declarado', () => {
-  // Aquí NO se prueba que esté cerrado, porque NO lo está: se prueba lo que hay,
-  // para que quede escrito y medido. Si algún día se cierra, estas dos pruebas
-  // se ponen rojas y quien lo cierre las cambiará a propósito, no de casualidad.
-  it('lo que SÍ se cerró: sin cuenta no se entra', async () => {
-    const { ref, getBytes, uploadBytes } = ST;
-    await RUT.assertFails(getBytes(ref(sinCuenta(), 'pedidosRestaurantes/PED1/1.jpg')));
-    await RUT.assertFails(uploadBytes(ref(sinCuenta(), 'pedidosRestaurantes/PED1/2.jpg'), foto(), COMO_FOTO));
+describe('STORAGE · el chat del pedido: solo sus dos puntas', () => {
+  it('EL CLIENTE de ese pedido sube su comprobante Y puede pedir su URL', async () => {
+    // Las dos cosas juntas a propósito: las pantallas suben y ACTO SEGUIDO
+    // piden la URL con `getDownloadURL`, que exige permiso de LECTURA. Si solo
+    // se probara la subida, la foto se subiría y el mensaje se quedaría sin
+    // ella, en silencio.
+    const { ref, uploadBytes, getBytes } = ST;
+    const r = ref(como('conductor1'), 'pedidosRestaurantes/PED1/' + nueva(1000));
+    await RUT.assertSucceeds(uploadBytes(r, foto(), COMO_FOTO));
+    await RUT.assertSucceeds(getBytes(r));
   });
 
-  it('EL HUECO ANOTADO · con cuenta, cualquiera lee y escribe en el pedido de otro', async () => {
-    const { ref, uploadBytes, listAll } = ST;
-    await RUT.assertSucceeds(uploadBytes(ref(como('negocio1'), 'pedidosRestaurantes/PED1/1.jpg'), foto(), COMO_FOTO));
-    // `conductor1` no pinta nada en ese pedido, y aun así entra:
-    await RUT.assertSucceeds(listAll(ref(como('conductor1'), 'pedidosRestaurantes/PED1')));
-    await RUT.assertSucceeds(uploadBytes(ref(como('conductor1'), 'pedidosRestaurantes/PED1/1.jpg'), foto(), COMO_FOTO));
+  it('EL RESTAURANTE del pedido también, y su MESERO en activo', async () => {
+    const { ref, uploadBytes, getBytes } = ST;
+    const r = ref(como('negocio1'), 'pedidosRestaurantes/PED1/' + nueva(2000));
+    await RUT.assertSucceeds(uploadBytes(r, foto(), COMO_FOTO));
+    await RUT.assertSucceeds(getBytes(r));
+    await RUT.assertSucceeds(uploadBytes(ref(como('mesero1'), 'pedidosRestaurantes/PED1/' + nueva(2001)), foto(), COMO_FOTO));
+  });
+
+  it('EL QUE MUERDE · un tercero con cuenta NO entra: ni lista, ni lee, ni sube', async () => {
+    // Esto es lo que estaba abierto: cualquiera con una cuenta pedía la lista
+    // de pedidos, se bajaba las fotos del chat ajeno y las sobrescribía.
+    const { ref, uploadBytes, getBytes, listAll } = ST;
+    await entorno.withSecurityRulesDisabled(async (ctx) => {
+      await ST.uploadBytes(ST.ref(ctx.storage(), 'pedidosRestaurantes/PED1/9.jpg'), foto(), COMO_FOTO);
+    });
+    await RUT.assertFails(listAll(ref(como('conductor2'), 'pedidosRestaurantes/PED1')),
+      'se podían listar los archivos del chat de un pedido ajeno.');
+    await RUT.assertFails(getBytes(ref(como('conductor2'), 'pedidosRestaurantes/PED1/9.jpg')));
+    await RUT.assertFails(uploadBytes(ref(como('conductor2'), 'pedidosRestaurantes/PED1/8.jpg'), foto(), COMO_FOTO));
+    // Y OTRO NEGOCIO tampoco, que es el vecino con más motivos para mirar.
+    await RUT.assertFails(getBytes(ref(como('negocio2'), 'pedidosRestaurantes/PED1/9.jpg')));
+  });
+
+  it('EL QUE MUERDE · nadie pide la LISTA DE TODOS LOS PEDIDOS', async () => {
+    // ESTA ES LA PUERTA GRANDE, y la primera versión de estas pruebas no la
+    // probaba: la de arriba lista los archivos de UN pedido, no los pedidos.
+    // Con la regla vieja esto PASABA para cualquiera con cuenta — se pedía la
+    // lista de la carpeta madre y salían los números de todos los domicilios.
+    // Ni siquiera su propio cliente puede: la lista de todos no es de nadie.
+    const { ref, listAll } = ST;
+    await RUT.assertFails(listAll(ref(como('conductor2'), 'pedidosRestaurantes')),
+      'ASÍ SE ENTRABA: se pedía la lista y salían los pedidos de todo el mundo.');
+    await RUT.assertFails(listAll(ref(como('conductor1'), 'pedidosRestaurantes')));
+    await RUT.assertFails(listAll(ref(como('negocio1'), 'pedidosRestaurantes')));
+    await RUT.assertFails(listAll(ref(sinCuenta(), 'pedidosRestaurantes')));
+  });
+
+  it('EL QUE MUERDE · en el chat tampoco entra lo que no es una foto', async () => {
+    const { ref, uploadBytes } = ST;
+    await RUT.assertFails(uploadBytes(ref(como('conductor1'), 'pedidosRestaurantes/PED1/doc.pdf'),
+      foto(), { contentType: 'application/pdf' }));
+    await RUT.assertFails(uploadBytes(ref(como('conductor1'), 'pedidosRestaurantes/PED1/gordo.jpg'),
+      foto(11 * 1024), COMO_FOTO));
+  });
+
+  it('LA ADMINISTRACIÓN mira, pero NO escribe en el chat de un pedido', async () => {
+    // La lectura copia entera la regla de la base (firestore.rules:1437), que sí
+    // deja al panel ver el pedido. La escritura es más estrecha a propósito: el
+    // panel no manda mensajes en ese chat, y no tiene por qué poder escribir
+    // encima del comprobante de un pago.
+    const { ref, uploadBytes, getBytes } = ST;
+    await entorno.withSecurityRulesDisabled(async (ctx) => {
+      await ST.uploadBytes(ST.ref(ctx.storage(), 'pedidosRestaurantes/PED1/7.jpg'), foto(), COMO_FOTO);
+    });
+    await RUT.assertSucceeds(getBytes(ref(como('eladmin'), 'pedidosRestaurantes/PED1/7.jpg')));
+    await RUT.assertFails(uploadBytes(ref(como('eladmin'), 'pedidosRestaurantes/PED1/6.jpg'), foto(), COMO_FOTO));
+  });
+
+  it('EL QUE MUERDE · una foto que YA ESTÁ no se puede sobrescribir, ni por su dueño', async () => {
+    // En ese chat va el comprobante de un pago. Si se pudiera escribir encima,
+    // se taparía la prueba con otra imagen y no quedaría rastro.
+    const { ref, uploadBytes } = ST;
+    const r = ref(como('conductor1'), 'pedidosRestaurantes/PED1/' + nueva(3000));
+    await RUT.assertSucceeds(uploadBytes(r, foto(), COMO_FOTO));
+    await RUT.assertFails(uploadBytes(r, foto(9), COMO_FOTO),
+      'se pudo escribir encima de una foto que ya estaba: se tapa un comprobante y nadie se entera.');
+  });
+
+  it('un pedido que NO EXISTE está cerrado, y no revienta', async () => {
+    // El `firestore.exists()` va antes del `get()` justo por esto: sin él, un
+    // número inventado no da «no puedes», da un error raro.
+    const { ref, uploadBytes } = ST;
+    await RUT.assertFails(uploadBytes(ref(como('conductor1'), 'pedidosRestaurantes/NOEXISTE/1.jpg'), foto(), COMO_FOTO));
+  });
+
+  it('sin cuenta no se entra a ninguno', async () => {
+    const { ref, getBytes, uploadBytes } = ST;
+    await RUT.assertFails(getBytes(ref(sinCuenta(), 'pedidosRestaurantes/PED1/9.jpg')));
+    await RUT.assertFails(uploadBytes(ref(sinCuenta(), 'pedidosRestaurantes/PED1/7.jpg'), foto(), COMO_FOTO));
+  });
+
+  it('LOS 29 VIEJOS · su restaurante SÍ entra; su cliente no, y está declarado', async () => {
+    // Los 29 pedidos de julio son anteriores a la línea que guarda `clienteId`,
+    // así que a su cliente esto lo deja fuera. No rompe nada —los 29 están
+    // cerrados, entregados o cancelados, y entre todos tienen CERO fotos— y el
+    // restaurante, que es quien los conserva, sigue entrando.
+    // Si algún día se rellena el `clienteId` de los viejos, esta prueba se pone
+    // roja y quien lo haga la cambiará a propósito.
+    const { ref, uploadBytes } = ST;
+    await RUT.assertSucceeds(uploadBytes(ref(como('negocio1'), 'pedidosRestaurantes/PEDVIEJO/' + nueva(1)), foto(), COMO_FOTO));
+    await RUT.assertFails(uploadBytes(ref(como('conductor1'), 'pedidosRestaurantes/PEDVIEJO/2.jpg'), foto(), COMO_FOTO));
   });
 });
 
