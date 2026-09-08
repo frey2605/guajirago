@@ -104,9 +104,26 @@ exports.notificarNuevaOferta = onDocumentUpdated("viajes/{viajeId}", async (even
   }
 });
 
+// ── LA COLECCIÓN DE PEDIDOS CAMBIÓ DE NOMBRE (7-sep-2026) ───────────────────
+//  `pedidosRestaurantes` pasó a `pedidos`, porque aliados va a venderse a
+//  panaderías y peluquerías y la base de datos no puede seguir diciendo
+//  «restaurante».
+//
+//  UN DISPARADOR SOLO PUEDE ESCUCHAR UNA CARPETA, así que durante la mudanza hay
+//  DOS, uno por nombre. Si se hubiera cambiado el único que había, entre el
+//  despliegue de la función y el de las apps habría entrado un pedido SIN AVISAR
+//  A NADIE: el restaurante no se entera, y el cliente esperando. Minutos, pero
+//  con un pedido de verdad dentro.
+//
+//  🔒 EL CUERPO ES UNO SOLO. Los dos disparadores llaman a la MISMA función, que
+//  es la de siempre movida de sitio sin tocarle una coma. Copiar el cuerpo
+//  habría sido el gemelo que prohíbe la SEGUNDA LEY: el día que se cambie el
+//  texto del aviso, uno de los dos se quedaría viejo y nadie lo miraría.
+//  Cuando la mudanza termine se borra el disparador del nombre viejo —con
+//  `firebase functions:delete`— y el cuerpo se queda donde está.
+
 // Notificar al restaurante (dueño + recepción/admin) cuando llega un pedido a domicilio
-exports.notificarNuevoPedidoRestaurante = onDocumentCreated("pedidosRestaurantes/{id}", async (event) => {
-  const p = event.data.data();
+async function avisarDelPedidoNuevo(p) {
   if (!p || p.tipo === "local" || p.estado !== "nuevo") return null;
   const restauranteId = p.restauranteId;
   if (!restauranteId) return null;
@@ -148,12 +165,17 @@ exports.notificarNuevoPedidoRestaurante = onDocumentCreated("pedidosRestaurantes
     console.error("Error notificarNuevoPedidoRestaurante:", e.message);
     return null;
   }
-});
+}
+
+// Las DOS puertas, el MISMO cuerpo. La de arriba se borra cuando la mudanza acabe.
+exports.notificarNuevoPedidoRestaurante = onDocumentCreated("pedidosRestaurantes/{id}",
+  async (event) => avisarDelPedidoNuevo(event.data.data()));
+exports.notificarNuevoPedido = onDocumentCreated("pedidos/{id}",
+  async (event) => avisarDelPedidoNuevo(event.data.data()));
 
 // Avisar al CLIENTE cuando su pedido a domicilio cambia de estado
-exports.notificarClientePedido = onDocumentUpdated("pedidosRestaurantes/{id}", async (event) => {
-  const antes = event.data.before.data();
-  const despues = event.data.after.data();
+// EL MISMO TRATO que el de arriba: un cuerpo, dos puertas. Ver el porque alli.
+async function avisarAlClienteDelCambio(antes, despues) {
   if (!despues || !despues.clienteFcmToken) return null;
   if (antes.estado === despues.estado) return null;
 
@@ -181,7 +203,12 @@ exports.notificarClientePedido = onDocumentUpdated("pedidosRestaurantes/{id}", a
     console.error("Error notificarClientePedido:", e.message);
     return null;
   }
-});
+}
+
+exports.notificarClientePedido = onDocumentUpdated("pedidosRestaurantes/{id}",
+  async (event) => avisarAlClienteDelCambio(event.data.before.data(), event.data.after.data()));
+exports.notificarClienteDelPedido = onDocumentUpdated("pedidos/{id}",
+  async (event) => avisarAlClienteDelCambio(event.data.before.data(), event.data.after.data()));
 
 // Avisar a la AGENCIA cuando llega una nueva reserva de turismo
 exports.notificarNuevaReserva = onDocumentCreated("reservasTurismo/{id}", async (event) => {

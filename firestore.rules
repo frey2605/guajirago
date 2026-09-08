@@ -723,8 +723,22 @@ service cloud.firestore {
       function elViaje() {
         return get(/databases/$(database)/documents/viajes/$(request.resource.data.viajeId)).data;
       }
+      // ── EL PEDIDO, ESTÉ EN LA CARPETA QUE ESTÉ (7-sep-2026) ────────────────
+      //  La colección de pedidos cambió de nombre: `pedidosRestaurantes` pasó a
+      //  `pedidos`. Los 29 que había ya están copiados en la nueva, y de aquí en
+      //  adelante los nuevos nacen ahí. Pero mientras dure la mudanza puede
+      //  quedar alguno solo en la vieja, así que se mira primero la nueva y se
+      //  cae a la vieja si no está.
+      //  Si esto se hubiera quedado mirando solo el nombre viejo, CALIFICAR un
+      //  pedido habría dejado de funcionar el día de la mudanza — y negando, sin
+      //  que nada lo dijera. Cuando se retire el nombre viejo, se quita la caída.
+      function elPedidoEstaEnLaNueva() {
+        return exists(/databases/$(database)/documents/pedidos/$(request.resource.data.pedidoId));
+      }
       function elPedido() {
-        return get(/databases/$(database)/documents/pedidosRestaurantes/$(request.resource.data.pedidoId)).data;
+        return elPedidoEstaEnLaNueva()
+          ? get(/databases/$(database)/documents/pedidos/$(request.resource.data.pedidoId)).data
+          : get(/databases/$(database)/documents/pedidosRestaurantes/$(request.resource.data.pedidoId)).data;
       }
       // Los dos que iban en el viaje, y cada uno califica AL OTRO.
       function calificaSuViaje() {
@@ -768,7 +782,10 @@ service cloud.firestore {
       // pinta en esos dos estados (`Restaurantes.js:582`). Esto es la regla
       // exigiendo lo que la pantalla ya cumplía.
       function calificaSuPedido() {
-        return exists(/databases/$(database)/documents/pedidosRestaurantes/$(request.resource.data.pedidoId)) &&
+        // El pedido tiene que existir EN ALGUNA de las dos carpetas — ver
+        // `elPedido()` arriba, que es quien sabe en cuál está.
+        return (elPedidoEstaEnLaNueva()
+            || exists(/databases/$(database)/documents/pedidosRestaurantes/$(request.resource.data.pedidoId))) &&
           elPedido().get('clienteId', '') == request.auth.uid &&
           request.resource.data.get('calificadoId', '') == elPedido().get('restauranteId', 'sin-restaurante') &&
           elPedido().get('estado', '') in ['entregado', 'cerrado'] &&

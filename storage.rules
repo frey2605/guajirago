@@ -116,15 +116,40 @@ service firebase.storage {
     //  permiso de lectura. Por eso la lectura no es más estrecha que la
     //  escritura: si lo fuera, la foto se subiría y el mensaje se quedaría sin
     //  ella, en silencio.
-    function esDelPedido(pedidoId) {
-      return haySesion()
-        && firestore.exists(/databases/(default)/documents/pedidosRestaurantes/$(pedidoId))
+    //  ── Y BUSCA EL PEDIDO EN LOS DOS SITIOS (7-sep-2026) ────────────────────
+    //   La colección de pedidos cambió de nombre: `pedidosRestaurantes` pasó a
+    //   `pedidos`, porque aliados va a vender a panaderías y peluquerías y la
+    //   base de datos no puede seguir diciendo «restaurante». Esta regla vive en
+    //   OTRO servicio y no se entera del cambio: le pregunta a Firestore dónde
+    //   está el pedido. Si solo mirara uno de los dos nombres, la mitad de los
+    //   pedidos se quedaría sin poder subir su comprobante — negando en silencio.
+    //
+    //   🔴 ESTO NO SE PUDO PONER ANTES, Y HAY QUE DECIR POR QUÉ. En el trabajo
+    //   anterior se intentó, con `pedidos` todavía VACÍA, y se REPRODUJO un
+    //   agujero contra el emulador: cualquiera con cuenta creaba
+    //   `pedidos/{el número del pedido de otro}` poniéndose de cliente, y con eso
+    //   se bajaba el COMPROBANTE DE PAGO de la víctima y podía meterle fotos en
+    //   su chat. Una colección vacía es una lista de números libres.
+    //   AHORA es seguro porque los 29 pedidos YA ESTÁN COPIADOS aquí: sus números
+    //   están ocupados, y no se puede crear encima de un documento que existe.
+    //   Lo fija una prueba en `pruebas/storage.test.js` que fabrica el falso.
+    //
+    //   EL NUEVO VA PRIMERO: estas condiciones cortan en cuanto una se cumple,
+    //   así que para un pedido de hoy —que ya vive en `pedidos`— la segunda mitad
+    //   ni se ejecuta. Cuando se retire el nombre viejo, se quita esa mitad.
+    function esDelPedidoEn(pedido) {
+      return firestore.exists(pedido)
         && (
-          firestore.get(/databases/(default)/documents/pedidosRestaurantes/$(pedidoId))
-            .data.get('clienteId', '') == request.auth.uid
-          || esDelNegocio(firestore.get(/databases/(default)/documents/pedidosRestaurantes/$(pedidoId))
-               .data.get('restauranteId', ''))
+          firestore.get(pedido).data.get('clienteId', '') == request.auth.uid
+          || esDelNegocio(firestore.get(pedido).data.get('restauranteId', ''))
         );
+    }
+
+    function esDelPedido(pedidoId) {
+      return haySesion() && (
+        esDelPedidoEn(/databases/(default)/documents/pedidos/$(pedidoId))
+        || esDelPedidoEn(/databases/(default)/documents/pedidosRestaurantes/$(pedidoId))
+      );
     }
 
     // ── LO QUE SE PUEDE SUBIR ──────────────────────────────────────────────

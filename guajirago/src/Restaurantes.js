@@ -146,7 +146,7 @@ function Restaurantes({ nombre, onVolver, foto, onCerrarSesion, onIrPerfil, onIr
   // Escuchar el pedido activo en tiempo real (para el seguimiento y el chat)
   useEffect(() => {
     if (!pedidoId) { setPedidoActivo(null); return; }
-    const unsub = onSnapshot(doc(db, 'pedidosRestaurantes', pedidoId), (snap) => {
+    const unsub = onSnapshot(doc(db, 'pedidos', pedidoId), (snap) => {
       if (snap.exists()) setPedidoActivo({ id: snap.id, ...snap.data() });
     });
     return () => unsub();
@@ -157,7 +157,7 @@ function Restaurantes({ nombre, onVolver, foto, onCerrarSesion, onIrPerfil, onIr
     if (pantalla !== 'misPedidos') return;
     const ids = leerMisPedidosIds();
     if (ids.length === 0) { setMisPedidos([]); return; }
-    const unsubs = ids.map((id) => onSnapshot(doc(db, 'pedidosRestaurantes', id), (snap) => {
+    const unsubs = ids.map((id) => onSnapshot(doc(db, 'pedidos', id), (snap) => {
       if (!snap.exists()) return;
       setMisPedidos((prev) => [...prev.filter((p) => p.id !== snap.id), { id: snap.id, ...snap.data() }]);
     }));
@@ -330,7 +330,7 @@ function Restaurantes({ nombre, onVolver, foto, onCerrarSesion, onIrPerfil, onIr
 
       // Token para avisarle al cliente los cambios de estado (si acepta notificaciones)
       const clienteFcmToken = await obtenerTokenFCM();
-      const ref = await addDoc(collection(db, 'pedidosRestaurantes'), {
+      const ref = await addDoc(collection(db, 'pedidos'), {
         restauranteId: restauranteActivo.id,
         // REGLA 9 - LA FIRMA: aqui se apunta QUIEN lo pide. Sin esta firma el
         // servidor no tiene forma de saber de quien es, y hasta el 24-ago-2026
@@ -378,7 +378,7 @@ function Restaurantes({ nombre, onVolver, foto, onCerrarSesion, onIrPerfil, onIr
     if (!pedidoActivo || cancelando || !puedeCancelar(pedidoActivo.estado)) return;
     setCancelando(true);
     try {
-      await updateDoc(doc(db, 'pedidosRestaurantes', pedidoActivo.id), { estado: 'cancelado', canceladoPor: 'cliente' });
+      await updateDoc(doc(db, 'pedidos', pedidoActivo.id), { estado: 'cancelado', canceladoPor: 'cliente' });
       setMotivoCancelCliente('');
       setPidiendoMotivoCancel(true);
     } catch (e) {}
@@ -387,7 +387,7 @@ function Restaurantes({ nombre, onVolver, foto, onCerrarSesion, onIrPerfil, onIr
 
   const guardarMotivoCancel = async () => {
     if (pedidoActivo) {
-      try { await updateDoc(doc(db, 'pedidosRestaurantes', pedidoActivo.id), { motivoCancelacion: motivoCancelCliente.trim() || 'Sin especificar' }); } catch (e) {}
+      try { await updateDoc(doc(db, 'pedidos', pedidoActivo.id), { motivoCancelacion: motivoCancelCliente.trim() || 'Sin especificar' }); } catch (e) {}
     }
     setPidiendoMotivoCancel(false);
   };
@@ -412,7 +412,7 @@ function Restaurantes({ nombre, onVolver, foto, onCerrarSesion, onIrPerfil, onIr
     try {
       let urlImagen = '';
       if (imagenChat) urlImagen = await subirImagenChat(imagenChat);
-      await updateDoc(doc(db, 'pedidosRestaurantes', pedidoActivo.id), {
+      await updateDoc(doc(db, 'pedidos', pedidoActivo.id), {
         mensajesPedido: arrayUnion({
           de: 'cliente',
           texto,
@@ -453,7 +453,7 @@ function Restaurantes({ nombre, onVolver, foto, onCerrarSesion, onIrPerfil, onIr
         fecha: new Date().toISOString(),
       });
       guardada = true;
-      await updateDoc(doc(db, 'pedidosRestaurantes', pedidoActivo.id), { calificado: true, estrellas: estrellasCal });
+      await updateDoc(doc(db, 'pedidos', pedidoActivo.id), { calificado: true, estrellas: estrellasCal });
       setEstrellasCal(0);
       setComentarioCal('');
     } catch (e) {

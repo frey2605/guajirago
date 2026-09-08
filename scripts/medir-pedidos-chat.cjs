@@ -1,7 +1,7 @@
 /**
  * PASO 1 · MEDIR LOS PEDIDOS   (SOLO LECTURA)
  *
- * Para cerrar `pedidosRestaurantes/` en el almacen hay que poder preguntarle a
+ * Para cerrar `pedidos/` en el almacen hay que poder preguntarle a
  * Firestore de QUIEN es cada pedido. Este guion contesta con los datos reales:
  *   · cuantos pedidos hay
  *   · QUE CAMPOS traen, y cuales identifican al cliente y al restaurante
@@ -28,7 +28,7 @@ const val = (v) => v == null ? undefined : v.stringValue ?? v.booleanValue
 
   let p; const docs = [];
   do {
-    const r = await fetch(BASE + '/pedidosRestaurantes?pageSize=300' + (p ? '&pageToken=' + p : ''),
+    const r = await fetch(BASE + '/pedidos?pageSize=300' + (p ? '&pageToken=' + p : ''),
       { headers: { Authorization: 'Bearer ' + t } });
     if (!r.ok) { console.log('no pude leer: HTTP ' + r.status); process.exit(1); }
     const x = await r.json(); docs.push(...(x.documents || [])); p = x.nextPageToken;

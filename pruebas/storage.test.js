@@ -87,6 +87,29 @@ beforeEach(async () => {
     await setDoc(doc(db, 'pedidosRestaurantes/PEDVIEJO'), {
       restauranteId: 'negocio1', estado: 'cerrado',
     });
+    // LOS MISMOS, EN LA CARPETA NUEVA. Así está la nube desde el 7-sep-2026: la
+    // colección cambió de nombre (`pedidosRestaurantes` → `pedidos`), los 29 se
+    // copiaron, y la vieja se queda de lápida. Sembrar los dos es lo que hace
+    // que estas pruebas midan la realidad, y no una foto de ayer.
+    await setDoc(doc(db, 'pedidos/PED1'), {
+      clienteId: 'conductor1', restauranteId: 'negocio1', estado: 'nuevo',
+    });
+    await setDoc(doc(db, 'pedidos/PEDVIEJO'), {
+      restauranteId: 'negocio1', estado: 'cerrado',
+    });
+    // Y DOS QUE ESTÁN EN UNA SOLA CARPETA, que son los que de verdad prueban
+    // que la regla mira las DOS. Con todo sembrado por duplicado, quitarle
+    // cualquiera de las dos consultas seguía encontrando el pedido en la otra:
+    // los mutantes sobrevivían y las pruebas no protegían nada.
+    //   · SOLOVIEJO: un rezagado, creado entre la mudanza y el despliegue de las
+    //     apps. Existe mientras la lápida siga en pie.
+    //   · SOLONUEVO: como serán TODOS de aquí en adelante.
+    await setDoc(doc(db, 'pedidosRestaurantes/SOLOVIEJO'), {
+      clienteId: 'conductor1', restauranteId: 'negocio1', estado: 'nuevo',
+    });
+    await setDoc(doc(db, 'pedidos/SOLONUEVO'), {
+      clienteId: 'conductor1', restauranteId: 'negocio1', estado: 'nuevo',
+    });
   });
   // Los archivos que ya existen, sembrados saltándose las reglas.
   await entorno.withSecurityRulesDisabled(async (ctx) => {
@@ -326,24 +349,53 @@ describe('STORAGE · el chat del pedido: solo sus dos puntas', () => {
   //  SOLO donde de verdad viven los pedidos, fabricar un gemelo no sirve de
   //  nada. El día que se mude, el orden es PRIMERO LOS DATOS —con los números
   //  ya ocupados no se puede crear encima— y solo entonces esta regla.
-  it('EL QUE MUERDE · fabricar un pedido falso NO abre el chat de otro', async () => {
+  it('EL QUE MUERDE · un pedido que solo está en la carpeta NUEVA', async () => {
+    // Así serán todos de aquí en adelante. Si la regla dejara de mirar la
+    // carpeta nueva, NADIE podría subir el comprobante de un domicilio — y
+    // fallaría negando, en silencio.
     const { ref, uploadBytes, getBytes } = ST;
+    const r = ref(como('conductor1'), 'pedidosRestaurantes/SOLONUEVO/' + nueva(6000));
+    await RUT.assertSucceeds(uploadBytes(r, foto(), COMO_FOTO));
+    await RUT.assertSucceeds(getBytes(r));
+    await RUT.assertFails(uploadBytes(
+      ref(como('conductor2'), 'pedidosRestaurantes/SOLONUEVO/' + nueva(6001)), foto(), COMO_FOTO));
+  });
+
+  it('EL QUE MUERDE · un rezagado que solo está en la carpeta VIEJA', async () => {
+    // Los que entren entre la mudanza de los datos y el despliegue de las apps.
+    // Si la regla dejara de mirar la carpeta vieja, esos se quedarían sin poder
+    // mandar su comprobante mientras la lápida siga en pie.
+    const { ref, uploadBytes, getBytes } = ST;
+    const r = ref(como('conductor1'), 'pedidosRestaurantes/SOLOVIEJO/' + nueva(7000));
+    await RUT.assertSucceeds(uploadBytes(r, foto(), COMO_FOTO));
+    await RUT.assertSucceeds(getBytes(r));
+    await RUT.assertFails(uploadBytes(
+      ref(como('conductor2'), 'pedidosRestaurantes/SOLOVIEJO/' + nueva(7001)), foto(), COMO_FOTO));
+  });
+
+  it('EL QUE MUERDE · el número YA ESTÁ OCUPADO: no se puede fabricar el gemelo', async () => {
+    // ESTO ES LO QUE DE VERDAD CIERRA LA PUERTA, y por eso los datos se mudaron
+    // ANTES que esta regla: mientras `pedidos` estuvo vacía, cualquier número
+    // estaba libre. Ahora que el pedido existe ahí, crear encima es imposible —
+    // lo dice el servidor, no una comprobación de la app.
     const { doc, setDoc } = FS;
-    // La víctima tiene su pedido y su comprobante en el chat.
+    await RUT.assertFails(setDoc(doc(entorno.authenticatedContext('conductor2').firestore(),
+      'pedidos/PED1'), { clienteId: 'conductor2', restauranteId: 'negocio1', estado: 'nuevo' }),
+    'SE PUDO ESCRIBIR ENCIMA DEL PEDIDO DE OTRO. Con eso, la regla del almacén lo daría '
+    + 'por dueño y le abriría el chat: ahí va el comprobante de un pago.');
+  });
+
+  it('EL QUE MUERDE · y con el pedido de otro tampoco entra al chat', async () => {
+    const { ref, uploadBytes, getBytes } = ST;
+    // La víctima sube su comprobante.
     const suya = 'pedidosRestaurantes/PED1/' + nueva(5000);
     await RUT.assertSucceeds(uploadBytes(ref(como('conductor1'), suya), foto(), COMO_FOTO));
-    // El extraño se fabrica el gemelo con EL MISMO NÚMERO, a su nombre.
-    await entorno.withSecurityRulesDisabled(async (ctx) => {
-      await setDoc(doc(ctx.firestore(), 'pedidos/PED1'), {
-        clienteId: 'conductor2', restauranteId: 'negocio1', estado: 'nuevo',
-      });
-    });
-    // Y aun así no entra.
+    // El extraño no lo baja ni le mete nada, ni por la carpeta vieja ni por la nueva.
     await RUT.assertFails(getBytes(ref(como('conductor2'), suya)),
-      'CON UN PEDIDO FALSO SE ENTRÓ AL CHAT DE OTRO. Ahí va el comprobante de un pago.');
+      'SE ENTRÓ AL CHAT DE OTRO. Ahí va el comprobante de un pago.');
     await RUT.assertFails(uploadBytes(
       ref(como('conductor2'), 'pedidosRestaurantes/PED1/' + nueva(5001)), foto(), COMO_FOTO),
-    'con un pedido falso se pudo METER una foto en el chat de otro.');
+    'se pudo METER una foto en el chat de otro.');
   });
 
   it('LOS 29 VIEJOS · su restaurante SÍ entra; su cliente no, y está declarado', async () => {

@@ -160,7 +160,7 @@ const der = (s, n) => String(s).padStart(n);
   }
 
   // ── Las mesas cerradas ──────────────────────────────────────────────────
-  const { docs: pedidos, error } = await traer(t, 'pedidosRestaurantes');
+  const { docs: pedidos, error } = await traer(t, 'pedidos');
   if (error) throw new Error('no pude leer pedidosRestaurantes: ' + error);
 
   const deMesa = [];

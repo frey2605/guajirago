@@ -897,3 +897,4 @@ nombre de la coleccion, dejarlos como estaban los habria vuelto MENTIRA: mandan
 a quien los lea a una carpeta que ahora es una lapida cerrada. Ni una linea de
 codigo cambio en ninguno de los dos.
 Autorizado por Jhon el 7-sep-2026, enseñandole los dos diffs enteros.
+2026-09-07T23:55:50.546Z	pruebas/amarres.test.js	NEGADO: fuera de la promesa "La mudanza de los pedidos: apps, funciones y los 29 datos pasan de pedidosRestaurantes a pedidos"

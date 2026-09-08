@@ -560,12 +560,28 @@ describe('SEGUNDA LEY · el cuarto privado del negocio, una sola lista', () => {
       'avisos de pedidos y reservas dejarían de llegarle al dueño EN SILENCIO: no falla ' +
       'nada, simplemente no se encuentra el token.');
 
-    ['notificarNuevoPedidoRestaurante', 'notificarNuevaReserva'].forEach((nombre) => {
-      const desde = vivo.split('exports.' + nombre + ' =')[1];
-      assert.ok(desde, 'ya no existe la función ' + nombre + ' en functions/index.js. Si se ' +
+    // ── DÓNDE VIVE EL CUERPO DE CADA AVISO ──────────────────────────────────
+    //  Antes bastaba partir por `exports.<nombre> =`: cada aviso era una función
+    //  exportada con su cuerpo dentro. Desde el 7-sep-2026 el del PEDIDO ya no.
+    //  La colección cambió de nombre (`pedidosRestaurantes` → `pedidos`) y un
+    //  disparador solo puede escuchar UNA carpeta, así que durante la mudanza
+    //  hay DOS disparadores llamando al MISMO cuerpo, que salió a
+    //  `avisarDelPedidoNuevo`. Copiarlo habría sido el gemelo que prohíbe la
+    //  SEGUNDA LEY: al cambiar el texto del aviso, una copia se quedaría vieja.
+    //
+    //  ESTA PRUEBA VIGILA EXACTAMENTE LO MISMO QUE ANTES —que el aviso lea el
+    //  token del cuarto privado y NUNCA del escaparate—; solo cambia dónde lo
+    //  busca. Si algún día el cuerpo vuelve a meterse dentro del `exports`, hay
+    //  que devolver este nombre a la forma de la reserva.
+    [
+      ['avisarDelPedidoNuevo', 'async function ', '('],
+      ['notificarNuevaReserva', 'exports.', ' ='],
+    ].forEach(([nombre, prefijo, cola]) => {
+      const desde = vivo.split(prefijo + nombre + cola)[1];
+      assert.ok(desde, 'ya no existe ' + nombre + ' en functions/index.js. Si se ' +
         'le cambió el nombre, cámbialo también aquí: esta prueba es lo único que vigila que ' +
         'siga leyendo el token del sitio bueno.');
-      const cuerpo = desde.split(/\r?\nexports\./)[0];
+      const cuerpo = desde.split(/\r?\n(?:exports\.|async function )/)[0];
       assert.ok(cuerpo.includes('collection(NEGOCIO_PRIVADO)'),
         nombre + ' ya no busca el token en el cuarto privado del negocio.');
       assert.ok(!LEE_DEL_ESCAPARATE.test(cuerpo),
@@ -1010,5 +1026,85 @@ describe('AMARRES · REGLA 9 · la bandeja: la lista de sitios y el modo de escr
     }
     assert.ok(/hasOwnProperty\.call/.test(t), 'no está el traductor seguro');
     assert.ok(/new Map\(\)/.test(t), 'el ranking sigue con un objeto en vez de un Map');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// LA MUDANZA DE LOS PEDIDOS · que no se quede nadie atrás
+// ─────────────────────────────────────────────────────────────────────────────
+//  La colección cambió de nombre el 7-sep-2026: `pedidosRestaurantes` → `pedidos`.
+//  Son VEINTE sitios en tres repos que no pueden importarse entre sí, más dos
+//  disparadores en el servidor. Si UNO se queda con el nombre viejo, no falla
+//  nada: lee una carpeta que ahora es una lápida, no encuentra nada, y esa
+//  pantalla se queda vacía sin un solo error. Es la peor forma de romperse.
+//
+//  Estas pruebas son lo único que vigila eso. Cuando la lápida se retire del
+//  todo, se quedan igual: siguen diciendo que nadie puede volver al nombre viejo.
+describe('LA MUDANZA DE LOS PEDIDOS · ninguna app se queda con el nombre viejo', () => {
+  const PANTALLAS = [
+    'guajirago/src/Restaurantes.js',
+    'guajirago-admin/src/Restaurantes.js',
+    'guajirago-aliados/src/App.js',
+    'guajirago-aliados/src/CorteCaja.js',
+    'guajirago-aliados/src/HistorialDomicilios.js',
+    'guajirago-aliados/src/HistorialMesas.js',
+    'guajirago-aliados/src/Mesero.js',
+    'guajirago-aliados/src/PedidosDomicilio.js',
+    'guajirago-aliados/src/ResumenDia.js',
+  ];
+
+  PANTALLAS.forEach((archivo) => {
+    it(archivo + ' ya no le pide los pedidos a la carpeta vieja', () => {
+      const t = leer(archivo);
+      // Solo las lecturas y escrituras a la BASE. La ruta del ALMACÉN sigue
+      // llamándose `pedidosRestaurantes/` a propósito: esa carpeta tiene CERO
+      // archivos y renombrarla es cosmético, va aparte.
+      assert.ok(!/\bdb,\s*'pedidosRestaurantes'/.test(t),
+        archivo + ' sigue pidiéndole los pedidos a `pedidosRestaurantes`, que ya es una '
+        + 'lápida. No falla: se queda vacía y nadie se entera.');
+    });
+  });
+
+  it('EL QUE MUERDE · alguna pantalla sí pide los pedidos (no se borró la lectura)', () => {
+    // Sin esto, la prueba de arriba se quedaría verde si alguien borrara la
+    // lectura entera en vez de cambiarle el nombre.
+    // EL SUELO ES **TODAS**, y no es exigente de más: las nueve piden pedidos,
+    // por eso están en esta lista. Con un suelo flojo («al menos 8») romper una
+    // pasaba desapercibido — se cazó con un mutante que le cambiaba el nombre a
+    // la colección de UNA pantalla y la prueba seguía verde.
+    const sinLectura = PANTALLAS.filter((a) => !/\bdb,\s*'pedidos'/.test(leer(a)));
+    assert.deepStrictEqual(sinLectura, [],
+      'estas pantallas ya no le piden los pedidos a `pedidos`: ' + sinLectura.join(', ')
+      + '. O se movieron de sitio, o alguien borró la lectura en vez de renombrarla — y una '
+      + 'pantalla sin lectura se queda vacía sin que nada falle.');
+  });
+
+  it('EL QUE MUERDE · los DOS disparadores siguen vivos, uno por carpeta', () => {
+    // Un disparador solo puede escuchar UNA carpeta. Mientras la mudanza dure
+    // hacen falta los dos: si se borra el de la carpeta vieja demasiado pronto,
+    // un pedido que aún entre por ahí no le avisa a NADIE — el restaurante no se
+    // entera y el cliente esperando.
+    const t = leer('guajirago/functions/index.js');
+    for (const [ruta, quien] of [
+      ['pedidosRestaurantes/{id}', 'la carpeta VIEJA'],
+      ['pedidos/{id}', 'la carpeta NUEVA'],
+    ]) {
+      assert.ok(t.includes('onDocumentCreated("' + ruta + '"'),
+        'ya no hay disparador de pedido NUEVO escuchando ' + quien + ' (' + ruta + ').');
+      assert.ok(t.includes('onDocumentUpdated("' + ruta + '"'),
+        'ya no hay disparador de CAMBIO DE ESTADO escuchando ' + quien + ' (' + ruta + ').');
+    }
+  });
+
+  it('EL QUE MUERDE · y los cuatro llaman al MISMO cuerpo, no a una copia', () => {
+    // Copiar el cuerpo sería el gemelo que prohíbe la SEGUNDA LEY: al cambiar el
+    // texto del aviso, una de las copias se quedaría vieja y nadie la miraría.
+    const t = leer('guajirago/functions/index.js');
+    for (const cuerpo of ['avisarDelPedidoNuevo', 'avisarAlClienteDelCambio']) {
+      const veces = t.split(cuerpo + '(').length - 1;
+      assert.strictEqual(veces, 3,
+        cuerpo + ' se nombra ' + veces + ' veces y deberían ser 3: su declaración y las DOS '
+        + 'puertas que la llaman. Si son menos, alguien copió el cuerpo o borró una puerta.');
+    }
   });
 });

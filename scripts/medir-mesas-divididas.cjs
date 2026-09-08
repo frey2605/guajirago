@@ -102,7 +102,7 @@ const pad = (s, n) => String(s).length >= n ? String(s).slice(0, n) : String(s) 
     negocios.set(d.name.split('/').pop(), val((d.fields || {}).nombre) || '(sin nombre)');
   }
 
-  const { docs, error } = await traer(t, 'pedidosRestaurantes');
+  const { docs, error } = await traer(t, 'pedidos');
   if (error) throw new Error('no pude leer pedidosRestaurantes: ' + error);
 
   console.log('\n=== LAS MESAS Y SUS CUENTAS · SOLO LECTURA · '
