@@ -1553,14 +1553,31 @@ service cloud.firestore {
       // si un negocio bloqueado siguiera recibiendo pedidos, el cliente pagaría
       // por comida que nadie va a cocinar. Bloquear a un cliente que no paga no
       // puede convertirse en un problema para SUS clientes.
-      allow create: if esAdmin() ||
+      // ── 🔴 Y NO SE CREA AQUÍ UN NÚMERO QUE YA EXISTE EN `pedidos` ──────────
+      //  Esta carpeta es la VIEJA: los pedidos de hoy nacen en `pedidos`. Pero
+      //  sigue abierta para los REZAGADOS —una pestaña que alguien dejó sin
+      //  recargar y todavía escribe aquí—, y eso deja su número LIBRE.
+      //
+      //  Ahí estaba el agujero, y se reprodujo contra el emulador: un pedido de
+      //  hoy vive SOLO en `pedidos`, así que su mismo número está libre AQUÍ; el
+      //  atacante lo creaba a su nombre y la regla del almacén lo daba por dueño
+      //  del chat — 4.096 bytes del comprobante de la víctima.
+      //  `storage.rules` ya se defiende preguntando en «Y» (hay que ser dueño en
+      //  TODAS las carpetas donde el pedido exista), pero eso solo convierte el
+      //  robo en un fastidio: el gemelo falso dejaba al DUEÑO fuera de su chat.
+      //
+      //  Esto lo cierra donde nace. Un rezagado de verdad trae un número que no
+      //  existe en `pedidos`, y pasa igual que siempre. Cuando se retire esta
+      //  carpeta entera, este renglón se va con ella.
+      allow create: if (esAdmin() ||
         (esDelNegocio(request.resource.data.restauranteId) &&
          negocioPuedeOperar(request.resource.data.restauranteId)) ||
         (request.auth != null &&
          request.resource.data.get('clienteId', '') == request.auth.uid &&
          request.resource.data.get('estado', '') == 'nuevo' &&
          exists(/databases/$(database)/documents/restaurantes/$(request.resource.data.restauranteId)) &&
-         negocioPuedeOperar(request.resource.data.restauranteId));
+         negocioPuedeOperar(request.resource.data.restauranteId)))
+        && !exists(/databases/$(database)/documents/pedidos/$(pedidoId));
 
       // Lo único que el cliente puede hacerle al estado de SU pedido: dejarlo
       // como está, o cancelarlo. Todo lo demás lo mueve el restaurante.
@@ -1590,10 +1607,10 @@ service cloud.firestore {
 
     // ══ EL NOMBRE NUEVO: `pedidos` (7-sep-2026) ══════════════════════════════
     //  Segundo pedazo del cambio de nombre de «restaurante» a «negocio». Este
-    //  trabajo prepara SOLO EL TERRENO: las reglas y las pruebas aprenden el
-    //  nombre nuevo, y NO se toca ni una app, ni una función, ni un dato. Hoy
-    //  esta colección está VACÍA y ninguna pantalla escribe aquí: todo sigue
-    //  entrando por `pedidosRestaurantes`, arriba, exactamente igual que ayer.
+    //  trabajo empezó preparando SOLO EL TERRENO —las reglas y las pruebas— y se
+    //  completó el mismo día: los 29 pedidos están copiados aquí, las apps
+    //  escriben aquí, y las funciones escuchan las dos carpetas. La de arriba se
+    //  queda de lápida hasta que deje de aparecer un rezagado.
     //
     //  LAS DOS PUERTAS VIVEN A LA VEZ A PROPÓSITO, y esa lección salió del
     //  ensayo del cuarto de atrás: el código y las reglas no se pueden cambiar
@@ -1606,32 +1623,32 @@ service cloud.firestore {
     //  el gemelo que prohíbe la SEGUNDA LEY. Mientras las dos existan lo vigila
     //  `pruebas/reglas.test.js`, que corre la MISMA batería contra las dos.
     //
-    //  ══ 🔴 EL AVISO QUE NO SE PUEDE PERDER, PARA LA FASE SIGUIENTE ══════════
-    //  ESTA COLECCIÓN ESTÁ VACÍA, Y ESO LA HACE FALSIFICABLE. El `allow create`
-    //  de aquí abajo deja que cualquiera con cuenta cree `pedidos/{el id que
-    //  él elija}` poniéndose de cliente — igual que el de arriba, y ahí está
-    //  bien, porque allí los números ya están ocupados y no se puede crear
-    //  encima de un documento que existe.
+    //  ══ 🔴 LA HISTORIA DEL GEMELO FALSO, QUE COSTÓ DOS RONDAS ═══════════════
+    //  Aquí estuvo el aviso de «esta colección está vacía, no la mires todavía».
+    //  Ya no aplica —los 29 pedidos están dentro y las apps escriben aquí— pero
+    //  lo que enseñó vale para las tres carpetas que faltan por renombrar.
     //
-    //  🔴 POR ESO `storage.rules` NO PUEDE MIRAR AQUÍ TODAVÍA. La regla de las
-    //  fotos del chat le pregunta a Firestore de quién es el pedido. Se probó a
-    //  hacer que mirara las dos colecciones, y se REPRODUJO el agujero contra el
-    //  emulador: un extraño fabricaba `pedidos/{numero-del-pedido-ajeno}` con su
-    //  propio nombre, y con eso se bajaba el COMPROBANTE DE PAGO de la víctima —
-    //  y encima podía meter fotos en su chat. Se quitó.
+    //  EL PROBLEMA. `storage.rules` decide quién ve las fotos del chat de un
+    //  pedido preguntándole a Firestore de quién es. Mientras dos carpetas
+    //  convivan, un número puede estar OCUPADO en una y LIBRE en la otra — y en
+    //  la libre cualquiera con cuenta puede crear un gemelo poniéndose de
+    //  cliente. Se reprodujo contra el emulador las dos veces:
+    //    · con `pedidos` vacía, el gemelo se fabricaba AQUÍ;
+    //    · con `pedidos` llena, se fabricaba en `pedidosRestaurantes`, porque un
+    //      pedido de hoy nace solo aquí y allí su número queda libre para siempre.
+    //  En los dos casos el atacante se bajaba el comprobante de pago ajeno.
     //
-    //  Y LO PEOR: ese pedido falso sería INVISIBLE. Las dos funciones que avisan
-    //  —`notificarNuevoPedidoRestaurante` y `notificarClientePedido`— escuchan la
-    //  colección VIEJA, así que no se dispararía ninguna; y ninguna pantalla lee
-    //  esta colección todavía, así que no saldría en ningún sitio. Se quedaría
-    //  ahí callado, dándole la llave del chat ajeno a quien lo puso.
-    //  Este proyecto tiene una ley contra negar en silencio. Esto era abrir en
-    //  silencio, que es peor.
+    //  LAS DOS COSAS QUE LO CIERRAN, y hacen falta LAS DOS:
+    //   1. `storage.rules` pregunta en «Y», no en «O»: hay que ser dueño en
+    //      TODAS las carpetas donde el pedido exista. Así fabricar un gemelo
+    //      solo puede QUITAR acceso, nunca darlo.
+    //   2. Y el `allow create` de la carpeta VIEJA no deja crear un número que
+    //      ya existe aquí. Sin esto, el gemelo falso no robaba pero SÍ dejaba al
+    //      dueño fuera de su propio chat.
     //
-    //  CUÁNDO SE PUEDE: solo DESPUÉS de mudar los 29 documentos aquí. Con los
-    //  números ya ocupados, fabricar un gemelo deja de ser posible. O sea que en
-    //  la fase siguiente el orden es: primero los datos, y solo entonces
-    //  `storage.rules`. Nunca al revés.
+    //  LA REGLA GENERAL, para las tres carpetas que faltan: mientras dos
+    //  nombres convivan, preguntar en «Y» y cerrar la creación cruzada. Un «O»
+    //  entre dos carpetas siempre deja que fabricar un documento DÉ permiso.
     match /pedidos/{pedidoId} {
       allow get: if request.auth != null && (
         resource.data.get('clienteId', '') == request.auth.uid ||

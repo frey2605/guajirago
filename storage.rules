@@ -134,9 +134,28 @@ service firebase.storage {
     //   están ocupados, y no se puede crear encima de un documento que existe.
     //   Lo fija una prueba en `pruebas/storage.test.js` que fabrica el falso.
     //
-    //   EL NUEVO VA PRIMERO: estas condiciones cortan en cuanto una se cumple,
-    //   así que para un pedido de hoy —que ya vive en `pedidos`— la segunda mitad
-    //   ni se ejecuta. Cuando se retire el nombre viejo, se quita esa mitad.
+    //   🔴🔴 Y OJO CON LA FORMA DE PREGUNTARLO, QUE AQUÍ ESTÁ TODO.
+    //   La primera versión decía «mira la nueva **O** la vieja»:
+    //        esDelPedidoEn(NUEVA) || esDelPedidoEn(VIEJA)
+    //   y el razonamiento era «los 29 ya están copiados, sus números están
+    //   ocupados». Cierto para la NUEVA — y falso para la VIEJA. Un pedido de
+    //   HOY nace SOLO en `pedidos`, así que su mismo número queda LIBRE PARA
+    //   SIEMPRE en `pedidosRestaurantes`, donde cualquiera con cuenta puede
+    //   crear. Reproducido contra el emulador: el atacante creaba el gemelo en
+    //   la carpeta VIEJA y se bajaba 4.096 bytes del comprobante de la víctima.
+    //   Con un `||`, fabricar un documento SIEMPRE PUEDE DAR permiso.
+    //
+    //   SE PREGUNTA EN «Y», que le da la vuelta: hay que ser dueño en TODAS las
+    //   carpetas donde el pedido exista. Así, fabricar un gemelo solo puede
+    //   QUITARLE acceso al atacante, nunca dárselo — y al dueño de verdad no le
+    //   estorba, porque en la carpeta que él no controla no hay nada que pase.
+    //   Se lee así: existe en alguna · y si está en la nueva, es suyo ahí · y si
+    //   está en la vieja, es suyo ahí.
+    //
+    //   (En `firestore.rules` el mismo problema se resolvió con un ternario. Ahí
+    //   vale porque solo LEE un dato del pedido; aquí no bastaría, porque un
+    //   rezagado que vive solo en la vieja dejaría libre su hueco en la nueva.
+    //   Esta forma aguanta los dos lados.)
     function esDelPedidoEn(pedido) {
       return firestore.exists(pedido)
         && (
@@ -146,10 +165,13 @@ service firebase.storage {
     }
 
     function esDelPedido(pedidoId) {
-      return haySesion() && (
-        esDelPedidoEn(/databases/(default)/documents/pedidos/$(pedidoId))
-        || esDelPedidoEn(/databases/(default)/documents/pedidosRestaurantes/$(pedidoId))
-      );
+      return haySesion()
+        && (firestore.exists(/databases/(default)/documents/pedidos/$(pedidoId))
+            || firestore.exists(/databases/(default)/documents/pedidosRestaurantes/$(pedidoId)))
+        && (!firestore.exists(/databases/(default)/documents/pedidos/$(pedidoId))
+            || esDelPedidoEn(/databases/(default)/documents/pedidos/$(pedidoId)))
+        && (!firestore.exists(/databases/(default)/documents/pedidosRestaurantes/$(pedidoId))
+            || esDelPedidoEn(/databases/(default)/documents/pedidosRestaurantes/$(pedidoId)));
     }
 
     // ── LO QUE SE PUEDE SUBIR ──────────────────────────────────────────────

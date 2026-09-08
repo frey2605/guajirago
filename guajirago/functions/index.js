@@ -110,10 +110,18 @@ exports.notificarNuevaOferta = onDocumentUpdated("viajes/{viajeId}", async (even
 //  «restaurante».
 //
 //  UN DISPARADOR SOLO PUEDE ESCUCHAR UNA CARPETA, así que durante la mudanza hay
-//  DOS, uno por nombre. Si se hubiera cambiado el único que había, entre el
-//  despliegue de la función y el de las apps habría entrado un pedido SIN AVISAR
-//  A NADIE: el restaurante no se entera, y el cliente esperando. Minutos, pero
-//  con un pedido de verdad dentro.
+//  DOS, uno por nombre. Si se hubiera cambiado el único que había, un pedido que
+//  entrara por la otra carpeta no avisaría a nadie.
+//
+//  🔴 PERO ESTO NO TAPA EL HUECO ENTERO, Y HAY QUE DECIRLO. Entre que se despliega
+//  aliados y que se despliega la app del cliente —y después, en cada pestaña que
+//  alguien dejó abierta sin recargar— el cliente escribe en la carpeta VIEJA y
+//  aliados ya solo mira la NUEVA. El aviso SÍ llega, porque el disparador viejo
+//  sigue vivo... pero el pedido NO aparece en la lista del restaurante. Un push
+//  de «Nuevo pedido» que no lleva a ninguna parte es peor que ningún push.
+//  Lo único que cierra eso es volver a correr, DESPUÉS de desplegar,
+//  `node scripts/mudar-pedidos.cjs --aplicar`, que recoge los rezagados. Y
+//  repetirlo unas horas más tarde, por las pestañas que tarden en recargarse.
 //
 //  🔒 EL CUERPO ES UNO SOLO. Los dos disparadores llaman a la MISMA función, que
 //  es la de siempre movida de sitio sin tocarle una coma. Copiar el cuerpo

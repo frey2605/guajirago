@@ -1207,11 +1207,25 @@ describe('EL CAMBIO DE NOMBRE · `pedidos` abre y cierra igual que `pedidosResta
         .map((l) => l.trim()).join('\n');
     };
     // Se tapa el nombre de cada colección para que la comparación sea justa.
-    const viejo = trozo('pedidosRestaurantes').replace(/pedidosRestaurantes/g, 'X');
+    // Y se quita EL ÚNICO renglón que la vieja tiene de más, a propósito: el que
+    // impide crear ahí un número que ya existe en `pedidos`. Ese candado nació
+    // el 7-sep-2026 al cerrar el agujero del gemelo falso, y solo tiene sentido
+    // en la carpeta que se está retirando — en la nueva no hay nada más viejo
+    // donde mirar. Si algún día se le añade otra diferencia, esta prueba se pone
+    // roja, que es lo que se quiere.
+    const CANDADO_DEL_REZAGADO = "&& !exists(/databases/$(database)/documents/pedidos/$(pedidoId));";
+    const viejo = trozo('pedidosRestaurantes')
+      .split('\n').filter((l) => l.trim() !== CANDADO_DEL_REZAGADO).join('\n')
+      .replace(/pedidosRestaurantes/g, 'X')
+      // ese candado deja el `allow create` entre paréntesis de más; se igualan.
+      .replace(/allow create: if \(/, 'allow create: if ')
+      .replace(/negocioPuedeOperar\(request\.resource\.data\.restauranteId\)\)\)$/m,
+        'negocioPuedeOperar(request.resource.data.restauranteId));');
     const nuevo = trozo('pedidos').replace(/\bpedidos\b/g, 'X');
     assert.strictEqual(nuevo, viejo,
-      'los dos bloques de reglas del pedido YA NO dicen lo mismo. Mientras la mudanza '
-      + 'dure, un pedido tendría permisos distintos según por qué puerta entrara.');
+      'los dos bloques de reglas del pedido YA NO dicen lo mismo, más allá del candado del '
+      + 'rezagado. Mientras la mudanza dure, un pedido tendría permisos distintos según por '
+      + 'qué puerta entrara.');
   });
 });
 

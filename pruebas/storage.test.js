@@ -76,6 +76,13 @@ beforeEach(async () => {
     await setDoc(doc(db, 'usuarios/eladmin'), { nombre: 'Admin', rol: 'admin' });
     await setDoc(doc(db, 'usuarios/negocio1'), { nombre: 'Restaurante', rol: '' });
     await setDoc(doc(db, 'usuarios/negocio2'), { nombre: 'Otro', rol: '' });
+    // EL NEGOCIO, EN EL ESCAPARATE, Y ABIERTO. Sin esto, crear un pedido falla
+    // igual —el `allow create` exige que el negocio exista y pueda operar— y las
+    // pruebas del gemelo falso pasarían POR LA RAZÓN EQUIVOCADA: se cazó con un
+    // mutante que quitaba el candado y seguía verde.
+    await setDoc(doc(db, 'restaurantes/negocio1'), {
+      nombre: 'REST', activo: true, aprobado: true, estadoComercial: 'alDia',
+    });
     // Un mesero EN ACTIVO del negocio1, y uno al que ya despidieron.
     await setDoc(doc(db, 'empleados/mesero1'), { restauranteId: 'negocio1', activo: true });
     await setDoc(doc(db, 'empleados/despedido'), { restauranteId: 'negocio1', activo: false });
@@ -371,6 +378,43 @@ describe('STORAGE · el chat del pedido: solo sus dos puntas', () => {
     await RUT.assertSucceeds(getBytes(r));
     await RUT.assertFails(uploadBytes(
       ref(como('conductor2'), 'pedidosRestaurantes/SOLOVIEJO/' + nueva(7001)), foto(), COMO_FOTO));
+  });
+
+  it('EL QUE MUERDE · fabricar el gemelo en la carpeta VIEJA tampoco abre nada', async () => {
+    // 🔴 ESTE ES EL AGUJERO QUE FALTABA, y casi se despliega. Un pedido de HOY
+    // nace SOLO en `pedidos`, así que su mismo número queda LIBRE PARA SIEMPRE
+    // en `pedidosRestaurantes`, donde cualquiera con cuenta puede crear.
+    // Con la regla escrita en «O» —mira la nueva O la vieja— el atacante creaba
+    // ahí su gemelo y se bajaba el comprobante ajeno: 4.096 bytes, medidos.
+    // La prueba anterior solo fabricaba en la carpeta OCUPADA, que es el lado
+    // que ya estaba cerrado. El lado libre, que era el del agujero, no lo
+    // probaba nadie — y la suite entera pasaba con el agujero puesto.
+    const { ref, uploadBytes, getBytes } = ST;
+    const { doc, setDoc } = FS;
+    // La víctima tiene su pedido SOLO en la carpeta nueva, y sube su comprobante.
+    const suya = 'pedidosRestaurantes/SOLONUEVO/' + nueva(8000);
+    await RUT.assertSucceeds(uploadBytes(ref(como('conductor1'), suya), foto(), COMO_FOTO));
+    // EL ATAQUE, INTENTADO DE VERDAD: el atacante trata de fabricar el gemelo en
+    // el hueco libre de la carpeta vieja, con las reglas puestas. Ya no puede:
+    // `firestore.rules` no deja crear ahí un número que ya existe en `pedidos`.
+    await RUT.assertFails(setDoc(
+      doc(entorno.authenticatedContext('conductor2').firestore(), 'pedidosRestaurantes/SOLONUEVO'),
+      { clienteId: 'conductor2', restauranteId: 'negocio1', estado: 'nuevo' }),
+    'SE PUDO FABRICAR EL GEMELO EN LA CARPETA VIEJA. Con eso la regla del almacén lo daría '
+    + 'por dueño del chat: ahí va el comprobante de un pago.');
+    // Y aunque alguien lo lograra por otro camino, el almacén tampoco le abre:
+    // pregunta en «Y», así que hay que ser dueño en TODAS las carpetas donde el
+    // pedido exista, y fabricar un gemelo solo puede QUITAR acceso, nunca darlo.
+    await entorno.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'pedidosRestaurantes/SOLONUEVO'), {
+        clienteId: 'conductor2', restauranteId: 'negocio1', estado: 'nuevo',
+      });
+    });
+    await RUT.assertFails(getBytes(ref(como('conductor2'), suya)),
+      'CON UN GEMELO EN LA CARPETA VIEJA SE ENTRÓ AL CHAT DE OTRO. Preguntar en «O» siempre '
+      + 'deja que fabricar un documento DÉ permiso; hay que preguntar en «Y».');
+    await RUT.assertFails(uploadBytes(
+      ref(como('conductor2'), 'pedidosRestaurantes/SOLONUEVO/' + nueva(8001)), foto(), COMO_FOTO));
   });
 
   it('EL QUE MUERDE · el número YA ESTÁ OCUPADO: no se puede fabricar el gemelo', async () => {

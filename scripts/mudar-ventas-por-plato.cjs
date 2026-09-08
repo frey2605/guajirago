@@ -149,7 +149,7 @@ const der = (s, n) => String(s).padStart(n);
 
   // La verdad: lo que se vendió en las mesas ya cerradas.
   const { docs: pedidos, error } = await traer(t, 'pedidos');
-  if (error) throw new Error('no pude leer pedidosRestaurantes: ' + error);
+  if (error) throw new Error('no pude leer los pedidos: ' + error);
 
   const verdad = new Map();  // negocioId -> { platoId: cantidad }
   let mesas = 0;

@@ -35,7 +35,9 @@ import { obtenerTokenFCM } from './Notificaciones';
 // ============================================================
 // GuajiraGo - Módulo de Restaurantes (lado del cliente)
 // Pantallas: lista de restaurantes -> menú + carrito -> confirmación
-// Lee la colección "restaurantes" y crea pedidos en "pedidosRestaurantes"
+// Lee la colección "restaurantes" y crea pedidos en "pedidos"
+// (las fotos del chat siguen en la carpeta `pedidosRestaurantes/` del almacén:
+//  esa NO se renombró, tiene cero archivos y es cosmético)
 // ============================================================
 
 // Pedidos que este dispositivo ha hecho (para la pantalla "Mis pedidos")

@@ -1,7 +1,8 @@
 /**
  * PASO 1 · MEDIR LOS PEDIDOS   (SOLO LECTURA)
  *
- * Para cerrar `pedidos/` en el almacen hay que poder preguntarle a
+ * Para cerrar la carpeta `pedidosRestaurantes/` del ALMACEN (que NO se renombro,
+ * tiene cero archivos) hay que poder preguntarle a
  * Firestore de QUIEN es cada pedido. Este guion contesta con los datos reales:
  *   · cuantos pedidos hay
  *   · QUE CAMPOS traen, y cuales identifican al cliente y al restaurante
