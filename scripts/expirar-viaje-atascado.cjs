@@ -116,6 +116,32 @@ const val = (v) => v == null ? undefined
     ?? (v.integerValue != null ? Number(v.integerValue) : undefined)
     ?? (v.doubleValue != null ? v.doubleValue : undefined);
 
+/**
+ * 🔴 ORDENA LAS CLAVES ANTES DE COMPARAR, Y HAY QUE EXPLICAR POR QUÉ.
+ *
+ * La primera versión de este careo comparaba `JSON.stringify(campos)` a pelo y
+ * dio 90 FALSAS ALARMAS la primera vez que se corrió de verdad (9-sep-2026):
+ * dijo que se habían tocado 90 viajes que nadie tocó. Firestore NO devuelve los
+ * campos en el mismo orden en dos lecturas, así que dos textos distintos pueden
+ * ser el mismo documento.
+ *
+ * Un careo que grita en falso es peor que no tener careo: la próxima vez nadie
+ * lo mira. Es la MISMA trampa que ya mordió en `scripts/mudar-negocios.cjs`, y
+ * por eso está escrita aquí también.
+ *
+ * Los ARRAYS se dejan en su orden a propósito: ahí el orden sí significa algo.
+ */
+function ordenado(v) {
+  if (Array.isArray(v)) return v.map(ordenado);
+  if (v && typeof v === 'object') {
+    const o = {};
+    for (const k of Object.keys(v).sort()) o[k] = ordenado(v[k]);
+    return o;
+  }
+  return v;
+}
+const huella = (campos) => JSON.stringify(ordenado(campos || {}));
+
 (async () => {
   const t = await token();
   const docs = await traer(t, 'viajes');
@@ -147,7 +173,7 @@ const val = (v) => v == null ? undefined
 
   // El ANTES de TODA la colección, para el careo del final.
   const antes = {};
-  for (const d of docs) antes[d.name] = JSON.stringify(d.fields);
+  for (const d of docs) antes[d.name] = { huella: huella(d.fields), tocado: d.updateTime };
   const tocados = new Set(atascados.map((d) => d.name));
 
   let movidos = 0, fallos = 0;
@@ -196,7 +222,7 @@ const val = (v) => v == null ? undefined
   for (const d of despues) {
     const nuevo = d.fields || {};
     if (!(d.name in antes)) { problemas.push('apareció un viaje que no estaba: ' + d.name.split('/').pop()); continue; }
-    const viejo = JSON.parse(antes[d.name]);
+    const viejo = antes[d.name];
     const id = d.name.split('/').pop();
 
     if (tocados.has(d.name)) {
@@ -204,16 +230,22 @@ const val = (v) => v == null ? undefined
       if (val(nuevo.estado) !== DESTINO) problemas.push(id + ': el estado no quedó en ' + DESTINO);
       if (val(nuevo.expiradoPor) !== QUIEN) problemas.push(id + ': falta la huella de quién lo movió');
       if (!val(nuevo.fechaExpiracion)) problemas.push(id + ': falta la fecha de expiración');
-      for (const k of Object.keys(viejo)) {
-        if (CAMPOS.includes(k)) continue;
-        if (JSON.stringify(viejo[k]) !== JSON.stringify(nuevo[k])) problemas.push(id + ': cambió «' + k + '», y no tenía que cambiar');
+      // De los que SI se tocaron se compara todo MENOS los tres campos
+      // prometidos, con las claves ordenadas.
+      const sinLosTres = (campos) => {
+        const c = { ...(campos || {}) };
+        for (const k of CAMPOS) delete c[k];
+        return huella(c);
+      };
+      const antesDelDoc = docs.find((x) => x.name === d.name);
+      if (sinLosTres(antesDelDoc.fields) !== sinLosTres(nuevo)) {
+        problemas.push(id + ': cambió algún campo que no eran los tres prometidos');
       }
-      for (const k of Object.keys(nuevo)) {
-        if (CAMPOS.includes(k) || k in viejo) continue;
-        problemas.push(id + ': apareció «' + k + '», que no estaba');
-      }
-    } else if (JSON.stringify(viejo) !== JSON.stringify(nuevo)) {
-      // Los otros 90: NI UNA COMA.
+    } else if (huella(nuevo) !== viejo.huella || d.updateTime !== viejo.tocado) {
+      // Los que NO se tocaban: ni una coma. Se miran las dos cosas — el
+      // contenido ordenado Y la marca de escritura del servidor. La segunda
+      // es la que no se puede discutir: si el updateTime no cambió, ese
+      // documento NO se escribió, punto.
       problemas.push(id + ': cambió, y este viaje no se tocaba');
     }
   }
