@@ -930,3 +930,14 @@ Los encontro la SEGUNDA OPINION, no yo. Es la segunda vez el mismo dia que un
 barrido mio deja `scripts/` fuera: el de la manana miro las 3 apps, las
 funciones y las dos reglas, y este miro lo que tocaba el cambio. Queda dicho.
 Autorizado por Jhon el 9-sep-2026.
+
+2026-09-09 (3) · EXCEPCION AUTORIZADA POR EL DUENO
+Promesa: la misma de (2), la lapida de los pedidos.
+Fuera de la lista, y se pidio permiso ANTES:
+  · firestore.rules.LIVE   (la copia de lo que hay PUESTO en el servidor)
+Motivo: llevaba sin refrescarse desde el 23-ago-2026 (commit 64f1b20). Dentro
+decia que `pedidosRestaurantes` estaba abierto a cualquiera con cuenta, o sea
+que el repo no tenia constancia de lo desplegado ni del 7-sep ni del 9-sep. Lo
+encontro la segunda opinion. Se baja del servidor con scripts/bajar-reglas.cjs
+DESPUES de desplegar, no se escribe a mano: es una foto, no un archivo fuente.
+Autorizado por Jhon el 9-sep-2026.

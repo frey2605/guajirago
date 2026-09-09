@@ -1,57 +1,1090 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    // ── ¿QUIEN ES DEL PANEL? ──────────────────────────────────────────────────
+    // Se pregunta por el campo 'rol' de la ficha de quien llama. Desde la REGLA 1
+    // ese campo ya no lo puede escribir el dueño de la ficha, así que la respuesta
+    // es de fiar. Usa .get('rol','') a propósito: medido el 23-ago-2026, 8 de las
+    // 10 fichas NO tienen el campo, y preguntar por un campo que no existe da error.
+    function esAdmin() {
+      return request.auth != null && (
+        get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.get('rol', '') == 'admin' ||
+        get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.get('rol', '') == 'superadmin'
+      );
+    }
+
+    // ── REGLA 9 · ¿ESTE NEGOCIO ES EL SUYO? ─────────────────────────────────
+    // En un restaurante o una agencia trabajan DOS clases de personas, y entran
+    // con cuentas DISTINTAS:
+    //   · el dueño    — su cuenta ES el negocio: request.auth.uid == el id.
+    //   · el empleado — tiene cuenta aparte, y su uid NO se parece en nada al
+    //     del negocio. Quien dice a qué negocio pertenece es su ficha en
+    //     'empleados/{uid}'. Medido el 24-ago-2026: hay 1 empleado real (JUAN,
+    //     del restaurante TWjNDorw...), así que la trampa no es hipotética.
+    //
+    // Si esto se contestara solo con "¿tu cuenta es el negocio?", el mesero
+    // dejaría de poder tomar pedidos EN SILENCIO: la app no enseña el error de
+    // permisos, simplemente se queda la pantalla vacía y nadie sabe por qué.
+    //
+    // Vive aquí arriba, suelta, porque la contestan DOS bloques —los pedidos y
+    // las reservas— y la SEGUNDA LEY prohíbe dos calculadoras del mismo proceso:
+    // si se escribiera en los dos sitios, uno se quedaría viejo.
+    //
+    // El exists() va ANTES del get() a propósito: preguntar por una ficha que no
+    // existe da error, y un error aquí tumbaría la condición entera.
+    //
+    // Y mira 'activo' (añadido el 24-ago-2026). Antes quien lo miraba era la APP
+    // —o sea el lado de fuera, el que el atacante controla—, así que al empleado
+    // despedido no se le caía la llave: seguía leyendo y cambiando los pedidos
+    // del negocio sin pasar por la app. Medido: la única ficha real (JUAN) tiene
+    // activo:true, así que esto no le quita nada a nadie que trabaje hoy. El
+    // valor por defecto es 'true' para que una ficha vieja sin el campo entre.
+    // ── LAS TRES LLAVES · QUE APAGAR UN NEGOCIO LO APAGUE DE VERDAD ────────
+    // El software de aliados se vende. Palabras del dueño: quiere poder apagar a
+    // un cliente desde el panel.
+    //
+    // Medido el 6-sep-2026, apagar NO APAGABA NADA:
+    //   · el `activo` del negocio NO LO LEÍA NADIE — un interruptor protegido por
+    //     las reglas y desconectado de todo.
+    //   · «no aprobado» solo pintaba un cartel abajo (aliados/App.js:397) y el
+    //     negocio seguía tomando pedidos igual.
+    //   · las reglas de los pedidos solo comprobaban que el negocio EXISTIERA.
+    //
+    // Son TRES cosas distintas y por eso son tres campos, no uno:
+    //   · `visibleEnEscaparate`  ¿sale en la app de clientes? Un restaurante de
+    //     otra ciudad compró el programa, está al día, y NO sale: allí no hay
+    //     conductores que lleven el domicilio.
+    //   · `estadoComercial`      ¿pagó? Lo mueve el sistema por fecha.
+    //   · `activo`               ¿lo suspendió el dueño a mano, por otro motivo?
+    // Si fueran un solo campo, apagar a uno por no pagar obligaría a acordarse de
+    // qué más estaba apagado y por qué.
+    //
+    // ── PRIMER TIEMPO, Y ESTO IMPORTA ─────────────────────────────────────
+    // Este candado bloquea SOLO a quien está EXPRESAMENTE bloqueado o suspendido.
+    // Un campo que falta NO bloquea a nadie.
+    //
+    // No es descuido: 2 de los 3 negocios de hoy no tienen el campo de
+    // aprobación, y preguntar «¿está expresamente al día?» los dejaría fuera el
+    // mismo día. El riesgo caro de todo este trabajo es dejar fuera a un negocio
+    // QUE SÍ PAGÓ, y así no puede pasar.
+    //
+    // SEGUNDO TIEMPO, antes del primer cliente que pague: apretarlo a «solo opera
+    // quien está expresamente al día». Eso exige que todos tengan el campo.
+    // ── Y MIRA LAS DOS CARPETAS, EN «Y» (7-sep-2026) ─────────────────────────
+    //  La carpeta de negocios cambió de nombre: `restaurantes` pasó a `negocios`,
+    //  porque aliados va a venderse a panaderías y peluquerías. Mientras las dos
+    //  convivan hay que preguntar en las dos.
+    //
+    //  🔴 Y EN «Y», NUNCA EN «O». Es la lección que costó dos rondas con los
+    //  pedidos: si bastara con que UNA carpeta dijera que sí, un negocio nuevo
+    //  —que nace solo en `negocios`— podría crearse a sí mismo en el hueco libre
+    //  de `restaurantes` diciendo que está «al día», y DESBLOQUEARSE SOLO.
+    //  Preguntando en «Y» —tiene que poder operar en TODAS las carpetas donde
+    //  exista— fabricar un gemelo solo puede QUITAR permiso, nunca darlo.
+    //  (Aquí el riesgo era menor que en los pedidos, porque el documento se llama
+    //  igual que la cuenta de su dueño y nadie puede crear el negocio de OTRO.
+    //  Pero sí podía desbloquearse a SÍ MISMO, y eso es dinero.)
+    //
+    //  Y tiene que existir en ALGUNA: un id inventado no opera.
+    //
+    //  LO QUE HAY QUE VIGILAR MIENTRAS DURE: preguntar en «Y» convierte la
+    //  carpeta vieja en un CANDADO VIVO, y a partir de hoy ya nadie la
+    //  escribe —el panel y la rutina nocturna solo tocan `negocios`—. Un
+    //  negocio cuya copia congelada dijera `activo:false` o
+    //  `estadoComercial:bloqueado` se quedaría frenado para siempre, sin
+    //  pantalla que lo levante y sin decir por qué.
+    //  MEDIDO contra el servidor el 7-sep-2026, antes de desplegar: los 3
+    //  documentos de `restaurantes` tienen `activo:true` y NINGUNO tiene
+    //  `estadoComercial`. O sea, hoy el «Y» se decide entero en `negocios`.
+    //  Si alguna vez se vuelve a escribir la carpeta vieja, hay que volver
+    //  a medir esto antes.
+    //  Cuando se retire `restaurantes`, se quita su mitad.
+    // ¿Existe este negocio, en la carpeta que sea? Mientras las dos convivan,
+    // preguntar solo por una daría un «no existe» falso.
+    function elNegocioExiste(negocioId) {
+      return exists(/databases/$(database)/documents/negocios/$(negocioId))
+        || exists(/databases/$(database)/documents/restaurantes/$(negocioId));
+    }
+    function puedeOperarEn(negocio) {
+      return !exists(negocio)
+        || (get(negocio).data.get('activo', true) != false
+            && get(negocio).data.get('estadoComercial', 'alDia') != 'bloqueado');
+    }
+    function negocioPuedeOperar(negocioId) {
+      return negocioId != null && negocioId != ''
+        && elNegocioExiste(negocioId)
+        && puedeOperarEn(/databases/$(database)/documents/negocios/$(negocioId))
+        && puedeOperarEn(/databases/$(database)/documents/restaurantes/$(negocioId));
+    }
+
+    function esDelNegocio(negocioId) {
+      return request.auth != null && (
+        request.auth.uid == negocioId ||
+        (exists(/databases/$(database)/documents/empleados/$(request.auth.uid)) &&
+         get(/databases/$(database)/documents/empleados/$(request.auth.uid)).data.get('restauranteId', '') == negocioId &&
+         get(/databases/$(database)/documents/empleados/$(request.auth.uid)).data.get('activo', true) == true)
+      );
+    }
+
     match /usuarios/{userId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null && (
-        request.auth.uid == userId ||
+      // ── REGLA 1 · LA LLAVE MAESTRA ──────────────────────────────────────────
+      // Hasta el 23-ago-2026 el dueño de una ficha podía escribir CUALQUIER campo
+      // de la suya, incluido 'rol'. Con eso cualquiera se nombraba superadmin en
+      // diez segundos. Y el remate: hay 12 reglas que preguntan "¿eres admin?"
+      // leyendo ese mismo campo — le preguntaban al carnet que rellena el visitante.
+      //
+      // Medido el 23-ago-2026: de las TRES apps, NINGUNA escribe estos cuatro
+      // campos sobre usuarios/{uid}. Las 3 escrituras de 'activo' de la app del
+      // conductor van a la colección 'conductores', que es otra. Por eso cerrar
+      // esto no rompe nada.
+      function camposDePoder() {
+        return ['rol', 'activo', 'sanciones', 'sancionHasta'];
+      }
+
+      // ── EL CORREO SE PONE UNA VEZ Y NO SE MUEVE ─────────────────────────────
+      // El correo de la ficha se escribe al registrarse (Login.js:146) y nunca más.
+      // Medido el 23-ago-2026: NINGUNA pantalla de las tres apps lo cambia después
+      // (MiPerfil solo nombre/teléfono/foto, Configuración solo sonido y avisos,
+      // Seguridad solo el contacto de confianza, el alta de conductor no lo toca).
+      //
+      // Se congela porque el panel busca POR CORREO a quién dar poder o créditos y
+      // se queda con el primer resultado sin avisar de duplicados (Superadmin.js:581
+      // y :302). Quien se copiara en su ficha el correo de un jefe podía quedarse
+      // con el ascenso ajeno. Medido: 3 fichas ya comparten correo — de pruebas, sin
+      // rol, pero la puerta funcionaba.
+      //
+      // Va en lista APARTE de camposDePoder porque en el CREATE sí hay que dejarlo
+      // escribir: si no, nadie puede volver a registrarse.
+      function camposCongelados() {
+        return ['email'];
+      }
+
+      // ── REGLA 7 · LA PLATA NO LA ESCRIBE EL TELÉFONO ────────────────────────
+      // Medido el 24-ago-2026: $369.700 en créditos repartidos en 8 fichas, y
+      // esta regla dejaba que cualquiera se escribiera su propio saldo. Se
+      // habían cerrado 'rol', 'email' y 'activo'; el dinero se quedó abierto.
+      //
+      // Los tres caminos que lo escribían desde el celular —canjear un código
+      // de recarga, la promoción, y los créditos de bienvenida del conductor—
+      // se mudaron al servidor (functions: canjearCodigoRecarga,
+      // reclamarPromocion, creditosDeBienvenida), que se salta estas reglas.
+      // Cobrar la comisión ya lo hacía el servidor desde el principio.
+      //
+      // Va en lista propia y se bloquea TAMBIÉN en el create: medido, ninguna
+      // de las tres apps crea una ficha de usuario con saldo. (La app de
+      // aliados sí escribe 'creditos: 0' al registrar un negocio, pero eso es
+      // la colección 'restaurantes', que es otra y no pasa por aquí.)
+      function camposDePlata() {
+        return ['creditos'];
+      }
+
+      // ── REGLA 6 · LA FICHA DE UNA PERSONA ES SUYA ────────────────────────────
+      // Hasta el 23-ago-2026 cualquier usuario registrado leía TODAS las fichas.
+      // Medido ese día: 10 fichas — 8 con teléfono, 8 con fecha de nacimiento,
+      // 7 con FOTO DE LA CÉDULA y 8 con el contacto de emergencia.
+      //
+      // Lo que tenía atascado este candado: el registro pedía la LISTA entera para
+      // ver si el celular estaba repetido (Login.js:106). Esa pregunta se mudó al
+      // servidor (functions: celularDisponible), que contesta sí o no sin enseñar
+      // nada. Comprobado: era la ÚNICA consulta de lista de las tres apps.
+      //
+      // 'get' = pedir UNA ficha. Cada quien la suya (App.js:237, MiPerfil.js:29,
+      // Creditos.js:32, y las demás: todas usan user.uid).
+      // 'list' = pedir el montón. Solo el panel.
+      allow get: if request.auth != null && (request.auth.uid == userId || esAdmin());
+      allow list: if esAdmin();
+
+      // Caso 1 — el dueño escribe su propia ficha, menos los campos de poder.
+      // Va primero a propósito: no gasta la lectura que cuesta el get() de abajo.
+      allow create: if request.auth != null
+        && request.auth.uid == userId
+        && !request.resource.data.keys().hasAny(camposDePoder().concat(camposDePlata()));
+      allow update: if request.auth != null
+        && request.auth.uid == userId
+        && !request.resource.data.diff(resource.data).affectedKeys()
+             .hasAny(camposDePoder().concat(camposCongelados()).concat(camposDePlata()));
+
+      // Caso 2 — un admin o superadmin sí puede tocarlo todo, en cualquier ficha.
+      // Es la única vía para dar un rol (Superadmin.js:599) o sancionar
+      // (Conductores.js:299). Cuesta una lectura, por eso va después.
+      allow create, update: if request.auth != null && (
         get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.rol == 'admin' ||
         get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.rol == 'superadmin'
       );
+
+      allow delete: if false;
     }
     match /viajes/{viajeId} {
-      allow read, write: if request.auth != null;
+      // ── REGLA 6 · UN VIAJE ES DE QUIEN VIAJA ─────────────────────────────────
+      // Hasta el 23-ago-2026 cualquier usuario registrado leía LOS 91 viajes.
+      // Medido ese día, los 91 llevan dentro: nombre y correo del pasajero, su
+      // código de seguridad, la dirección de recogida, la de destino y sus
+      // coordenadas exactas. 78 llevan además el teléfono del conductor.
+      //
+      // Se usa .get(campo, '') porque 13 viajes no tienen conductorId todavía, y
+      // preguntar por un campo que no existe da error.
+      function esMio() {
+        return resource.data.get('pasajeroId', '') == request.auth.uid
+            || resource.data.get('conductorId', '') == request.auth.uid;
+      }
+      // El MERCADO: los que están buscando taxi. El conductor TIENE que verlos —
+      // es el negocio (AppConductor.js:847). Los 82 terminados o cancelados no
+      // están aquí: esos dejan de verse.
+      function enElMercado() {
+        return resource.data.get('estado', '') in
+          ['esperando', 'en_negociacion', 'confirmando', 'contraoferta'];
+      }
+      // El conductor que DEJÓ UNA OFERTA sigue viendo el viaje aunque lo pierda.
+      // Sin esto, en cuanto el pasajero elige a otro, la app del que perdió deja de
+      // poder mirar el viaje y la tarjeta se le queda pegada en la pantalla
+      // (AppConductor.js:654 vigila el viaje justo para enterarse de que perdió).
+      // OJO CON EL ORDEN: esta pregunta necesita un viaje CONCRETO. Cuando el panel
+      // pide la LISTA entera no hay uno concreto y la comprobación revienta, así que
+      // va la ÚLTIMA — para entonces el panel ya salió por esAdmin(). Comprobado: si
+      // se pone antes, el panel se queda ciego.
+      function dejoUnaOferta() {
+        return exists(/databases/$(database)/documents/viajes/$(viajeId)/contraofertas/$(request.auth.uid));
+      }
+      allow read: if request.auth != null
+        && (esMio() || enElMercado() || esAdmin() || dejoUnaOferta());
+
+      // ── REGLA 10 · QUIÉN PUEDE TOCAR UN VIAJE (25-ago-2026) ─────────────
+      //
+      // Hasta hoy esto decía `allow create, update: if request.auth != null`:
+      // CUALQUIERA con una cuenta escribía CUALQUIER campo de CUALQUIER viaje.
+      //
+      // Se cierra ahora porque es la llave que abría el candado de las llamadas.
+      // La segunda opinión lo demostró EJECUTÁNDOLO: un extraño se escribía
+      // `conductorId: <su uid>` en un viaje ajeno y con eso pasaba a ser «de los
+      // dos» — leía la llamada, la contestaba, y al conductor DE VERDAD se le
+      // negaba la suya. Peor que antes de cerrar nada: ya no hacía falta ganarle
+      // una carrera, bastaba con echarlo.
+      //
+      // EL ALTA. El viaje nace a nombre de quien lo pide, y no de otro:
+      // guajirago/src/viajeNuevo.js:38 escribe `pasajeroId: user.uid`. Sin esto,
+      // cualquiera crea viajes a nombre de cualquiera.
+      //
+      // EL CAMBIO. Tres pueden tocarlo, y cada uno por su motivo:
+      //   · esMio()       — el pasajero y el conductor de ese viaje. Es todo el
+      //     ciclo normal: en camino, llegué, finalizado, cancelar.
+      //   · esAdmin()     — el panel.
+      //
+      // AQUÍ HABÍA UN TERCERO, `enElMercado()`, y SE QUITÓ el 25-ago-2026 (ver el
+      // bloque de LA TARJETA FALSA, abajo). El motivo que estaba escrito aquí era
+      // FALSO: decía que sin él, `AppConductor.js:619` —soltar los viajes que no
+      // ganó— «deja de funcionar EN SILENCIO». No: esa función busca con
+      // `where('conductorId','==',miId)`, así que esos viajes YA son suyos y entra
+      // por `esMio()`. Se comprobó enumerando las escrituras una por una.
+      //
+      // Y `pasajeroId` SE CONGELA. Un viaje no cambia de dueño nunca; es el campo
+      // del que cuelgan el chat, la llamada, el código de seguridad y el cobro.
+      // Se compara el valor, no las claves, así que reenviarlo igual no molesta.
+      //
+      // LO QUE ESTO NO CERRABA —y se cerró el mismo día, aquí abajo—: este
+      // bloque dejaba que cualquiera escribiera `conductorId`. Se escribió que
+      // «no le sirve de nada a un impostor» porque se pensó solo en la llamada,
+      // que en efecto ya no existe cuando el viaje está en el mercado. Pero sí
+      // servía, y para otra cosa: para fabricarse un viaje con la víctima de
+      // conductor y colgarle las calificaciones. Es la lección de siempre —
+      // «no le sirve de nada» es una frase sobre el ataque que UNO imaginó.
+
+      // ── REGLA 10 · EL CONDUCTOR NO SE LO PONE EL PASAJERO (25-ago-2026) ──
+      //
+      // Cierra UNA de las tres puertas por las que se fabrica el comprobante de
+      // una calificación. Hasta hoy cualquiera se creaba un viaje con la VÍCTIMA
+      // de conductor y le colgaba las estrellas que quisiera: la regla de
+      // `calificaciones` pregunta «¿ibas en ese viaje?», y el viaje se lo
+      // fabricaba el propio atacante. Medido ejecutándolo: 15 de 15 de una
+      // estrella coladas, y la media pública de la víctima en 1.0.
+      //
+      // ⚠ LAS OTRAS DOS, y cómo quedaron. Se cuentan aquí porque una versión
+      // anterior de este comentario se apuntaba el cierre entero, y la segunda
+      // opinión volvió a reproducir el MISMO ataque CON ESTE ARREGLO PUESTO,
+      // dando otra vez 15 de 15 y media 1.0:
+      //   · EL PEDIDO — CERRADO POR FUERA esa misma tarde. Ver EL COMPROBANTE LO
+      //     TIENE QUE FIRMAR EL OTRO, en el bloque de `pedidos`: el
+      //     pedido del cliente nace 'nuevo', contra un negocio que existe, y el
+      //     cliente no lo mueve por el flujo. Ya no se le cuelgan estrellas a un
+      //     tercero. POR DENTRO NO: quien es del negocio se fabrica su propio
+      //     comprobante — es el caso de abajo, el de las cinco estrellas a sí
+      //     mismo, por la puerta del pedido en vez de la del viaje.
+      //   · CINCO ESTRELLAS A SÍ MISMO — CERRADA el mismo día, con TRES candados:
+      //     nadie se califica a sí mismo, nadie se oferta su propio viaje, y nadie
+      //     califica al negocio para el que trabaja. El tercero hizo falta porque
+      //     con los dos primeros la segunda opinión seguía metiendo 15 de 15 con
+      //     una segunda cuenta puesta de EMPLEADA. Lo que NO se cierra con reglas
+      //     está escrito en el bloque de `calificaciones`. Tenía DOS caminos:
+      //     · POR EL VIAJE: se crea uno, se deja a sí mismo una contraoferta (el id
+      //       del documento ES su uid, así que la REGLA 2 lo permite) y llama a
+      //       `confirmarConductor`, que cumple sus tres controles y le escribe el
+      //       conductor. 3 de 3, y en bucle, porque al finalizar `onViajeCerrado`
+      //       lo suelta y la comisión baja sin suelo.
+      //     · POR EL PEDIDO: quien es del negocio —dueño o empleado— entra por la
+      //       rama `esDelNegocio()` del `create`, que NO le exige que el pedido
+      //       nazca 'nuevo' ni le mira el `clienteId`. Se hace un pedido a sí
+      //       mismo ya 'entregado' y lo califica. Medido: 15 de 15, media 5.0.
+      //       Y LO QUE MÁS MUERDE, que no estaba escrito en ninguna parte:
+      //       `restaurantes/{id}`, `usuarios/{id}` y `conductores/{id}` comparten
+      //       el MISMO espacio de uid, y crear un negocio solo pide `uid ==
+      //       restauranteId`. Así que un CONDUCTOR se registra un negocio con su
+      //       propio uid, se hace quince pedidos a sí mismo, y las quince
+      //       estrellas caen sobre el uid que `MiPerfil.js:40` lee para pintar su
+      //       media DE CONDUCTOR.
+      //     Lo de siempre: el que califica y el calificado son la misma persona.
+      // La primera se cerró esa misma tarde; la segunda NO, y es la última que
+      // queda de las tres. Las dos son la misma idea: EL COMPROBANTE LO TIENE QUE
+      // FIRMAR EL OTRO.
+      //
+      // (Aquí estuvo anotada unas horas una TERCERA cosa abierta —la tarjeta de
+      // confirmación falsa— que YA ESTÁ CERRADA el mismo día: ver el bloque de LA
+      // TARJETA FALSA, más abajo. Se cerró quitando `enElMercado()` del `update`.)
+      //
+      // Es la TERCERA vez que muerde el mismo patrón en dos días —las llamadas, el
+      // canje de códigos y esto—, y ya está escrito arriba: una regla que le
+      // pregunta a otro documento no vale más que las reglas de ESE documento.
+      // Aquí es donde se para.
+      //
+      // QUIÉN PONE UN CONDUCTOR DE VERDAD: la función `confirmarConductor`
+      // (functions/index.js), que corre en el servidor con el SDK de administrador
+      // y NO pasa por estas reglas. Por eso cerrar esto por aquí no rompe el taxi
+      // —comprobado ejecutando el ciclo entero— pero TAMPOCO basta: esa función
+      // hace lo que le pidan si le cumplen sus tres controles. Es la puerta, no el
+      // guardia. Ver arriba.
+      //
+      // MEDIDO ANTES DE TOCAR (25-ago-2026), buscando en las tres apps:
+      //   · un viaje NACE sin conductor — `guajirago/src/viajeNuevo.js` no escribe
+      //     ese campo. Por eso el create puede prohibirlo sin coste.
+      //   · lo ÚNICO que las apps escriben en ese campo es `conductorId: null`,
+      //     para SOLTAR un viaje: AppConductor.js:619 (el conductor suelta los que
+      //     no ganó), y Solicitar.js:966 / SolicitarMensajeria.js:980, que NO son
+      //     cancelar —eso es Solicitar.js:771 y no toca este campo— sino
+      //     `rechazarConfirmacion`: la pasajera dice que no a la tarjeta del
+      //     conductor y el viaje vuelve al mercado. Por eso el update deja dejarlo
+      //     sin conductor, y nada más.
+      //   · y el PANEL pierde TRES cosas que hoy puede hacer, aunque no las use:
+      //     ponerle un conductor a un viaje, cambiárselo, y —esto también, y
+      //     conviene decirlo— QUITÁRSELO. El `esMio()` de soltar no le vale al
+      //     panel, así que `conductorId: null` desde admin o superadmin ahora se
+      //     niega, cuando antes pasaba. Se comprobó que `guajirago-admin` no
+      //     escribe NADA en `viajes` —sus 6 usos son `getDocs`— y que
+      //     `guajirago-aliados` no la toca. Se dice aquí para que el día que el
+      //     panel necesite mover un conductor, se sepa por qué no puede y se haga
+      //     por el sitio bueno: la función del servidor.
+      //   · el panel NO escribe conductorId en ningún viaje.
+      //
+      // NO SE USA UN CENTINELA, y esto costó una segunda opinión entera. La
+      // primera versión comparaba `.get('conductorId', 'ninguno')` a los dos
+      // lados. Parecía elegante y era una puerta: 'ninguno' es un texto que se
+      // PUEDE ESCRIBIR, así que a un viaje del mercado —que entonces cualquiera
+      // podía escribir; esa puerta se tapió esa misma tarde, ver LA TARJETA FALSA—
+      // cualquiera le escribía `conductorId: 'ninguno'` y los dos lados daban
+      // 'ninguno', o sea IGUAL, o sea permitido. Y no era inocuo: 'ninguno' es
+      // verdadero en JavaScript, así que `Solicitar.js:588` le sacaba a la
+      // pasajera la tarjeta de confirmación CON EL NOMBRE Y EL TELÉFONO que el
+      // impostor quisiera. Un mutante que cambiaba 'ninguno' por '' sobrevivió a
+      // las 357 pruebas: nadie miraba qué pasa si alguien ESCRIBE el centinela.
+      //
+      // TAMPOCO se pregunta por las CLAVES, y ésta es la tercera versión: la
+      // segunda preguntaba `keys().hasAny(['conductorId'])` y tenía su propia
+      // puerta. `deleteField()` BORRA el campo, así que desaparece de `keys()` y
+      // la rama de «no mandas el campo» lo daba por bueno: cualquiera le borraba
+      // el conductor a un viaje ajeno. Lo midió la segunda opinión careando las
+      // tres versiones — y con retintín, porque `pasajeroId`, dos renglones más
+      // abajo, ya usaba el patrón bueno.
+      //
+      // ASÍ QUE SE COMPARA CON `null` DE DEFECTO, y con eso «el campo no está» y
+      // «el campo vale null» pasan a ser LA MISMA COSA — que es lo que son de
+      // verdad: las dos dicen que este viaje no tiene conductor, y las dos lo
+      // sueltan igual (`onViajeCerrado` hace `if (!cid) return`, y el
+      // `where('conductorId','==',uid)` lo pierde igual). Con eso no queda ninguna
+      // rama que pueda dar ERROR: esto ya no se apoya en «un error niega», frase
+      // que salió falsa una vez en este mismo archivo, en el bloque de los
+      // códigos, donde un `||` se tragaba el error y lo daba por bueno.
+      //
+      // Y SOLTAR UN VIAJE ES COSA DE LOS DOS QUE VAN EN ÉL — `esMio()`. OJO CON
+      // ESTE `esMio()`: la razón por la que se puso ya no es la razón por la que
+      // sigue aquí, y conviene decirlo porque si no, el próximo que lea esto lo
+      // borrará pensando que sobra.
+      //   · SE PUSO (mañana del 25-ago) para parar a un extraño: `confirmando`
+      //     estaba DENTRO de `enElMercado()`, y el `update` dejaba entrar por ahí,
+      //     así que un conductor cualquiera le quitaba el conductor a un viaje
+      //     ajeno y echaba al de verdad. Mismo ataque de las llamadas, por la otra
+      //     cara: allí se metía uno, aquí se sacaba al otro.
+      //   · ESA PUERTA SE TAPIÓ esa misma tarde (ver LA TARJETA FALSA, abajo):
+      //     `enElMercado()` salió del `update`. Al extraño ya lo para el
+      //     `(esMio() || esAdmin())` de fuera, antes de llegar aquí.
+      //   · LO QUE ESTE `esMio()` SIGUE HACIENDO, y es su único trabajo vivo, es
+      //     que EL PANEL no pueda soltar a un conductor. El panel pasa el filtro de
+      //     fuera por `esAdmin()` y llegaría hasta aquí. Tiene su prueba, abajo
+      //     («ni el panel suelta al conductor de un viaje»): sin ella un mutante
+      //     que borre este `esMio()` sobrevive a la suite entera — lo comprobó la
+      //     segunda opinión, 0 rojas de 297.
+      //
+      // Y no cuesta nada, porque MEDIDO: los tres sitios que sueltan un viaje son
+      // siempre de uno de los dos. `limpiarViajesOtrosConductor`
+      // (AppConductor.js:612) busca con `where('conductorId','==',miId)` — o sea
+      // SOLO viajes donde él ya es el conductor. Y `rechazarConfirmacion`
+      // (Solicitar.js:960, SolicitarMensajeria.js:974) lo hace la pasajera sobre su
+      // propio viaje. Ninguno necesita soltar un viaje ajeno.
+      //
+      // Quedan tres casos y ya está:
+      //   · lo dejas igual que está → pasa. Incluye no mandarlo.
+      //   · lo dejas SIN conductor y el viaje es TUYO → pasa, con null o
+      //     borrándolo. Es soltar el viaje.
+      //   · cualquier otra cosa → se niega. Ponerle uno a un viaje que no lo
+      //     tiene, cambiárselo al que lo tiene, colar un texto cualquiera, o
+      //     quitárselo a un viaje que no es tuyo.
+      function conductorIntacto() {
+        return request.resource.data.get('conductorId', null) ==
+                 resource.data.get('conductorId', null)
+          || (request.resource.data.get('conductorId', null) == null && esMio());
+      }
+
+      allow create: if request.auth != null
+        && request.resource.data.get('pasajeroId', '') == request.auth.uid
+        && !request.resource.data.keys().hasAny(['conductorId']);
+
+      // El `esAdmin()` va DONDE ESTABA, dentro del `&&`, y no delante con un `||`.
+      // Sacarlo delante —como se hizo en el primer intento— le quitaba al panel el
+      // congelado de `pasajeroId`: el panel podía cambiarle el DUEÑO a un viaje,
+      // que es justo lo que el comentario de arriba jura que no pasa nunca. Lo cazó
+      // la segunda opinión careando las dos versiones. Y de paso le cobraba una
+      // lectura de más a TODO el mundo en CADA escritura del viaje, porque
+      // `esAdmin()` hace un `get()` y al ir primero ya no se lo salta nadie.
+      // ── LA TARJETA FALSA · FUERA `enElMercado()` DEL UPDATE (25-ago-2026) ──
+      //
+      // ESTO ES LO QUE CIERRA LA TERCERA PUERTA, la que quedó anotada arriba esta
+      // mañana. `enElMercado()` en el UPDATE le daba a CUALQUIERA con cuenta
+      // permiso de escritura sobre CUALQUIER viaje que estuviera buscando
+      // conductor. El candado de `conductorId` de hoy tapaba un campo; la puerta
+      // seguía abierta para todos los demás, y por ahí:
+      //   · SE MONTABA LA TARJETA FALSA. El NOMBRE, la PLACA, el VEHÍCULO y el
+      //     TELÉFONO del conductor salen del documento del viaje, y se pintan en la
+      //     ficha que ve la pasajera durante el viaje (`Solicitar.js:1108`,
+      //     `:1144-1145`, `:1218-1219`). Sin tocar `conductorId` ni una vez se le
+      //     reescribían los cuatro: conductor legítimo, teléfono y placa del
+      //     impostor. La pasajera se sube al carro equivocado.
+      //     Y PEOR, que es lo que lo convierte en el daño físico más grave de toda
+      //     la auditoría: esos mismos cuatro campos son los que van en el WhatsApp
+      //     DE EMERGENCIA que la pasajera le manda a su familia
+      //     (`Solicitar.js:749-757`, y `Seguridad.js:93-96`). O sea que el impostor
+      //     no solo la sube a su carro: le hace mandarle a su familia la placa y el
+      //     teléfono equivocados. Si algo pasa, buscan el carro que no es.
+      //     (Una versión anterior de este comentario citaba `Solicitar.js:588-599`.
+      //     Esa pantalla lee los mismos campos, pero cuelga de `estado ==
+      //     'confirmando'`, que YA NO LO ESCRIBE NADIE: es camino muerto. La cita
+      //     buena es la de arriba, y el argumento es más fuerte, no más flojo.)
+      //   · se le bajaba la tarifa a 1, y
+      //   · se le mataba el viaje poniéndolo en `vencido`.
+      //
+      // SE QUITA ENTERO EN VEZ DE CONGELAR CAMPO POR CAMPO, porque congelar cuatro
+      // campos deja los otros treinta abiertos —`pasajeroLat`/`pasajeroLng`, por
+      // ejemplo, que mandan al conductor a una dirección— y porque la lista de
+      // campos se queda vieja el día que alguien añade uno.
+      //
+      // MEDIDO ANTES DE TOCAR, enumerando TODAS las escrituras al documento del
+      // viaje en las tres apps y en las funciones, una por una y sin truncar:
+      //   · UN CONDUCTOR QUE SOLO ESTÁ OFERTANDO NO ESCRIBE NADA EN EL VIAJE. Su
+      //     oferta va a la subcolección `contraofertas/{suUid}`
+      //     (`AppConductor.js:353`), que tiene sus propias reglas. El propio código
+      //     lo dice: «La tarjeta NO se descarta: el viaje sigue abierto».
+      //   · las otras 5 escrituras del conductor sobre el viaje son sobre
+      //     `viajeActual`, y `viajeActual` sale de dos sitios, los dos filtrados
+      //     por él mismo: `where('conductorId','==',miId)` (`AppConductor.js:711`)
+      //     y un `data.conductorId === miId` (`AppConductor.js:659`). Todas pasan
+      //     por `esMio()`.
+      //   · `limpiarViajesOtrosConductor` (`AppConductor.js:612`), que suelta los
+      //     que no ganó, también busca con `where('conductorId','==',miId)`.
+      //     Por eso el comentario de más arriba —el que decía que sin
+      //     `enElMercado()` esa función «deja de funcionar EN SILENCIO»— ERA
+      //     FALSO, y llevaba escrito ahí desde ayer.
+      //   · todas las escrituras del pasajero son sobre SU viaje.
+      //   · quien pone al conductor y su tarjeta es `confirmarConductor`
+      //     (`functions/index.js:284-292`), que corre en el servidor y no pasa por
+      //     estas reglas. La pasajera lo llama con `httpsCallable`
+      //     (`Solicitar.js:980`, `SolicitarMensajeria.js:993`).
+      //   · el panel no escribe NADA en `viajes`; aliados no la toca.
+      //
+      // OJO: `enElMercado()` SE QUEDA EN EL `read` (arriba). El conductor TIENE que
+      // ver el mercado — es el negocio. Lo que se le quita es escribir en él.
+      //
+      // ANOTADO al paso, NO se toca aquí: los estados `confirmando` y
+      // `contraoferta` YA NO LOS ESCRIBE NADIE en ninguna de las tres apps ni en
+      // las funciones — se quedaron del flujo viejo, antes de que el mercado de
+      // ofertas pasara por `confirmarConductor`. Siguen declarados en
+      // `guajirago/src/estadosViaje.js:28` (y de ahí entran en `enElMercado()`), y
+      // la pantalla de confirmación del pasajero con sus dos botones
+      // (`Solicitar.js:939-974` y sus gemelos de mensajería) solo se alcanza desde
+      // ahí: son unos 40 renglones que nadie ejecuta. Borrarlos es otro trabajo,
+      // con su foto y su permiso.
+      allow update: if request.auth != null
+        && (esMio() || esAdmin())
+        && request.resource.data.get('pasajeroId', '') == resource.data.get('pasajeroId', '')
+        && conductorIntacto();
+
+      allow delete: if false;
+      // ── REGLAS 5 y 11 · EL CAJON PRIVADO DEL VIAJE ─────────────────────────
+      // Aquí vive el código de seguridad. SOLO lo ve la pasajera que lo va a decir.
+      // El conductor NO puede leerlo: pregunta si el que le dijeron es el bueno, y
+      // esa comparación la hace el servidor (functions: verificarCodigoViaje).
+      // Antes el código iba dentro del viaje y lo leía cualquiera que mirase el
+      // mercado — o sea, no protegía de nada.
+      match /privado/{docPrivado} {
+        function elViaje() {
+          return get(/databases/$(database)/documents/viajes/$(viajeId)).data;
+        }
+        allow read: if request.auth != null
+          && (elViaje().get('pasajeroId', '') == request.auth.uid || esAdmin());
+        // Se escribe UNA vez, al pedir el viaje, y no se vuelve a tocar: si se
+        // pudiera cambiar, el impostor pondría el suyo.
+        allow create: if request.auth != null
+          && elViaje().get('pasajeroId', '') == request.auth.uid;
+        allow update, delete: if false;
+      }
+
       match /contraofertas/{conductorId} {
-        allow read, write: if request.auth != null;
+        // ── REGLA 2 · LA OFERTA LA FIRMA SU CONDUCTOR ────────────────────────
+        // Hasta el 23-ago-2026 cualquiera podía escribir una oferta a nombre de
+        // OTRO conductor. Con eso y una llamada a confirmarConductor se le
+        // descontaba la comisión a un conductor que nunca ofertó, y encima quedaba
+        // marcado como ocupado. Cerrar solo la función no bastaba: el atacante
+        // podía hacerlo en su PROPIO viaje.
+
+        // ── REGLA 10 · Y LEERLAS TAMPOCO ES DE CUALQUIERA (25-ago-2026) ──────
+        //
+        // El `read` seguía abierto a cualquiera con cuenta. El id de cada oferta ES
+        // el número del conductor que la dejó, con su nombre, teléfono, placa y
+        // vehículo dentro (AppConductor.js:353).
+        //
+        // Por sí solo ya es una fuga. Lo que lo hace grave es lo de al lado: con
+        // esos números se le pide la ficha a cada conductor y se mira su UBICACIÓN
+        // EN VIVO. Era la forma de cosechar la flota entera aunque el `list` de
+        // `conductores` esté cerrado. Las dos puertas se cierran juntas o no se
+        // cierra ninguna.
+        //
+        // Quién las lee ahora: el PASAJERO de ese viaje —es quien las mira para
+        // escoger (Solicitar.js:649, SolicitarMensajeria.js:654), y es la única
+        // pantalla de las tres apps que pide esta colección—, el CONDUCTOR que la
+        // dejó, y el panel.
+        allow read: if request.auth != null && (
+          request.auth.uid == conductorId ||
+          get(/databases/$(database)/documents/viajes/$(viajeId)).data.get('pasajeroId', '') == request.auth.uid ||
+          esAdmin()
+        );
+        // Ofertar: solo el conductor que firma (AppConductor.js:353 usa su uid).
+        //
+        // Y NO SOBRE SU PROPIO VIAJE (25-ago-2026). Este era el primer paso del
+        // ataque de las cinco estrellas a sí mismo: crear un viaje, dejarse una
+        // oferta a uno mismo —el id del documento ES su uid, así que la firma de
+        // arriba la cumple— y llamar a `confirmarConductor`, que le cumple sus
+        // CUATRO controles (el viaje es suyo, está en 'esperando', la oferta
+        // existe, y él no está ocupado) y le escribe el conductor. Se corta también
+        // aquí, y no solo en las
+        // calificaciones, porque el daño no era solo la nota:
+        //   · en BUCLE — al marcar el viaje 'finalizado' (puede: es suyo por los
+        //     dos lados), `onViajeCerrado` lo libera y vuelve a empezar.
+        //   · y la COMISIÓN SE DESCUENTA SIN SUELO (`functions/index.js:299`): los
+        //     créditos se van a negativo y ya. Quien pierde NO es un tercero: el
+        //     descuento cae en la cuenta del propio atacante — pierde GuajiraGo,
+        //     porque con el saldo en negativo sigue tomando viajes DE VERDAD sin
+        //     pagar comisión. El tope está solo en el celular
+        //     (`AppConductor.js:341`), y el celular no manda.
+        //   · y le infla la cuenta de viajes hechos, que es lo que mira el panel.
+        //
+        // NO ROMPE NADA, medido: el mercado del conductor NO le esconde sus propios
+        // viajes (`AppConductor.js:849` pide todos los del mercado sin filtrar por
+        // pasajero), así que hoy la app se lo permitiría — pero no hay ni un solo
+        // uso legítimo: nadie se lleva a sí mismo. Y en la base viva, medido el
+        // 25-ago-2026: 0 contraofertas en los 91 viajes. No hay nada que romper.
+        allow create: if request.auth != null
+          && request.auth.uid == conductorId
+          && get(/databases/$(database)/documents/viajes/$(viajeId)).data.get('pasajeroId', '')
+               != request.auth.uid;
+        // Cambiarla: su conductor (AppConductor.js:635) o el pasajero DE ESE viaje,
+        // que marca como no vigentes las que perdieron (Solicitar.js:1050 y
+        // SolicitarMensajeria.js:1062). Sin esto último se rompe elegir conductor.
+        allow update: if request.auth != null && (
+          request.auth.uid == conductorId ||
+          request.auth.uid == get(/databases/$(database)/documents/viajes/$(viajeId)).data.pasajeroId
+        );
+        allow delete: if false;
       }
       match /mensajes/{mensajeId} {
-        allow read, write: if request.auth != null;
+        // ── REGLA 6 · EL CHAT ES DE LOS DOS QUE VIAJAN ──────────────────────
+        // Hasta el 23-ago-2026 cualquier usuario registrado podía LEER el chat de
+        // cualquier viaje, y además ESCRIBIR dentro haciéndose pasar por el
+        // conductor o por la pasajera. Solo lo usan esos dos (Solicitar.js:740 y
+        // :752, SolicitarMensajeria.js:745 y :757, AppConductor.js:1106 y :1118).
+        function elViaje() {
+          return get(/databases/$(database)/documents/viajes/$(viajeId)).data;
+        }
+        function vaEnEsteViaje() {
+          return elViaje().get('pasajeroId', '') == request.auth.uid
+              || elViaje().get('conductorId', '') == request.auth.uid;
+        }
+        allow read: if request.auth != null && (vaEnEsteViaje() || esAdmin());
+        allow create, update: if request.auth != null && (vaEnEsteViaje() || esAdmin());
+        allow delete: if false;
       }
     }
+    // ── REGLA 10 · LA FLOTA NO SE DESCARGA (25-ago-2026) ────────────────────
+    //
+    // Esto decía `allow read: if request.auth != null`. Medido ese día: 8 fichas,
+    // y dentro de cada una `ubicacion` —lat y lng, refrescada por watchPosition
+    // mientras el conductor trabaja (AppConductor.js:814)—, más `telefono`,
+    // `placa`, `vehiculo` y el token de avisos.
+    //
+    // O sea: con una cuenta gratis se seguía EN VIVO a toda la flota, y con
+    // nombre y teléfono al lado. Es riesgo físico, y de más alcance que el de las
+    // llamadas: no hace falta ni ir en el viaje.
+    //
+    // `read` se parte en dos, como en los pedidos y en las llamadas:
+    //
+    //   · list — pedir el montón. **NO LO HACE NADIE.** Buscado el 25-ago-2026 en
+    //     las TRES apps: no hay un solo getDocs(collection(db,'conductores')).
+    //     Ni siquiera el panel — su pantalla de conductores lee la colección
+    //     `usuarios`, donde vive la ficha de la persona. Se deja para el panel
+    //     por si algún día la necesita, no porque haga falta hoy.
+    //
+    //   · get  — pedir UNA. Esto SÍ hace falta y se deja abierto a quien tenga
+    //     cuenta: es como el pasajero ve moverse el carro de su conductor en el
+    //     mapa (Solicitar.js:688 y SolicitarMensajeria.js:692, que solo usan
+    //     `ubicacion.lat` y `ubicacion.lng`). Para pedirla hay que SABERSE el
+    //     número del conductor.
+    //
+    // Y por eso, en el mismo trabajo, se cierran las ofertas de un viaje: ahí es
+    // donde se podían cosechar esos números en montón. Mira `contraofertas`.
+    //
+    // LO QUE ESTO NO CIERRA, dicho claro: quien consiga el número de UN conductor
+    // —porque viajó con él— puede seguir mirando su ubicación después. Cerrarlo
+    // del todo pide mudar `ubicacion` a un sitio aparte, y eso toca las dos apps.
+    // Queda ANOTADO. Lo que se cierra hoy es la descarga en montón.
     match /conductores/{conductorId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null && (
+      allow get: if request.auth != null;
+      allow list: if esAdmin();
+      allow create, update: if request.auth != null && (
         request.auth.uid == conductorId ||
         get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.rol == 'admin' ||
         get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.rol == 'superadmin'
       );
+      allow delete: if false;
     }
+    // ── REGLA 10 · UNA CALIFICACIÓN LA ESCRIBE QUIEN ESTUVO AHÍ ─────────────
+    //
+    // Hasta el 25-ago-2026: `create, update: if request.auth != null`. Cualquiera
+    // con una cuenta se ponía doscientas de cinco estrellas, le ponía doscientas
+    // de una a un rival, o REESCRIBÍA las malas que ya tenía. Esa media sale en el
+    // perfil (MiPerfil.js:40), en la ficha del restaurante (Restaurantes.js:162),
+    // en la del negocio (aliados/CalificacionesRestaurante.js:18) y en el panel.
+    //
+    // LO QUE ATA ESTO NO ES UNA FIRMA, ES EL PAR. La primera versión de este
+    // arreglo añadía un campo `autorId` a la app y comprobaba que fuera de quien
+    // escribía. La segunda opinión demostró EJECUTANDO que eso no cerraba nada:
+    // comprobaba que el autor estuviera en ALGÚN viaje, pero nunca miraba a quién
+    // se le ponían las estrellas. Con UN solo viaje propio se le colgaban
+    // calificaciones a cualquiera — el ataque del informe, intacto.
+    //
+    // Y de paso el `autorId` era peor que inútil: con el `read` abierto, cualquiera
+    // se bajaba la colección y averiguaba QUÉ pasajero le puso una estrella a un
+    // conductor, y en qué viaje. Riesgo de represalia sobre una persona real, que
+    // antes no existía porque el documento era anónimo.
+    //
+    // Así que no se guarda quién escribe: se comprueba EL PAR. Para calificar un
+    // viaje hay que ser uno de los dos que iban en él, y las estrellas tienen que
+    // ir para EL OTRO. Para calificar un pedido hay que ser su cliente, y las
+    // estrellas van para SU restaurante. Sin datos nuevos y sin tocar la app.
+    //
+    // ⚠ LO QUE ESTO **NO** CIERRA, Y HAY QUE DECIRLO ANTES QUE NADA:
+    //
+    // Una versión anterior de este comentario decía que se le pregunta al viaje y
+    // al pedido «que son documentos que quien califica no controla». ERA FALSO, y
+    // lo demostró ejecutándolo la segunda opinión del 25-ago-2026: el atacante SE
+    // FABRICA los dos.
+    //   · `viajes` deja crear con solo `pasajeroId == mi uid` — `conductorId` va
+    //     libre. Se crea un viaje falso con la víctima de conductor y se le cuelgan
+    //     las estrellas que se quiera. Medido: 15 de 15 colaron, y la media pública
+    //     del negocio atacado quedó en 1.0.
+    //   · `pedidosRestaurantes` igual, con solo `clienteId == mi uid`.
+    //   · Y con un viaje falso donde uno es pasajero Y conductor, se pone cinco
+    //     estrellas a sí mismo.
+    //
+    // Es la TERCERA vez en dos días que muerde el mismo patrón, ya escrito en el
+    // bloque de las llamadas: UNA REGLA QUE LE PREGUNTA A OTRO DOCUMENTO NO VALE
+    // MÁS QUE LAS REGLAS DE ESE OTRO DOCUMENTO.
+    //
+    // Cerrarlo pide dos cosas que NO son de este bloque, y por eso no se hicieron
+    // aquí: que un viaje no pueda nacer ni cambiar con un `conductorId` puesto por
+    // su pasajero (solo lo pone `confirmarConductor`, que corre en el servidor), y
+    // que un pedido no valga como comprobante hasta que el restaurante lo haya
+    // marcado. Queda ANOTADO como el trabajo siguiente.
+    //
+    // ENTONCES, ¿QUÉ SÍ CIERRA ESTO? Reescribir una calificación para tapar la
+    // mala; ponerle doscientas estrellas o cero; calificar sin viaje ni pedido;
+    // calificar el viaje o el pedido DE OTRO; y que el negocio, al reportar, toque
+    // algo más que los cuatro campos del reporte. Es menos de lo que parecía, y
+    // más que nada.
+    //
+    // HAY DOS FORMAS DE CALIFICAR y una regla que solo conozca una rompe la otra:
+    //   · el VIAJE      — lleva `viajeId` (guajirago/src/Calificacion.js).
+    //   · el RESTAURANTE — lleva `pedidoId` (guajirago/src/Restaurantes.js).
+    // Y se exige UNA de las dos, no las dos: mandando las dos claves se entraba
+    // por la rama del pedido propio y se colgaba del viaje ajeno. También lo cazó
+    // la segunda opinión, ejecutándolo.
+    //
+    // EL `read` SE DEJA ABIERTO a quien tenga cuenta: una calificación es pública
+    // por naturaleza —son las estrellas del restaurante— y
+    // `guajirago/src/Restaurantes.js:121` pide la colección ENTERA sin filtro para
+    // las medias. Ahora se puede dejar así sin daño, porque el documento NO dice
+    // quién lo escribió.
+    //
+    // EL `update` NO ES SOLO DEL PANEL, y por poco se rompe: el restaurante
+    // REPORTA los comentarios insultantes desde
+    // `aliados/CalificacionesRestaurante.js:38`, y esa pantalla se traga el error
+    // con un catch vacío. Si la regla lo negara, quedaría un botón que se cierra
+    // sin decir nada y la cola de moderación del panel vacía para siempre. Así que
+    // el negocio puede marcar SU comentario como reportado — y solo esos cuatro
+    // campos: las estrellas no se tocan.
+    //
+    // (Una versión anterior de este comentario decía que esa pantalla pinta
+    // «Reportado» ANTES de saber si se guardó. No es cierto: el setLista va después
+    // del await y dentro del try. El problema real es que se cierra en silencio.)
+    //
+    // ANOTADO, no cerrado: (1) nada limita a UNA calificación por viaje — el
+    // addDoc genera id nuevo cada vez, y cerrarlo pide un id fijo, o sea tocar la
+    // app; (2) no se mira el estado del viaje, así que se puede calificar antes de
+    // que pase nada.
     match /calificaciones/{calId} {
-      allow read, write: if request.auth != null;
+      function estrellasDeVerdad() {
+        return request.resource.data.get('estrellas', 0) is int
+          && request.resource.data.get('estrellas', 0) >= 1
+          && request.resource.data.get('estrellas', 0) <= 5;
+      }
+      function elViaje() {
+        return get(/databases/$(database)/documents/viajes/$(request.resource.data.viajeId)).data;
+      }
+      // ── EL PEDIDO, ESTÉ EN LA CARPETA QUE ESTÉ (7-sep-2026) ────────────────
+      //  LA CAÍDA AL NOMBRE VIEJO SE QUITÓ EL 9-sep-2026. Mientras duró la
+      //  mudanza esto miraba primero `pedidos` y se caía a `pedidosRestaurantes`
+      //  si no estaba, porque podía quedar alguno solo en la vieja. Ya no queda
+      //  ninguno: medido antes de quitarla, los 29 están en LAS DOS carpetas y
+      //  desde el despliegue no ha nacido ni uno en la vieja.
+      function elPedidoExiste() {
+        return exists(/databases/$(database)/documents/pedidos/$(request.resource.data.pedidoId));
+      }
+      function elPedido() {
+        return get(/databases/$(database)/documents/pedidos/$(request.resource.data.pedidoId)).data;
+      }
+      // Los dos que iban en el viaje, y cada uno califica AL OTRO.
+      function calificaSuViaje() {
+        return exists(/databases/$(database)/documents/viajes/$(request.resource.data.viajeId)) && (
+          (elViaje().get('pasajeroId', '') == request.auth.uid &&
+           request.resource.data.get('calificadoId', '') == elViaje().get('conductorId', 'sin-conductor')) ||
+          (elViaje().get('conductorId', '') == request.auth.uid &&
+           request.resource.data.get('calificadoId', '') == elViaje().get('pasajeroId', 'sin-pasajero'))
+        );
+      }
+      // El cliente del pedido, y las estrellas van para SU restaurante. Y EL
+      // PEDIDO TIENE QUE ESTAR ENTREGADO O CERRADO — que es la mitad que faltaba,
+      // y sin ella todo lo demás era decoración: preguntarle a un documento que el
+      // atacante se fabrica no prueba nada. 'entregado' y 'cerrado' solo los pone
+      // EL RESTAURANTE (`aliados/PedidosDomicilio.js:138`); el cliente, desde el
+      // 25-ago-2026, solo puede dejar el estado quieto o cancelar. Así que para
+      // calificar hace falta que el negocio haya dicho que el pedido pasó.
+      //
+      // Y NO SE CALIFICA AL NEGOCIO PARA EL QUE UNO TRABAJA (25-ago-2026). Sin
+      // esto, «nadie se califica a sí mismo» no bastaba, y lo midió la segunda
+      // opinión EJECUTÁNDOLO con el otro candado ya puesto: 15 de 15, media 5.0.
+      // La cadena era de una sola persona con dos cuentas y no necesitaba a nadie:
+      //   1. la cuenta A se registra un negocio con SU PROPIO uid — solo pide
+      //      `uid == restauranteId`, y NADIE tiene que aprobarlo: el negocio nace
+      //      `aprobado: false` y las estrellas entran igual.
+      //   2. la cuenta A nombra EMPLEADA a la cuenta B.
+      //   3. la cuenta B ya es «del negocio», así que se fabrica un pedido por la
+      //      rama `esDelNegocio()` del `create` —que no le exige que nazca 'nuevo'
+      //      ni le mira el `clienteId`— ya 'entregado'.
+      //   4. y lo califica. El candado de arriba ni lo roza: quien califica (B) no
+      //      es el calificado (A).
+      // Con el uid compartido entre `restaurantes`, `usuarios` y `conductores`, esas
+      // quince estrellas caen sobre la media DE CONDUCTOR de la cuenta A
+      // (`MiPerfil.js:40`).
+      //
+      // `esDelNegocio()` cubre las dos caras —el dueño y el empleado activo—, así
+      // que con esta línea se cierran las dos. Al cliente de verdad no le quita
+      // nada: no trabaja en el restaurante donde pide.
+      //
+      // Y no cambia nada de lo que la app ya hacía: el botón de calificar SOLO se
+      // pinta en esos dos estados (`Restaurantes.js:582`). Esto es la regla
+      // exigiendo lo que la pantalla ya cumplía.
+      function calificaSuPedido() {
+        // El pedido tiene que existir. Antes se miraba en las DOS carpetas;
+        // desde que se retiró la vieja (9-sep-2026), solo hay una.
+        return elPedidoExiste() &&
+          elPedido().get('clienteId', '') == request.auth.uid &&
+          request.resource.data.get('calificadoId', '') == elPedido().get('restauranteId', 'sin-restaurante') &&
+          elPedido().get('estado', '') in ['entregado', 'cerrado'] &&
+          !esDelNegocio(elPedido().get('restauranteId', ''));
+      }
+      // Lo único que el negocio puede tocar de una calificación suya.
+      function soloElReporte() {
+        return request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['reportado', 'motivoReporte', 'estadoReporte', 'fechaReporte']);
+      }
+
+      allow read: if request.auth != null;
+
+      // SOBRE EL `request.auth != null` DE AQUÍ ABAJO: se plantó el mutante de
+      // quitarlo (25-ago-2026) y las pruebas siguieron VERDES. No es que falte una
+      // prueba: es que no se puede escribir. Sin sesión, cualquier camino de
+      // calificaSuViaje() o calificaSuPedido() toca request.auth.uid y revienta, y
+      // un error dentro de una regla deniega. O sea que el mutante es EQUIVALENTE.
+      // Se deja escrito porque negar «porque revienta» es fiarse de un detalle fino
+      // del motor, y porque leerlo aquí es más claro que deducirlo.
+      // ── REGLA 10 · NADIE SE CALIFICA A SÍ MISMO (25-ago-2026) ──────────────
+      //
+      // Una sola línea, y cierra la ÚLTIMA de las tres puertas — las dos por las
+      // que se entraba a ella, que estaban anotadas arriba:
+      //   · POR EL VIAJE: se creaba uno, se dejaba a sí mismo una contraoferta y
+      //     se llamaba a `confirmarConductor`, que cumplía sus tres controles y le
+      //     escribía el conductor. Cinco estrellas a sí mismo, 3 de 3.
+      //   · POR EL PEDIDO: quien es del negocio se hacía un pedido a sí mismo ya
+      //     'entregado' —la rama `esDelNegocio()` del create no le exige que nazca
+      //     'nuevo' ni le mira el `clienteId`— y se calificaba. 15 de 15, media
+      //     5.0. Y con el uid compartido entre `restaurantes`, `usuarios` y
+      //     `conductores`, un CONDUCTOR se registraba un negocio con su propio uid
+      //     y las quince estrellas caían sobre su media DE CONDUCTOR.
+      //
+      // Las dos acaban en el mismo sitio: el que califica y el calificado son la
+      // MISMA persona. Se corta ahí, que es donde vale para las dos y para las que
+      // no se nos han ocurrido.
+      //
+      // NO LE QUITA NADA A NADIE, medido: solo hay DOS sitios que escriben una
+      // calificación —`Calificacion.js:47` y `Restaurantes.js:425`—, y en los
+      // CUATRO usos `calificadoId` es SIEMPRE el otro: `Solicitar.js:1039` y
+      // `SolicitarMensajeria.js:1060` le pasan el conductor del viaje,
+      // `AppConductor.js:1168` le pasa el pasajero, y `Restaurantes.js:430` pone el
+      // restaurante del pedido. Ninguno puede ser uno mismo en un uso normal.
+      // (Ojo: `Calificacion.js:50` escribe `calificadoId: calificadoId || ''`, así
+      // que la app misma puede mandar '' — ver el párrafo del defecto, abajo.)
+      //
+      // EL DEFECTO ES '', y un mutante que lo cambia por el propio uid SOBREVIVE a
+      // las pruebas. Una versión anterior de este comentario decía que era un
+      // «mutante equivalente, comprobado ejecutándolo». NO ERA CIERTO, y lo
+      // desmintió la segunda opinión corriendo las dos versiones lado a lado: hay
+      // tres entradas donde NO niegan igual, y la que se queda es LA MÁS
+      // PERMISIVA. Son las tres en que falta `calificadoId` y el otro lado vale
+      // también '': un viaje con `conductorId: ''`, un viaje con `pasajeroId: ''`,
+      // y un pedido con `restauranteId: ''`. Ahí el PAR compara '' con '' y da que
+      // sí. NO son alcanzables hoy —un viaje no puede nacer con conductor, el
+      // candado del conductor impide ponerlo, y un pedido exige un restaurante que
+      // exista—, y la calificación que saldría no llevaría `calificadoId`, así que
+      // `MiPerfil.js:40` nunca la sumaría. Pero es una puerta que depende de que
+      // esos tres estados sigan siendo imposibles, no del candado. Queda dicho.
+      //
+      // LO QUE ESTO **NO** CIERRA, y hay que decirlo con precisión, porque la
+      // primera versión de este comentario se apuntó «la ÚLTIMA puerta» cuando
+      // faltaba una y la segunda opinión la midió con 15 de 15:
+      //   · CERRADO — una sola cuenta calificándose a sí misma, por el viaje o por
+      //     el pedido.
+      //   · CERRADO — el negocio, o quien trabaja en él, calificando al negocio.
+      //     Es el candado `!esDelNegocio()` de `calificaSuPedido()`.
+      //   · ABIERTO, y no se cierra con reglas: una SEGUNDA cuenta que NO trabaje
+      //     en el negocio, pida de verdad, y califique. El negocio marca su propio
+      //     pedido 'entregado' —tiene que poder— y esa cuenta ya tiene un
+      //     comprobante legítimo. Ninguna regla puede distinguir eso de un cliente
+      //     contento: haría falta mirar PATRONES (siempre el mismo par de cuentas,
+      //     pedidos sin pago, horas raras). Le pasa a todos los sistemas de reseñas
+      //     del mundo. Lo que sí se acabó es la versión gratis, instantánea e
+      //     ilimitada con una cuenta y media.
+      allow create: if request.auth != null
+        && estrellasDeVerdad()
+        && request.resource.data.get('calificadoId', '') != request.auth.uid
+        && (
+          (request.resource.data.keys().hasAny(['viajeId']) &&
+           !request.resource.data.keys().hasAny(['pedidoId']) && calificaSuViaje()) ||
+          (request.resource.data.keys().hasAny(['pedidoId']) &&
+           !request.resource.data.keys().hasAny(['viajeId']) && calificaSuPedido())
+        );
+
+      // El `!= ''` NO sobra. Sin él, `esDelNegocio('')` es un COMODÍN: una ficha de
+      // empleado a la que le falte `restauranteId` cumple esa pregunta, y TODA
+      // calificación de viaje devuelve '' en ese campo. Esa persona podría reportar
+      // —o sea ESCONDER, porque Restaurantes.js:164 y aliados:29 filtran las
+      // reportadas— la calificación de quien quisiera. Lo cazó la segunda opinión
+      // del 25-ago-2026.
+      allow update: if esAdmin() || (
+        resource.data.get('restauranteId', '') != '' &&
+        esDelNegocio(resource.data.get('restauranteId', '')) &&
+        soloElReporte()
+      );
+
+      allow delete: if false;
     }
+    // ── REGLA 10 · UNA LLAMADA ES DE LOS DOS QUE VIAJAN, DE NADIE MÁS ───────
+    // Hasta el 24-ago-2026 esto decía «allow read, create, update: if
+    // request.auth != null»: cualquiera con una cuenta podía LEER y ESCRIBIR
+    // ENCIMA de la llamada de un viaje ajeno.
+    //
+    // No es solo privacidad. Aquí dentro va la negociación de la llamada de voz
+    // (guajirago/src/Llamada.js): quien escriba primero la respuesta, HABLA. Así
+    // que un extraño podía tumbar la llamada de una pasajera en marcha y, con
+    // suerte de tiempo, contestar antes que su conductor y hacerse pasar por él.
+    // «Cambio de punto, sal a la esquina de atrás.» Es riesgo físico.
+    //
+    // ESTE BLOQUE SOLO NO CIERRA ESA PUERTA, y por poco se despliega creyendo que
+    // sí. La segunda opinión lo tumbó en un paso: como aquí se le pregunta al
+    // VIAJE quién va dentro, y el viaje lo escribía cualquiera, bastaba con
+    // ponerse de `conductorId` para entrar — y de paso dejar fuera al conductor de
+    // verdad. Lo que lo cierra son LAS DOS COSAS: esto y el `allow update` del
+    // bloque `viajes`, cerrado el mismo día. Si algún día alguien vuelve a abrir
+    // aquel, esto se queda de adorno.
+    //
+    // QUIÉN PUEDE, Y CÓMO SE SABE
+    //
+    // El id de este documento ES el id del viaje — lo hacen así los cuatro sitios
+    // que lo usan (Llamada.js:25, Solicitar.js:679, SolicitarMensajeria.js:683,
+    // AppConductor.js:1120). Comprobado el 24-ago-2026 contra el servidor vivo: la
+    // única llamada que existe tiene por id un viaje de verdad. Por eso no hace
+    // falta guardar nada nuevo dentro: se le pregunta al viaje.
+    //
+    // LOS DOS LADOS, y esto importa: quien llama NO es siempre el pasajero. En
+    // Llamada.js llaman los dos, y los dos escriben este mismo documento (la
+    // oferta, la respuesta y sus candidatos). Una regla que solo mirara
+    // `pasajeroId` dejaría MUDA la mitad de las llamadas — y en silencio, porque
+    // el catch de Llamada.js:206 y :212 se traga el error.
+    //
+    // `read` se parte en dos, como en los pedidos:
+    //   · get  — mirar UNA llamada, que es lo único que hace la app: los cuatro
+    //     sitios abren doc(db,'llamadas', viajeId), nunca la colección.
+    //   · list — pedirlas muchas. No lo hace nadie, y además cada documento
+    //     costaría preguntarle a su viaje. Solo el panel.
+    //
+    // SOBRE EL exists() DE ABAJO, y conviene saber qué hace y qué NO hace.
+    //
+    // Se plantó el mutante de quitarlo (24-ago-2026) y las pruebas siguieron
+    // VERDES. Motivo: preguntarle a un viaje que no existe da error, y un error
+    // dentro de una regla NIEGA. O sea que el exists() NO es lo que cierra esta
+    // puerta — la cierra el error. Queda dicho para que nadie crea que quitarlo
+    // abre una fuga: no la abre.
+    //
+    // Se queda porque negar «porque revienta» es fiarse de un detalle fino del
+    // motor de reglas: comprobado, el error NO niega por su cuenta — se lo traga
+    // el ||, y por eso el panel SÍ puede leer una llamada huérfana. Lo que cierra
+    // la puerta al extraño es que ahí el error se queda solo, sin un || que lo
+    // rescate. Es demasiado fino para dejarlo sin red.
+    //
+    // Y QUE CONSTE, porque el comentario anterior citaba solo al vecino que le
+    // daba la razón: en este mismo archivo la pregunta «¿va este uid en este
+    // viaje?» está escrita CUATRO veces y de cuatro formas distintas — esMio() en
+    // el bloque de viajes, elViaje() en el privado del viaje, vaEnEsteViaje() en
+    // el chat, y esta. Las tres primeras NO usan exists(). Ya se nota la
+    // divergencia: en el chat el panel puede escribir y aquí no. Unificarlas es
+    // trabajo aparte (SEGUNDA LEY), y queda ANOTADO.
+    //
+    // Y `.get(campo, '')` con defecto vacío SÍ es carga: un viaje sin conductor
+    // todavía no tiene ese campo, y la cadena vacía no es el uid de nadie. Ese
+    // mutante —cambiar el defecto por el uid de quien pregunta— sí muere.
     match /llamadas/{llamadaId} {
-      allow read, write: if request.auth != null;
+      function esDeLosQueViajan() {
+        return request.auth != null &&
+          exists(/databases/$(database)/documents/viajes/$(llamadaId)) && (
+            get(/databases/$(database)/documents/viajes/$(llamadaId)).data.get('pasajeroId', '') == request.auth.uid ||
+            get(/databases/$(database)/documents/viajes/$(llamadaId)).data.get('conductorId', '') == request.auth.uid
+          );
+      }
+
+      allow get: if esDeLosQueViajan() || esAdmin();
+      allow list: if esAdmin();
+      allow create, update: if esDeLosQueViajan();
+      allow delete: if false;
     }
     match /codigos/{codigoId} {
-      allow read, write: if request.auth != null;
+      // ── REGLA 6 · LOS CODIGOS DE RECARGA NO SE LISTAN ────────────────────────
+      // Hasta el 23-ago-2026 cualquier usuario registrado podía pedir la LISTA
+      // entera y ver cuáles seguían sin usar. Medido ese día: 8 códigos, 3 sin
+      // usar, por $100.800 de verdad.
+
+      // ── REGLA 10 · Y NADIE MÁS QUE EL PANEL LOS ESCRIBE (25-ago-2026) ──────
+      //
+      // Faltaba lo peor, y estuvo abierto dos días más: `create, update: if
+      // request.auth != null`. CUALQUIERA con una cuenta se fabricaba
+      // `codigos/LOQUESEA` con `{valor: 5000000, usado: false}` y lo canjeaba.
+      // Dinero de la nada, sin tope y en bucle. O reescribía `usado: false` sobre
+      // uno ya gastado para volver a cobrarlo.
+      //
+      // POR QUÉ NO BASTABA CON LA FUNCIÓN. `canjearCodigoRecarga`
+      // (functions/index.js:520) está bien hecha: exige sesión, mira `usado`, mira
+      // `valor`, y todo dentro de una transacción. Pero se FÍA de esos dos campos,
+      // y esos dos los escribía el cliente. La REGLA 7 movió la CUENTA al servidor
+      // y dejó el DATO en la calle.
+      // LA LECCIÓN, que es la misma que la de las llamadas y el viaje: una
+      // función —o una regla— no vale más que las reglas del documento del que se
+      // fía.
+      //
+      // Y EL `get` TAMBIÉN SE CIERRA, porque el comentario de arriba se quedó
+      // viejo: decía que el canje pedía el código desde la app. Ya no.
+      // `guajirago/src/Creditos.js:111` solo llama a la función, y la función corre
+      // con el SDK de administrador, que se salta estas reglas. Buscado el
+      // 25-ago-2026 en las tres apps: 'codigos' solo aparece en el panel.
+      //
+      // Importa cerrarlo porque aquí dentro no solo hay dinero. Medido ese día:
+      // los 8 documentos llevan `cuentaDestino`, `banco`, `numComprobante` y
+      // `telefonoConductor` — los datos bancarios del conductor que hizo la
+      // recarga. Con el get abierto, quien acertara un código los leía.
+      //
+      // Medido el 25-ago-2026: 8 códigos, 5 usados, 1 anulado, 2 vivos por $50.800.
+      // Los escribe el panel: Codigos.js:208 (crear) y :266 (anular).
+      allow get, list: if esAdmin();
+
+      // ── UN CÓDIGO SE CREA UNA VEZ, Y DESPUÉS SOLO SE ANULA (6-sep-2026) ────
+      // `create` y `update` iban juntos en el mismo renglón, y en Firestore
+      // `update` es lo que pasa cuando se escribe ENCIMA de un documento que ya
+      // existe. El panel guarda con setDoc y su campo del código SE PUEDE
+      // TECLEAR: escribir uno que ya existía lo sobrescribía entero, dejándolo
+      // otra vez en `usado: false, anulado: false`. Un código ya cobrado volvía
+      // a valer, por el valor nuevo que se le pusiera.
+      // No es un caso de laboratorio: en la base hay uno tecleado a mano
+      // (PRUEBA50000, $50.000), así que la puerta se usa.
+      //
+      // Lo único que el panel necesita cambiarle a un código vivo es ANULARLO.
+      // Marcarlo como cobrado lo hace `canjearCodigoRecarga` con el SDK de
+      // administrador, que no pasa por estas reglas.
+      allow create: if esAdmin();
+      allow update: if esAdmin()
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['anulado', 'fechaAnulacion']);
+      allow delete: if false;
     }
     match /promociones/{promoId} {
-      allow read, write: if request.auth != null;
+      allow read: if request.auth != null;
+      allow create, update: if request.auth != null;
+      // EXCEPCION medida: el panel borra promociones (Promociones.js:155).
+      allow delete: if request.auth != null && (
+        get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.rol == 'admin' ||
+        get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.rol == 'superadmin'
+      );
       match /usos/{usoId} {
-        allow read, write: if request.auth != null;
+        allow read: if request.auth != null;
+        allow create, update: if request.auth != null;
+        allow delete: if false;
       }
     }
     match /anuncios/{anuncioId} {
       allow read: if request.auth != null;
-      allow write: if request.auth != null && (
+      allow create, update: if request.auth != null && (
+        get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.rol == 'admin' ||
+        get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.rol == 'superadmin'
+      );
+      // EXCEPCION medida: el panel borra anuncios (Superadmin.js:541).
+      allow delete: if request.auth != null && (
         get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.rol == 'admin' ||
         get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.rol == 'superadmin'
       );
     }
     match /config/{documentoConfig} {
       allow read: if request.auth != null;
-      allow write: if request.auth != null &&
+      allow create, update: if request.auth != null &&
         get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.rol == 'superadmin';
+      allow delete: if false;
     }
     match /logs/{logId} {
       allow read: if request.auth != null &&
@@ -61,44 +1094,1114 @@ service cloud.firestore {
         get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.rol == 'superadmin'
       );
     }
+    // ── REGLA 9 · LA BANDEJA DE RECHAZOS (26-ago-2026) ──────────────────────
+    // Palabras del dueño: «Nada se rechaza en silencio. Todo rechazo va a una
+    // bandeja con su motivo.» El 26-ago se cerró la primera mitad —que el cliente
+    // se entere— en las tres apps. Esta es la segunda: que el dueño lo VEA.
+    //
+    // POR QUÉ NO VA EN `logs`, que ya existe justo aquí arriba: `logs` es el rastro
+    // de auditoría del superadmin y solo lo escriben admin y superadmin. Un pasajero
+    // al que le rechacen una calificación NO puede escribir ahí — y aunque pudiera,
+    // ahogaría la auditoría: la pantalla que la lee pide los ÚLTIMOS 100
+    // (admin/Superadmin.js:151) y hoy hay 53 registros. Los rechazos empujarían
+    // fuera de la vista lo que de verdad hay que auditar.
+    //
+    // EL PELIGRO DE ESTA COLECCIÓN, y cómo se ataja. Aquí escribe CUALQUIERA con
+    // cuenta —tiene que ser así: el que sufre el rechazo es quien lo cuenta—, y eso
+    // es un vertedero esperando a pasar. Se ataja por el NOMBRE del documento:
+    //
+    //     rechazos/{uid}__{donde}
+    //
+    // El nombre tiene que ser EXACTAMENTE ése, y `donde` tiene que salir de la lista
+    // cerrada de abajo. Con eso, lo máximo que una persona puede crear en toda su
+    // vida son TANTOS DOCUMENTOS COMO SITIOS HAY. Hoy, cuatro. Repetirse cae siempre
+    // en el mismo y solo sube el contador.
+    //
+    // LA PRIMERA VERSIÓN NO CERRABA, y aquí está escrito para que no se repita. Decía
+    // `rechazoId.matches(uid + '__.*')` —solo que EMPEZARA por el uid— y el resto del
+    // nombre era texto libre. El comentario prometía «un puñado al día». La segunda
+    // opinión lo midió ejecutándolo contra el emulador: UNA cuenta creó 300 documentos
+    // de basura, 300 de 300 intentos. Y con eso la bandeja repetía el mismo defecto
+    // por el que se descartó `logs` cuatro renglones más arriba: la pantalla pide 200
+    // y la basura empuja fuera de la vista los rechazos de verdad.
+    //
+    // La lección, otra vez: un candado que ata el PRINCIPIO de algo no ata nada. Lo
+    // que no se fija, el que escribe lo elige.
+    //
+    // Y SE MIRA LO QUE ENTRA. `hasOnly` para que no cuelen campos de paso, `hasAll`
+    // para que no nazca a medias, la lista cerrada de clases y de apps, y un tope de
+    // 60 letras a los dos textos libres. Un campo libre sin tope es un sitio donde
+    // guardar lo que sea.
+    //
+    // LO QUE AQUÍ SE VE POCO, y por qué — con la medición delante, porque la primera
+    // versión de este comentario decía otra cosa y era FALSA.
+    //
+    // Decía que sin internet «esta escritura tampoco sale». No es verdad: las dos apps
+    // encienden la cola de escrituras sin red (guajirago/src/firebase.js:24 y
+    // guajirago-aliados/src/firebase.js:24), así que el apunte se guarda en el
+    // teléfono y LLEGA solo cuando vuelve la señal. La segunda opinión lo midió
+    // apagando y encendiendo la red: el apunte apareció en el servidor.
+    //
+    // Lo que pasa de verdad es otra cosa: sin red una ESCRITURA no falla, se queda
+    // esperando. Así que en los caminos que escriben —calificar un viaje, calificar
+    // un pedido— el fallo nunca salta y no hay nada que apuntar. Donde sí salta es en
+    // los que LEEN, que sin red fallan de inmediato: ver las calificaciones del
+    // restaurante, o cargar esta misma bandeja.
+    match /rechazos/{rechazoId} {
+      // Solo el panel lo lee. Aquí dentro hay identificadores de personas y de qué
+      // les falló: no es para el escaparate.
+      allow get, list: if esAdmin();
+
+      // Los sitios que existen. Es una lista CERRADA a propósito: es lo que convierte
+      // «puede crear los que quiera» en «puede crear cuatro». Si mañana hace falta
+      // uno nuevo, se añade AQUÍ y en la tabla del panel (admin/Rechazos.js), y hay
+      // una prueba que carea los dos lados.
+      function sitios() {
+        return ['calificar-viaje', 'calificar-pedido',
+                'ver-calificaciones', 'reportar-comentario'];
+      }
+
+      // El nombre del documento se compara ENTERO, no por el principio. Así el que
+      // escribe no elige nada: ni cuántos documentos, ni cómo se llaman.
+      function esSuyo() {
+        return request.auth != null
+          && request.resource.data.get('quienUid', '') == request.auth.uid
+          && rechazoId == request.auth.uid + '__' + request.resource.data.get('donde', '');
+      }
+
+      function camposBuenos() {
+        return request.resource.data.keys().hasOnly(
+                 ['quienUid', 'app', 'donde', 'clave', 'codigo', 'veces', 'ultima'])
+          // ESTE RENGLÓN HOY NO HACE NADA, y se dice en vez de fingir que sí.
+          // Las comprobaciones de tipo de abajo —`in [...]`, `is timestamp`,
+          // `is int`— ya obligan a que los campos ESTÉN: en estas reglas, leer un
+          // campo que falta da error, y un error niega. Se comprobó EJECUTANDO
+          // las dos versiones con diez escrituras distintas: cero diferencias.
+          // Se queda como cinturón, por si mañana alguien cambia una de esas
+          // comprobaciones por una con valor por defecto —`.get(campo, algo)`—,
+          // que sí toleraría el campo ausente sin que nada avisara.
+          && request.resource.data.keys().hasAll(
+                 ['quienUid', 'app', 'donde', 'clave', 'veces', 'ultima'])
+          && request.resource.data.clave in ['permiso', 'sinRed', 'otro']
+          && request.resource.data.app in ['pasajero', 'aliados']
+          // `donde` SALE DE LA LISTA. No es solo higiene: es la mitad del candado
+          // anti-vertedero, porque el nombre del documento se construye con él. Y de
+          // paso cierra otro agujero que midió la segunda opinión: con
+          // `donde: '__proto__'` la pantalla del panel REVENTABA al pintarla —y como
+          // aquí no se borra nada (REGLA 12), habría quedado rota para siempre.
+          && request.resource.data.donde in sitios()
+          // `ultima` es OBLIGATORIA. La pantalla ordena por ella, y en Firestore un
+          // documento sin el campo por el que se ordena NO SALE en la consulta:
+          // estaría en la base y el panel diría «ningún rechazo apuntado». Lo midió
+          // la segunda opinión: 1 de 2 documentos visibles, y quitándosela a uno que
+          // ya se veía, 0 de 1.
+          && request.resource.data.ultima is timestamp
+          && request.resource.data.get('codigo', '') is string
+          && request.resource.data.get('codigo', '').size() <= 60
+          && request.resource.data.veces is int;
+      }
+
+      // Nace contando UNO. Si naciera contando mil, el contador no diría nada.
+      allow create: if esSuyo() && camposBuenos() && request.resource.data.veces == 1;
+
+      // Repetirse SUBE el contador DE UNO EN UNO, y nada más. No se puede cambiar de
+      // dueño, ni de app, ni de sitio: eso convertiría un documento viejo en otro
+      // distinto y la bandeja contaría una historia falsa.
+      //
+      // EL «DE UNO EN UNO» NO SOBRA. Antes decía solo `>`, y la segunda opinión saltó
+      // de 1 a mil millones de una escritura: el titular que ve el dueño («N rechazos
+      // en M sitios») era un número que elegía el atacante. Bajarlo tampoco se puede:
+      // sería borrar sin dejar lápida (REGLA 12).
+      allow update: if esSuyo() && camposBuenos()
+        && request.resource.data.quienUid == resource.data.quienUid
+        && request.resource.data.app == resource.data.app
+        && request.resource.data.donde == resource.data.donde
+        && request.resource.data.veces == resource.data.veces + 1;
+
+      allow delete: if false;
+    }
     match /dispositivosBeneficio/{deviceId} {
       allow read: if request.auth != null;
       allow create: if request.auth != null;
       allow update, delete: if false;
     }
+    // ── REGLA 9 · UN NEGOCIO NO SE APRUEBA A SÍ MISMO ───────────────────────
+    // El alta está bien hecha: aliados/Login.js:49 crea el negocio con
+    // `aprobado: false` y `estadoAprobacion: 'pendiente'`. Nace sin aprobar, como
+    // debe ser. El agujero estaba en lo de DESPUÉS: la regla dejaba al negocio
+    // escribir CUALQUIER campo de su propio documento, así que se aprobaba solo
+    // con una sola escritura —`aprobado: true`— y aparecía en la app del cliente.
+    //
+    // Y lo peor no era que apareciera, sino que DESAPARECÍA de la bandeja del
+    // dueño: el panel enseña como pendientes solo los que tienen
+    // `aprobado === false` (admin/Restaurantes.js:86). El que se aprueba solo
+    // nunca le sale al dueño para revisarlo. Se colaba sin que nadie lo viera.
+    //
+    // En el mismo documento vive `creditos`, que es DINERO —el panel lo enseña
+    // como «💰 Créditos» (admin/Restaurantes.js:107 y :136)— y también se lo
+    // escribía el propio negocio. Es exactamente lo que la REGLA 7 cerró para
+    // las personas; a los negocios se les quedó abierto.
     match /restaurantes/{restauranteId} {
+      // Lo que decide el PANEL y nadie más. Medido el 24-ago-2026: TODAS las
+      // escrituras de estos campos posteriores al alta salen del panel —
+      // admin/Restaurantes.js:53, :58 y :63, admin/Turismo.js:50, :55 y :60, y
+      // admin/AliadosPendientes.js:26 y :31. Ninguna pantalla de aliados los
+      // toca después de crear el negocio, así que congelarlos no le quita nada
+      // a nadie. Lo que el negocio SÍ cambia —el menú, los tours, las mesas, el
+      // horario, el logo, `abierto`, `demoraMin`— se queda como estaba.
+      // ── `tipoNegocio` ENTRA AQUÍ EL 6-SEP-2026 · EL SOFTWARE SE VENDE ──────
+      // Hasta hoy un negocio podía CAMBIARSE SU PROPIO TIPO desde su app: el campo
+      // no estaba en ninguna de las dos listas cerradas. Con un solo dueño daba
+      // igual. Vendiéndolo NO: el dueño decidió que sea UN SOLO programa con
+      // módulos, y que `tipoNegocio` sea EL PAQUETE COMERCIAL que decide qué
+      // módulos vienen encendidos. O sea que un cliente se encendía los caros él
+      // solo, cambiándose el tipo desde el navegador. Lo destapó la segunda
+      // opinión al revisar el guion que puso ese campo.
+      //
+      // EL REGISTRO NO SE ROMPE, y se comprobó antes de tocar: el negocio escribe
+      // su tipo al registrarse con `setDoc` sobre un documento que NO EXISTE, o
+      // sea que pasa por `allow create` —otra regla, que no se toca— y no por
+      // este `update`. Elegir el tipo al nacer sigue siendo suyo; cambiarlo
+      // después, no.
+      //
+      // Y NO ROMPE NADA MÁS: medido el 6-sep-2026, NINGUNA de las tres apps
+      // cambia `tipoNegocio` después de crear el negocio. Ni el panel.
+      // `estadoComercial` y `visibleEnEscaparate` entran aquí EL MISMO DÍA que se
+      // inventan, y es lo más importante de las tres llaves: si un negocio pudiera
+      // escribirse `estadoComercial: 'alDia'`, el bloqueo por no pagar se
+      // desharía con una línea desde el navegador. La llave la guarda quien cobra.
+      function camposDelPanel() {
+        return ['aprobado', 'estadoAprobacion', 'activo', 'creditos', 'rol',
+                'fechaAprobacion', 'fechaRechazo', 'tipoNegocio',
+                'estadoComercial', 'visibleEnEscaparate'];
+      }
+
+      // LO QUE NO PUEDE VOLVER AL ESCAPARATE (tanda 2, 24-ago-2026).
+      //
+      // Esta colección se la descarga ENTERA la app del pasajero para enseñar
+      // dónde pedir (guajirago/src/Restaurantes.js, Turismo.js). Hasta hoy dentro
+      // viajaban el nombre, el teléfono y el correo del dueño: le llegaban solos a
+      // cualquiera que abriera esa pantalla. Ya se mudaron al cuarto de atras,
+      // que desde el 7-sep-2026 se llama negociosPrivado.
+      //
+      // Esto es lo que impide que VUELVAN. Sin ello, vaciarlos es un trabajo de un
+      // día: la próxima pantalla que guarde el perfil los mete otra vez y nadie se
+      // entera, porque nada falla — simplemente el dato reaparece en el escaparate.
+      //
+      // Es la MISMA lista que guajirago-aliados/src/negocioPrivado.js, y hay una
+      // prueba que carea los dos lados (pruebas/amarres.test.js).
+      function camposPrivados() {
+        return ['duenoNombre', 'duenoTelefono', 'email', 'creditos', 'fcmToken'];
+      }
+
       allow read: if request.auth != null;
-      allow write: if request.auth != null && (
-        request.auth.uid == restauranteId ||
-        get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.rol == 'admin' ||
-        get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.rol == 'superadmin'
+
+      // En el ALTA sí hay que dejarlos escribir: si se prohibieran aquí, nadie
+      // podría volver a registrar un negocio. Lo que se exige es que ESTÉN y que
+      // valgan lo seguro.
+      //
+      // OJO AL DETALLE QUE CASI SE CUELA (lo cazó el revisor el 24-ago-2026,
+      // ejecutándolo): esto decía `.get('aprobado', false) == false`, o sea «si
+      // viene, que sea false». Y un campo que NO VIENE también pasaba. Con eso el
+      // negocio se registraba SIN el campo y conseguía exactamente lo mismo que
+      // aprobándose a sí mismo:
+      //   · el cliente lo ENSEÑA, porque filtra `aprobado !== false` y «no existe»
+      //     no es «false» (guajirago/src/Restaurantes.js:104, Turismo.js:44);
+      //   · y la bandeja de pendientes del panel NO lo ve, porque busca
+      //     `aprobado == false` y un campo ausente no cuadra con esa consulta
+      //     (admin/AliadosPendientes.js:15, admin/Restaurantes.js:86) — es más:
+      //     el panel lo pinta como «APROBADO».
+      // El mismo agujero por la otra puerta. Por eso ahora se exige que el campo
+      // ESTÉ, no solo que «si está valga lo seguro».
+      //
+      // Al alta legítima no le cuesta nada: aliados/Login.js manda `aprobado`,
+      // `estadoAprobacion` y `rol` en el mismo setDoc. (Antes decía «los cinco» y
+      // se quedó viejo con la tanda 2: desde entonces `creditos` NO se manda aquí,
+      // vive en el cuarto — mira el hasAny() de más abajo.)
+      //
+      // Y exigir el valor exacto cierra de paso los tipos: un `aprobado: 'true'` de
+      // texto no es igual a false, así que se niega — a propósito, no por un error
+      // de evaluación.
+      allow create: if (esAdmin() || (
+        request.auth != null &&
+        request.auth.uid == restauranteId &&
+        request.resource.data.aprobado == false &&
+        request.resource.data.estadoAprobacion == 'pendiente' &&
+        request.resource.data.rol == 'dueno' &&
+        !request.resource.data.keys().hasAny(['fechaAprobacion', 'fechaRechazo']) &&
+        // OJO: aquí YA NO se pide «creditos == 0». Desde la tanda 2, 'creditos' no
+        // vive en el escaparate: vive en el cuarto. Así que ahora tiene que estar
+        // AUSENTE, y de eso se encarga el hasAny() de abajo, porque 'creditos' es
+        // uno de los camposPrivados(). Es más fuerte que antes: antes podía venir
+        // valiendo cero, ahora no puede venir.
+        !request.resource.data.keys().hasAny(camposPrivados())
+      ))
+      // ── 🔴 Y NO SE CREA AQUÍ UN NEGOCIO QUE YA EXISTE EN `negocios` ──────
+      //  Esta carpeta es la VIEJA: los negocios de hoy nacen en `negocios`.
+      //  Sigue abierta por si queda un REZAGADO —una pestaña sin recargar—, y
+      //  eso deja su hueco libre. Sin este candado, un negocio nuevo podría
+      //  crearse a sí mismo aquí diciendo que está «al día» y desbloquearse.
+      //  `negocioPuedeOperar` ya pregunta en «Y», así que el gemelo solo podría
+      //  QUITARLE permiso; esto lo cierra donde nace. Es la misma pareja de
+      //  candados que cerró el gemelo falso de los pedidos.
+      //
+      //  EL PARÉNTESIS DE ARRIBA NO ES ADORNO. En este lenguaje «&&» ata más
+      //  fuerte que «||»: sin él esto se leería «esAdmin() O (lo demás Y el
+      //  candado)», y el candado se quedaría colgando de media regla, sin
+      //  cubrir la rama del admin. Hoy no muerde —el panel nunca CREA un
+      //  negocio, solo lo cambia— pero el comentario de aquí arriba decía que
+      //  esto era la misma pareja de candados que la de los pedidos, y allí el
+      //  paréntesis sí está. Ahora es verdad.
+      //  Cuando se retire esta carpeta, este renglón se va con ella.
+      && !exists(/databases/$(database)/documents/negocios/$(restauranteId));
+
+      // Al cambiarlo: el negocio manda en lo suyo, pero no en lo del panel.
+      // En el update se mira affectedKeys() y no keys(): así lo que YA esté dentro
+      // de un documento viejo no bloquea guardar el perfil, pero nadie puede
+      // añadirlo ni cambiarlo. Con esto, EL VACIADO se puede correr antes o después
+      // de desplegar, sin una ventana en la que un negocio no pueda guardar su
+      // perfil.
+      //
+      // OJO — ESO VALE PARA EL VACIADO, NO PARA EL ALTA. La segunda opinión del
+      // 24-ago-2026 lo comprobó ejecutando las cuatro combinaciones: el create de
+      // aquí abajo y aliados/Login.js son INCOMPATIBLES en las dos direcciones.
+      //   · reglas nuevas + app vieja  -> el alta manda los datos del dueño: NEGADA.
+      //   · app nueva + reglas viejas  -> el alta no manda `creditos` y la regla
+      //     vieja pedía `creditos == 0`: NEGADA por campo ausente.
+      // O sea que hay una ventana, corta pero real, en la que un negocio NUEVO no
+      // se puede registrar — y con la caché del navegador, quien tenga la app vieja
+      // sigue sin poder hasta que la refresque.
+      //
+      // Y falla feo: createUserWithEmailAndPassword ya se ejecutó, así que la cuenta
+      // queda creada sin negocio. Al reintentar sale «ese correo ya tiene una
+      // cuenta» y ese correo no se puede volver a usar.
+      //
+      // Se asumió a propósito (24-ago-2026): no hay clientes todavía y los dos
+      // despliegues van seguidos. Si algún día se repite con negocios trabajando,
+      // el camino es un paso intermedio en las reglas que acepte las DOS altas, y
+      // endurecerlas después de que la app vieja haya desaparecido.
+      allow update: if esAdmin() || (
+        request.auth != null &&
+        request.auth.uid == restauranteId &&
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny(camposDelPanel()) &&
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny(camposPrivados())
       );
+
+      allow delete: if false;
     }
+
+    // ══ EL NOMBRE NUEVO: `negocios` (7-sep-2026) ════════════════════════════
+    //  TERCER pedazo del cambio de nombre «restaurante» → «negocio», de cuatro.
+    //  Detrás va el CAMPO `restauranteId` → `negocioId`, que aún no se ha hecho:
+    //  no se retira la carpeta vieja hasta que ese también esté.
+    //  Esta es LA CARPETA DE LOS NEGOCIOS: mientras se llamara `restaurantes`,
+    //  el día que entrara una peluquería el sistema por dentro diría que una
+    //  peluquería es un restaurante.
+    //
+    //  ES LA MISMA REGLA QUE LA DE ARRIBA, palabra por palabra — sin los
+    //  comentarios, que cuentan la historia de cómo se cerró cada agujero y se
+    //  quedan en el original — y con el comodín en el idioma nuevo
+    //  (`negocioId` donde el viejo dice `restauranteId`). Lo carea, palabra
+    //  por palabra, una prueba en `pruebas/reglas.test.js`.
+    //
+    //  LAS DOS VIVEN A LA VEZ mientras dure la mudanza. La de arriba se retira
+    //  cuando pasen unos días sin que aparezca un rezagado.
+    match /negocios/{negocioId} {
+      function camposDelPanel() {
+        return ['aprobado', 'estadoAprobacion', 'activo', 'creditos', 'rol',
+                'fechaAprobacion', 'fechaRechazo', 'tipoNegocio',
+                'estadoComercial', 'visibleEnEscaparate'];
+      }
+
+      function camposPrivados() {
+        return ['duenoNombre', 'duenoTelefono', 'email', 'creditos', 'fcmToken'];
+      }
+
+      allow read: if request.auth != null;
+
+      allow create: if esAdmin() || (
+        request.auth != null &&
+        request.auth.uid == negocioId &&
+        request.resource.data.aprobado == false &&
+        request.resource.data.estadoAprobacion == 'pendiente' &&
+        request.resource.data.rol == 'dueno' &&
+        !request.resource.data.keys().hasAny(['fechaAprobacion', 'fechaRechazo']) &&
+        !request.resource.data.keys().hasAny(camposPrivados())
+      );
+
+      allow update: if esAdmin() || (
+        request.auth != null &&
+        request.auth.uid == negocioId &&
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny(camposDelPanel()) &&
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny(camposPrivados())
+      );
+
+      allow delete: if false;
+    }
+
+    // ── REGLA 9 · EL CUARTO DE ATRÁS DE CADA NEGOCIO ────────────────────────
+    // El documento `negocios/{id}` es el ESCAPARATE: la app del pasajero se
+    // descarga la colección entera para enseñar dónde pedir, y eso está bien.
+    // Lo que no estaba bien es lo que viajaba dentro. Medido el 24-ago-2026 en el
+    // servidor: los 3 negocios llevaban el NOMBRE, el TELÉFONO y el CORREO de su
+    // dueño, más sus créditos. A cualquiera que se registrara le llegaban solos.
+    //
+    // Aquí vive lo que no es para el escaparate. El id del documento es el MISMO
+    // que el del negocio, así que «¿es tuyo?» se contesta sin leer nada.
+    // Qué campos son privados lo decide UN solo archivo,
+    // `guajirago-aliados/src/negocioPrivado.js`, y hay una prueba que carea ese
+    // archivo con estas reglas (pruebas/amarres.test.js).
+    // ── EL NOMBRE CAMBIÓ (7-sep-2026): antes era `restaurantesPrivado` ────────
+    //  Decisión del dueño: aliados va a ser UN software con módulos y va a vender
+    //  a panaderías, peluquerías, hoteles y tiendas — no solo a restaurantes.
+    //  Con el nombre viejo, la base de datos habría dicho que una peluquería es
+    //  un restaurante. Se cambia AHORA porque hay 3 negocios y ningún cliente
+    //  pagando: es el momento más barato que va a existir.
+    //  Este es el ENSAYO del cambio, el más pequeño de los cuatro: 3 documentos
+    //  y cuatro sitios en el código. La lápida del nombre viejo está más abajo.
+    match /negociosPrivado/{negocioId} {
+      // LO QUE SOLO ESCRIBE EL PANEL. Son LOS MISMOS SIETE que en `restaurantes`,
+      // y eso es a propósito: si aquí fueran menos, este cuarto sería una PUERTA DE
+      // ATRÁS a la REGLA 9-C.
+      //
+      // Hasta el 24-ago-2026 esta lista tenía uno solo, 'creditos'. Daba igual
+      // mientras nadie leyera el cuarto más que su dueño. Dejó de dar igual cuando
+      // el panel empezó a leerlo (tanda 1b-2b), y la segunda opinión lo rompió
+      // EJECUTÁNDOLO contra el emulador:
+      //
+      //   escribir en restaurantes/r1        {aprobado:true}  -> NEGADO (REGLA 9-C)
+      //   escribir en restaurantesPrivado/r1 {aprobado:true}  -> ACEPTADO
+      //   ...y el panel lo veía APROBADO y el negocio DESAPARECÍA de la bandeja de
+      //   pendientes, que lista los que tienen aprobado === false.
+      //
+      // El panel ya no se lo traga —conSuCuarto() copia solo los campos privados—,
+      // pero eso es taparlo por fuera. Esto lo cierra donde nace. Los DOS lados,
+      // porque el próximo que escriba un lector no va a saber nada de esta historia.
+      function camposDelPanel() {
+        return ['creditos', 'aprobado', 'estadoAprobacion', 'activo', 'rol',
+                'fechaAprobacion', 'fechaRechazo'];
+      }
+
+      allow read: if request.auth != null && (
+        request.auth.uid == negocioId || esAdmin()
+      );
+
+      // OJO AL DEFECTO, que aquí SÍ vale y en el create de `restaurantes` NO:
+      //
+      // Allí, `.get('aprobado', false)` era un agujero — un negocio que se
+      // registraba SIN el campo conseguía lo mismo que aprobándose solo, porque
+      // «campo ausente» significaba VISIBLE para el cliente e INVISIBLE en la
+      // bandeja de pendientes. El defecto tapaba un estado peligroso.
+      //
+      // Aquí es al revés: «sin créditos» es que no hay dinero, que es el estado
+      // seguro.
+      //
+      // ¿Y para qué hace falta tolerarlo? Para el camino de REPUESTO, no para el
+      // normal. Lo normal es que el cuarto ya exista cuando llega el token:
+      // aliados/Login.js lo crea durante el registro y solo después App.js llama a
+      // registrarTokenFCM, así que el token entra por update. Medido el 24-ago-2026
+      // en el servidor vivo: los 3 cuartos existen y ninguno nació con un campo.
+      //
+      // La tolerancia es para cuando ESO falla. Si el segundo setDoc del registro
+      // no llegó a escribirse, el cuarto no existe, y el primero en crearlo acaba
+      // siendo el teléfono del dueño guardando su token — con ese único campo. Sin
+      // tolerarlo, ese negocio se quedaría sin avisos para siempre y sin saber por qué.
+      //
+      // El token vive aquí desde la tanda 1b-2a (24-ago-2026):
+      // aliados/Notificaciones.js lo escribe en esta colección y las dos funciones
+      // de avisos lo leen de aquí.
+      //
+      // La regla que se saca de los dos casos: un defecto vale cuando el estado
+      // por defecto es el SEGURO, y es un agujero cuando el estado por defecto
+      // es el que el atacante quería.
+      // Congelarlos en el update NO basta. Sin el hasAny() de abajo, el negocio
+      // crea su cuarto DE CERO con `aprobado: true` dentro y nace mintiendo — no
+      // hay ningún campo que cambiar, así que affectedKeys() no lo ve venir. Es la
+      // misma lección del create de `restaurantes`, unos renglones más arriba.
+      //
+      // 'creditos' se saca de la lista aquí porque tiene su propia comprobación (la
+      // de al lado): puede venir, pero valiendo cero. Se saca con removeAll() en vez
+      // de escribir los seis a mano, para que no haya DOS listas que mantener.
+      allow create: if esAdmin() || (
+        request.auth != null &&
+        request.auth.uid == negocioId &&
+        request.resource.data.get('creditos', 0) == 0 &&
+        !request.resource.data.keys().hasAny(camposDelPanel().removeAll(['creditos']))
+      );
+
+      allow update: if esAdmin() || (
+        request.auth != null &&
+        request.auth.uid == negocioId &&
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny(camposDelPanel())
+      );
+
+      allow delete: if false;
+    }
+
+    // ── LA LÁPIDA DEL NOMBRE VIEJO (7-sep-2026) ──────────────────────────────
+    //  `restaurantesPrivado` fue el nombre de este cuarto hasta hoy. Sus 3
+    //  documentos NO se borraron —REGLA 12 del dueño: «los borrados dejan
+    //  lápida»—: se COPIARON a `negociosPrivado` con
+    //  `scripts/mudar-negocios-privado.cjs`, y los viejos siguen ahí intactos
+    //  por si algún día hubiera que carear. La copia se comprobó releyendo del
+    //  servidor: 3 iguales, 0 distintos.
+    //
+    //  AQUÍ ESTUVO EL ANDAMIO. Hasta hace un momento este bloque tenía los
+    //  MISMOS permisos que el nuevo, a propósito: entre que se publicaron las
+    //  reglas y que se publicaron las apps pasaron unos minutos, y en esos
+    //  minutos las apps de la calle todavía pedían el nombre viejo. Se cierra
+    //  AHORA, y solo después de comprobar bajando los dos paquetes del servidor
+    //  que aliados y el panel ya piden `negociosPrivado` y no nombran el viejo.
+    //  Si se hubiera cerrado de una vez, `aliados/Login.js:80` —que escribe el
+    //  cuarto al REGISTRARSE, y sin red de seguridad— habría dejado un negocio a
+    //  medio nacer para siempre, y la REGLA 12 prohíbe borrarlo.
+    //
+    //  🔴 Y SIN VENDERLO DE MÁS, que en este archivo ya ha pasado: este bloque
+    //  NO es lo que cierra la puerta. No hay ningún `match /{document=**}` en
+    //  estas reglas, así que lo que no tiene bloque ya está negado por defecto.
+    //  Está escrito para que se LEA la intención —y para que si alguien vuelve a
+    //  añadir un comodín abierto arriba, esto siga negando aquí abajo.
+    match /restaurantesPrivado/{negocioId} {
+      allow read, write: if false;
+    }
+
+    // ── LA LÁPIDA DEL NOMBRE VIEJO (9-sep-2026) ──────────────────────────────
+    //  `pedidosRestaurantes` fue el nombre de esta colección hasta el 7-sep-2026.
+    //  Sus 29 documentos NO se borraron —REGLA 12 del dueño: «los borrados dejan
+    //  lápida»—: se COPIARON a `pedidos` con `scripts/mudar-pedidos.cjs` y los
+    //  viejos siguen ahí intactos.
+    //
+    //  SE CIERRA HOY, y esto es lo que se midió antes de cerrar:
+    //   · 29 en cada carpeta, y LOS 29 ESTÁN EN LAS DOS. Cero viven solo aquí,
+    //     así que cerrar esto no deja ningún pedido sin sitio donde leerse.
+    //   · el último que nació aquí es del 5-jul-2026. Desde que las tres apps se
+    //     publicaron con el nombre nuevo (9-sep-2026), ninguno.
+    //   · los tres paquetes publicados se bajaron del servidor y ninguno nombra
+    //     ya `pedidosRestaurantes`.
+    //
+    //  DÓNDE ESTÁ LA HISTORIA. Los 82 renglones que explicaban por qué existe
+    //  cada candado —la fuga de los 29 pedidos con teléfono y dirección, el
+    //  comprobante de calificación que tenía que firmar el otro, los tres
+    //  candados de la REGLA 10— se mudaron al bloque `match /pedidos/` de aquí
+    //  abajo, que es donde vive ahora la regla que explican. Antes de mudarlos
+    //  se careó que los dos bloques decían LA MISMA REGLA letra por letra: no
+    //  cambió ni una condición.
+    //
+    //  🔴 Y SIN VENDERLO DE MÁS: este bloque NO es lo que cierra la puerta. No
+    //  hay ningún `match /{document=**}` en estas reglas, así que lo que no tiene
+    //  bloque ya está negado por defecto. Está escrito para que se LEA la
+    //  intención —y para que si alguien vuelve a añadir un comodín abierto
+    //  arriba, esto siga negando aquí abajo.
     match /pedidosRestaurantes/{pedidoId} {
-      allow read, write: if request.auth != null;
+      allow read, write: if false;
     }
+
+    // ══ LA CARPETA DE LOS PEDIDOS · `pedidos` ════════════════════════════════
+    //  Se llamó `pedidosRestaurantes` hasta el 7-sep-2026. Fue el segundo pedazo
+    //  del cambio de nombre de «restaurante» a «negocio»: los 29 pedidos se
+    //  copiaron aquí, las apps se mudaron, y la vieja quedó de lápida.
+    //  EL 9-sep-2026 SE RETIRÓ DEL TODO: la lápida de aquí arriba está cerrada,
+    //  el disparador que la escuchaba se borró, y `storage.rules` dejó de
+    //  preguntarle. Ya solo hay UNA carpeta de pedidos.
+    //
+    //  ── LO DE ABAJO ES HISTORIA, Y SE DEJA A PROPÓSITO ───────────────────
+    //  No describe lo que hace esta regla hoy: describe LO QUE COSTÓ APRENDER
+    //  mientras las dos carpetas convivieron, y hace falta tal cual el día que
+    //  se renombre otra colección. Falta al menos una: el campo `restauranteId`
+    //  todavía se llama así.
+    //
+    //  ══ 🔴 LA HISTORIA DEL GEMELO FALSO, QUE COSTÓ DOS RONDAS ═══════════════
+    //  Mientras las dos carpetas vivieron a la vez —y tenían que vivir, porque
+    //  el código y las reglas no se pueden cambiar en el mismo instante— hubo
+    //  un agujero que costó dos rondas cerrar.
+    //
+    //  EL PROBLEMA. `storage.rules` decide quién ve las fotos del chat de un
+    //  pedido preguntándole a Firestore de quién es. Mientras dos carpetas
+    //  convivan, un número puede estar OCUPADO en una y LIBRE en la otra — y en
+    //  la libre cualquiera con cuenta puede crear un gemelo poniéndose de
+    //  cliente. Se reprodujo contra el emulador las dos veces:
+    //    · con `pedidos` vacía, el gemelo se fabricaba AQUÍ;
+    //    · con `pedidos` llena, se fabricaba en `pedidosRestaurantes`, porque un
+    //      pedido de hoy nace solo aquí y allí su número queda libre para siempre.
+    //  En los dos casos el atacante se bajaba el comprobante de pago ajeno.
+    //
+    //  LAS DOS COSAS QUE LO CERRARON, y hicieron falta LAS DOS:
+    //   1. `storage.rules` preguntaba en «Y», no en «O»: había que ser dueño en
+    //      TODAS las carpetas donde el pedido existiera. Así fabricar un gemelo
+    //      solo podía QUITAR acceso, nunca darlo.
+    //   2. Y el `allow create` de la carpeta VIEJA no dejaba crear un número que
+    //      ya existiera aquí. Sin eso, el gemelo falso no robaba pero SÍ dejaba
+    //      al dueño fuera de su propio chat.
+    //  (Las dos se retiraron el 9-sep-2026 con la carpeta vieja: hoy no hay
+    //  segunda carpeta donde fabricar nada.)
+    //
+    //  LA REGLA GENERAL, para las tres carpetas que faltan: mientras dos
+    //  nombres convivan, preguntar en «Y» y cerrar la creación cruzada. Un «O»
+    //  entre dos carpetas siempre deja que fabricar un documento DÉ permiso.
+    // ── REGLA 9 · CADA PEDIDO ES DE SU CLIENTE Y DE SU RESTAURANTE ──────────
+    // Hasta el 24-ago-2026 esto decía «allow read: if request.auth != null», o
+    // sea: CUALQUIERA con una cuenta podía pedir la lista completa de pedidos.
+    // Medido ese día: 29 pedidos, 17 con TELÉFONO Y DIRECCIÓN de personas
+    // reales, $1.200.000 en total. No hacía falta ser listo: era una consulta.
+    //
+    // 'read' se parte en dos porque son dos permisos que no se parecen:
+    //   · get  — mirar UN pedido del que ya sabes el número.
+    //   · list — pedirlos MUCHOS de una. La fuga estaba aquí.
+    //
+    // Quién puede LISTAR: el negocio dueño de esos pedidos, y el panel. Las
+    // cinco pantallas de aliados ya preguntan where('restauranteId','==', el
+    // suyo), así que encajan sin tocarlas. El panel pide la colección entera
+    // sin filtro: por eso esAdmin() va PRIMERO, para que la condición se pueda
+    // resolver sin mirar los pedidos uno por uno.
+    //
+    // Quién puede mirar UNO: además, su cliente. El cliente encuentra el suyo
+    // por el número que guarda en su propio teléfono; desde hoy los pedidos
+    // NUEVOS llevan 'clienteId' y por ahí se le reconoce.
+    //
+    // Los 29 VIEJOS no tienen dueño y no se les puede inventar uno. Medido: 0
+    // están activos (20 cerrados, 7 cancelados, 2 entregados), así que ningún
+    // cliente está mirando uno ahora mismo. Se quedan visibles para su
+    // restaurante y para el panel, que son quienes los necesitan. No se borran.
+    match /pedidos/{pedidoId} {
+      allow get: if request.auth != null && (
+        resource.data.get('clienteId', '') == request.auth.uid ||
+        esDelNegocio(resource.data.restauranteId) ||
+        esAdmin()
+      );
+      allow list: if esAdmin() || esDelNegocio(resource.data.restauranteId);
+
+      // ── REGLA 10 · EL COMPROBANTE LO TIENE QUE FIRMAR EL OTRO (25-ago-2026) ──
+      //
+      // Esta es la SEGUNDA de las tres puertas por las que se fabricaba el
+      // comprobante de una calificación, y la que más dolía: la primera —el viaje—
+      // se cerró esta mañana, y la segunda opinión volvió a reproducir el MISMO
+      // ataque por aquí, con aquel arreglo puesto, y volvió a dar 15 de 15
+      // calificaciones de una estrella y la media pública de la víctima en 1.0.
+      //
+      // CÓMO ERA: el `create` solo pedía `clienteId == mi uid`. `restauranteId`
+      // iba LIBRE y nadie comprobaba que fuera un negocio de verdad. El atacante
+      // se fabricaba un pedido con el uid de la VÍCTIMA de «restaurante» —incluso
+      // el de un CONDUCTOR, que no es un negocio— y `calificaSuPedido()` lo daba
+      // por bueno. Llega a la misma media, porque `MiPerfil.js:40` suma por
+      // `calificadoId` sin mirar de dónde salió.
+      //
+      // SE CIERRA CON TRES CANDADOS, y hacen falta los tres:
+      //   1. el pedido del cliente NACE 'nuevo'. Siempre: `Restaurantes.js:337`
+      //      escribe eso y nada más.
+      //   2. contra un negocio QUE EXISTE. Con esto ya no se le pueden colgar
+      //      estrellas a un conductor, que es lo que medía el informe.
+      //   3. y EL CLIENTE NO MUEVE EL PEDIDO por el flujo: lo único que puede
+      //      hacerle al `estado` es dejarlo como está o ponerlo en 'cancelado'.
+      //      Sin esto los dos primeros no sirven de nada contra un RIVAL: bastaba
+      //      crear un pedido a nombre del restaurante de al lado, marcarlo
+      //      'entregado' uno mismo y calificarlo con una estrella.
+      // El tercero es el que convierte el pedido en un comprobante DE VERDAD: para
+      // que sirva para calificar tiene que estar en un estado que SOLO el
+      // restaurante puede poner. Ver `calificaSuPedido()` más abajo.
+      //
+      // MEDIDO ANTES DE TOCAR, los dos lados, sin truncar:
+      //   · EL CLIENTE solo escribe dos estados en toda la app: 'nuevo' al crear
+      //     (`Restaurantes.js:337`) y 'cancelado' al cancelar
+      //     (`Restaurantes.js:370`, y solo desde 'nuevo' o 'confirmado' —
+      //     `puedeCancelar`, `Restaurantes.js:365`). Sus otras tres escrituras no
+      //     tocan el estado: el motivo de cancelación (:379), el chat (:404) y la
+      //     marca de calificado (:435).
+      //   · EL RESTAURANTE escribe todos los demás: 'confirmado', 'preparando',
+      //     'empacado', 'en_camino', 'entregado', 'cerrado'
+      //     (`aliados/PedidosDomicilio.js:138`, con la cadena de
+      //     `flujoPedidos.js:11`), y 'tomado'/'cerrado' para las mesas
+      //     (`aliados/Mesero.js:295` y `:248`).
+      //   · el PANEL no escribe NADA en esta colección. Las funciones solo
+      //     reaccionan para avisar (`functions/index.js:103` y `:149`).
+      //   · en la base viva: 29 pedidos, los 29 apuntan a un negocio REAL, y los
+      //     29 están en un estado final (20 cerrados, 7 cancelados, 2 entregados).
+      //     La única calificación con `pedidoId` cuelga de un pedido 'entregado'.
+      //     O sea: esto no le quita nada a nada de lo que ya hay.
+      //
+      // Al crearlo, el pedido se FIRMA. Dos firmas valen, y son los dos únicos
+      // sitios de todo el proyecto que crean pedidos:
+      //   · el cliente de la app (Restaurantes.js) — pone su propio clienteId.
+      //   · el restaurante tomando una mesa (Mesero.js) — es del negocio, y por
+      //     eso ÉL sí puede crear un pedido ya 'tomado': es su propio trabajo.
+      // EL CANDADO VA EN LOS DOS CAMINOS, y el del cliente no es un extra:
+      // si un negocio bloqueado siguiera recibiendo pedidos, el cliente pagaría
+      // por comida que nadie va a cocinar. Bloquear a un cliente que no paga no
+      // puede convertirse en un problema para SUS clientes.
+      allow create: if esAdmin() ||
+        (esDelNegocio(request.resource.data.restauranteId) &&
+         negocioPuedeOperar(request.resource.data.restauranteId)) ||
+        (request.auth != null &&
+         request.resource.data.get('clienteId', '') == request.auth.uid &&
+         request.resource.data.get('estado', '') == 'nuevo' &&
+         negocioPuedeOperar(request.resource.data.restauranteId));
+
+      // Lo único que el cliente puede hacerle al estado de SU pedido: dejarlo
+      // como está, o cancelarlo. Todo lo demás lo mueve el restaurante.
+      function elClienteNoMueveElPedido() {
+        return request.resource.data.get('estado', '') == resource.data.get('estado', '')
+            || request.resource.data.get('estado', '') == 'cancelado';
+      }
+
+      // Al cambiarlo: su cliente, su restaurante o el panel. Y el pedido NO
+      // puede cambiar de dueño ni de restaurante por el camino: si pudiera, la
+      // firma de arriba no valdría nada — bastaría crear uno propio y después
+      // apuntarlo al negocio ajeno para colarse dentro.
+      // El negocio bloqueado no mueve pedidos. Pero SU CLIENTE sigue pudiendo
+      // cancelar el suyo: a nadie se le atrapa un pedido por una deuda que no es
+      // suya, y cancelarlo es justo lo que va a querer hacer.
+      allow update: if (esAdmin() ||
+          (esDelNegocio(resource.data.restauranteId) &&
+           negocioPuedeOperar(resource.data.restauranteId)) ||
+          (request.auth != null &&
+           resource.data.get('clienteId', '') == request.auth.uid &&
+           elClienteNoMueveElPedido())) &&
+        request.resource.data.restauranteId == resource.data.restauranteId &&
+        request.resource.data.get('clienteId', '') == resource.data.get('clienteId', '');
+
+      allow delete: if false;
+    }
+
+    // ── LA LISTA DE EMPLEADOS VIEJA · UNA PUERTA QUE NO DA A NINGUNA PARTE ──
+    // Esta subcolección está MUERTA. Medido el 6-sep-2026 buscando en las tres
+    // apps y en las funciones: NADIE la lee ni la escribe. El sistema de empleados
+    // que funciona es la colección `empleados/{uid}` de más abajo, y ese sí está
+    // cerrado desde el 24-ago. Aquí dentro solo queda un registro huérfano que la
+    // REGLA 12 no deja borrar.
+    //
+    // Estaba abierta a lectura Y ESCRITURA para cualquiera que hubiera entrado. No
+    // era una escalada —`esDelNegocio()` pregunta a la colección buena, no a
+    // esta— pero en un software que se VENDE una puerta abierta que no da a
+    // ninguna parte sigue siendo una puerta abierta. Se cierra porque no cuesta
+    // nada y porque nadie la usa: no puede romper lo que nadie llama.
     match /restaurantes/{restauranteId}/empleados/{empleadoId} {
-      allow read, write: if request.auth != null;
+      allow read: if esAdmin();
+      allow create, update: if false;
+      allow delete: if false;
     }
+    // ── REGLA 9 · LA FICHA DE EMPLEADO YA NO SE LA ESCRIBE CUALQUIERA ───────
+    // Esto decía «allow create, update: if request.auth != null». O sea: quien
+    // tuviera una cuenta se escribía su PROPIA ficha de empleado poniéndole el
+    // negocio que quisiera. Con eso conseguía DOS cosas:
+    //
+    //   · Entrar a la app de aliados como personal de un negocio ajeno
+    //     —aliados/App.js:73 le abre la sesión leyendo justo esta ficha—, ver
+    //     el menú, las mesas y los pedidos, y ponerse a tomar pedidos.
+    //   · Y desde el 24-ago-2026, además, burlar la regla de los pedidos: la
+    //     pregunta esDelNegocio() le pregunta a ESTA ficha quién es empleado de
+    //     quién. El candado de arriba se apoyaba en una llave falsificable.
+    //
+    // Es el mismo molde exacto de la REGLA 1: se le preguntaba al carnet que
+    // rellena el visitante. No se supuso — se ejecutó contra el emulador y los
+    // cuatro pasos del ataque pasaron, incluido leer teléfono y dirección.
+    //
+    // Quién las escribe DE VERDAD: solo el dueño, desde su pantalla de equipo
+    // (aliados/Empleados.js:102 al crear, :79 al editar, :126 al activar o
+    // desactivar). Esa pantalla ya está cerrada con llave —aliados/App.js:399
+    // solo la abre si efDueno— y el dueño escribe con su propia sesión, así que
+    // su uid ES el restauranteId que lleva la ficha. Medido el 24-ago-2026: 1
+    // empleado real (JUAN, activo, del restaurante TWjNDorw...). Ninguna otra
+    // app ni función las toca.
     match /empleados/{empleadoId} {
-      allow read, write: if request.auth != null;
+      // Cada quien lee la SUYA, y es lo primero que hace la app al entrar: sirve
+      // para saber si quien llega es dueño o empleado (aliados/Login.js:88 y
+      // aliados/App.js:73). Va primero porque no cuesta ninguna lectura.
+      allow get: if request.auth != null && (
+        request.auth.uid == empleadoId ||
+        esDelNegocio(resource.data.restauranteId) ||
+        esAdmin()
+      );
+
+      // La lista, solo la de su propio equipo (aliados/Empleados.js:46 y
+      // aliados/PedidosDomicilio.js:92 — las dos ya filtran por restauranteId).
+      allow list: if esAdmin() || esDelNegocio(resource.data.restauranteId);
+
+      // ── REGLA 10 · Y A NADIE SE LE NOMBRA EMPLEADO A LA FUERZA (25-ago-2026) ──
+      // Esta puerta la abrió el candado del 25-ago que está unos renglones más
+      // arriba, en calificaSuPedido(): «quien trabaja en el negocio no le pone la
+      // nota al negocio». La frase es correcta. El problema es QUIÉN contesta a
+      // «¿trabaja aquí?»: esta ficha. Y esta ficha la escribe el negocio.
+      //
+      // El identificador del documento —empleadoId— no lo miraba nadie. Con eso,
+      // un restaurante al que no le gustó una calificación:
+      //   1. lee el clienteId de su propio pedido —lo tiene, el pedido es suyo—,
+      //   2. escribe empleados/{ese cliente} con su restauranteId dentro,
+      //   3. y ese cliente NO PUEDE VOLVER A CALIFICARLO. Nunca. Y sin enterarse:
+      //      guajirago/src/Restaurantes.js:438 se traga el fallo con un catch
+      //      vacío, así que el botón de enviar simplemente no hace nada.
+      //
+      // Es otra vez la lección de siempre, la que ya está escrita cinco veces en
+      // este archivo: una regla no vale más que las reglas del documento del que
+      // se fía. Con un matiz NUEVO que conviene dejar escrito: en todas las demás
+      // reglas, esDelNegocio() ABRE puertas —el libro de pedidos, el equipo—, así
+      // que nombrar empleado a un extraño era regalarle algo al enemigo y nadie
+      // iba a hacerlo. En la de calificaciones, por primera vez, que te nombren
+      // empleado te QUITA algo. Ahí el mismo permiso de siempre cambió de bando.
+      //
+      // DÓNDE ESTÁ LA RAYA, medido y no supuesto:
+      //   · un empleado DE VERDAD nace en aliados/firebaseSecundario.js:20, que
+      //     lo llama aliados/Empleados.js:98: una cuenta recién creada, con un
+      //     identificador nuevo. NO tiene ficha en `usuarios` ni en `restaurantes`,
+      //     porque no ha pasado por ninguna de las dos puertas.
+      //   · un cliente que se registró BIEN tiene ficha en `usuarios`, y la escribe
+      //     el registro en guajirago/src/Login.js:153.
+      //   · y el dueño de OTRO negocio tiene ficha en `restaurantes`.
+      // Medido el 25-ago-2026 contra el servidor vivo: 1 empleado real, y NO tiene
+      // ficha de usuario. 10 usuarios, 3 negocios y 8 conductores, ninguno de ellos
+      // empleado y todos con su ficha. HOY la raya no parte a nadie.
+      //
+      // LO QUE ESTA RAYA NO CUBRE — y hay que escribirlo porque la primera versión
+      // de este comentario decía lo contrario. Decía que el registro escribe la
+      // ficha «sin try/catch, así que no queda cuenta a medias». Es FALSO por las
+      // dos mitades, y lo cazó la segunda opinión EJECUTANDO el ataque entero con
+      // este arreglo ya puesto:
+      //   · la cuenta de Auth nace en guajirago/src/Login.js:105 y la ficha se
+      //     escribe 48 renglones después, en :153, con tres viajes a la red por
+      //     medio (la callable de :114 y las lecturas de :131 y :150).
+      //   · todo eso va dentro del try que abre en :104, y su catch (:175) solo
+      //     pinta un mensaje: NO borra la cuenta. La única rama que la borra es la
+      //     del celular repetido (:116).
+      //   · y la propia app cuenta con que pasa: iniciarSesion (:192) hace
+      //     «if (docSnap.exists()) … else onEntrar('','','','','')» — deja entrar
+      //     igual, sin ficha. Esa rama else es la prueba de que el caso existe.
+      //   · guajirago-aliados/src/Login.js:49 y :75 tienen el mismo hueco.
+      // Una cuenta así PUEDE pedir comida y calificar —ni la regla del pedido ni la
+      // de la calificación le piden ficha de usuario—, y a ESA todavía se la puede
+      // fichar para callarla.
+      //
+      // O sea: esta raya se apoya en una COSTUMBRE de la app, no en una garantía.
+      // Tapa a todo el que se registró bien, que hoy son todos los que hay. Cerrarla
+      // del todo es trabajo de la APP y queda ANOTADO: o el registro borra la cuenta
+      // de Auth en CUALQUIER fallo —no solo en el del celular repetido—, o
+      // iniciarSesion, que ya sabe que la ficha no está, la vuelve a crear.
+      //
+      // Y para robar el empleado de OTRO no hay puerta: si la ficha ya existe,
+      // esto es un update, y allí manda el dueño de AHORA con el restauranteId
+      // congelado. Esto solo tiene que cuidar el nacimiento.
+      //
+      // Al admin no se le pide nada de esto, igual que antes: el panel es de
+      // confianza, y si algún día aparece un caso raro se resuelve desde ahí.
+      //
+      // Lo que esto NO cierra y queda ANOTADO: el catch vacío de
+      // guajirago/src/Restaurantes.js:438. Cualquier calificación que se niegue —
+      // por esta regla o por la de arriba— se ve como que el botón no funciona.
+      // Es la REGLA 9 del dueño («nada se rechaza en silencio») y es trabajo de
+      // la app, no de aquí.
+      //
+      // Nombrar y editar: SOLO el dueño del negocio. Ojo, aquí se pregunta por
+      // el dueño y no por esDelNegocio(): si valiera cualquiera del negocio, un
+      // empleado se subiría los permisos a sí mismo o se reactivaría después de
+      // que lo despidan, y volveríamos al carnet que rellena el visitante.
+      allow create: if esAdmin() || (
+        request.auth != null &&
+        request.auth.uid == request.resource.data.get('restauranteId', '') &&
+        !exists(/databases/$(database)/documents/usuarios/$(empleadoId)) &&
+        !elNegocioExiste(empleadoId)
+      );
+
+      // Y la ficha no puede mudarse de negocio: sin esto, el dueño de un negocio
+      // cualquiera crea una ficha suya y luego la apunta al negocio de al lado.
+      //
+      // El .get('restauranteId','') no es adorno: con acceso directo, una ficha a
+      // la que le faltara el campo daría ERROR aquí, y un error niega a TODOS —
+      // incluido el panel. Como borrar está prohibido (REGLA 12), esa ficha se
+      // quedaría congelada para siempre y sin forma de repararla.
+      //
+      // La segunda mitad es la que salva los AVISOS del empleado: su propio
+      // teléfono guarda el token del aviso push en SU ficha al entrar
+      // (aliados/Notificaciones.js:22), y esa escritura sale con la sesión del
+      // empleado, no con la del dueño. Sin este permiso se le apagaría el aviso
+      // de «pedido nuevo» EN SILENCIO: ese catch solo escribe en la consola, así
+      // que nadie se enteraría hasta que el restaurante empezara a perder pedidos.
+      // Quien lee el token son las funciones del servidor (functions/index.js:95
+      // y :172). Se le deja UN campo y nada más: con hasOnly no puede colar de
+      // paso ni sus permisos ni el activo.
+      allow update: if ((esAdmin() || (
+          request.auth != null &&
+          request.auth.uid == resource.data.get('restauranteId', '')
+        )) &&
+        request.resource.data.get('restauranteId', '') == resource.data.get('restauranteId', '')
+      ) || (
+        request.auth != null &&
+        request.auth.uid == empleadoId &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['fcmToken'])
+      );
+
+      allow delete: if false;
     }
+    // ── EL SOFTWARE SE VA A VENDER · CADA NEGOCIO EN SU CAJÓN ───────────────
+    // Palabras del dueño (6-sep-2026): «Lo voy a vender.» Eso cambia lo que hay
+    // que exigirle a estas reglas. Con UN solo dueño, «cualquiera que haya
+    // entrado» son sus propios empleados y clientes. Vendiéndolo a varios
+    // negocios, «cualquiera que haya entrado» son TAMBIÉN los otros negocios que
+    // lo compraron — y un competidor de la misma calle no tiene que abrir nada:
+    // se mete por la consola del navegador y pide los datos del vecino.
+    //
+    // Auditado ese día: había ONCE permisos abiertos y CUATRO colecciones enteras
+    // que cualquier usuario registrado de las TRES apps podía leer y escribir.
+    // Estas dos van juntas porque comparten el truco que las hace fáciles: el
+    // negocio va en el NOMBRE del documento, `restauranteId_loQueSea`
+    // (Mesero.js:114, :273, :316, :318). La regla lo lee de ahí sin abrir nada.
+    //
+    // MEDIDO ANTES DE CERRAR (scripts/medir-cajones-abiertos.cjs): 2 documentos en
+    // visitasDiarias y 1 en mesasInfo, TODOS de un mismo negocio y todos con el
+    // nombre bien puesto. CERO huérfanos. Así que la regla puede nacer estricta:
+    // no hay nada viejo que se quede fuera.
+    function elNegocioDelNombre(docId) {
+      return docId.split('_')[0];
+    }
+
     match /visitasDiarias/{docId} {
-      allow read, write: if request.auth != null;
+      allow read: if esAdmin() || esDelNegocio(elNegocioDelNombre(docId));
+      allow create, update: if esAdmin()
+        || (esDelNegocio(elNegocioDelNombre(docId))
+            && negocioPuedeOperar(elNegocioDelNombre(docId)));
+      allow delete: if false;
     }
     match /mesasInfo/{docId} {
-      allow read, write: if request.auth != null;
+      allow read: if esAdmin() || esDelNegocio(elNegocioDelNombre(docId));
+      allow create, update: if esAdmin()
+        || (esDelNegocio(elNegocioDelNombre(docId))
+            && negocioPuedeOperar(elNegocioDelNombre(docId)));
+      allow delete: if false;
+    }
+
+    // ── EL CONTADOR DE VENTAS POR PLATO, FUERA DEL MENÚ (7-sep-2026) ────────
+    //
+    // POR QUÉ EXISTE ESTA COLECCIÓN. Hasta hoy, «cuántas veces se vendió cada
+    // plato» vivía DENTRO de `restaurantes/{id}.menu[].vecesVendido`, y lo
+    // escribía el cierre de mesa (aliados/Mesero.js). Dos cosas iban mal:
+    //
+    //   1. NO FUNCIONABA para los empleados. La regla de `restaurantes` solo
+    //      deja escribir a `uid == restauranteId`, o sea al dueño. Un mesero
+    //      cerraba la mesa, el servidor le decía que no, y el error caía en un
+    //      `catch (e) {}`. MEDIDO EN LA BASE VIVA el 7-sep-2026 con
+    //      scripts/medir-mas-vendidos.cjs: de 12 mesas cerradas, 9 las cerró un
+    //      empleado. El contador decía 20; lo vendido de verdad eran 34. Los 20
+    //      son EXACTAMENTE las 3 mesas del dueño, y los 14 que faltan son
+    //      EXACTAMENTE lo que vendieron los empleados. Cuadra plato por plato.
+    //
+    //   2. DEJARLE ESCRIBIR `menu` NO ERA LA SALIDA. Las reglas no pueden mirar
+    //      dentro de una lista: quien pueda escribir `menu` puede escribir
+    //      CUALQUIER menú — precios incluidos. Se le enseñaron al dueño los dos
+    //      caminos con lo que gana y lo que cuesta cada uno, y escogió sacar el
+    //      contador del menú. El menú se queda como estaba: solo el dueño.
+    //
+    // POR QUÉ AQUÍ ABAJO Y NO EN UNA SUBCOLECCIÓN: el nombre del documento ES el
+    // id del negocio, así que la regla sabe de quién es SIN leer nada — el mismo
+    // truco que visitasDiarias y mesasInfo, pero sin partir por guion bajo, que
+    // es el apaño que el hallazgo 10 tiene anotado.
+    //
+    // Y LA LECTURA NO ES PÚBLICA, a diferencia del sitio de donde viene. Las
+    // ventas por plato de un negocio estaban en el escaparate —la colección que
+    // la app del pasajero se descarga entera—, así que cualquiera con cuenta veía
+    // cuánto vende el vecino de cada cosa. Aquí ya no.
+    //
+    // LO QUE SIGUE SIN PODERSE COMPROBAR, dicho para que conste: dentro del mapa
+    // `platos` no se puede validar plato por plato. Un empleado del negocio puede
+    // estropear el ranking DE SU PROPIO NEGOCIO. Es un riesgo mucho menor que el
+    // del menú —no hay dinero de por medio, solo un orden— y se acepta a
+    // propósito, no por olvido.
+    match /ventasPorPlato/{negocioId} {
+      allow read: if esAdmin() || esDelNegocio(negocioId);
+      allow create, update: if esAdmin()
+        || (esDelNegocio(negocioId) && negocioPuedeOperar(negocioId));
+      allow delete: if false;
     }
 
     // ===== NUEVAS (agregadas) =====
+    // ── REGLA 9 · CADA RESERVA ES DE SU CLIENTE Y DE SU AGENCIA ─────────────
+    // El mismo agujero que los pedidos, y se tapa igual. Con una diferencia que
+    // lo hace gratis: medido el 24-ago-2026 hay CERO reservas. No hay nada
+    // viejo que se quede sin dueño, así que aquí la regla nace estricta.
     match /reservasTurismo/{reservaId} {
-      allow read, write: if request.auth != null;
+      allow get: if request.auth != null && (
+        resource.data.get('clienteId', '') == request.auth.uid ||
+        esDelNegocio(resource.data.agenciaId) ||
+        esAdmin()
+      );
+      allow list: if esAdmin() || esDelNegocio(resource.data.agenciaId);
+
+      allow create: if esAdmin() ||
+        esDelNegocio(request.resource.data.agenciaId) ||
+        (request.auth != null &&
+         request.resource.data.get('clienteId', '') == request.auth.uid);
+
+      allow update: if (esAdmin() ||
+          esDelNegocio(resource.data.agenciaId) ||
+          (request.auth != null &&
+           resource.data.get('clienteId', '') == request.auth.uid)) &&
+        request.resource.data.agenciaId == resource.data.agenciaId &&
+        request.resource.data.get('clienteId', '') == resource.data.get('clienteId', '');
+
+      allow delete: if false;
     }
+    // ── LO QUE LE CUESTA LA MERCANCÍA A CADA NEGOCIO ────────────────────────
+    // El más grave de los cuatro: son los COSTOS. Estaba abierto a lectura y a
+    // escritura para cualquier usuario registrado de las tres apps.
+    //
+    // Aquí el negocio no va en el nombre —los documentos nacen con nombre
+    // automático (Inventario.js:117)— sino en el campo `restauranteId`, y la
+    // pantalla ya busca por él (Inventario.js:90). Así que se cierra igual que los
+    // pedidos: `esDelNegocio(...)`, que es el ayudante que ya usa medio archivo.
+    //
+    // MEDIDO ANTES DE CERRAR: CERO documentos. Cerrarlo no puede romper nada.
     match /comprasInsumos/{compraId} {
-      allow read, write: if request.auth != null;
+      allow get: if esAdmin() || esDelNegocio(resource.data.get('restauranteId', ''));
+      allow list: if esAdmin() || esDelNegocio(resource.data.get('restauranteId', ''));
+      allow create: if esAdmin()
+        || (esDelNegocio(request.resource.data.get('restauranteId', ''))
+            && negocioPuedeOperar(request.resource.data.get('restauranteId', '')));
+      // No se puede mudar una compra de un negocio a otro.
+      allow update: if (esAdmin()
+          || (esDelNegocio(resource.data.get('restauranteId', ''))
+              && negocioPuedeOperar(resource.data.get('restauranteId', ''))))
+        && request.resource.data.get('restauranteId', '') == resource.data.get('restauranteId', '');
+      allow delete: if false;
     }
+
+    // ── EL CONTADOR DE PROMOCIONES ──────────────────────────────────────────
+    // Este NO es del negocio: lo escribe el CLIENTE desde la app del pasajero
+    // (Restaurantes.js:315 y :358) para que no use la misma promoción más veces
+    // de las que el restaurante permitió. El nombre es `promoId__telefono`.
+    //
+    // Lo que de verdad hay que impedir aquí es que alguien PONGA SU CONTADOR A
+    // CERO para volver a gastar la promoción. Por eso el contador solo puede subir
+    // de uno en uno — el mismo candado que ya lleva la bandeja de rechazos.
+    //
+    // Y se quita el LISTADO: nadie lista esto (comprobado en las tres apps y en
+    // las funciones; solo se lee de uno en uno por su nombre). Dejarlo abierto
+    // permitía barrer la colección entera y salir con los TELÉFONOS de todos los
+    // clientes, que es de lo poco que hay aquí que vale para hacer daño.
+    //
+    // MEDIDO ANTES DE CERRAR: CERO documentos.
+    //
+    // ANOTADO, NO ARREGLADO: el límite se lleva por teléfono y el teléfono se
+    // ESCRIBE A MANO en la pantalla del pedido. O sea que hoy se puede burlar
+    // poniendo otro número, y ninguna regla puede impedirlo desde aquí. Es un
+    // problema distinto y va aparte.
+
+    // ══════════════════════════════════════════════════════════════════════
+    // LA FICHA DE COBRO DE CADA CLIENTE
+    //
+    // El software de aliados se vende. Aquí vive lo que paga cada cliente: su
+    // precio, su oferta, sus días de prueba y de gracia, y cuándo le toca.
+    //
+    // Palabras del dueño (6-sep-2026): «cada cliente puede tener valores y
+    // ofertas diferentes» y «los datos de prueba y todo lo demás se debe colocar
+    // en el panel de administración de cada cliente». Por eso NADA de esto está
+    // escrito en el código: son datos de cada quien, puestos desde el panel.
+    //
+    // La cuenta de cuánto se cobra vive en guajirago/functions/suscripcion.js —
+    // en el SERVIDOR, porque «la calculadora buena es la del servidor».
+    //
+    // ── LAS TRES DECISIONES QUE HAY AQUÍ ─────────────────────────────────
+    //
+    // 1. EL NEGOCIO LEE LA SUYA. Que un cliente vea qué paga y cuándo le vence
+    //    baja las discusiones a la mitad, y no le cuesta nada a nadie.
+    //
+    // 2. PERO NO PUEDE LISTARLAS. Si pudiera, pediría la colección entera y
+    //    saldría con EL PRECIO DE TODOS SUS COMPETIDORES. Es lo más valioso que
+    //    hay en este cajón y es lo que más fácil se escapa: `allow read` a secas
+    //    incluye el listado, y por eso aquí van `get` y `list` separados.
+    //
+    // 3. NO LA ESCRIBE NADIE MÁS QUE EL PANEL. Si un negocio pudiera tocar su
+    //    propia ficha, se pondría precio cero y fecha de cobro en el año 3000.
+    //    La ficha la escribe quien cobra.
+    match /suscripciones/{negocioId} {
+
+      // El estado tiene que ser uno de los que el sistema conoce. NO es un
+      // capricho: el candado de `negocioPuedeOperar` pregunta por el texto exacto
+      // `bloqueado`, y la calculadora del servidor devuelve esa misma palabra. Un
+      // «Bloqueado» con mayúscula escrito desde el panel dejaría el bloqueo sin
+      // efecto PARA SIEMPRE y nadie lo notaría hasta que un moroso siguiera
+      // trabajando. Aquí se corta esa posibilidad de raíz.
+      function estadoConocido() {
+        return !request.resource.data.keys().hasAny(['estado'])
+          || request.resource.data.estado in
+             ['prueba', 'alDia', 'porVencer', 'vencido', 'bloqueado', 'cancelado'];
+      }
+
+      // Y el dinero tiene que ser dinero. Un precio en texto («80.000») haría que
+      // la calculadora se plantara y ese cliente no se cobraría nunca — en
+      // silencio, que es la peor forma de no cobrar.
+      function plataBuena() {
+        return (!request.resource.data.keys().hasAny(['precio'])
+                || (request.resource.data.precio is number
+                    && request.resource.data.precio >= 0))
+          && (!request.resource.data.keys().hasAny(['diasDeGracia'])
+                || request.resource.data.diasDeGracia is int)
+          && (!request.resource.data.keys().hasAny(['diasDePrueba'])
+                || request.resource.data.diasDePrueba is int)
+          && (!request.resource.data.keys().hasAny(['diasDeAviso'])
+                || request.resource.data.diasDeAviso is int);
+      }
+
+      // ── POR QUÉ `get` Y `list` VAN SEPARADOS Y NO UN `read` ────────────
+      // Se probó: cambiándolos por `allow read: if esAdmin() || esDelNegocio(...)`
+      // el listado SIGUE fallando para un negocio, así que no abre el agujero.
+      // La razón es sutil: en un listado el comodín `{negocioId}` no está atado a
+      // ningún documento, así que `esDelNegocio(negocioId)` no puede ser cierto.
+      //
+      // Se dejan separados AUNQUE DEN LO MISMO, y a propósito: con `read` la
+      // seguridad de esta colección —la más valiosa del sistema comercial—
+      // dependería de que quien la lea mañana conozca esa sutileza. Separados,
+      // dice lo que quiere decir: el negocio LEE LA SUYA, y LISTAR es solo del
+      // dueño.
+      allow get: if esAdmin() || esDelNegocio(negocioId);
+      allow list: if esAdmin();
+      allow create, update: if esAdmin() && estadoConocido() && plataBuena();
+
+      // REGLA 12 del dueño: los borrados dejan lápida. Una ficha de cobro es el
+      // historial comercial de un cliente: si se cancela, se marca cancelada.
+      allow delete: if false;
+
+      // ── EL HISTORIAL DE COBROS ────────────────────────────────────────
+      // Un cobro apuntado es un hecho, no una opinión: una vez escrito NO SE
+      // EDITA NI SE BORRA. Si un cobro se pudiera cambiar después, el historial
+      // no serviría para resolver una discusión — que es su único trabajo.
+      match /cobros/{cobroId} {
+        allow get, list: if esAdmin() || esDelNegocio(negocioId);
+        allow create: if esAdmin();
+        allow update, delete: if false;
+      }
+    }
+
     match /usosPromo/{usoId} {
-      allow read, write: if request.auth != null;
+      function contadorBueno() {
+        return request.resource.data.keys().hasOnly(['veces', 'telefono', 'promoId'])
+          && request.resource.data.keys().hasAll(['veces', 'telefono', 'promoId'])
+          && request.resource.data.veces is int
+          && request.resource.data.telefono is string
+          && request.resource.data.promoId is string
+          && usoId == request.resource.data.promoId + '__' + request.resource.data.telefono;
+      }
+      allow get: if request.auth != null;
+      allow list: if esAdmin();
+
+      // EL CLIENTE solo puede empezar en uno y subir de uno en uno. Eso es lo que
+      // impide la trampa de ponerse el contador a cero para volver a gastar la
+      // promoción.
+      //
+      // LA ADMINISTRADORA SÍ PUEDE BAJARLO, y esto lo decidió el dueño el
+      // 6-sep-2026 después de que se le enseñaran las dos opciones. El caso real
+      // que lo justifica: un fallo deja el contador de un cliente en 3 cuando solo
+      // usó la promoción una vez, el cliente se queja de que no le deja usarla, y
+      // sin esto habría que entrar a mano por la consola de Firebase.
+      //
+      // Al admin se le pide igual que el documento tenga la forma correcta: poder
+      // corregir no es poder escribir cualquier cosa.
+      allow create: if contadorBueno() && (
+        esAdmin() || (request.auth != null && request.resource.data.veces == 1)
+      );
+      allow update: if contadorBueno()
+        && request.resource.data.telefono == resource.data.telefono
+        && request.resource.data.promoId == resource.data.promoId
+        && (
+          esAdmin()
+          || (request.auth != null
+              && request.resource.data.veces == resource.data.veces + 1)
+        );
+      allow delete: if false;
     }
   }
 }
