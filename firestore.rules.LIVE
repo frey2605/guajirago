@@ -230,9 +230,13 @@ service cloud.firestore {
       // El MERCADO: los que están buscando taxi. El conductor TIENE que verlos —
       // es el negocio (AppConductor.js:847). Los 82 terminados o cancelados no
       // están aquí: esos dejan de verse.
+      // Eran CUATRO hasta el 9-sep-2026. `confirmando` y `contraoferta` se
+      // retiraron: nadie los escribía desde que el mercado de ofertas pasa por
+      // `confirmarConductor`. El porqué entero está en `estadosViaje.js`, que es
+      // la fuente única, y una prueba ata esta lista con aquella.
       function enElMercado() {
         return resource.data.get('estado', '') in
-          ['esperando', 'en_negociacion', 'confirmando', 'contraoferta'];
+          ['esperando', 'en_negociacion'];
       }
       // El conductor que DEJÓ UNA OFERTA sigue viendo el viaje aunque lo pierda.
       // Sin esto, en cuanto el pasajero elige a otro, la app del que perdió deja de
@@ -508,15 +512,37 @@ service cloud.firestore {
       // OJO: `enElMercado()` SE QUEDA EN EL `read` (arriba). El conductor TIENE que
       // ver el mercado — es el negocio. Lo que se le quita es escribir en él.
       //
-      // ANOTADO al paso, NO se toca aquí: los estados `confirmando` y
-      // `contraoferta` YA NO LOS ESCRIBE NADIE en ninguna de las tres apps ni en
-      // las funciones — se quedaron del flujo viejo, antes de que el mercado de
-      // ofertas pasara por `confirmarConductor`. Siguen declarados en
-      // `guajirago/src/estadosViaje.js:28` (y de ahí entran en `enElMercado()`), y
-      // la pantalla de confirmación del pasajero con sus dos botones
-      // (`Solicitar.js:939-974` y sus gemelos de mensajería) solo se alcanza desde
-      // ahí: son unos 40 renglones que nadie ejecuta. Borrarlos es otro trabajo,
-      // con su foto y su permiso.
+      // ✅ LO QUE AQUÍ QUEDÓ ANOTADO, YA ESTÁ HECHO (9-sep-2026). Los estados
+      // `confirmando` y `contraoferta` se RETIRARON del mercado: se quedaron del
+      // flujo viejo, de antes de que las ofertas pasaran por `confirmarConductor`,
+      // y no los escribía nadie en ninguna de las tres apps ni en las funciones.
+      // Ya no están en `enElMercado()` ni en `estadosViaje.js`.
+      //
+      // Antes de quitarlos se midió EL SERVIDOR, no solo el código: había UN viaje
+      // parado en `contraoferta` desde el 2-jul-2026. Se pasó a `expirado` primero,
+      // con `scripts/expirar-viaje-atascado.cjs`.
+      //
+      // (Y de paso salió otra cosa, que va aparte y está avisada al dueño:
+      // `expirarViajesColgados` solo mira `esperando` y `aceptado`, así que un
+      // viaje que se quede negociando NO LO LIMPIA NADIE. Por eso aquel llevaba
+      // dos meses ahí.)
+      //
+      // LO QUE SIGUE PENDIENTE, y son TRES cosas, no una:
+      //  1. La pantalla de confirmación del pasajero (`Solicitar.js`, el aviso con
+      //     los dos botones) solo se alcanzaba desde `confirmando`: hoy es código
+      //     que no se puede ejecutar. Son ~150 renglones —más de los 40 que decía
+      //     esta nota— porque se lleva por delante `confirmacionPendiente` entera.
+      //  2. La otra rama muerta, la de `contraoferta`: `Solicitar.js:599-620`, que
+      //     armaba la lista de ofertas leyendo el DOCUMENTO del viaje. Hoy esa
+      //     lista solo se llena desde el listener de la subcolección
+      //     (`Solicitar.js:684-706`), que es el mercado de verdad.
+      //  3. 🔴 Y HAY UN TERCER ESTADO MUERTO que este trabajo NO retiró:
+      //     `en_negociacion`. Mismo caso, medido con el mismo contador: cero
+      //     escritores en las tres apps y en las funciones, y cero viajes en el
+      //     servidor. Sigue en `estadosViaje.js`, aquí, en el panel y en la
+      //     limpieza de `AppConductor.js`. Lo cazó la segunda opinión del
+      //     9-sep-2026, y está dicho al dueño: quien lea esto no debe creer que
+      //     el mercado ya quedó limpio.
       allow update: if request.auth != null
         && (esMio() || esAdmin())
         && request.resource.data.get('pasajeroId', '') == resource.data.get('pasajeroId', '')
