@@ -38,7 +38,7 @@ const DUELEN = ['porVencer', 'vencido', 'bloqueado'];
 const NO_OPERAN = ['bloqueado', 'cancelado'];
 
 /**
- * QUÉ VA EN EL INTERRUPTOR DEL NEGOCIO (`restaurantes/{id}.estadoComercial`).
+ * QUÉ VA EN EL INTERRUPTOR DEL NEGOCIO (`negocios/{id}.estadoComercial`).
  *
  * EL INTERRUPTOR NO CUENTA LA HISTORIA COMERCIAL: solo contesta «¿puede
  * trabajar?». Y el candado del servidor entiende UNA SOLA palabra para decir que
@@ -83,7 +83,7 @@ function faltaAlgoParaCastigar(ficha, hoy) {
  * QUÉ HAY QUE HACERLE HOY A ESTE CLIENTE.
  *
  * @param ficha    lo que dice `suscripciones/{negocioId}`
- * @param negocio  lo que dice `restaurantes/{negocioId}` (para saber si el
+ * @param negocio  lo que dice `negocios/{negocioId}` (para saber si el
  *                 interruptor ya está donde tiene que estar)
  * @param hoy      la fecha DEL SERVIDOR, `AAAA-MM-DD`. Nunca la del navegador de
  *                 un cliente: bastaría con cambiarle la hora al computador para

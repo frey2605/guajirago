@@ -7,7 +7,7 @@ admin.initializeApp();
 
 // EL CUARTO DE ATRÁS DE CADA NEGOCIO.
 //
-// El token de avisos del dueño vive AQUÍ, y no en restaurantes/{id}, que es el
+// El token de avisos del dueño vive AQUÍ, y no en negocios/{id}, que es el
 // escaparate que se descarga cualquier cliente de la app.
 //
 // Este nombre está escrito en TRES sitios del proyecto, y ninguno puede importar

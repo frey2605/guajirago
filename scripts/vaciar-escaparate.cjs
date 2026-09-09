@@ -12,7 +12,7 @@
  *
  * QUÉ HACE
  *
- * `restaurantes/{id}` es EL ESCAPARATE: la app del pasajero se descarga esa
+ * `negocios/{id}` es EL ESCAPARATE: la app del pasajero se descarga esa
  * colección ENTERA para enseñar dónde pedir (guajirago/src/Restaurantes.js,
  * Turismo.js). Dentro viajaban el NOMBRE, el TELÉFONO y el CORREO del dueño, y
  * sus créditos. Le llegaban solos a cualquiera que abriera esa pantalla.

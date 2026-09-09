@@ -12,7 +12,7 @@
  *
  * QUÉ HACE, Y QUÉ NO HACE
  *
- * El documento `restaurantes/{id}` es el escaparate: la app del pasajero se
+ * El documento `negocios/{id}` es el escaparate: la app del pasajero se
  * descarga la colección entera. Dentro viajaban los datos personales del dueño.
  * La tanda 1a creó el cuarto de atrás (`restaurantesPrivado/{id}`) y el registro
  * de un negocio NUEVO ya escribe ahí. Este script trae a los que ya existían.
