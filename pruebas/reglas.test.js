@@ -4607,3 +4607,234 @@ describe('PUNTO 2 · el contador de ventas por plato', () => {
     await RUT.assertSucceeds(getDoc(doc(como('eladmin'), suyo)));
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════════════
+// LA MUDANZA DE LOS NEGOCIOS · `restaurantes` → `negocios` (7-sep-2026)
+// ═══════════════════════════════════════════════════════════════════════════
+// La carpeta de los negocios cambió de nombre, porque aliados va a venderse a
+// panaderías y peluquerías y el sistema por dentro decía que una peluquería era
+// un restaurante.
+//
+// MIENTRAS DURE, LAS DOS CARPETAS VIVEN A LA VEZ. Eso es exactamente lo que
+// abrió un agujero DOS VECES con los pedidos, una por cada lado, y las dos se
+// reprodujeron contra el emulador. Lo aprendido se fija aquí:
+//
+//   1. LAS DOS REGLAS SON LA MISMA, palabra por palabra. Si no lo fueran, la
+//      batería entera de más arriba solo estaría protegiendo una de las dos.
+//   2. LA PREGUNTA VA EN «Y», nunca en «O». Fabricar un gemelo en la carpeta
+//      donde el número está libre solo puede QUITAR permiso, nunca darlo.
+//   3. LA CREACIÓN CRUZADA ESTÁ CERRADA: en la carpeta vieja no se puede crear
+//      un número que ya existe en la nueva.
+describe('LA MUDANZA DE LOS NEGOCIOS · las dos carpetas', () => {
+  // ── 1. SON LA MISMA REGLA ────────────────────────────────────────────────
+  // Esta prueba no ejecuta nada: compara los dos textos. Es la que hace que
+  // todo lo demás valga, porque significa que las ~40 pruebas de arriba, que
+  // solo tocan `restaurantes`, describen también a `negocios`.
+  it('las dos reglas son la misma, palabra por palabra', () => {
+    const reglas = fs.readFileSync(path.join(RAIZ, 'firestore.rules'), 'utf8');
+
+    const bloqueDe = (cabecera) => {
+      const i = reglas.indexOf(cabecera);
+      assert.ok(i >= 0, 'no está el bloque «' + cabecera + '» en firestore.rules');
+      const fin = reglas.indexOf('\n    }', i);
+      assert.ok(fin > i, 'el bloque «' + cabecera + '» no cierra');
+      return reglas.slice(i, fin);
+    };
+
+    // Se quitan los comentarios (la historia de cada agujero vive solo en el
+    // bloque viejo), los renglones en blanco y la sangría; y se pone el comodín
+    // y el nombre de la carpeta en el mismo idioma para poder comparar.
+    const limpio = (t) => t
+      .split('\n')
+      .map((l) => l.trim())
+      .filter((l) => l && !l.startsWith('//'))
+      .join('\n')
+      .split('restauranteId').join('negocioId')
+      .split('match /restaurantes/').join('match /negocios/');
+
+    // LAS ÚNICAS DIFERENCIAS PERMITIDAS, escritas una por una. Las dos son el
+    // candado de la creación cruzada, que solo existe en la carpeta vieja y se
+    // va con ella: el renglón, y el paréntesis que hace que cubra la regla
+    // ENTERA y no solo media (en este lenguaje «&&» ata más fuerte que «||»,
+    // así que sin el paréntesis el candado se quedaría fuera de la rama del
+    // admin — lo cazó la segunda opinión del 7-sep-2026).
+    //
+    // Van declaradas así, y no como un «quítale el candado y compara», para que
+    // el día que alguien meta una diferencia DE VERDAD no pueda colarse dentro
+    // de la que ya estaba permitida.
+    const SOLO_EN_LA_VIEJA = [
+      ['el paréntesis que hace que el candado cubra toda la regla',
+       'allow create: if (esAdmin()', 'allow create: if esAdmin()'],
+      ['el candado de la creación cruzada',
+       '\n))\n&& !exists(/databases/$(database)/documents/negocios/$(negocioId));', '\n);'],
+    ];
+    let viejo = limpio(bloqueDe('match /restaurantes/{restauranteId} {'));
+    const nuevo = limpio(bloqueDe('match /negocios/{negocioId} {'));
+
+    SOLO_EN_LA_VIEJA.forEach(([nombre, enLaVieja, comoQuedaSinEso]) => {
+      assert.ok(viejo.includes(enLaVieja),
+        'el bloque de `restaurantes` perdió ' + nombre + '. Sin eso, un negocio nuevo ' +
+        'puede crearse a sí mismo en la carpeta vieja diciendo que está «al día» y ' +
+        'desbloquearse solo.');
+      assert.ok(!nuevo.includes(enLaVieja),
+        nombre + ' se coló en el bloque de `negocios`. Ahí no pinta nada: es la carpeta ' +
+        'buena, y no tiene ninguna carpeta más nueva de la que defenderse.');
+      viejo = viejo.split(enLaVieja).join(comoQuedaSinEso);
+    });
+
+    assert.strictEqual(viejo, nuevo,
+      'las reglas de `restaurantes` y las de `negocios` YA NO DICEN LO MISMO. Todo lo que ' +
+      'protege la batería de arriba solo mira `restaurantes`: la diferencia que acabas de ' +
+      'meter deja una de las dos carpetas sin ese candado, y nada más lo avisaría.');
+  });
+
+  // ── 2. LA CARPETA NUEVA ESTÁ CERRADA IGUAL ───────────────────────────────
+  // El careo de arriba compara TEXTO. Esto ejecuta, por si el texto engañara.
+  describe('la carpeta nueva se comporta igual', () => {
+    const base = { nombre: 'PELUQUERÍA ANA', aprobado: false, estadoAprobacion: 'pendiente', rol: 'dueno' };
+
+    it('un negocio nuevo se crea a sí mismo, y nada más', async () => {
+      const { doc, setDoc } = FS;
+      await RUT.assertSucceeds(setDoc(doc(como('pel1'), 'negocios/pel1'), base));
+      await RUT.assertFails(setDoc(doc(como('pel2'), 'negocios/ajeno'), base));
+    });
+
+    it('no nace aprobado, ni con crédito, ni con los datos del dueño dentro', async () => {
+      const { doc, setDoc } = FS;
+      await RUT.assertFails(setDoc(doc(como('p1'), 'negocios/p1'), { ...base, aprobado: true }));
+      await RUT.assertFails(setDoc(doc(como('p2'), 'negocios/p2'), { ...base, estadoAprobacion: 'aprobado' }));
+      await RUT.assertFails(setDoc(doc(como('p3'), 'negocios/p3'), { ...base, creditos: 900000 }));
+      await RUT.assertFails(setDoc(doc(como('p4'), 'negocios/p4'), { ...base, duenoTelefono: '+573000000000' }));
+      await RUT.assertFails(setDoc(doc(como('p5'), 'negocios/p5'), { ...base, email: 'ana@ejemplo.com' }));
+      await RUT.assertFails(setDoc(doc(como('p6'), 'negocios/p6'), { ...base, fcmToken: 'tok' }));
+      await RUT.assertFails(setDoc(doc(como('p7'), 'negocios/p7'), { ...base, fechaAprobacion: '2026-01-01' }));
+    });
+
+    it('y después no se toca lo que manda el panel', async () => {
+      const { doc, setDoc, updateDoc, deleteDoc } = FS;
+      await entorno.withSecurityRulesDisabled(async (ctx) => {
+        await setDoc(doc(ctx.firestore(), 'negocios/pel9'), { ...base, activo: true, creditos: 1000 });
+      });
+      await RUT.assertFails(updateDoc(doc(como('pel9'), 'negocios/pel9'), { aprobado: true }));
+      await RUT.assertFails(updateDoc(doc(como('pel9'), 'negocios/pel9'), { creditos: 900000 }));
+      await RUT.assertFails(updateDoc(doc(como('pel9'), 'negocios/pel9'), { activo: false }));
+      await RUT.assertFails(updateDoc(doc(como('pel9'), 'negocios/pel9'), { estadoComercial: 'alDia' }));
+      await RUT.assertFails(updateDoc(doc(como('pel9'), 'negocios/pel9'), { fcmToken: 'tok' }));
+      await RUT.assertFails(deleteDoc(doc(como('pel9'), 'negocios/pel9')));
+      // Y lo suyo sí lo cambia: si no, esto pasaría por estar todo cerrado.
+      await RUT.assertSucceeds(updateDoc(doc(como('pel9'), 'negocios/pel9'), { nombre: 'PELUQUERÍA ANA Y CÍA' }));
+    });
+  });
+
+  // ── 3. EL GEMELO FABRICADO ───────────────────────────────────────────────
+  // La historia entera, de principio a fin: un negocio bloqueado por no pagar
+  // intenta desbloquearse fabricándose un gemelo en el hueco libre de la
+  // carpeta vieja. Los dos candados tienen que pararlo, cada uno por su lado.
+  describe('un negocio bloqueado NO se desbloquea fabricándose un gemelo', () => {
+    const base = { nombre: 'EL MOROSO', aprobado: false, estadoAprobacion: 'pendiente', rol: 'dueno' };
+
+    beforeEach(async () => {
+      await entorno.withSecurityRulesDisabled(async (ctx) => {
+        const { doc, setDoc } = FS;
+        // Nace en la carpeta NUEVA, como nacen los de hoy, y debe tres meses.
+        await setDoc(doc(ctx.firestore(), 'negocios/moroso'), {
+          nombre: 'EL MOROSO', activo: true, estadoComercial: 'bloqueado',
+        });
+      });
+    });
+
+    it('CANDADO 1 · no puede crear su gemelo en la carpeta vieja', async () => {
+      const { doc, setDoc } = FS;
+      await RUT.assertFails(setDoc(doc(como('moroso'), 'restaurantes/moroso'),
+        { ...base, estadoComercial: 'alDia' }));
+      // Sin `estadoComercial` tampoco: lo que se niega es CREARLO, no el campo.
+      await RUT.assertFails(setDoc(doc(como('moroso'), 'restaurantes/moroso'), base));
+      // Y el control, para que esto no pase por culpa del contenido: otro
+      // negocio que NO existe en la carpeta nueva sí puede crearse ahí.
+      await RUT.assertSucceeds(setDoc(doc(como('rezagado'), 'restaurantes/rezagado'), base));
+    });
+
+    it('CANDADO 2 · y aunque lo tuviera, seguiría sin poder vender', async () => {
+      const { doc, setDoc } = FS;
+      // Se le REGALA el gemelo saltándose las reglas: el peor caso posible.
+      await entorno.withSecurityRulesDisabled(async (ctx) => {
+        await setDoc(doc(ctx.firestore(), 'restaurantes/moroso'), {
+          nombre: 'EL MOROSO', activo: true, estadoComercial: 'alDia',
+        });
+      });
+      // Preguntando en «O» esto pasaría: la carpeta vieja dice «al día».
+      // Preguntando en «Y», la nueva sigue diciendo «bloqueado» y manda.
+      await RUT.assertFails(setDoc(doc(como('pasajero1'), 'pedidos/pedGemelo'), {
+        clienteId: 'pasajero1', estado: 'nuevo', restauranteId: 'moroso', total: 30000,
+      }));
+    });
+
+    it('y al revés: bloqueado en la VIEJA, tampoco vende desde la nueva', async () => {
+      const { doc, setDoc } = FS;
+      await entorno.withSecurityRulesDisabled(async (ctx) => {
+        const db = ctx.firestore();
+        await setDoc(doc(db, 'negocios/otro'), { nombre: 'OTRO', activo: true, estadoComercial: 'alDia' });
+        await setDoc(doc(db, 'restaurantes/otro'), { nombre: 'OTRO', activo: true, estadoComercial: 'bloqueado' });
+      });
+      await RUT.assertFails(setDoc(doc(como('pasajero1'), 'pedidos/pedOtro'), {
+        clienteId: 'pasajero1', estado: 'nuevo', restauranteId: 'otro', total: 30000,
+      }));
+    });
+
+    // EL CONTROL. Sin esto, las tres de arriba podrían estar pasando porque
+    // NINGÚN pedido se puede crear —un error tonto en el payload— y no porque
+    // los candados funcionen.
+    it('EL CONTROL · un negocio al día en las dos carpetas SÍ vende', async () => {
+      const { doc, setDoc } = FS;
+      await entorno.withSecurityRulesDisabled(async (ctx) => {
+        const db = ctx.firestore();
+        await setDoc(doc(db, 'negocios/sano'), { nombre: 'SANO', activo: true, estadoComercial: 'alDia' });
+        await setDoc(doc(db, 'restaurantes/sano'), { nombre: 'SANO', activo: true, estadoComercial: 'alDia' });
+      });
+      await RUT.assertSucceeds(setDoc(doc(como('pasajero1'), 'pedidos/pedSano'), {
+        clienteId: 'pasajero1', estado: 'nuevo', restauranteId: 'sano', total: 30000,
+      }));
+    });
+
+    // Y el negocio que vive SOLO en la carpeta nueva —el caso normal a partir
+    // de hoy— vende sin que la carpeta vieja tenga que existir.
+    it('EL CASO NORMAL · un negocio que solo vive en `negocios` vende igual', async () => {
+      const { doc, setDoc } = FS;
+      await entorno.withSecurityRulesDisabled(async (ctx) => {
+        await setDoc(doc(ctx.firestore(), 'negocios/solonuevo'), { nombre: 'NUEVO', activo: true });
+      });
+      await RUT.assertSucceeds(setDoc(doc(como('pasajero1'), 'pedidos/pedNuevo'), {
+        clienteId: 'pasajero1', estado: 'nuevo', restauranteId: 'solonuevo', total: 30000,
+      }));
+    });
+
+    // ── LA DIRECCIÓN CONTRARIA, Y POR QUÉ SÍ SE DEJA ───────────────────────
+    // El candado 1 va en un solo sentido: viejo → nuevo. Al revés SÍ se puede,
+    // y tiene que poderse: un negocio que quedó solo en la carpeta vieja —uno
+    // de los tres de siempre, o un rezagado que se registró con la app vieja
+    // durante el despliegue— necesita poder tener su ficha en la carpeta buena.
+    //
+    // Y no abre nada, porque el documento se llama IGUAL que la cuenta de su
+    // dueño: `request.auth.uid == negocioId`. O sea, el único que puede crear
+    // esa ficha es él mismo. Esto lo deja escrito, que es distinto de que
+    // funcione por casualidad.
+    it('al revés SÍ se puede: el rezagado se hace su ficha en la carpeta nueva', async () => {
+      const { doc, setDoc } = FS;
+      await entorno.withSecurityRulesDisabled(async (ctx) => {
+        await setDoc(doc(ctx.firestore(), 'restaurantes/soloviejo'), { nombre: 'EL DE ANTES', activo: true });
+      });
+      await RUT.assertSucceeds(setDoc(doc(como('soloviejo'), 'negocios/soloviejo'), base));
+      // Pero solo ÉL. Otro con cuenta no se la puede hacer en su nombre.
+      await RUT.assertFails(setDoc(doc(como('listillo'), 'negocios/soloviejo'), base));
+    });
+
+    // Y un id inventado sigue sin poder recibir pedidos, que era lo que cerraba
+    // `elNegocioExiste` antes de tener dos carpetas.
+    it('un negocio que no existe en NINGUNA carpeta no recibe pedidos', async () => {
+      const { doc, setDoc } = FS;
+      await RUT.assertFails(setDoc(doc(como('pasajero1'), 'pedidos/pedFantasma'), {
+        clienteId: 'pasajero1', estado: 'nuevo', restauranteId: 'noexisteestenegocio', total: 30000,
+      }));
+    });
+  });
+});

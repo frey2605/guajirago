@@ -81,7 +81,7 @@ const SENALES = Object.entries(LISTAS)
 
 (async () => {
   const t = await token();
-  const r = await fetch(BASE + '/restaurantes?pageSize=300', { headers: { Authorization: 'Bearer ' + t } });
+  const r = await fetch(BASE + '/negocios?pageSize=300', { headers: { Authorization: 'Bearer ' + t } });
   if (!r.ok) throw new Error('no pude leer los negocios: ' + r.status);
   const docs = (await r.json()).documents || [];
 

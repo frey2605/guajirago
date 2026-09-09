@@ -930,7 +930,7 @@ exports.rutinaDeCobros = onSchedule(
       const negocioId = docu.id;
       try {
         const ficha = docu.data() || {};
-        const negSnap = await db.collection("restaurantes").doc(negocioId).get();
+        const negSnap = await db.collection("negocios").doc(negocioId).get();
         if (!negSnap.exists) {
           paraRevisar.push({ negocioId, porQue: "tiene ficha de cobro pero el negocio no existe" });
           continue;
@@ -1066,7 +1066,7 @@ exports.recalcularCobro = onCall(async (request) => {
 
   const [fichaSnap, negSnap] = await Promise.all([
     db.collection("suscripciones").doc(negocioId).get(),
-    db.collection("restaurantes").doc(negocioId).get(),
+    db.collection("negocios").doc(negocioId).get(),
   ]);
   if (!fichaSnap.exists) throw new HttpsError("not-found", "Ese cliente no tiene ficha de cobro");
   if (!negSnap.exists) throw new HttpsError("not-found", "Ese negocio no existe");

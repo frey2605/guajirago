@@ -180,7 +180,7 @@ function enCristiano(v) {
   say(C.gris + '   la escritura solo entra si el cuarto NO existe: lo comprueba el servidor' + C.off);
   say('');
 
-  const negocios = await traer(t, 'restaurantes');
+  const negocios = await traer(t, 'negocios');
   const cuartos = new Set((await traer(t, COLECCION_PRIVADA)).map((d) => d.id));
 
   let candidatos = 0; let escritos = 0; let fallados = 0; let yaTenian = 0; let sinNada = 0;

@@ -98,7 +98,7 @@ const pad = (s, n) => String(s).length >= n ? String(s).slice(0, n) : String(s) 
   const t = await token();
 
   const negocios = new Map();
-  for (const d of (await traer(t, 'restaurantes')).docs) {
+  for (const d of (await traer(t, 'negocios')).docs) {
     negocios.set(d.name.split('/').pop(), val((d.fields || {}).nombre) || '(sin nombre)');
   }
 

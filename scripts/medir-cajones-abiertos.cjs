@@ -86,7 +86,7 @@ const CAJONES = [
 
   // Los negocios que existen, para poder decir de quién es cada dato.
   const negocios = new Map();
-  for (const d of (await traer(t, 'restaurantes')).docs) {
+  for (const d of (await traer(t, 'negocios')).docs) {
     negocios.set(d.name.split('/').pop(), val((d.fields || {}).nombre) || '(sin nombre)');
   }
 

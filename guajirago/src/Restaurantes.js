@@ -35,7 +35,7 @@ import { obtenerTokenFCM } from './Notificaciones';
 // ============================================================
 // GuajiraGo - Módulo de Restaurantes (lado del cliente)
 // Pantallas: lista de restaurantes -> menú + carrito -> confirmación
-// Lee la colección "restaurantes" y crea pedidos en "pedidos"
+// Lee la colección "negocios" y crea pedidos en "pedidos"
 // (las fotos del chat siguen en la carpeta `pedidosRestaurantes/` del almacén:
 //  esa NO se renombró, tiene cero archivos y es cosmético)
 // ============================================================
@@ -113,7 +113,7 @@ function Restaurantes({ nombre, onVolver, foto, onCerrarSesion, onIrPerfil, onIr
   // Escuchar restaurantes en tiempo real
   useEffect(() => {
     const unsub = onSnapshot(
-      collection(db, 'restaurantes'),
+      collection(db, 'negocios'),
       (snap) => {
         const lista = losDeComida(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
         setRestaurantes(lista);
@@ -481,7 +481,7 @@ function Restaurantes({ nombre, onVolver, foto, onCerrarSesion, onIrPerfil, onIr
 
   // ---------- Solo para probar: crear restaurante demo ----------
   const crearRestauranteDemo = async () => {
-    await setDoc(doc(db, 'restaurantes', 'donde-meche'), {
+    await setDoc(doc(db, 'negocios', 'donde-meche'), {
       nombre: 'Donde Meche',
       emoji: '🍲',
       descripcion: 'Comida guajira de la buena',

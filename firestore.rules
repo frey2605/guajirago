@@ -70,12 +70,51 @@ service cloud.firestore {
     //
     // SEGUNDO TIEMPO, antes del primer cliente que pague: apretarlo a «solo opera
     // quien está expresamente al día». Eso exige que todos tengan el campo.
+    // ── Y MIRA LAS DOS CARPETAS, EN «Y» (7-sep-2026) ─────────────────────────
+    //  La carpeta de negocios cambió de nombre: `restaurantes` pasó a `negocios`,
+    //  porque aliados va a venderse a panaderías y peluquerías. Mientras las dos
+    //  convivan hay que preguntar en las dos.
+    //
+    //  🔴 Y EN «Y», NUNCA EN «O». Es la lección que costó dos rondas con los
+    //  pedidos: si bastara con que UNA carpeta dijera que sí, un negocio nuevo
+    //  —que nace solo en `negocios`— podría crearse a sí mismo en el hueco libre
+    //  de `restaurantes` diciendo que está «al día», y DESBLOQUEARSE SOLO.
+    //  Preguntando en «Y» —tiene que poder operar en TODAS las carpetas donde
+    //  exista— fabricar un gemelo solo puede QUITAR permiso, nunca darlo.
+    //  (Aquí el riesgo era menor que en los pedidos, porque el documento se llama
+    //  igual que la cuenta de su dueño y nadie puede crear el negocio de OTRO.
+    //  Pero sí podía desbloquearse a SÍ MISMO, y eso es dinero.)
+    //
+    //  Y tiene que existir en ALGUNA: un id inventado no opera.
+    //
+    //  LO QUE HAY QUE VIGILAR MIENTRAS DURE: preguntar en «Y» convierte la
+    //  carpeta vieja en un CANDADO VIVO, y a partir de hoy ya nadie la
+    //  escribe —el panel y la rutina nocturna solo tocan `negocios`—. Un
+    //  negocio cuya copia congelada dijera `activo:false` o
+    //  `estadoComercial:bloqueado` se quedaría frenado para siempre, sin
+    //  pantalla que lo levante y sin decir por qué.
+    //  MEDIDO contra el servidor el 7-sep-2026, antes de desplegar: los 3
+    //  documentos de `restaurantes` tienen `activo:true` y NINGUNO tiene
+    //  `estadoComercial`. O sea, hoy el «Y» se decide entero en `negocios`.
+    //  Si alguna vez se vuelve a escribir la carpeta vieja, hay que volver
+    //  a medir esto antes.
+    //  Cuando se retire `restaurantes`, se quita su mitad.
+    // ¿Existe este negocio, en la carpeta que sea? Mientras las dos convivan,
+    // preguntar solo por una daría un «no existe» falso.
+    function elNegocioExiste(negocioId) {
+      return exists(/databases/$(database)/documents/negocios/$(negocioId))
+        || exists(/databases/$(database)/documents/restaurantes/$(negocioId));
+    }
+    function puedeOperarEn(negocio) {
+      return !exists(negocio)
+        || (get(negocio).data.get('activo', true) != false
+            && get(negocio).data.get('estadoComercial', 'alDia') != 'bloqueado');
+    }
     function negocioPuedeOperar(negocioId) {
       return negocioId != null && negocioId != ''
-        && get(/databases/$(database)/documents/restaurantes/$(negocioId))
-             .data.get('activo', true) != false
-        && get(/databases/$(database)/documents/restaurantes/$(negocioId))
-             .data.get('estadoComercial', 'alDia') != 'bloqueado';
+        && elNegocioExiste(negocioId)
+        && puedeOperarEn(/databases/$(database)/documents/negocios/$(negocioId))
+        && puedeOperarEn(/databases/$(database)/documents/restaurantes/$(negocioId));
     }
 
     function esDelNegocio(negocioId) {
@@ -1289,7 +1328,7 @@ service cloud.firestore {
       // Y exigir el valor exacto cierra de paso los tipos: un `aprobado: 'true'` de
       // texto no es igual a false, así que se niega — a propósito, no por un error
       // de evaluación.
-      allow create: if esAdmin() || (
+      allow create: if (esAdmin() || (
         request.auth != null &&
         request.auth.uid == restauranteId &&
         request.resource.data.aprobado == false &&
@@ -1302,7 +1341,25 @@ service cloud.firestore {
         // uno de los camposPrivados(). Es más fuerte que antes: antes podía venir
         // valiendo cero, ahora no puede venir.
         !request.resource.data.keys().hasAny(camposPrivados())
-      );
+      ))
+      // ── 🔴 Y NO SE CREA AQUÍ UN NEGOCIO QUE YA EXISTE EN `negocios` ──────
+      //  Esta carpeta es la VIEJA: los negocios de hoy nacen en `negocios`.
+      //  Sigue abierta por si queda un REZAGADO —una pestaña sin recargar—, y
+      //  eso deja su hueco libre. Sin este candado, un negocio nuevo podría
+      //  crearse a sí mismo aquí diciendo que está «al día» y desbloquearse.
+      //  `negocioPuedeOperar` ya pregunta en «Y», así que el gemelo solo podría
+      //  QUITARLE permiso; esto lo cierra donde nace. Es la misma pareja de
+      //  candados que cerró el gemelo falso de los pedidos.
+      //
+      //  EL PARÉNTESIS DE ARRIBA NO ES ADORNO. En este lenguaje «&&» ata más
+      //  fuerte que «||»: sin él esto se leería «esAdmin() O (lo demás Y el
+      //  candado)», y el candado se quedaría colgando de media regla, sin
+      //  cubrir la rama del admin. Hoy no muerde —el panel nunca CREA un
+      //  negocio, solo lo cambia— pero el comentario de aquí arriba decía que
+      //  esto era la misma pareja de candados que la de los pedidos, y allí el
+      //  paréntesis sí está. Ahora es verdad.
+      //  Cuando se retire esta carpeta, este renglón se va con ella.
+      && !exists(/databases/$(database)/documents/negocios/$(restauranteId));
 
       // Al cambiarlo: el negocio manda en lo suyo, pero no en lo del panel.
       // En el update se mira affectedKeys() y no keys(): así lo que YA esté dentro
@@ -1338,6 +1395,56 @@ service cloud.firestore {
 
       allow delete: if false;
     }
+
+    // ══ EL NOMBRE NUEVO: `negocios` (7-sep-2026) ════════════════════════════
+    //  TERCER pedazo del cambio de nombre «restaurante» → «negocio», de cuatro.
+    //  Detrás va el CAMPO `restauranteId` → `negocioId`, que aún no se ha hecho:
+    //  no se retira la carpeta vieja hasta que ese también esté.
+    //  Esta es LA CARPETA DE LOS NEGOCIOS: mientras se llamara `restaurantes`,
+    //  el día que entrara una peluquería el sistema por dentro diría que una
+    //  peluquería es un restaurante.
+    //
+    //  ES LA MISMA REGLA QUE LA DE ARRIBA, palabra por palabra — sin los
+    //  comentarios, que cuentan la historia de cómo se cerró cada agujero y se
+    //  quedan en el original — y con el comodín en el idioma nuevo
+    //  (`negocioId` donde el viejo dice `restauranteId`). Lo carea, palabra
+    //  por palabra, una prueba en `pruebas/reglas.test.js`.
+    //
+    //  LAS DOS VIVEN A LA VEZ mientras dure la mudanza. La de arriba se retira
+    //  cuando pasen unos días sin que aparezca un rezagado.
+    match /negocios/{negocioId} {
+      function camposDelPanel() {
+        return ['aprobado', 'estadoAprobacion', 'activo', 'creditos', 'rol',
+                'fechaAprobacion', 'fechaRechazo', 'tipoNegocio',
+                'estadoComercial', 'visibleEnEscaparate'];
+      }
+
+      function camposPrivados() {
+        return ['duenoNombre', 'duenoTelefono', 'email', 'creditos', 'fcmToken'];
+      }
+
+      allow read: if request.auth != null;
+
+      allow create: if esAdmin() || (
+        request.auth != null &&
+        request.auth.uid == negocioId &&
+        request.resource.data.aprobado == false &&
+        request.resource.data.estadoAprobacion == 'pendiente' &&
+        request.resource.data.rol == 'dueno' &&
+        !request.resource.data.keys().hasAny(['fechaAprobacion', 'fechaRechazo']) &&
+        !request.resource.data.keys().hasAny(camposPrivados())
+      );
+
+      allow update: if esAdmin() || (
+        request.auth != null &&
+        request.auth.uid == negocioId &&
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny(camposDelPanel()) &&
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny(camposPrivados())
+      );
+
+      allow delete: if false;
+    }
+
     // ── REGLA 9 · EL CUARTO DE ATRÁS DE CADA NEGOCIO ────────────────────────
     // El documento `restaurantes/{id}` es el ESCAPARATE: la app del pasajero se
     // descarga la colección entera para enseñar dónde pedir, y eso está bien.
@@ -1575,7 +1682,6 @@ service cloud.firestore {
         (request.auth != null &&
          request.resource.data.get('clienteId', '') == request.auth.uid &&
          request.resource.data.get('estado', '') == 'nuevo' &&
-         exists(/databases/$(database)/documents/restaurantes/$(request.resource.data.restauranteId)) &&
          negocioPuedeOperar(request.resource.data.restauranteId)))
         && !exists(/databases/$(database)/documents/pedidos/$(pedidoId));
 
@@ -1664,7 +1770,6 @@ service cloud.firestore {
         (request.auth != null &&
          request.resource.data.get('clienteId', '') == request.auth.uid &&
          request.resource.data.get('estado', '') == 'nuevo' &&
-         exists(/databases/$(database)/documents/restaurantes/$(request.resource.data.restauranteId)) &&
          negocioPuedeOperar(request.resource.data.restauranteId));
 
       function elClienteNoMueveElPedido() {
@@ -1818,7 +1923,7 @@ service cloud.firestore {
         request.auth != null &&
         request.auth.uid == request.resource.data.get('restauranteId', '') &&
         !exists(/databases/$(database)/documents/usuarios/$(empleadoId)) &&
-        !exists(/databases/$(database)/documents/restaurantes/$(empleadoId))
+        !elNegocioExiste(empleadoId)
       );
 
       // Y la ficha no puede mudarse de negocio: sin esto, el dueño de un negocio

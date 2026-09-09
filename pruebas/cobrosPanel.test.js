@@ -498,7 +498,7 @@ describe('LA PANTALLA · las llaves dicen la verdad', () => {
       'apagar a mano no marca la ficha: la rutina lo volverá a encender esta noche.');
     assert.match(cuerpo, /COLECCION_COBRO/,
       'apagar a mano solo toca el negocio y no la ficha: se deshace solo.');
-    assert.match(cuerpo, /'restaurantes'/,
+    assert.match(cuerpo, /'negocios'/,
       'apagar a mano no mueve el interruptor que lee el candado del servidor.');
   });
 

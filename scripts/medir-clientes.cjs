@@ -118,7 +118,7 @@ const si = (b) => b ? 'sí' : 'no';
   console.log('MEDICIÓN DE CLIENTES · ' + hoy + ' (hora de Colombia)');
 
   const t = await token();
-  const negocios = await traer(t, 'restaurantes');
+  const negocios = await traer(t, 'negocios');
   const fichas = await traer(t, 'suscripciones');
   const privados = await traer(t, 'negociosPrivado');
   const rastro = await traer(t, 'logsCobros');

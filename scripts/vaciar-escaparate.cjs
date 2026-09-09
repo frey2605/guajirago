@@ -208,7 +208,7 @@ if (require.main !== module) return;
   say(C.gris + '   el cuarto de atrás: ' + COLECCION_PRIVADA + C.off);
   say('');
 
-  const escaparate = await traer(t, 'restaurantes');
+  const escaparate = await traer(t, 'negocios');
   const cuartos = await traer(t, COLECCION_PRIVADA);
   const porId = {};
   cuartos.forEach((c) => { porId[c.id] = c.campos; });
@@ -257,7 +257,7 @@ if (require.main !== module) return;
 
     // ── CANDADOS 2 y 3 · lo impone el servidor, y solo sobre esos campos ─────
     const mascara = presentes.map((c) => 'updateMask.fieldPaths=' + encodeURIComponent(c)).join('&');
-    const url = BASE + '/restaurantes/' + n.id + '?' + mascara + '&currentDocument.exists=true';
+    const url = BASE + '/negocios/' + n.id + '?' + mascara + '&currentDocument.exists=true';
     const r = await fetch(url, {
       method: 'PATCH',
       headers: { Authorization: 'Bearer ' + t, 'Content-Type': 'application/json' },

@@ -93,8 +93,8 @@ const sale = (n) => n.aprobado !== false
 
 (async () => {
   const t = await token();
-  const { docs, error } = await traer(t, 'restaurantes');
-  if (error) throw new Error('no pude leer restaurantes: ' + error);
+  const { docs, error } = await traer(t, 'negocios');
+  if (error) throw new Error('no pude leer los negocios: ' + error);
 
   console.log('\n=== ¿QUIÉN SALE EN LA APP? · SOLO LECTURA · '
     + new Date().toLocaleString('es-CO') + ' ===\n');

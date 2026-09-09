@@ -369,30 +369,40 @@ describe('SEGUNDA LEY · el cuarto privado del negocio, una sola lista', () => {
   // siempre: los nombres de los campos salen también en los comentarios, y una
   // prueba que los encuentre ahí pasa aunque la lista esté vacía. Ya lo cazó un
   // mutante una vez, en el amarre del dinero de aquí abajo.
-  it('las reglas del ESCAPARATE prohíben exactamente los campos privados', () => {
-    const { CAMPOS_PRIVADOS } = modulo();
-    const reglas = leer('firestore.rules');
-    const desde = reglas.split('match /restaurantes/{restauranteId}')[1];
-    assert.ok(desde, 'no está el bloque de restaurantes en las reglas');
-    const bloque = desde.split('match /')[0];
-    const lista = (bloque.split('function camposPrivados()')[1] || '').split('}')[0];
-    assert.ok(lista.trim(),
-      'firestore.rules ya no tiene camposPrivados() en el bloque de restaurantes. Sin esa ' +
-      'lista, cualquier pantalla puede devolver el nombre, el teléfono o el correo del dueño ' +
-      'al escaparate — y no falla nada al hacerlo, el dato simplemente reaparece.');
-    // Se busca con expresión regular, no con la cadena entre comillas simples. Con
-    // includes("'" + campo + "'") bastaba escribir la lista de las reglas con
-    // comillas dobles —código válido, funciona igual— para que esto se pusiera rojo
-    // DICIENDO QUE FALTA UN CAMPO QUE SÍ ESTÁ. Eso es peor que no avisar: manda a
-    // buscar un agujero que no existe.
-    //
-    // Es la TERCERA vez que este archivo tropieza con las comillas (mira el amarre
-    // del token y el de las tres pantallas). Por eso queda escrito aquí también.
-    CAMPOS_PRIVADOS.forEach((campo) => {
-      assert.ok(new RegExp("['\"\\x60]" + campo + "['\"\\x60]").test(lista),
-        'A camposPrivados() de firestore.rules le falta «' + campo + '», que negocioPrivado.js ' +
-        'sí declara privado. Ese campo podría volver a escribirse en restaurantes/{id}, que es ' +
-        'la colección que la app del pasajero se descarga ENTERA.');
+  // LAS DOS CARPETAS, no una (7-sep-2026). El escaparate se está mudando de
+  // `restaurantes` a `negocios` y las dos viven a la vez. Mirando solo una, la
+  // otra podía quedarse sin la lista y esto seguía verde.
+  const LOS_DOS_ESCAPARATES = [
+    'match /restaurantes/{restauranteId}',
+    'match /negocios/{negocioId}',
+  ];
+  LOS_DOS_ESCAPARATES.forEach((cabecera) => {
+    it('las reglas del ESCAPARATE prohíben exactamente los campos privados · ' + cabecera, () => {
+      const { CAMPOS_PRIVADOS } = modulo();
+      const reglas = leer('firestore.rules');
+      const desde = reglas.split(cabecera)[1];
+      assert.ok(desde, 'no está el bloque «' + cabecera + '» en las reglas');
+      const bloque = desde.split('match /')[0];
+      const lista = (bloque.split('function camposPrivados()')[1] || '').split('}')[0];
+      assert.ok(lista.trim(),
+        'firestore.rules ya no tiene camposPrivados() en el bloque «' + cabecera + '». Sin esa ' +
+        'lista, cualquier pantalla puede devolver el nombre, el teléfono o el correo del dueño ' +
+        'al escaparate — y no falla nada al hacerlo, el dato simplemente reaparece.');
+      // Se busca con expresión regular, no con la cadena entre comillas simples. Con
+      // includes("'" + campo + "'") bastaba escribir la lista de las reglas con
+      // comillas dobles —código válido, funciona igual— para que esto se pusiera rojo
+      // DICIENDO QUE FALTA UN CAMPO QUE SÍ ESTÁ. Eso es peor que no avisar: manda a
+      // buscar un agujero que no existe.
+      //
+      // Es la TERCERA vez que este archivo tropieza con las comillas (mira el amarre
+      // del token y el de las tres pantallas). Por eso queda escrito aquí también.
+      CAMPOS_PRIVADOS.forEach((campo) => {
+        assert.ok(new RegExp("['\"\\x60]" + campo + "['\"\\x60]").test(lista),
+          'A camposPrivados() de firestore.rules le falta «' + campo + '» en el bloque «' +
+          cabecera + '», y negocioPrivado.js sí lo declara privado. Ese campo podría volver ' +
+          'a escribirse en el escaparate, que es la colección que la app del pasajero se ' +
+          'descarga ENTERA.');
+      });
     });
   });
 
@@ -458,7 +468,7 @@ describe('SEGUNDA LEY · el cuarto privado del negocio, una sola lista', () => {
     // el nombre, el teléfono y el correo de su dueño dentro de la colección que la
     // app del pasajero se descarga entera — o sea, deshaciendo la tanda 2 entera
     // para cada negocio que se registre, y sin que nada avise.
-    assert.ok(vivo.includes("'restaurantes', uid), sinLoPrivado(datos)"),
+    assert.ok(vivo.includes("'negocios', uid), sinLoPrivado(datos)"),
       'aliados/Login.js volvió a escribir el escaparate con los datos del dueño dentro. ' +
       'Tiene que ser sinLoPrivado(datos): lo privado va SOLO al cuarto.');
 
@@ -471,11 +481,11 @@ describe('SEGUNDA LEY · el cuarto privado del negocio, una sola lista', () => {
     // Hoy eso lo negarían las REGLAS (affectedKeys().hasAny(camposPrivados())), o
     // sea que el cinturón fallaba y aguantaban los tirantes. Se arregla el cinturón:
     // una fuga que solo para el servidor es una fuga que el programador no ve.
-    // Se cuentan solo las ESCRITURAS. La otra vez que restaurantes/{uid} aparece en
+    // Se cuentan solo las ESCRITURAS. La otra vez que negocios/{uid} aparece en
     // este archivo es el getDoc de iniciarSesion, que es legítimo y tiene que estar.
-    const veces = (vivo.match(/setDoc\(doc\(db, 'restaurantes', uid\)/g) || []).length;
+    const veces = (vivo.match(/setDoc\(doc\(db, 'negocios', uid\)/g) || []).length;
     assert.strictEqual(veces, 1,
-      'aliados/Login.js ESCRIBE en restaurantes/{uid} ' + veces + ' veces, y tiene que ser ' +
+      'aliados/Login.js ESCRIBE en negocios/{uid} ' + veces + ' veces, y tiene que ser ' +
       'UNA. Si se añadió otra, mírala: lo más fácil que puede haber pasado es que alguien ' +
       'devolviera al escaparate un dato del dueño «para que el panel lo vea», sin saber que ' +
       'esa colección se la descarga entera cualquier cliente de la app del pasajero.');
@@ -502,10 +512,18 @@ describe('SEGUNDA LEY · el cuarto privado del negocio, una sola lista', () => {
   //    pasar. Y en guajirago/functions/ no hay ni .eslintrc que obligue a un
   //    estilo de comillas.
   //
+  // 3. 🔴 UN «NO» TIENE QUE NOMBRAR LAS DOS CARPETAS mientras las dos vivan
+  //    (7-sep-2026). Estos dos son «no»: dicen que este archivo NO nombra el
+  //    escaparate. El día que el código pasó de `restaurantes` a `negocios`, un
+  //    «no» atado solo al nombre viejo se puso VERDE sin comprobar ya nada — y
+  //    habría seguido verde aunque el token del dueño volviera al escaparate
+  //    nuevo. Un «no» clavado a un nombre que ya nadie usa no protege: lo
+  //    parece, que es peor. Cuando se retire `restaurantes`, se quita de aquí.
+  //
   // (\x60 es la comilla invertida. Se escribe así para no tener que escapar
   // acentos graves dentro de una expresión regular.)
-  const NOMBRA_EL_ESCAPARATE = /['"\x60]restaurantes['"\x60]/;
-  const LEE_DEL_ESCAPARATE = /collection\(\s*['"\x60]restaurantes['"\x60]\s*\)/;
+  const NOMBRA_EL_ESCAPARATE = /['"\x60](restaurantes|negocios)['"\x60]/;
+  const LEE_DEL_ESCAPARATE = /collection\(\s*['"\x60](restaurantes|negocios)['"\x60]\s*\)/;
 
   it('la app de aliados guarda el token del dueño en el cuarto, no en el escaparate', () => {
     const vivo = leer('guajirago-aliados/src/Notificaciones.js').replace(/\/\/.*$/gm, '');
@@ -523,8 +541,9 @@ describe('SEGUNDA LEY · el cuarto privado del negocio, una sola lista', () => {
       'recibiría ni un aviso y nada fallaría. Si de verdad cambió la forma de escribirlo, ' +
       'cambia también esta prueba — pero cámbiala a mano, mirando lo que hace el código.');
     assert.ok(!NOMBRA_EL_ESCAPARATE.test(vivo),
-      'aliados/Notificaciones.js volvió a nombrar la colección «restaurantes». El token del ' +
-      'dueño no puede acabar ahí, ni por el camino principal ni por uno añadido al lado.');
+      'aliados/Notificaciones.js volvió a nombrar el escaparate («negocios», o «restaurantes» ' +
+      'mientras la vieja siga viva). El token del dueño no puede acabar ahí, ni por el camino ' +
+      'principal ni por uno añadido al lado.');
   });
 
   // LAS FUNCIONES NO PUEDEN IMPORTAR NADA DE ALIADOS: son otro repo y otro
@@ -585,7 +604,8 @@ describe('SEGUNDA LEY · el cuarto privado del negocio, una sola lista', () => {
       assert.ok(cuerpo.includes('collection(NEGOCIO_PRIVADO)'),
         nombre + ' ya no busca el token en el cuarto privado del negocio.');
       assert.ok(!LEE_DEL_ESCAPARATE.test(cuerpo),
-        nombre + ' volvió a leer de la colección «restaurantes», que es EL ESCAPARATE: la ' +
+        nombre + ' volvió a leer del ESCAPARATE («negocios», o «restaurantes» mientras la ' +
+        'vieja siga viva): la ' +
         'app del pasajero se la descarga entera. Un token guardado ahí se lo lleva ' +
         'cualquiera con una cuenta. Ojo: esto salta también si la lectura buena sigue ahí ' +
         'y alguien añadió otra al lado, que es justo como se cuela una fuga.');

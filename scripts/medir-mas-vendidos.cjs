@@ -114,7 +114,7 @@ const der = (s, n) => String(s).padStart(n);
 
   // ── Los negocios, con su menú ───────────────────────────────────────────
   const negocios = new Map();
-  for (const d of (await traer(t, 'restaurantes')).docs) {
+  for (const d of (await traer(t, 'negocios')).docs) {
     const id = d.name.split('/').pop();
     const f = d.fields || {};
     const menu = lista(f.menu).map((p) => {

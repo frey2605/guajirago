@@ -136,7 +136,7 @@ const der = (s, n) => String(s).padStart(n);
 
   // Los negocios y sus menús (solo para poder decir el NOMBRE de cada plato).
   const negocios = new Map();
-  for (const d of (await traer(t, 'restaurantes')).docs) {
+  for (const d of (await traer(t, 'negocios')).docs) {
     const id = d.name.split('/').pop();
     const f = d.fields || {};
     const platos = new Map();

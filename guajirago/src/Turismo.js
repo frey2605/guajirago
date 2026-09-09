@@ -44,7 +44,7 @@ function Turismo({ nombre, foto, onVolver, onCerrarSesion, onIrPerfil, onIrGanan
   useEffect(() => {
     (async () => {
       try {
-        const snap = await getDocs(query(collection(db, 'restaurantes'), where('tipoNegocio', '==', 'turismo')));
+        const snap = await getDocs(query(collection(db, 'negocios'), where('tipoNegocio', '==', 'turismo')));
         const lista = lasDeTurismo(snap.docs.map(d => ({ id: d.id, ...d.data() })));
         setAgencias(lista);
       } catch (e) {}
