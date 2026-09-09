@@ -56,12 +56,6 @@ el gemelo que se queda viejo. Aquí queda el índice, y lo que es de GuajiraGo y
 | 2 · AUDITAR | 5 · PROBAR | 8 · SIMULACRO | 11 · VERIFICAR CONTRA LA NUBE |
 | 3 · PROPONER y **PARAR** | 6 · **SABOTEAR** | 9 · GUARDAR | 12 · RE-AUDITAR |
 
-### 🛑 EN GUAJIRAGO SE PARA
-
-En los pasos **3** y **10** se espera el «dale» del dueño. Aquí **no** se ejecuta de corrido.
-No es desconfianza: las dos veces que se paró a preguntar apareció un fallo real que nadie
-había pedido buscar.
-
 ### Y aquí, además
 
 - **Paso 1 · MEDIR** — guion de SOLO LECTURA contra **Firestore vivo**, guardado en `scripts/`.
