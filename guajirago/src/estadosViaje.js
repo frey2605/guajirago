@@ -25,4 +25,19 @@
  * enElMercado(). La prueba no deja hacerlo a medias.
  */
 
-export const ESTADOS_MERCADO = ['esperando', 'en_negociacion', 'confirmando', 'contraoferta'];
+// ── DOS QUE SE RETIRARON (9-sep-2026) ───────────────────────────────────────
+// Esta lista tenía CUATRO. `confirmando` y `contraoferta` se quedaron del flujo
+// viejo, de antes de que el mercado de ofertas pasara por la función
+// `confirmarConductor`: la oferta de un conductor ya no cambia el estado del
+// viaje, se guarda en la subcolección `viajes/{id}/contraofertas/{suUid}`.
+//
+// MEDIDO contra el servidor antes de quitarlos (scripts/medir-estados-muertos.cjs):
+//   · NADIE los escribe, en ninguna de las tres apps ni en las funciones.
+//   · `confirmando`: cero viajes, nunca.
+//   · `contraoferta`: UN viaje parado ahí desde el 2-jul-2026. Se pasó a
+//     `expirado` ANTES de quitar el estado, con `scripts/expirar-viaje-atascado.cjs`.
+//
+// OJO, QUE NO ES LO MISMO: 15 viajes tienen un CAMPO llamado `contraoferta`
+// —el monto que ofreció el conductor— y el panel lo usa para calcular lo que se
+// cobró. Ese campo NO se toca. Lo que se retira es el ESTADO.
+export const ESTADOS_MERCADO = ['esperando', 'en_negociacion'];

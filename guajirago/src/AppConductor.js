@@ -633,7 +633,8 @@ function AppConductor({ nombre, telefono, placa, vehiculo, tipoVehiculo, onCerra
     try {
       const snap = await getDocs(query(collection(db, 'viajes'), where('conductorId', '==', miId)));
       snap.docs.forEach(d => {
-        if (d.id !== idViajeGanador && (d.data().estado === 'confirmando' || d.data().estado === 'en_negociacion' || d.data().estado === 'esperando')) {
+        // Sin `confirmando` desde el 9-sep-2026: estado retirado del mercado.
+        if (d.id !== idViajeGanador && (d.data().estado === 'en_negociacion' || d.data().estado === 'esperando')) {
           updateDoc(doc(db, 'viajes', d.id), {
             estado: 'esperando',
             conductorId: null,

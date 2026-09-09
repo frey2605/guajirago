@@ -97,14 +97,21 @@ beforeEach(async () => {
 // Si se separan no salta ningún error: al conductor le sale el mercado VACÍO y
 // nadie sabe por qué. Esta prueba es el único amarre posible — y es de verdad:
 // se pone roja antes de que nada llegue al servidor.
-describe('SEGUNDA LEY · la app y las reglas dicen lo mismo', () => {
-  /** Saca la lista de estados de un texto, en el orden en que aparece. */
-  const listaDe = (texto, desde) => {
-    const trozo = texto.slice(texto.indexOf(desde));
-    const entre = trozo.slice(trozo.indexOf('['), trozo.indexOf(']') + 1);
-    return entre.replace(/[[\]'"\s]/g, '').split(',').filter(Boolean);
-  };
+/**
+ * Saca la lista de estados de un texto, en el orden en que aparece.
+ *
+ * VIVE AQUÍ ARRIBA, y no dentro de un describe, porque lo usan DOS pruebas de
+ * este archivo: el amarre app↔reglas y la del mercado del conductor. Estuvo
+ * copiado a mano en las dos durante un rato el 9-sep-2026 y lo cazó la segunda
+ * opinión — un gemelo, dentro del archivo que hace de policía de la SEGUNDA LEY.
+ */
+const listaDe = (texto, desde) => {
+  const trozo = texto.slice(texto.indexOf(desde));
+  const entre = trozo.slice(trozo.indexOf('['), trozo.indexOf(']') + 1);
+  return entre.replace(/[[\]'"\s]/g, '').split(',').filter(Boolean);
+};
 
+describe('SEGUNDA LEY · la app y las reglas dicen lo mismo', () => {
   it('los estados del MERCADO son los mismos en la app y en las reglas', () => {
     const app = fs.readFileSync(path.join(RAIZ, 'guajirago/src/estadosViaje.js'), 'utf8');
     const reglas = fs.readFileSync(path.join(RAIZ, 'firestore.rules'), 'utf8');
@@ -858,11 +865,26 @@ describe('REGLA 6 · cada quien ve lo suyo', () => {
     await RUT.assertFails(getDocs(collection(como('pasajero1'), 'viajes')));
   });
 
+  // LA LISTA SE LEE DE LA APP, NO SE COPIA. Estaba escrita a mano con los cuatro
+  // estados, y el 9-sep-2026 —al retirar `confirmando` y `contraoferta`— esta
+  // prueba se puso roja diciendo que el conductor había perdido el mercado. Era
+  // mentira: lo que pasaba es que la PRUEBA pedía un estado que las reglas ya no
+  // dejan ver. Una prueba con la lista copiada no vigila el mercado: vigila su
+  // propia copia, que es el gemelo que prohíbe la SEGUNDA LEY.
+  //
+  // QUÉ VIGILA ESTA, Y QUÉ NO — porque no es lo que parece. Leyendo la lista de
+  // la app, esta prueba NO caza que la app y las reglas se separen: si alguien
+  // toca solo un lado, aquí sigue verde. Eso lo caza la de arriba
+  // («los estados del MERCADO son los mismos»), que compara los dos TEXTOS.
+  // Lo que esta hace es EJECUTAR la consulta de verdad contra las reglas: que
+  // pedir exactamente lo que la app pide no le sea negado al conductor.
   it('el conductor SIGUE viendo el mercado, que es el negocio (AppConductor.js:847)', async () => {
     const { collection, query, where, getDocs } = FS;
+    const app = fs.readFileSync(path.join(RAIZ, 'guajirago/src/estadosViaje.js'), 'utf8');
+    const mercado = listaDe(app, 'export const ESTADOS_MERCADO');
+    assert.ok(mercado.length > 0, 'no se encontró ESTADOS_MERCADO en estadosViaje.js');
     await RUT.assertSucceeds(getDocs(query(
-      collection(como('conductor1'), 'viajes'),
-      where('estado', 'in', ['esperando', 'en_negociacion', 'confirmando', 'contraoferta'])
+      collection(como('conductor1'), 'viajes'), where('estado', 'in', mercado)
     )));
   });
 
@@ -2714,8 +2736,11 @@ describe('REGLA 10 · un viaje no lo toca cualquiera', () => {
       await setDoc(doc(db, 'llamadas/va'), { estado: 'sonando' });
       // Todavía buscando conductor: DENTRO del mercado.
       await setDoc(doc(db, 'viajes/vm'), { pasajeroId: 'pasajero1', estado: 'esperando', tarifaValor: 9000 });
-      // DENTRO del mercado y CON conductor: 'confirmando' entra en enElMercado().
-      // Aquí es donde un extraño puede echar al conductor de verdad.
+      // CON conductor, y en un estado que un extraño no puede tocar. Hasta el
+      // 9-sep-2026 'confirmando' entraba en enElMercado(); ya no, porque se
+      // retiró. La prueba se queda igual y sigue mordiendo: lo que la hace valer
+      // no es que el viaje esté en el mercado, es el `esMio()` del `allow update`
+      // —el `update` dejó de depender de enElMercado() el 25-ago-2026—.
       await setDoc(doc(db, 'viajes/vc'), {
         pasajeroId: 'pasajero1', conductorId: 'conductor1', estado: 'confirmando', tarifaValor: 11000,
       });
@@ -2995,12 +3020,18 @@ describe('REGLA 10 · un viaje no lo toca cualquiera', () => {
   });
 
   // ── ECHAR AL CONDUCTOR DE VERDAD ─────────────────────────────────────────
-  // 'confirmando' esta DENTRO del mercado, asi que un conductor cualquiera llega
-  // a ese viaje por enElMercado(). Sin este candado le quitaba el conductor a un
-  // viaje ajeno que estaba esperando el si de la pasajera, y echaba al conductor
-  // de verdad. Es el mismo ataque de las llamadas por la otra cara: alli se metia
-  // uno, aqui se saca al otro. Un mutante que devolvia la version sin esMio()
-  // sobrevivio a las 366 pruebas: ninguna miraba este caso.
+  // CUANDO SE ESCRIBIO ESTO (25-ago-2026), 'confirmando' estaba DENTRO del
+  // mercado, asi que un conductor cualquiera LLEGABA a ese viaje por
+  // enElMercado(). Sin este candado le quitaba el conductor a un viaje ajeno que
+  // estaba esperando el si de la pasajera, y echaba al conductor de verdad. Es el
+  // mismo ataque de las llamadas por la otra cara: alli se metia uno, aqui se
+  // saca al otro. Un mutante que devolvia la version sin esMio() sobrevivio a las
+  // 366 pruebas: ninguna miraba este caso.
+  //
+  // EL 9-sep-2026 SE RETIRO ESE ESTADO del mercado, y esta prueba se queda: al
+  // extrano lo para `(esMio() || esAdmin())` del `allow update`, que no depende
+  // de enElMercado() desde aquel mismo 25-ago. O sea que sigue midiendo lo que
+  // decia medir, solo que ahora por un candado y no por dos.
   it('EL ATAQUE · un extrano NO echa al conductor de un viaje en confirmando', async () => {
     await sembrarViajes();
     const { doc, updateDoc, deleteField } = FS;
