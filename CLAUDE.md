@@ -42,32 +42,43 @@ Esta manda sobre todas las demás. Antes de cada cambio:
 
 ---
 
-## 🔟 LOS 10 GRANDES PASOS — el orden de TODO arreglo
+## 🔢 LOS 12 GRANDES PASOS — el orden de TODO arreglo
 
 > Un «dale» autoriza el arreglo, NO autoriza saltarse pasos.
 
-**MEDIR y AUDITAR van DOS VECES, antes y después. Y no son lo mismo.**
-· **Medir** = mirar los DATOS reales (Firestore vivo) y contar. ¿Cuántos? ¿Cuánta plata? ¿Desde cuándo?
-· **Auditar** = mirar el CÓDIGO y sus efectos. ¿Qué caminos existen? ¿Qué se puede romper?
+**Los 12 pasos NO se escriben aquí.** Viven en `~/.claude/CLAUDE.md`, que se carga en TODOS
+los proyectos: **una sola copia**, por la SEGUNDA LEY. Escribirlos otra vez aquí sería crear
+el gemelo que se queda viejo. Aquí queda el índice, y lo que es de GuajiraGo y de nadie más.
 
-**ANTES DE TOCAR NADA**
-1. **MEDIR.** Script de SOLO LECTURA contra Firestore vivo. Se guarda: el paso 10 lo re-corre.
-2. **AUDITAR.** Enumerar TODOS los escritores y lectores en las tres apps. La causa, no el síntoma.
-3. **PROPONER Y PARAR.** Con el número medido, los riesgos sin maquillar, y se espera el «dale».
+| | | | |
+|---|---|---|---|
+| 1 · MEDIR | 4 · CONSTRUIR | 7 · AUDITAR OTRA VEZ | 10 · APLICAR |
+| 2 · AUDITAR | 5 · PROBAR | 8 · SIMULACRO | 11 · VERIFICAR CONTRA LA NUBE |
+| 3 · PROPONER y **PARAR** | 6 · **SABOTEAR** | 9 · GUARDAR | 12 · RE-AUDITAR |
 
-**CON PERMISO DEL DUEÑO**
-4. **CONSTRUIR** solo lo declarado en la foto. Ni un renglón de más.
-5. **PROBAR.** Pruebas que EJECUTAN + suite completa + `guardian.cjs revisar` + cacería de
-   mutantes: dañar el arreglo a propósito y comprobar que una prueba FALLA.
-6. **AUDITAR OTRA VEZ.** Careo contra los datos REALES con el arreglo puesto.
-7. **SIMULACRO** (solo si se tocan DATOS). Correr SIN escribir y enseñar qué cambiaría, uno por uno.
+### 🛑 EN GUAJIRAGO SE PARA
 
-**AL APLICAR**
-8. **APLICAR** — con permiso otra vez, y **SOLO lo de esta sesión**. El despliegue sale de una
-   COPIA LIMPIA de lo commiteado, jamás de la carpeta de trabajo viva.
-9. **VERIFICAR CONTRA LA NUBE.** Volver a LEER del servidor. Que el comando diga "listo" no
-   es prueba de nada.
-10. **RE-AUDITAR lo aplicado.** Contar otra vez y comprobar que lo intocado sigue igual.
+En los pasos **3** y **10** se espera el «dale» del dueño. Aquí **no** se ejecuta de corrido.
+No es desconfianza: las dos veces que se paró a preguntar apareció un fallo real que nadie
+había pedido buscar.
+
+### Y aquí, además
+
+- **Paso 1 · MEDIR** — guion de SOLO LECTURA contra **Firestore vivo**, guardado en `scripts/`.
+  Y medir incluye bajar **las reglas que están PUESTAS** (`scripts/bajar-reglas.cjs`): el
+  servidor puede ir por detrás del repo, y desplegar las apps antes que las reglas mata la
+  app **en silencio**.
+- **Paso 2 · AUDITAR** — enumerar escritores y lectores **en las TRES apps**. No hay API:
+  cambiar un campo en una rompe otra sin que nada avise.
+- **Paso 4 · CONSTRUIR** — solo lo declarado en la **foto del guardián**
+  (`node scripts/guardian.cjs foto "<qué se arregla>" <sitio> [<sitio>...]`).
+- **Paso 5 · PROBAR** — `npm test` (la suite entera, con el emulador) **más**
+  `node scripts/guardian.cjs revisar`.
+- **Paso 9 · GUARDAR** — **los tres repos son APARTE**: raíz, `guajirago-admin` y
+  `guajirago-aliados`. Empujar uno **no** empuja los otros, y un `git status` en la raíz no ve
+  los cambios de los otros dos.
+- **Paso 10 · APLICAR** — desde **dentro de la carpeta de cada app**. Desde la raíz,
+  `firebase deploy --only hosting` publica un resto de junio y tumba la app del cliente.
 
 ---
 
@@ -107,7 +118,7 @@ Manda sobre todo el proyecto, en las tres apps y en las funciones. Tiene tres ca
   saca a un sitio común. No se hace una segunda versión.
 - **Si al arreglar aparece un gemelo, se ANOTA y se le dice al dueño.** No se unifica de
   paso: eso es tocar código que funciona, y lo prohíbe la PRIMERA LEY. Unificar es un
-  trabajo aparte, con sus 10 pasos y su permiso.
+  trabajo aparte, con sus 12 pasos y su permiso.
 - **Un arreglo que hay que aplicar dos veces es la prueba de que la ley está rota ahí.**
   Se hace el arreglo en los dos sitios —porque hay que dejarlo funcionando— y se anota el
   gemelo como deuda, con nombre y archivo.
