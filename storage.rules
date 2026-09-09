@@ -116,13 +116,25 @@ service firebase.storage {
     //  permiso de lectura. Por eso la lectura no es más estrecha que la
     //  escritura: si lo fuera, la foto se subiría y el mensaje se quedaría sin
     //  ella, en silencio.
-    //  ── Y BUSCA EL PEDIDO EN LOS DOS SITIOS (7-sep-2026) ────────────────────
-    //   La colección de pedidos cambió de nombre: `pedidosRestaurantes` pasó a
-    //   `pedidos`, porque aliados va a vender a panaderías y peluquerías y la
-    //   base de datos no puede seguir diciendo «restaurante». Esta regla vive en
-    //   OTRO servicio y no se entera del cambio: le pregunta a Firestore dónde
-    //   está el pedido. Si solo mirara uno de los dos nombres, la mitad de los
-    //   pedidos se quedaría sin poder subir su comprobante — negando en silencio.
+    //  ── AQUÍ BUSCÓ EL PEDIDO EN DOS SITIOS, Y YA NO (retirado el 9-sep-2026) ─
+    //   La colección de pedidos cambió de nombre el 7-sep-2026:
+    //   `pedidosRestaurantes` pasó a `pedidos`, porque aliados va a vender a
+    //   panaderías y peluquerías y la base de datos no puede seguir diciendo
+    //   «restaurante». Mientras las dos convivieron, esta regla —que vive en
+    //   OTRO servicio y no se entera del cambio— tenía que preguntar por las
+    //   dos, o la mitad de los pedidos se habría quedado sin poder subir su
+    //   comprobante, negando en silencio.
+    //
+    //   HOY SOLO HAY UNA. Medido antes de simplificarlo: 29 pedidos en cada
+    //   carpeta y LOS 29 EN LAS DOS —cero viven solo en la vieja—, el último
+    //   que nació en la vieja es del 5-jul-2026, y los tres paquetes publicados
+    //   se bajaron del servidor sin que ninguno nombre ya el nombre viejo.
+    //   `firestore.rules` cerró esa carpeta el mismo día.
+    //
+    //   LO DE ABAJO SE DEJA ESCRITO A PROPÓSITO. Ya no describe este renglón:
+    //   describe la REGLA GENERAL para los renombrados que faltan, y costó dos
+    //   rondas aprenderla. El día que se renombre otra colección, se vuelve a
+    //   necesitar tal cual.
     //
     //   🔴 ESTO NO SE PUDO PONER ANTES, Y HAY QUE DECIR POR QUÉ. En el trabajo
     //   anterior se intentó, con `pedidos` todavía VACÍA, y se REPRODUJO un
@@ -164,14 +176,12 @@ service firebase.storage {
         );
     }
 
+    // Una sola carpeta desde el 9-sep-2026. `esDelPedidoEn` ya comprueba que el
+    // pedido EXISTA, así que no hace falta preguntarlo aparte: un número
+    // inventado no es de nadie.
     function esDelPedido(pedidoId) {
       return haySesion()
-        && (firestore.exists(/databases/(default)/documents/pedidos/$(pedidoId))
-            || firestore.exists(/databases/(default)/documents/pedidosRestaurantes/$(pedidoId)))
-        && (!firestore.exists(/databases/(default)/documents/pedidos/$(pedidoId))
-            || esDelPedidoEn(/databases/(default)/documents/pedidos/$(pedidoId)))
-        && (!firestore.exists(/databases/(default)/documents/pedidosRestaurantes/$(pedidoId))
-            || esDelPedidoEn(/databases/(default)/documents/pedidosRestaurantes/$(pedidoId)));
+        && esDelPedidoEn(/databases/(default)/documents/pedidos/$(pedidoId));
     }
 
     // ── LO QUE SE PUEDE SUBIR ──────────────────────────────────────────────

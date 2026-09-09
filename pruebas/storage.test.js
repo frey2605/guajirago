@@ -368,14 +368,22 @@ describe('STORAGE · el chat del pedido: solo sus dos puntas', () => {
       ref(como('conductor2'), 'pedidosRestaurantes/SOLONUEVO/' + nueva(6001)), foto(), COMO_FOTO));
   });
 
-  it('EL QUE MUERDE · un rezagado que solo está en la carpeta VIEJA', async () => {
-    // Los que entren entre la mudanza de los datos y el despliegue de las apps.
-    // Si la regla dejara de mirar la carpeta vieja, esos se quedarían sin poder
-    // mandar su comprobante mientras la lápida siga en pie.
+  // Hasta el 9-sep-2026 esta prueba decía lo CONTRARIO: que un pedido que viviera
+  // solo en la carpeta vieja también abría su chat. Hacía falta mientras podían
+  // entrar rezagados entre la mudanza de los datos y el despliegue de las apps.
+  // Ya no entra ninguno —medido antes de retirarlo: 29 pedidos en cada carpeta,
+  // los 29 en LAS DOS, y el último que nació en la vieja es del 5-jul-2026—, y la
+  // regla dejó de mirar ahí. Ahora esto fija que mirar ahí no vuelva.
+  it('EL QUE MUERDE · un pedido que SOLO está en la carpeta vieja no abre nada', async () => {
     const { ref, uploadBytes, getBytes } = ST;
-    const r = ref(como('conductor1'), 'pedidosRestaurantes/SOLOVIEJO/' + nueva(7000));
-    await RUT.assertSucceeds(uploadBytes(r, foto(), COMO_FOTO));
-    await RUT.assertSucceeds(getBytes(r));
+    // Ni su propio cliente. No es una pérdida: no existe ninguno así, y si
+    // apareciera, el guion de mudanza lo copia a `pedidos` y vuelve a abrirse.
+    // Lo que esto impide es que la regla vuelva a preguntarle a una lápida —donde
+    // los números están libres y cualquiera con cuenta fabrica un gemelo.
+    await RUT.assertFails(uploadBytes(
+      ref(como('conductor1'), 'pedidosRestaurantes/SOLOVIEJO/' + nueva(7000)), foto(), COMO_FOTO));
+    await RUT.assertFails(getBytes(
+      ref(como('conductor1'), 'pedidosRestaurantes/SOLOVIEJO/' + nueva(7002))));
     await RUT.assertFails(uploadBytes(
       ref(como('conductor2'), 'pedidosRestaurantes/SOLOVIEJO/' + nueva(7001)), foto(), COMO_FOTO));
   });
@@ -395,8 +403,12 @@ describe('STORAGE · el chat del pedido: solo sus dos puntas', () => {
     const suya = 'pedidosRestaurantes/SOLONUEVO/' + nueva(8000);
     await RUT.assertSucceeds(uploadBytes(ref(como('conductor1'), suya), foto(), COMO_FOTO));
     // EL ATAQUE, INTENTADO DE VERDAD: el atacante trata de fabricar el gemelo en
-    // el hueco libre de la carpeta vieja, con las reglas puestas. Ya no puede:
-    // `firestore.rules` no deja crear ahí un número que ya existe en `pedidos`.
+    // el hueco libre de la carpeta vieja, con las reglas puestas. Ya no puede.
+    // POR QUÉ, HOY: la carpeta vieja entera es `write: if false` desde el
+    // 9-sep-2026. Hasta ese día lo que lo impedía era otra cosa —un candado que no
+    // dejaba crear ahí un número que ya existiera en `pedidos`—, y esta prueba lo
+    // cazaba igual. Se deja porque sigue mordiendo si alguien reabriera la lápida
+    // o volviera a preguntar en «O».
     await RUT.assertFails(setDoc(
       doc(entorno.authenticatedContext('conductor2').firestore(), 'pedidosRestaurantes/SOLONUEVO'),
       { clienteId: 'conductor2', restauranteId: 'negocio1', estado: 'nuevo' }),

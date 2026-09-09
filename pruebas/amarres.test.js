@@ -584,9 +584,12 @@ describe('SEGUNDA LEY · el cuarto privado del negocio, una sola lista', () => {
     //  exportada con su cuerpo dentro. Desde el 7-sep-2026 el del PEDIDO ya no.
     //  La colección cambió de nombre (`pedidosRestaurantes` → `pedidos`) y un
     //  disparador solo puede escuchar UNA carpeta, así que durante la mudanza
-    //  hay DOS disparadores llamando al MISMO cuerpo, que salió a
+    //  hubo DOS disparadores llamando al MISMO cuerpo, que salió a
     //  `avisarDelPedidoNuevo`. Copiarlo habría sido el gemelo que prohíbe la
     //  SEGUNDA LEY: al cambiar el texto del aviso, una copia se quedaría vieja.
+    //  Desde el 9-sep-2026 queda UNA sola puerta, pero el cuerpo se dejó fuera a
+    //  propósito: es lo que hizo posible tener dos sin copiarlas, y el día que se
+    //  renombre otra colección hace falta otra vez.
     //
     //  ESTA PRUEBA VIGILA EXACTAMENTE LO MISMO QUE ANTES —que el aviso lea el
     //  token del cuarto privado y NUNCA del escaparate—; solo cambia dónde lo
@@ -1099,32 +1102,46 @@ describe('LA MUDANZA DE LOS PEDIDOS · ninguna app se queda con el nombre viejo'
       + 'pantalla sin lectura se queda vacía sin que nada falle.');
   });
 
-  it('EL QUE MUERDE · los DOS disparadores siguen vivos, uno por carpeta', () => {
-    // Un disparador solo puede escuchar UNA carpeta. Mientras la mudanza dure
-    // hacen falta los dos: si se borra el de la carpeta vieja demasiado pronto,
-    // un pedido que aún entre por ahí no le avisa a NADIE — el restaurante no se
-    // entera y el cliente esperando.
+  // Hasta el 9-sep-2026 aquí se exigían DOS disparadores por aviso, uno por
+  // carpeta: mientras la mudanza duró, borrar el de la carpeta vieja demasiado
+  // pronto habría dejado sin avisar a NADIE un pedido que aún entrara por ahí.
+  // Ya no entra ninguno —medido: el último nació el 5-jul-2026— y los dos viejos
+  // se retiraron. Ahora esto vigila lo CONTRARIO: que no vuelvan.
+  //
+  // Y SE MIRA EL `exports.`, NO SOLO LA CADENA. Lo cazó un sabotaje del
+  // 9-sep-2026: quitándole el `exports.` al disparador —dejándolo en el archivo,
+  // con su misma ruta— deja de desplegarse y NADIE recibe el aviso del pedido
+  // nuevo. La versión que buscaba `onDocumentCreated("pedidos/{id}"` a secas
+  // seguía verde con ese sabotaje puesto. Una función que no se exporta no
+  // existe para Firebase, por muy escrita que esté.
+  it('EL QUE MUERDE · queda UN disparador por aviso, EXPORTADO y en la carpeta buena', () => {
     const t = leer('guajirago/functions/index.js');
-    for (const [ruta, quien] of [
-      ['pedidosRestaurantes/{id}', 'la carpeta VIEJA'],
-      ['pedidos/{id}', 'la carpeta NUEVA'],
-    ]) {
-      assert.ok(t.includes('onDocumentCreated("' + ruta + '"'),
-        'ya no hay disparador de pedido NUEVO escuchando ' + quien + ' (' + ruta + ').');
-      assert.ok(t.includes('onDocumentUpdated("' + ruta + '"'),
-        'ya no hay disparador de CAMBIO DE ESTADO escuchando ' + quien + ' (' + ruta + ').');
+    for (const escucha of ['onDocumentCreated', 'onDocumentUpdated']) {
+      assert.match(t, new RegExp('exports\\.\\w+\\s*=\\s*' + escucha + '\\("pedidos/\\{id\\}"'),
+        'ya no hay disparador (' + escucha + ') EXPORTADO escuchando `pedidos`. Sin él, un '
+        + 'pedido entra y no le avisa a nadie: el restaurante no se entera y el cliente '
+        + 'esperando. Ojo: puede estar escrito y no exportado, que es lo mismo que no estar.');
+      assert.ok(!t.includes(escucha + '("pedidosRestaurantes/{id}"'),
+        'volvió un disparador (' + escucha + ') escuchando `pedidosRestaurantes`, que es una '
+        + 'lápida cerrada desde el 9-sep-2026. Ahí ya no puede entrar nada, así que ese '
+        + 'disparador no se ejecutaría nunca — pero sí confunde a quien lea esto, y cuesta '
+        + 'dinero tenerlo desplegado.');
     }
   });
 
-  it('EL QUE MUERDE · y los cuatro llaman al MISMO cuerpo, no a una copia', () => {
-    // Copiar el cuerpo sería el gemelo que prohíbe la SEGUNDA LEY: al cambiar el
-    // texto del aviso, una de las copias se quedaría vieja y nadie la miraría.
+  // EL CUERPO SIGUE SUELTO, aunque ya solo lo llame una puerta. Se deja así a
+  // propósito: es lo que permitió tener dos puertas sin dos copias, y el día que
+  // se renombre otra colección se vuelve a necesitar. Un disparador con el cuerpo
+  // pegado dentro obliga a copiarlo, y copiarlo es el gemelo que prohíbe la
+  // SEGUNDA LEY: al cambiar el texto del aviso, una copia se queda vieja.
+  it('EL QUE MUERDE · el cuerpo sigue suelto, y su puerta lo llama', () => {
     const t = leer('guajirago/functions/index.js');
     for (const cuerpo of ['avisarDelPedidoNuevo', 'avisarAlClienteDelCambio']) {
       const veces = t.split(cuerpo + '(').length - 1;
-      assert.strictEqual(veces, 3,
-        cuerpo + ' se nombra ' + veces + ' veces y deberían ser 3: su declaración y las DOS '
-        + 'puertas que la llaman. Si son menos, alguien copió el cuerpo o borró una puerta.');
+      assert.strictEqual(veces, 2,
+        cuerpo + ' se nombra ' + veces + ' veces y deberían ser 2: su declaración y la '
+        + 'puerta que la llama. Si es 1, alguien borró la puerta y el aviso no sale. Si son '
+        + 'más, mira si alguien copió el cuerpo en vez de llamarlo.');
     }
   });
 });

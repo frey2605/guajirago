@@ -27,7 +27,7 @@
  *
  * La verdad sale de los pedidos, que sí están completos:
  *
- *     pedidosRestaurantes  con  tipo == 'local'  y  estado == 'cerrado'
+ *     pedidos  con  tipo == 'local'  y  estado == 'cerrado'
  *     → por cada línea de `items`: id del plato × cantidad
  *
  *

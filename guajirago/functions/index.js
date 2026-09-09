@@ -104,31 +104,43 @@ exports.notificarNuevaOferta = onDocumentUpdated("viajes/{viajeId}", async (even
   }
 });
 
-// ── LA COLECCIÓN DE PEDIDOS CAMBIÓ DE NOMBRE (7-sep-2026) ───────────────────
+// ── LA COLECCIÓN DE PEDIDOS CAMBIÓ DE NOMBRE (7-sep-2026, cerrado el 9) ─────
 //  `pedidosRestaurantes` pasó a `pedidos`, porque aliados va a venderse a
 //  panaderías y peluquerías y la base de datos no puede seguir diciendo
 //  «restaurante».
 //
-//  UN DISPARADOR SOLO PUEDE ESCUCHAR UNA CARPETA, así que durante la mudanza hay
+//  UN DISPARADOR SOLO PUEDE ESCUCHAR UNA CARPETA, así que durante la mudanza hubo
 //  DOS, uno por nombre. Si se hubiera cambiado el único que había, un pedido que
-//  entrara por la otra carpeta no avisaría a nadie.
+//  entrara por la otra carpeta no habría avisado a nadie.
 //
-//  🔴 PERO ESTO NO TAPA EL HUECO ENTERO, Y HAY QUE DECIRLO. Entre que se despliega
-//  aliados y que se despliega la app del cliente —y después, en cada pestaña que
-//  alguien dejó abierta sin recargar— el cliente escribe en la carpeta VIEJA y
-//  aliados ya solo mira la NUEVA. El aviso SÍ llega, porque el disparador viejo
-//  sigue vivo... pero el pedido NO aparece en la lista del restaurante. Un push
-//  de «Nuevo pedido» que no lleva a ninguna parte es peor que ningún push.
-//  Lo único que cierra eso es volver a correr, DESPUÉS de desplegar,
-//  `node scripts/mudar-pedidos.cjs --aplicar`, que recoge los rezagados. Y
-//  repetirlo unas horas más tarde, por las pestañas que tarden en recargarse.
+//  ✅ LOS DEL NOMBRE VIEJO SE RETIRARON EL 9-sep-2026, y esto es lo que se midió
+//  antes de quitarlos: 29 pedidos en cada carpeta y LOS 29 EN LAS DOS (cero solo
+//  en la vieja); el último que nació en la vieja es del 5-jul-2026; y los tres
+//  paquetes publicados se bajaron del servidor sin que ninguno la nombre ya.
+//  Se llamaban `notificarNuevoPedidoRestaurante` y `notificarClientePedido`.
 //
-//  🔒 EL CUERPO ES UNO SOLO. Los dos disparadores llaman a la MISMA función, que
-//  es la de siempre movida de sitio sin tocarle una coma. Copiar el cuerpo
-//  habría sido el gemelo que prohíbe la SEGUNDA LEY: el día que se cambie el
-//  texto del aviso, uno de los dos se quedaría viejo y nadie lo miraría.
-//  Cuando la mudanza termine se borra el disparador del nombre viejo —con
-//  `firebase functions:delete`— y el cuerpo se queda donde está.
+//  🔴 LO QUE ESTO NO TAPABA, Y HAY QUE DEJARLO ESCRITO PARA EL PRÓXIMO CAMBIO DE
+//  NOMBRE. Entre que se despliega aliados y que se despliega la app del cliente
+//  —y después, en cada pestaña que alguien dejó abierta sin recargar— el cliente
+//  escribía en la carpeta VIEJA y aliados ya solo miraba la NUEVA. El aviso SÍ
+//  llegaba, porque el disparador viejo seguía vivo... pero el pedido NO aparecía
+//  en la lista del restaurante. Un push de «Nuevo pedido» que no lleva a ninguna
+//  parte es peor que ningún push.
+//  Lo único que cierra eso es volver a correr, DESPUÉS de desplegar, el guion de
+//  mudanza, que recoge los rezagados; y repetirlo unas horas más tarde, por las
+//  pestañas que tarden en recargarse.
+//
+//  🔒 EL CUERPO ERA UNO SOLO, y por eso retirarlos costó dos renglones. Los dos
+//  disparadores llamaban a la MISMA función. Copiar el cuerpo habría sido el
+//  gemelo que prohíbe la SEGUNDA LEY: el día que se cambiara el texto del aviso,
+//  uno de los dos se habría quedado viejo y nadie lo miraría. Al retirarlos, el
+//  cuerpo se quedó donde estaba, sin tocarle una coma.
+//  Los del nombre viejo hay que borrarlos del servidor A MANO, con
+//  `firebase functions:delete <nombre>`: quitarlos de este archivo NO los quita
+//  de allí, y un despliegue por nombre tampoco. Un `--only functions` a secas sí
+//  se ofrecería a borrarlos, pero ese comando además borraría `getTurnCredentials`
+//  y `notificarConductorEnPunto`, que están desplegadas y NO están en este
+//  archivo. Por nombre, siempre.
 
 // Notificar al restaurante (dueño + recepción/admin) cuando llega un pedido a domicilio
 async function avisarDelPedidoNuevo(p) {
@@ -175,14 +187,13 @@ async function avisarDelPedidoNuevo(p) {
   }
 }
 
-// Las DOS puertas, el MISMO cuerpo. La de arriba se borra cuando la mudanza acabe.
-exports.notificarNuevoPedidoRestaurante = onDocumentCreated("pedidosRestaurantes/{id}",
-  async (event) => avisarDelPedidoNuevo(event.data.data()));
+// Una sola puerta desde el 9-sep-2026. El cuerpo se queda suelto a propósito: es
+// lo que permitió tener dos puertas sin dos copias, y lo permitirá otra vez.
 exports.notificarNuevoPedido = onDocumentCreated("pedidos/{id}",
   async (event) => avisarDelPedidoNuevo(event.data.data()));
 
 // Avisar al CLIENTE cuando su pedido a domicilio cambia de estado
-// EL MISMO TRATO que el de arriba: un cuerpo, dos puertas. Ver el porque alli.
+// EL MISMO TRATO que el de arriba: el cuerpo suelto, y ya una sola puerta.
 async function avisarAlClienteDelCambio(antes, despues) {
   if (!despues || !despues.clienteFcmToken) return null;
   if (antes.estado === despues.estado) return null;
@@ -213,8 +224,6 @@ async function avisarAlClienteDelCambio(antes, despues) {
   }
 }
 
-exports.notificarClientePedido = onDocumentUpdated("pedidosRestaurantes/{id}",
-  async (event) => avisarAlClienteDelCambio(event.data.before.data(), event.data.after.data()));
 exports.notificarClienteDelPedido = onDocumentUpdated("pedidos/{id}",
   async (event) => avisarAlClienteDelCambio(event.data.before.data(), event.data.after.data()));
 

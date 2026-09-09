@@ -32,7 +32,7 @@
  * El contador solo lo toca el cierre de mesa, así que lo que DEBERÍA decir se
  * reconstruye sumando los pedidos de mesa ya cerrados:
  *
- *     pedidosRestaurantes  con  tipo == 'local'  y  estado == 'cerrado'
+ *     pedidos  con  tipo == 'local'  y  estado == 'cerrado'
  *     → por cada línea de `items`: id del plato × cantidad
  *
  * y se carea contra `menu[].vecesVendido` del documento del negocio.

@@ -898,3 +898,35 @@ a quien los lea a una carpeta que ahora es una lapida cerrada. Ni una linea de
 codigo cambio en ninguno de los dos.
 Autorizado por Jhon el 7-sep-2026, enseñandole los dos diffs enteros.
 2026-09-07T23:55:50.546Z	pruebas/amarres.test.js	NEGADO: fuera de la promesa "La mudanza de los pedidos: apps, funciones y los 29 datos pasan de pedidosRestaurantes a pedidos"
+
+2026-09-09 · EXCEPCION AUTORIZADA POR EL DUENO
+Promesa: "Los comentarios que dicen donde vive un dato HOY y ya no es verdad: el
+escaparate es negocios, no restaurantes"
+Fuera de la lista, y se pidio permiso ANTES de tocarlo:
+  · scripts/vaciar-escaparate.cjs:15    1 renglon de COMENTARIO
+  · scripts/mudar-datos-negocio.cjs:15  1 renglon de COMENTARIO
+Motivo: los dos afirmaban EN PRESENTE que `restaurantes/{id}` es el escaparate.
+Desde el 9-sep-2026 el escaparate es `negocios/{id}`: los dos mandaban a quien
+los leyera a una lapida. Los encontro la segunda opinion, no yo — mi barrido
+solo miro las 3 apps, las funciones y las dos reglas, y se dejo scripts/ fuera.
+Ni una linea de codigo cambio en ninguno de los dos: se comprobo con
+`git diff --stat` (1 insercion, 1 borrado por archivo).
+Los renglones que nombran `restaurantesPrivado` en PASADO —"la tanda 1b los
+COPIO al cuarto de atras"— se dejaron como estaban: cuentan lo que paso cuando
+ese cuarto se llamaba asi, y eso sigue siendo verdad.
+Autorizado por Jhon el 9-sep-2026, ensenandole los dos comentarios enteros.
+
+2026-09-09 (2) · EXCEPCION AUTORIZADA POR EL DUENO
+Promesa: "Se retira la lapida de pedidos: los 2 disparadores viejos, la caida al
+nombre viejo al calificar, y el bloque de pedidosRestaurantes se cierra"
+Fuera de la lista, y se pidio permiso ANTES de tocarlo:
+  · scripts/medir-mas-vendidos.cjs:35      1 renglon de COMENTARIO
+  · scripts/mudar-ventas-por-plato.cjs:30  1 renglon de COMENTARIO
+Motivo: las dos cabeceras decian que la verdad se saca de `pedidosRestaurantes`,
+y el codigo de los dos ya lee `pedidos` (:163 y :151). Desde hoy esa carpeta es
+una lapida cerrada: quien leyera la cabecera iria a buscar a un sitio donde ya
+no se puede ni entrar. Ni una linea de codigo cambio.
+Los encontro la SEGUNDA OPINION, no yo. Es la segunda vez el mismo dia que un
+barrido mio deja `scripts/` fuera: el de la manana miro las 3 apps, las
+funciones y las dos reglas, y este miro lo que tocaba el cambio. Queda dicho.
+Autorizado por Jhon el 9-sep-2026.
