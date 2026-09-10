@@ -941,3 +941,4 @@ que el repo no tenia constancia de lo desplegado ni del 7-sep ni del 9-sep. Lo
 encontro la segunda opinion. Se baja del servidor con scripts/bajar-reglas.cjs
 DESPUES de desplegar, no se escribe a mano: es una foto, no un archivo fuente.
 Autorizado por Jhon el 9-sep-2026.
+2026-09-10T10:19:46.051Z	scripts/medir-rutina-colgados.cjs	NEGADO: fuera de la promesa "Se retiran los dos estados MUERTOS del mercado (confirmando y contraoferta): nadie los escribe desde que el mercado pasa por confirmarConductor"
