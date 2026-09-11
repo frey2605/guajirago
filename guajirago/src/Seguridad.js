@@ -2,6 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { db, auth } from './firebase';
 import { doc, getDoc, setDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import Logo from './Logo';
+// Qué cuenta como «viaje en curso» vive en un solo sitio (SEGUNDA LEY). Esta
+// pantalla lo tenía escrito a mano y por eso mandaba los datos de un viaje
+// terminado — lee el porqué entero en estadosViaje.js.
+import { elViajeEnCurso } from './estadosViaje';
 
 function Seguridad({ onVolver }) {
   const [contactoNombre, setContactoNombre] = useState('');
@@ -79,22 +83,31 @@ function Seguridad({ onVolver }) {
       if (user) {
         const q = query(collection(db, 'viajes'), where('pasajeroId', '==', user.uid));
         const snap = await getDocs(q);
-        const viajeActivo = snap.docs
-          .map(d => ({ id: d.id, ...d.data() }))
-          .find(v => ['confirmado', 'aceptado', 'recogiendo', 'en_punto', 'en_viaje'].includes(v.estado) || ['recogiendo', 'en_punto', 'en_viaje'].includes(v.fase));
+        // QUIÉN DECIDE si hay viaje en curso: estadosViaje.js, no esta pantalla.
+        // Aquí estaba escrito a mano y miraba la FASE sin comprobar que el viaje
+        // estuviera vivo: un viaje cancelado o expirado EN MARCHA se queda con su
+        // fase pegada, así que entraba. Medido el 11-sep-2026: tres de los cinco
+        // de la base recibían los datos de un conductor de un viaje terminado.
+        const viajeActivo = elViajeEnCurso(snap.docs.map(d => ({ id: d.id, ...d.data() })));
 
         if (viajeActivo) {
           texto += '\n\n🛣️ *MI RUTA*';
           if (viajeActivo.origen) texto += `\n🟢 Origen: ${viajeActivo.origen}`;
           if (viajeActivo.destino) texto += `\n🔴 Destino: ${viajeActivo.destino}`;
 
-          texto += '\n\n🚗 *DATOS DEL CONDUCTOR*';
-          if (viajeActivo.conductorNombre) texto += `\n👤 Nombre: ${viajeActivo.conductorNombre}`;
-          if (viajeActivo.conductorPlaca) texto += `\n🚘 Placa: ${viajeActivo.conductorPlaca}`;
-          if (viajeActivo.conductorColor) texto += `\n🎨 Color: ${viajeActivo.conductorColor}`;
-          if (viajeActivo.conductorVehiculo) texto += `\n🏷️ Vehículo: ${viajeActivo.conductorVehiculo}`;
-          if (viajeActivo.conductorTelefono) texto += `\n📞 Teléfono: ${viajeActivo.conductorTelefono}`;
-          if (viajeActivo.conductorFoto) texto += `\n📸 Foto: ${viajeActivo.conductorFoto}`;
+          // LOS DATOS DEL CONDUCTOR, SOLO SI HAY CONDUCTOR. Si el pasajero
+          // todavía está buscando, va la ruta y nada más: un encabezado «DATOS
+          // DEL CONDUCTOR» vacío en un mensaje de emergencia hace dudar de todo
+          // el mensaje. Lo decidió el dueño el 11-sep-2026.
+          if (viajeActivo.conductorId) {
+            texto += '\n\n🚗 *DATOS DEL CONDUCTOR*';
+            if (viajeActivo.conductorNombre) texto += `\n👤 Nombre: ${viajeActivo.conductorNombre}`;
+            if (viajeActivo.conductorPlaca) texto += `\n🚘 Placa: ${viajeActivo.conductorPlaca}`;
+            if (viajeActivo.conductorColor) texto += `\n🎨 Color: ${viajeActivo.conductorColor}`;
+            if (viajeActivo.conductorVehiculo) texto += `\n🏷️ Vehículo: ${viajeActivo.conductorVehiculo}`;
+            if (viajeActivo.conductorTelefono) texto += `\n📞 Teléfono: ${viajeActivo.conductorTelefono}`;
+            if (viajeActivo.conductorFoto) texto += `\n📸 Foto: ${viajeActivo.conductorFoto}`;
+          }
         }
       }
     } catch (e) {}

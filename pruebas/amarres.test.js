@@ -1255,3 +1255,66 @@ describe('LA RUTINA DE VIAJES COLGADOS · obedece a la calculadora', () => {
     }
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// EL BOTÓN DE PÁNICO · que pregunte quién es el viaje en curso, y no lo adivine
+// ─────────────────────────────────────────────────────────────────────────────
+//  🔴 POR QUÉ EXISTE (11-sep-2026). `Seguridad.js` llevaba escrita a mano la
+//  condición de «viaje en curso», y miraba la FASE sin comprobar que el viaje
+//  estuviera vivo. Un viaje cancelado o expirado EN MARCHA se queda con su fase
+//  pegada, así que entraba.
+//
+//  MEDIDO contra el servidor (`scripts/medir-panico.cjs`): TRES DE LOS CINCO
+//  la base recibían la ruta y la placa de un conductor de un viaje TERMINADO.
+//  Aprietas emergencia sin ir en ningún viaje y a tu familia le llega el carro
+//  equivocado — justo lo que avisa `firestore.rules`: «buscan el carro que no es».
+//
+//  La decisión vive ahora en `guajirago/src/estadosViaje.js` y se prueba
+//  ejecutándola en `pruebas/viajeActivo.test.js`. Esto vigila que la pantalla la
+//  USE, porque volver a escribirla a mano no falla: solo vuelve a mentir.
+describe('EL BOTÓN DE PÁNICO · usa la fuente única del viaje en curso', () => {
+  const laPantalla = () => soloCodigo(leer('guajirago/src/Seguridad.js'));
+
+  it('Seguridad.js le pregunta a estadosViaje.js', () => {
+    const t = laPantalla();
+    assert.match(t, /import\s*\{[^}]*elViajeEnCurso[^}]*\}\s*from\s*['"]\.\/estadosViaje['"]/,
+      'Seguridad.js dejó de importar `elViajeEnCurso` de estadosViaje.js. Si volvió a '
+      + 'decidir por su cuenta qué es un viaje en curso, volvió a poder mandar los datos '
+      + 'de un viaje terminado.');
+    assert.match(t, /elViajeEnCurso\s*\(/,
+      'Seguridad.js importa `elViajeEnCurso` y no la llama.');
+  });
+
+  it('EL QUE MUERDE · y NO vuelve a mirar la fase por su cuenta', () => {
+    const t = laPantalla();
+    // Lo que reventó fue mirar la `fase` para decidir si el viaje estaba vivo.
+    //
+    // SE PROHÍBE LA PALABRA ENTERA, no «.fase». La primera versión miraba
+    // `/\.fase\b/` y se esquivaba escribiendo `v['fase']` — lo mismo con otra
+    // ortografía. El revisor lo hizo el 11-sep-2026: metió el fallo original
+    // entero y los tres amarres siguieron VERDES. Medido: en el código bueno la
+    // palabra `fase` no aparece ni una vez, así que prohibirla entera no da
+    // falso rojo. Un amarre que protege la ortografía y no la idea es adorno.
+    assert.ok(!/fase/.test(t),
+      'Seguridad.js volvió a nombrar la `fase` del viaje. La fase dice en qué PUNTO va un '
+      + 'viaje vivo; NO dice si está vivo. Un viaje cancelado en marcha se queda con su '
+      + 'fase pegada, y por ahí entraban los 7 viajes terminados que se midieron el '
+      + '11-sep-2026. Si de verdad hace falta la fase aquí, mira antes por qué.');
+    assert.ok(!/includes\s*\(\s*v\.estado\s*\)/.test(t),
+      'Seguridad.js volvió a llevar su propia lista de estados. Esa lista vive en '
+      + 'estadosViaje.js, y allí hay pruebas que la ejecutan.');
+  });
+
+  it('EL QUE MUERDE · los datos del conductor solo salen si hay conductor', () => {
+    const t = laPantalla();
+    const i = t.indexOf('DATOS DEL CONDUCTOR');
+    assert.ok(i > 0, 'Seguridad.js ya no manda los datos del conductor en la emergencia.');
+    // El encabezado tiene que ir DENTRO de un `if` que compruebe el conductor.
+    const antes = t.slice(Math.max(0, i - 400), i);
+    assert.match(antes, /if\s*\([^)]*conductorId/,
+      'el encabezado «DATOS DEL CONDUCTOR» se pinta sin comprobar que haya conductor. '
+      + 'Cuando el pasajero todavía está buscando, sale un encabezado vacío en un mensaje '
+      + 'de emergencia — y eso hace dudar de todo el mensaje. Lo decidió el dueño el '
+      + '11-sep-2026: la ruta sí, el conductor solo si lo hay.');
+  });
+});
