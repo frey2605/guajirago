@@ -27,6 +27,10 @@ const NEGOCIO_PRIVADO = "negociosPrivado";
 // La decisión de qué hacerle a cada cliente vive aparte y pura, para poder
 // probarla sin base de datos (ver cobros.cjs).
 const { queHacerCon, loQueSeEscribe, hoyEnColombia } = require('./cobros.cjs');
+// La decisión de qué hacer con un viaje que nadie cerró. Vive aparte para poder
+// probarla: `expirarViajesColgados` es programada y no se puede encender desde
+// el emulador.
+const { queHacerConElViaje } = require('./viajesColgados.cjs');
 const { esFecha } = require('./suscripcion.js');
 
 // Distancia en km entre dos coordenadas (Haversine)
@@ -403,42 +407,57 @@ exports.onViajeCerrado = onDocumentUpdated("viajes/{viajeId}", async (event) => 
 
 // ─────────────────────────────────────────────────────────────────────────────
 // VENCER VIAJES COLGADOS — evita que el panel muestre "EN CURSO" para siempre.
-// Corre cada 30 min y cierra los viajes que quedaron a medias:
-//   • 'esperando' de +20 min (búsquedas que se colgaron con la app cerrada) → 'vencido'.
-//   • 'aceptado' de +1 h desde que lo tomó el conductor (viaje abandonado, nunca se
-//     marcó finalizado) → 'expirado'. Se CONSERVA el registro (tuvo conductor, valor legal);
-//     onViajeCerrado libera al conductor (enViajeId/ocupado) porque 'expirado' es terminal.
+// Corre cada 30 min y cierra los viajes que quedaron a medias.
+//
+// 🔴 QUÉ CAMBIÓ EL 10-sep-2026, Y POR QUÉ IMPORTA
+// Esto cerraba POR RELOJ, sin mirar en qué punto iba el viaje. MEDIDO contra el
+// servidor (`scripts/medir-rutina-colgados.cjs`): de los 8 viajes que había
+// cerrado, CUATRO estaban en `fase: 'en_viaje'` — el conductor ya había recogido
+// al pasajero. La mitad se cerraron CON EL PASAJERO MONTADO.
+//
+// Ahora la decisión NO se toma aquí: la toma `viajesColgados.cjs`, que mira la
+// fase. Vive aparte porque esta función es PROGRAMADA y una función programada
+// no se puede encender desde el emulador — allí sí se puede probar caso por
+// caso, y `pruebas/viajesColgados.test.js` lo hace. (Mismo trato que
+// `cobros.cjs`: una calculadora por proceso, SEGUNDA LEY.)
+//
+// Los límites y el porqué de cada número están en `viajesColgados.cjs`. Aquí NO
+// se repiten: repetirlos sería el gemelo que se queda viejo.
+//
+// Se CONSERVA el registro del viaje (tuvo conductor, tiene valor legal), y
+// `onViajeCerrado` libera al conductor (enViajeId/ocupado) porque tanto
+// 'vencido' como 'expirado' son terminales.
 exports.expirarViajesColgados = onSchedule(
   { schedule: "every 30 minutes", timeZone: "America/Bogota", timeoutSeconds: 300 },
   async () => {
     const db = admin.firestore();
-    const ahora = Date.now();
-    const haceMin = (m) => new Date(ahora - m * 60000).toISOString();
-    const limiteEsperando = haceMin(20);   // 20 minutos
-    const limiteEnCurso = haceMin(60);      // 1 hora
+    // LA HORA DEL SERVIDOR, no la de ningún celular. Se toma UNA vez para que
+    // todos los viajes de esta pasada se midan contra el mismo instante.
+    const ahora = new Date().toISOString();
     let vencidos = 0, expirados = 0;
 
-    // 1) Búsquedas colgadas ('esperando') → 'vencido'
-    try {
-      const snap = await db.collection("viajes").where("estado", "==", "esperando").limit(400).get();
-      for (const d of snap.docs) {
-        const f = (d.data() || {}).fechaSolicitud || "";
-        if (f && f < limiteEsperando) { await d.ref.update({ estado: "vencido" }); vencidos++; }
-      }
-    } catch (e) { console.error("expirar esperando:", e.message); }
-
-    // 2) Viajes en curso abandonados ('aceptado' +3h) → 'expirado'
-    try {
-      const snap = await db.collection("viajes").where("estado", "==", "aceptado").limit(400).get();
-      for (const d of snap.docs) {
-        const v = d.data() || {};
-        const ref = v.fechaAceptacion || v.fechaSolicitud || "";
-        if (ref && ref < limiteEnCurso) {
-          await d.ref.update({ estado: "expirado", fechaExpiracion: new Date().toISOString(), expiradoPor: "sistema" });
-          expirados++;
+    // Se pregunta por los dos estados que esta rutina cierra. Los demás ni se
+    // leen: es lo que mantiene barata la pasada.
+    for (const estado of ["esperando", "aceptado"]) {
+      try {
+        const snap = await db.collection("viajes").where("estado", "==", estado).limit(400).get();
+        for (const d of snap.docs) {
+          const decision = queHacerConElViaje(d.data() || {}, ahora);
+          if (!decision.cerrar) continue;
+          // REGLA 9 del dueño: nada se cierra en silencio. Antes, un viaje
+          // 'vencido' no dejaba ninguna huella y no había forma de saber si lo
+          // cerró la rutina o la app — `Solicitar.js` también escribe 'vencido'.
+          await d.ref.update({
+            estado: decision.estado,
+            fechaExpiracion: ahora,
+            expiradoPor: "sistema",
+            motivoExpiracion: decision.porQue,
+          });
+          if (decision.estado === "vencido") vencidos++; else expirados++;
+          console.log("expirarViajesColgados:", d.id, "→", decision.estado, "·", decision.porQue);
         }
-      }
-    } catch (e) { console.error("expirar en curso:", e.message); }
+      } catch (e) { console.error("expirar " + estado + ":", e.message); }
+    }
 
     console.log("expirarViajesColgados: vencidos =", vencidos, "expirados =", expirados);
     return null;

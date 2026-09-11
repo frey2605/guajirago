@@ -942,3 +942,26 @@ encontro la segunda opinion. Se baja del servidor con scripts/bajar-reglas.cjs
 DESPUES de desplegar, no se escribe a mano: es una foto, no un archivo fuente.
 Autorizado por Jhon el 9-sep-2026.
 2026-09-10T10:19:46.051Z	scripts/medir-rutina-colgados.cjs	NEGADO: fuera de la promesa "Se retiran los dos estados MUERTOS del mercado (confirmando y contraoferta): nadie los escribe desde que el mercado pasa por confirmarConductor"
+2026-09-11T00:16:53.456Z	scripts/medir-rutina-colgados.cjs	NEGADO: fuera de la promesa "La rutina cierra viajes POR RELOJ sin mirar la fase: cerro 4 viajes con el pasajero montado. Que mire si el conductor ya recogio"
+
+2026-09-10 · EXCEPCION AUTORIZADA POR EL DUENO
+Promesa: "La rutina cierra viajes POR RELOJ sin mirar la fase: cerro 4 viajes
+con el pasajero montado. Que mire si el conductor ya recogio"
+Fuera de la lista, y se pidio permiso ANTES de tocarlo:
+  · scripts/medir-rutina-colgados.cjs
+Motivo: es el guion del PASO 1, y el PASO 12 lo vuelve a correr. Llevaba los
+limites escritos a mano (20 y 60) con un comentario que decia "lo que usa la
+rutina HOY", y este mismo arreglo lo volvio mentira: la rutina ya no tiene esos
+numeros dentro, y ahora hay un tercer limite (180) y la regla de la fase, que el
+guion no conocia. Seguia diciendo que un viaje de 65 min "lo habrian dado por
+abandonado en medio del viaje", que ya es falso. Un contador que cambia de
+opinion no sirve para el paso 12.
+Ahora IMPORTA la calculadora (`viajesColgados.cjs`) en vez de copiar sus
+numeros: era una TERCERA copia de los limites, y el amarre solo los prohibia en
+`index.js`, no en `scripts/`.
+Lo encontro la SEGUNDA OPINION, no yo. Es la tercera vez en dos dias que un
+barrido mio deja `scripts/` fuera. Queda dicho.
+Para tocarlo sin saltarme el candado: `git stash` del trabajo a medias, foto
+nueva desde limpio, y `git stash pop`. Asi el guardian no se queda ciego a lo ya
+tocado (memoria: guardian-foto-a-mitad-ciega).
+Autorizado por Jhon el 10-sep-2026.

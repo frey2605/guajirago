@@ -100,7 +100,7 @@ const r = spawnSync(
     // fichas de nombres distintos, pero eso es una casualidad que nadie vigila,
     // y `chatRecarga.test.js` además carga las reglas en el emulador —un efecto
     // global disparado sobre otra suite viva.
-    '"node --test pruebas/reglas.test.js pruebas/tarifas.test.js pruebas/descuentos.test.js pruebas/codigoSeguridad.test.js pruebas/viajeNuevo.test.js pruebas/compartidos.test.js pruebas/avisoCalificacion.test.js pruebas/avisosPanel.test.js pruebas/avisosConductor.test.js pruebas/gemelosSolicitar.test.js pruebas/tipoNegocio.test.js pruebas/avisosPasajero.test.js pruebas/suscripcion.test.js pruebas/cobros.test.js pruebas/cobrosPanel.test.js pruebas/filtroChat.test.js pruebas/amarres.test.js pruebas/vaciado.test.js pruebas/escaparate.test.js pruebas/repartoMesa.test.js && node --test pruebas/funciones.test.js && node --test pruebas/chatRecarga.test.js && node --test pruebas/storage.test.js"',
+    '"node --test pruebas/reglas.test.js pruebas/tarifas.test.js pruebas/descuentos.test.js pruebas/codigoSeguridad.test.js pruebas/viajeNuevo.test.js pruebas/compartidos.test.js pruebas/avisoCalificacion.test.js pruebas/avisosPanel.test.js pruebas/avisosConductor.test.js pruebas/gemelosSolicitar.test.js pruebas/tipoNegocio.test.js pruebas/avisosPasajero.test.js pruebas/suscripcion.test.js pruebas/cobros.test.js pruebas/cobrosPanel.test.js pruebas/filtroChat.test.js pruebas/amarres.test.js pruebas/vaciado.test.js pruebas/escaparate.test.js pruebas/repartoMesa.test.js pruebas/viajesColgados.test.js && node --test pruebas/funciones.test.js && node --test pruebas/chatRecarga.test.js && node --test pruebas/storage.test.js"',
   ],
   { cwd: RAIZ, env: entorno, stdio: 'inherit', shell: true }
 );

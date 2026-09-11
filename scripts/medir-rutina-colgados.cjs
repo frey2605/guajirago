@@ -3,38 +3,34 @@
  *
  *   node scripts/medir-rutina-colgados.cjs     <- SOLO LEE. No escribe nada.
  *
- * Guion del PASO 1. Se guarda para que el PASO 12 lo vuelva a correr.
+ * Guion del PASO 1, y el mismo que corre el PASO 12. Contar dos veces con el
+ * MISMO contador es la única forma de saber que no se movió lo que no tocaba.
  *
- * ── QUÉ PREGUNTA, Y POR QUÉ CAMBIÓ LA PREGUNTA ──────────────────────────────
- * Se empezó buscando un AGUJERO: `expirarViajesColgados` solo mira `esperando`
- * y `aceptado`, así que —se pensaba— un viaje parado en otro estado no lo
- * limpiaría nadie. Midiendo el CÓDIGO salió que eso ya no puede pasar: los
- * únicos estados VIVOS que alguien escribe hoy son esos dos. Los demás
- * (`en_negociacion`, `confirmado`, y los ya retirados `confirmando` y
- * `contraoferta`) NO LOS ESCRIBE NADIE.
+ * ── 🔴 LE PREGUNTA A LA CALCULADORA, NO SE INVENTA LOS NÚMEROS ──────────────
+ * La primera versión llevaba los límites escritos a mano (20 y 60) y un
+ * comentario que decía «lo que usa la rutina HOY». En cuanto la rutina cambió,
+ * este contador se quedó viejo: seguía diciendo que un viaje de 65 minutos «lo
+ * habrían dado por abandonado en medio del viaje», que ya era falso. Lo cazó la
+ * segunda opinión del 10-sep-2026.
  *
- * Así que la pregunta de verdad es la contraria, y es peor:
- * 🔴 LA RUTINA EXPIRA UN VIAJE `aceptado` A LA HORA. ¿Hay viajes de verdad que
- * duren más de una hora? Porque a ésos los mata EN MEDIO DEL VIAJE: el pasajero
- * va montado y el sistema da el viaje por abandonado.
+ * Un contador que cambia de opinión no sirve para el paso 12. Así que ahora
+ * IMPORTA la misma calculadora que usa la rutina: si los números o las reglas
+ * cambian, este guion cambia con ellos y no hay nada que acordarse de tocar.
  *
- * Y hay una señal de que ese número no está pensado: el comentario de al lado
- * (`functions/index.js:430`) dice «'aceptado' +3h» y el código usa 60 minutos.
- * Uno de los dos está mal desde que se escribió.
- *
- * ── CÓMO SE MIDE ────────────────────────────────────────────────────────────
- * Con los viajes que TERMINARON BIEN (`finalizado`): desde que el conductor lo
- * aceptó hasta que se cerró. Es la única duración real que hay en los datos.
- *
- * OJO CON ESTA MEDICIÓN, y hay que decirlo: hoy los viajes de la base son de
- * PRUEBA, no de clientes. Un puñado de pruebas cortas no demuestra que una
- * hora sea suficiente para un viaje de verdad — solo demuestra que hasta hoy no
- * ha mordido. El número hay que decidirlo pensando en el peor viaje real, no en
- * el promedio de las pruebas.
+ * ── QUÉ MIDE ────────────────────────────────────────────────────────────────
+ *   1. Si hay algún viaje colgado AHORA, y qué haría la rutina con cada uno.
+ *   2. Cuánto duran los viajes de verdad, para ver si los topes aprietan.
+ *   3. Qué ha cerrado la rutina hasta hoy, y EN QUÉ FASE estaban esos viajes —
+ *      que es lo que destapó el fallo: 4 de 8 se cerraron con el pasajero
+ *      montado.
  */
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+
+// LA MISMA calculadora que usa `expirarViajesColgados`. Ni una copia.
+const { queHacerConElViaje, MINUTOS, RODANDO }
+  = require('../guajirago/functions/viajesColgados.cjs');
 
 const PROYECTO = 'guajirago';
 const CI = '563584335869-fgrhgmd47bqnekij5i8b5pr03ho849e6.apps.googleusercontent.com';
@@ -43,9 +39,6 @@ const SES = path.join(os.homedir(), '.config', 'configstore', 'firebase-tools.js
 const BASE = 'https://firestore.googleapis.com/v1/projects/' + PROYECTO
   + '/databases/(default)/documents';
 
-// Lo que usa la rutina HOY (functions/index.js:417-418).
-const LIMITE_ESPERANDO_MIN = 20;
-const LIMITE_ACEPTADO_MIN = 60;
 const TERMINALES = ['finalizado', 'cancelado', 'cancelado_conductor', 'vencido', 'expirado'];
 
 const C = {
@@ -86,6 +79,13 @@ const val = (v) => v == null ? undefined
     ?? (v.integerValue != null ? Number(v.integerValue) : undefined)
     ?? (v.doubleValue != null ? v.doubleValue : undefined);
 
+/** El documento de Firestore en un objeto normal, como lo ve la función. */
+const enCristiano = (d) => {
+  const o = {};
+  for (const [k, v] of Object.entries(d.fields || {})) o[k] = val(v);
+  return o;
+};
+
 const minutos = (a, b) => (new Date(b) - new Date(a)) / 60000;
 const pad = (s, n) => String(s).length >= n ? String(s).slice(0, n)
   : String(s) + ' '.repeat(n - String(s).length);
@@ -93,14 +93,17 @@ const pad = (s, n) => String(s).length >= n ? String(s).slice(0, n)
 (async () => {
   const t = await token();
   const docs = await traer(t, 'viajes');
+  const ahora = new Date().toISOString();
 
   console.log('');
   console.log(C.neg + '  LA RUTINA QUE CIERRA VIAJES COLGADOS' + C.off);
   console.log(C.gris + '  viajes en el servidor: ' + docs.length + C.off);
-  console.log(C.gris + '  la rutina de hoy: `esperando` a los ' + LIMITE_ESPERANDO_MIN
-    + ' min → vencido   ·   `aceptado` a los ' + LIMITE_ACEPTADO_MIN + ' min → expirado' + C.off);
+  console.log(C.gris + '  los topes de HOY (salen de viajesColgados.cjs): buscando '
+    + MINUTOS.buscando + ' min · sin recoger ' + MINUTOS.noRecogio
+    + ' min · rodando ' + MINUTOS.rodando + ' min' + C.off);
+  console.log(C.gris + '  cuentan como «hay alguien ahí»: ' + RODANDO.join(', ') + C.off);
 
-  // ── 1. ¿HAY ALGUIEN COLGADO AHORA? ───────────────────────────────────────
+  // ── 1. QUÉ HAY, Y QUÉ HARÍA LA RUTINA CON CADA UNO ───────────────────────
   const cuenta = {};
   for (const d of docs) {
     const e = val((d.fields || {}).estado) || '(sin campo)';
@@ -108,74 +111,103 @@ const pad = (s, n) => String(s).length >= n ? String(s).slice(0, n)
   }
   console.log('');
   console.log('  ' + C.neg + 'LOS ESTADOS DE HOY' + C.off);
-  let colgados = 0;
   for (const [e, n] of Object.entries(cuenta).sort((a, b) => b[1] - a[1])) {
     const vivo = !TERMINALES.includes(e);
-    if (vivo) colgados += n;
     console.log('    ' + pad(e, 22) + String(n).padStart(4)
-      + (vivo ? C.ama + '   <-- NO es terminal: alguien lo tiene que cerrar' + C.off
-              : C.gris + '   terminal' + C.off));
+      + (vivo ? C.ama + '   <-- NO es terminal' + C.off : C.gris + '   terminal' + C.off));
   }
-  console.log('    ' + (colgados === 0
-    ? C.ver + 'ninguno colgado ahora mismo.' + C.off
-    : C.ama + colgados + ' viaje(s) sin cerrar.' + C.off));
 
-  // ── 2. 🔴 LO QUE DE VERDAD IMPORTA: ¿CUÁNTO DURA UN VIAJE? ───────────────
+  // Se le PREGUNTA a la calculadora, no se adivina.
+  const sinCerrar = docs.filter((d) => !TERMINALES.includes(val((d.fields || {}).estado)));
+  console.log('');
+  console.log('  ' + C.neg + 'QUÉ HARÍA LA RUTINA AHORA MISMO' + C.off);
+  if (sinCerrar.length === 0) {
+    console.log(C.ver + '    nada: no hay ningún viaje sin cerrar.' + C.off);
+  } else {
+    for (const d of sinCerrar) {
+      const r = queHacerConElViaje(enCristiano(d), ahora);
+      console.log('    ' + pad(d.name.split('/').pop(), 24)
+        + (r.cerrar ? C.ama + '→ ' + r.estado + C.off : C.ver + '· se queda' + C.off));
+      console.log(C.gris + '      ' + r.porQue + C.off);
+    }
+  }
+
+  // ── 2. ¿APRIETAN LOS TOPES? ──────────────────────────────────────────────
   const acabados = docs.filter((d) => val((d.fields || {}).estado) === 'finalizado');
   const duraciones = [];
   for (const d of acabados) {
     const f = d.fields || {};
-    const desde = val(f.fechaAceptacion) || val(f.fechaSolicitud);
+    const desde = val(f.tiempoEspera) || val(f.fechaAceptacion) || val(f.fechaSolicitud);
     if (!desde || !d.updateTime) continue;
     duraciones.push({
       id: d.name.split('/').pop(),
       m: minutos(desde, d.updateTime),
-      conFechaAceptacion: !!val(f.fechaAceptacion),
+      desdeDonde: val(f.tiempoEspera) ? 'desde que recogió'
+        : val(f.fechaAceptacion) ? 'desde que se aceptó' : 'desde que se pidió',
     });
   }
   duraciones.sort((a, b) => a.m - b.m);
 
   console.log('');
   console.log('  ' + C.neg + 'CUÁNTO DURÓ CADA VIAJE QUE TERMINÓ BIEN' + C.off);
-  console.log(C.gris + '    (desde que el conductor lo aceptó hasta que se cerró)' + C.off);
   if (duraciones.length === 0) {
     console.log('    no hay ninguno con fechas para medir.');
   } else {
     const enMin = duraciones.map((x) => x.m);
-    const mediana = enMin[Math.floor(enMin.length / 2)];
-    const sinFecha = duraciones.filter((x) => !x.conFechaAceptacion).length;
-    console.log('    viajes medidos:  ' + duraciones.length
-      + (sinFecha ? C.gris + '   (' + sinFecha + ' sin `fechaAceptacion`: se midió desde que se pidió)' + C.off : ''));
+    console.log('    viajes medidos:  ' + duraciones.length);
     console.log('    el más corto:    ' + enMin[0].toFixed(1) + ' min');
-    console.log('    la mitad duran:  ' + mediana.toFixed(1) + ' min o menos');
+    console.log('    la mitad duran:  ' + enMin[Math.floor(enMin.length / 2)].toFixed(1) + ' min o menos');
     console.log('    el más largo:    ' + enMin[enMin.length - 1].toFixed(1) + ' min');
-
-    const pasados = duraciones.filter((x) => x.m > LIMITE_ACEPTADO_MIN);
+    // Se compara contra el tope del que VA RODANDO, que es el que decide si a un
+    // viaje vivo se le acaba el tiempo. El de `noRecogio` no aplica: estos
+    // viajes terminaron, o sea que alguien recogió a alguien.
+    const pasados = duraciones.filter((x) => x.m > MINUTOS.rodando);
     console.log('');
     if (pasados.length === 0) {
-      console.log(C.ver + '    ✓ ninguno pasó de ' + LIMITE_ACEPTADO_MIN + ' min.' + C.off);
-      console.log(C.ama + '      PERO OJO: son ' + duraciones.length + ' viajes de PRUEBA, no de clientes.' + C.off);
-      console.log('      Que no haya mordido hasta hoy no dice que una hora alcance para');
-      console.log('      un viaje de verdad. El número se decide pensando en el PEOR viaje');
-      console.log('      real —un trancón, una espera larga—, no en el promedio.');
+      console.log(C.ver + '    ✓ ninguno pasó de ' + MINUTOS.rodando
+        + ' min, que es el tope del que va rodando.' + C.off);
+      console.log(C.ama + '      OJO: son ' + duraciones.length + ' viajes de PRUEBA, no de clientes.' + C.off);
+      console.log('      Que no haya mordido hasta hoy no dice que el tope alcance para un');
+      console.log('      viaje de verdad. Se decide pensando en el PEOR viaje real.');
     } else {
       console.log(C.roj + '    ✗ ' + pasados.length + ' de ' + duraciones.length
-        + ' pasaron de ' + LIMITE_ACEPTADO_MIN + ' min:' + C.off);
-      for (const p of pasados) console.log('      ' + pad(p.id, 24) + p.m.toFixed(1) + ' min');
-      console.log('      A ésos la rutina los habría dado por abandonados EN MEDIO DEL VIAJE.');
+        + ' pasaron de ' + MINUTOS.rodando + ' min:' + C.off);
+      for (const p of pasados) {
+        console.log('      ' + pad(p.id, 24) + p.m.toFixed(1) + ' min  (' + p.desdeDonde + ')');
+      }
+      console.log('      A ésos la rutina los habría cerrado antes de que terminaran.');
     }
   }
 
-  // ── 3. LO QUE LA RUTINA HA CERRADO ───────────────────────────────────────
+  // ── 3. LO QUE LA RUTINA YA CERRÓ, Y EN QUÉ FASE ESTABAN ──────────────────
+  // Ésta es la sección que destapó el fallo del 9-sep-2026.
   const porSistema = docs.filter((d) => val((d.fields || {}).expiradoPor) === 'sistema');
   console.log('');
-  console.log('  ' + C.neg + 'LO QUE LA RUTINA HA CERRADO HASTA HOY' + C.off);
-  console.log('    con la marca `expiradoPor: sistema`:  ' + porSistema.length);
-  console.log('    en estado `vencido`:                  ' + (cuenta.vencido || 0)
-    + C.gris + '   (a éstos la rutina NO les deja huella: solo cambia el estado)' + C.off);
-  console.log('    en estado `expirado`:                 ' + (cuenta.expirado || 0));
-  if (porSistema.length < (cuenta.expirado || 0)) {
-    console.log(C.gris + '    (los `expirado` sin marca son de antes de que la rutina la pusiera,');
-    console.log('     o los movió un guion a mano.)' + C.off);
+  console.log('  ' + C.neg + 'LO QUE LA RUTINA HA CERRADO, Y EN QUÉ PUNTO IBA CADA VIAJE' + C.off);
+  let conPasajero = 0;
+  for (const d of porSistema) {
+    const f = d.fields || {};
+    const fase = val(f.fase);
+    const vivo = RODANDO.includes(fase);
+    if (vivo) conPasajero++;
+    console.log('    ' + pad(d.name.split('/').pop(), 24) + pad(val(f.tipo) || '?', 12)
+      + 'fase=' + pad(fase || '(ninguna)', 12)
+      + (vivo ? C.roj + '  <-- SE CERRÓ CON ALGUIEN ESPERANDO O MONTADO' + C.off : ''));
   }
+  console.log('    total cerrados por la rutina: ' + porSistema.length
+    + (conPasajero ? C.roj + '   ·   ' + conPasajero + ' con el viaje vivo' + C.off
+                   : C.ver + '   ·   ninguno con el viaje vivo' + C.off));
+  console.log(C.gris + '    (los de antes del 10-sep-2026 se cerraron por reloj, sin mirar la fase.');
+  console.log('     Desde esa fecha la rutina mira la fase y ya no puede hacerlo.)' + C.off);
+
+  // ── 4. LA HUELLA ─────────────────────────────────────────────────────────
+  console.log('');
+  console.log('  ' + C.neg + 'LA HUELLA DE QUIÉN CERRÓ' + C.off);
+  const conMotivo = docs.filter((d) => val((d.fields || {}).motivoExpiracion)).length;
+  console.log('    con `expiradoPor`:      ' + porSistema.length);
+  console.log('    con `motivoExpiracion`: ' + conMotivo
+    + C.gris + '   (lo escribe la rutina desde el 10-sep-2026)' + C.off);
+  console.log(C.gris + '    Antes, un viaje «vencido» se cerraba SIN dejar rastro y no había forma de');
+  console.log('    saber si lo cerró la rutina o la app — `Solicitar.js` también lo escribe.');
+  console.log('    Ahora la rutina siempre deja quién, cuándo y por qué.' + C.off);
 })();

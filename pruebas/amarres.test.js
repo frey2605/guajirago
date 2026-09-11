@@ -18,7 +18,7 @@
 const { describe, it } = require('node:test');
 const assert = require('node:assert');
 // El cargador vive en cargar.cjs: un solo sitio para todas las pruebas (SEGUNDA LEY).
-const { leer, cargarDeLaApp } = require('./cargar.cjs');
+const { leer, cargarDeLaApp, soloCodigo } = require('./cargar.cjs');
 
 describe('AMARRES · la app y el servidor miden la distancia IGUAL', () => {
   it('las dos calculadoras dan los mismos kilómetros en los mismos puntos', () => {
@@ -1142,6 +1142,116 @@ describe('LA MUDANZA DE LOS PEDIDOS · ninguna app se queda con el nombre viejo'
         cuerpo + ' se nombra ' + veces + ' veces y deberían ser 2: su declaración y la '
         + 'puerta que la llama. Si es 1, alguien borró la puerta y el aviso no sale. Si son '
         + 'más, mira si alguien copió el cuerpo en vez de llamarlo.');
+    }
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// LA RUTINA QUE CIERRA VIAJES · que de verdad OBEDEZCA a la calculadora
+// ─────────────────────────────────────────────────────────────────────────────
+//  `expirarViajesColgados` es una función PROGRAMADA: no se puede encender desde
+//  el emulador, así que no hay forma de EJECUTARLA en una prueba. La decisión se
+//  sacó a `viajesColgados.cjs` justo para poder probarla —y allí se prueba caso
+//  por caso—, pero queda un trozo que solo se puede vigilar leyéndolo: que la
+//  rutina LLAME a la calculadora y HAGA CASO de lo que conteste.
+//
+//  🔴 ESTE AMARRE EXISTE PORQUE UN SABOTAJE SOBREVIVIÓ (10-sep-2026). Se cambió
+//  `if (!decision.cerrar) continue;` por `if (false) continue;` —o sea, la
+//  rutina cerrando TODOS los viajes que encontrara, incluidos los que van
+//  rodando con el pasajero dentro— y las 935 pruebas siguieron verdes. Es
+//  exactamente el fallo que este trabajo vino a arreglar, reabierto sin que
+//  nada avisara.
+describe('LA RUTINA DE VIAJES COLGADOS · obedece a la calculadora', () => {
+  /** El cuerpo de `expirarViajesColgados`, sin comentarios. */
+  const laRutina = () => {
+    const t = soloCodigo(leer('guajirago/functions/index.js'));
+    const i = t.indexOf('exports.expirarViajesColgados');
+    assert.ok(i >= 0, 'ya no existe `expirarViajesColgados` en functions/index.js.');
+    const fin = t.indexOf('exports.', i + 10);
+    return t.slice(i, fin > i ? fin : undefined);
+  };
+
+  it('la rutina LLAMA a la calculadora', () => {
+    const vivo = soloCodigo(leer('guajirago/functions/index.js'));
+    assert.match(vivo, /require\(['"]\.\/viajesColgados\.cjs['"]\)/,
+      'functions/index.js dejó de importar `viajesColgados.cjs`.');
+    assert.match(laRutina(), /queHacerConElViaje\s*\(/,
+      'la rutina ya no le pregunta a la calculadora. Si volvió a decidir por su cuenta, '
+      + 'volvió a cerrar por reloj sin mirar la fase — y eso cerró 4 viajes con el '
+      + 'pasajero montado antes del 10-sep-2026.');
+  });
+
+  it('EL QUE MUERDE · y NO escribe si la calculadora dice que no', () => {
+    const cuerpo = laRutina();
+    // Lo que se mira es que entre la respuesta y la escritura haya un freno de
+    // verdad, no que el texto esté por ahí: `if (false) continue` también
+    // contiene la palabra `continue`.
+    assert.match(cuerpo, /if\s*\(\s*!\s*decision\.cerrar\s*\)\s*continue\s*;/,
+      'la rutina ya no se frena cuando la calculadora dice que NO cierre. Sin ese freno '
+      + 'cierra todos los viajes que encuentra, incluidos los que van rodando con el '
+      + 'pasajero dentro. Es el fallo que se arregló el 10-sep-2026, reabierto.');
+    // Y que el freno esté ANTES de la escritura, no después.
+    const freno = cuerpo.search(/if\s*\(\s*!\s*decision\.cerrar\s*\)/);
+    const escribe = cuerpo.indexOf('.update(');
+    assert.ok(freno >= 0 && escribe > freno,
+      'la rutina escribe ANTES de mirar si la calculadora dijo que cerrara. El freno tiene '
+      + 'que ir delante de la escritura, o no frena nada.');
+  });
+
+  it('los límites viven SOLO en la calculadora, no repetidos aquí', () => {
+    // Si los minutos se escriben en los dos sitios, el día que se cambie uno el
+    // otro se queda viejo — y nadie mira el que no cambió. SEGUNDA LEY.
+    //
+    // SE MIRAN LOS NOMBRES, NO LOS NÚMEROS, y es a propósito. La primera versión
+    // buscaba los propios minutos (20, 60, 180) dentro de la rutina — y la rutina
+    // contiene «every 30 minutes», `timeoutSeconds: 300` y `.limit(400)`. El día
+    // que el dueño pusiera `buscando: 30` o `rodando: 300`, esta prueba se ponía
+    // ROJA sin que nada estuviera mal, y justo en el momento de tocar el número.
+    // Una prueba que estorba cuando haces lo correcto acaba desactivada.
+    // Lo cazó la segunda opinión del 10-sep-2026.
+    const cuerpo = laRutina();
+    assert.ok(!/haceMin|limiteEsperando|limiteEnCurso/.test(cuerpo),
+      'volvieron los límites escritos a mano dentro de la rutina. Los minutos los decide '
+      + '`viajesColgados.cjs` (MINUTOS), y ahí es donde el dueño los cambia.');
+    assert.ok(!/\bMINUTOS\b/.test(cuerpo),
+      'la rutina volvió a mirar `MINUTOS` por su cuenta. Los límites no se comparan aquí: '
+      + 'se le pregunta a `queHacerConElViaje`, que es quien sabe cuál toca según la fase.');
+  });
+
+  // ── LOS DOS QUE SE ESCAPARON ─────────────────────────────────────────────
+  //  Estos dos amarres existen porque, en la primera vuelta de sabotajes, DOS
+  //  sabotajes de la rutina pasaron por delante de los otros cuatro amarres sin
+  //  que nada se pusiera rojo. Los encontró la segunda opinión del 10-sep-2026
+  //  probándolos a mano, no leyéndolos.
+  it('EL QUE MUERDE · escribe el estado QUE DIJO la calculadora, no uno fijo', () => {
+    const cuerpo = laRutina();
+    assert.match(cuerpo, /estado:\s*decision\.estado/,
+      'la rutina volvió a escribir un estado fijo en vez del que decide la calculadora.\n'
+      + '   Si escribe siempre «expirado», una búsqueda colgada se marca `expirado` en vez\n'
+      + '   de `vencido` — y `limpiezaDiaria` SOLO borra los `vencido`, así que la base\n'
+      + '   deja de limpiarse sola. En silencio, como siempre.');
+  });
+
+  it('EL QUE MUERDE · mira los DOS estados, no solo las búsquedas', () => {
+    const cuerpo = laRutina();
+    const lista = cuerpo.match(/for\s*\(\s*const\s+estado\s+of\s*\[([^\]]*)\]/);
+    assert.ok(lista, 'la rutina ya no recorre una lista de estados: mírala entera.');
+    const estados = lista[1].replace(/["'\s]/g, '').split(',').filter(Boolean).sort();
+    assert.deepStrictEqual(estados, ['aceptado', 'esperando'],
+      'la rutina consulta estos estados: ' + estados.join(', ') + '\n'
+      + '   y tienen que ser los dos: `esperando` (búsquedas colgadas) y `aceptado`\n'
+      + '   (viajes que nadie cerró). Si se cae `aceptado`, se apaga el motivo entero\n'
+      + '   por el que existe esta rutina y no falla nada: solo deja de limpiar.');
+  });
+
+  it('EL QUE MUERDE · y deja huella de por qué cerró (REGLA 9)', () => {
+    const cuerpo = laRutina();
+    for (const campo of ['expiradoPor', 'motivoExpiracion', 'fechaExpiracion']) {
+      assert.ok(cuerpo.includes(campo),
+        'la rutina dejó de escribir `' + campo + '`. Antes del 10-sep-2026 un viaje '
+        + '«vencido» se cerraba sin dejar rastro, y no había forma de saber si lo cerró '
+        + 'la rutina o la app — `Solicitar.js` también escribe ese estado. Si un pasajero '
+        + 'reclama «mi viaje se canceló solo», esto es lo único que lo contesta.');
     }
   });
 });
