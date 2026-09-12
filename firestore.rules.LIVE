@@ -230,13 +230,15 @@ service cloud.firestore {
       // El MERCADO: los que están buscando taxi. El conductor TIENE que verlos —
       // es el negocio (AppConductor.js:847). Los 82 terminados o cancelados no
       // están aquí: esos dejan de verse.
-      // Eran CUATRO hasta el 9-sep-2026. `confirmando` y `contraoferta` se
-      // retiraron: nadie los escribía desde que el mercado de ofertas pasa por
-      // `confirmarConductor`. El porqué entero está en `estadosViaje.js`, que es
-      // la fuente única, y una prueba ata esta lista con aquella.
+      // Eran CUATRO. El 9-sep-2026 salieron `confirmando` y `contraoferta`, y el
+      // 12-sep `en_negociacion`: ninguno lo escribía nadie desde que las ofertas
+      // van por la subcolección `contraofertas` y no cambian el estado del viaje.
+      // Queda uno: buscar conductor es exactamente una cosa.
+      // El porqué entero está en `estadosViaje.js`, que es la fuente única, y una
+      // prueba ata esta lista con aquella.
       function enElMercado() {
         return resource.data.get('estado', '') in
-          ['esperando', 'en_negociacion'];
+          ['esperando'];
       }
       // El conductor que DEJÓ UNA OFERTA sigue viendo el viaje aunque lo pierda.
       // Sin esto, en cuanto el pasajero elige a otro, la app del que perdió deja de
@@ -527,7 +529,12 @@ service cloud.firestore {
       // viaje que se quede negociando NO LO LIMPIA NADIE. Por eso aquel llevaba
       // dos meses ahí.)
       //
-      // LO QUE SIGUE PENDIENTE, y son TRES cosas, no una:
+      // LO QUE SIGUE PENDIENTE, y son DOS. (Eran TRES: la tercera era el estado
+      // `en_negociacion`, que se retiró el 12-sep-2026 junto con `confirmado`.
+      // El mercado quedó con UNO: `esperando`. Esta nota decía que ese estado
+      // seguía vivo «en estadosViaje.js, aquí, en el panel y en AppConductor.js»
+      // — los cuatro sitios que aquel trabajo limpió. El aviso se quedó al revés
+      // y el mentiroso pasó a ser él.)
       //  1. La pantalla de confirmación del pasajero (`Solicitar.js`, el aviso con
       //     los dos botones) solo se alcanzaba desde `confirmando`: hoy es código
       //     que no se puede ejecutar. Son ~150 renglones —más de los 40 que decía
@@ -536,13 +543,6 @@ service cloud.firestore {
       //     armaba la lista de ofertas leyendo el DOCUMENTO del viaje. Hoy esa
       //     lista solo se llena desde el listener de la subcolección
       //     (`Solicitar.js:684-706`), que es el mercado de verdad.
-      //  3. 🔴 Y HAY UN TERCER ESTADO MUERTO que este trabajo NO retiró:
-      //     `en_negociacion`. Mismo caso, medido con el mismo contador: cero
-      //     escritores en las tres apps y en las funciones, y cero viajes en el
-      //     servidor. Sigue en `estadosViaje.js`, aquí, en el panel y en la
-      //     limpieza de `AppConductor.js`. Lo cazó la segunda opinión del
-      //     9-sep-2026, y está dicho al dueño: quien lea esto no debe creer que
-      //     el mercado ya quedó limpio.
       allow update: if request.auth != null
         && (esMio() || esAdmin())
         && request.resource.data.get('pasajeroId', '') == resource.data.get('pasajeroId', '')
