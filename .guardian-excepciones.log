@@ -981,3 +981,27 @@ mismo archivo, al corregir "los tres pasajeros" por "tres de los cinco".
 Deshacerlo dejaria un comentario que no se puede leer. Una palabra, cero codigo.
 Queda dicho para que no se vuelva costumbre: un arreglo de paso, por pequeño que
 sea, es un arreglo que nadie pidio.
+
+════════════════════════════════════════════════════════════════════════════
+12-sep-2026 · firestore.rules.LIVE — FUERA DE LA LISTA
+════════════════════════════════════════════════════════════════════════════
+Qué es: la FOTO de las reglas que están puestas en el servidor. No se escribe a
+mano nunca; la baja `scripts/bajar-reglas.cjs` preguntándole a Firebase.
+
+Por qué cambió: el dueño autorizó desplegar las reglas (solo cambiaban
+comentarios: 9 notas que mandaban a mirar un archivo borrado). El PASO 11 dice
+"volver a LEER del servidor y comparar" — y para esta pantalla eso es
+literalmente volver a bajar esta foto. Sin bajarla no hay forma de comprobar
+que el despliegue hizo lo que dijo.
+
+Por qué no estaba en la foto del guardián: la foto se tomó para arreglar
+comentarios en el repo. Que hubiera que desplegar —y por tanto refrescar esta
+copia— salió DESPUÉS, al medir: las 9 notas del servidor no se podían arreglar
+escribiendo. Se le preguntó al dueño y dijo que sí.
+
+Qué se comprobó antes de desplegar, por DOS caminos independientes: las reglas
+sin comentarios, antes y después, son IDÉNTICAS. No cambió ni un permiso de
+quién lee o escribe. Y después: lo publicado y el repo dicen lo mismo.
+
+Lección: cuando el arreglo de una nota vive en algo PUBLICADO, la foto tiene que
+incluir desde el principio la copia del servidor. Se supo tarde.
