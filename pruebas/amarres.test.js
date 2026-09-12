@@ -307,6 +307,72 @@ describe('AMARRES · el panel y la app dicen lo mismo', () => {
     );
   });
 
+  // ── Y LA OTRA PANTALLA DEL PANEL, QUE SE HABÍA ESCAPADO ──────────────────
+  //  El amarre de arriba vigilaba `Viajes.js` y nada más. `Mensajeria.js` tenía
+  //  su PROPIA copia de la lista —una tercera— con un `'en_viaje'` dentro.
+  //  Medido contra la base el 12-sep-2026: 0 viajes con `estado: 'en_viaje'` y
+  //  4 con `fase: 'en_viaje'`. O sea que el conteo no salía mal: lo que había
+  //  era una copia suelta que nadie vigilaba y una palabra que hacía creer que
+  //  una fase es un estado.
+  //
+  //  Un amarre que cubre una pantalla de dos deja la puerta de al lado abierta.
+  it('EL QUE MUERDE · y la de MENSAJERÍA del panel, también', () => {
+    const { ESTADOS_EN_CURSO } = cargarDeLaApp('guajirago/src/estadosViaje.js');
+    const t = soloCodigo(leer('guajirago-admin/src/Mensajeria.js'));
+
+    const TODAS = /const\s+esEnCurso\s*=\s*\(\w+\)\s*=>\s*\[([^\]]*)\]\.includes/g;
+    const halladas = [...t.matchAll(TODAS)];
+    assert.ok(halladas.length >= 1, 'guajirago-admin/src/Mensajeria.js ya no decide «en curso» '
+      + 'con una lista de estados (`const esEnCurso = (e) => [...].includes(e)`). Si se '
+      + 'cambió de forma, hay que mirar a mano que siga diciendo lo mismo que la app.');
+    // 🔴 UNA SOLA VEZ. La primera versión cogía la primera que encontraba, y la
+    // segunda opinión la burló dejando la buena arriba y metiendo OTRA
+    // `esEnCurso` dentro del componente, con `'en_viaje'`: la de dentro hace
+    // sombra a la de fuera, la pantalla cuenta con la mala, y las 78 pruebas en
+    // verde. Dos definiciones del mismo nombre es una tapando a la otra.
+    assert.strictEqual(halladas.length, 1,
+      '`esEnCurso` está definida ' + halladas.length + ' veces en Mensajeria.js. La de dentro '
+      + 'tapa a la de fuera, así que la pantalla puede estar contando con una lista que este '
+      + 'amarre ni siquiera mira.');
+    const enCurso = halladas[0];
+    const suya = enCurso[1].replace(/['"\s]/g, '').split(',').filter(Boolean);
+
+    assert.deepStrictEqual([...suya].sort(), [...ESTADOS_EN_CURSO].sort(),
+      'La lista de «en curso» del panel de MENSAJERÍA y la de la app se separaron.\n'
+      + '   app (ESTADOS_EN_CURSO):  ' + [...ESTADOS_EN_CURSO].sort().join(', ') + '\n'
+      + '   panel (Mensajeria.js):   ' + [...suya].sort().join(', ') + '\n'
+      + 'Si el cambio es a propósito, se cambian LOS DOS LADOS. Y ojo con `en_viaje`: es '
+      + 'una FASE, no un estado — ningún viaje lo tiene en `estado`, así que ponerlo aquí no '
+      + 'suma nada y hace creer lo contrario.');
+
+    // Y que no vuelva a colarse una FASE en la lista de estados, que es de
+    // donde vino el lío. Las fases viven en `FASES_GUARDADAS`, aparte.
+    const { FASES_GUARDADAS } = cargarDeLaApp('guajirago/src/estadosViaje.js');
+    const colada = suya.filter((e) => FASES_GUARDADAS.includes(e));
+    assert.deepStrictEqual(colada, [],
+      'en la lista de ESTADOS del panel de mensajería se coló una FASE: ' + colada.join(', ')
+      + '. El estado dice en qué punto del trato va el viaje; la fase, en qué punto del '
+      + 'recorrido. Un viaje nunca tiene una fase en `estado`, así que eso no cuenta nada — '
+      + 'pero el que lo lea creerá que sí.');
+
+    // ── Y QUE LA FASE NO SE CUELE DONDE SE LLAMA ─────────────────────────
+    //  La lista puede estar perfecta y colarse la fase en el sitio de la
+    //  llamada: `mandados.filter(m => esEnCurso(m.estado) || m.fase === 'en_viaje')`.
+    //  La segunda opinión lo probó: 78 pruebas en verde. Es EXACTAMENTE el
+    //  fallo del botón de pánico —mirar la fase sin comprobar que el viaje
+    //  esté vivo—, que ya costó que 3 de 5 pasajeros recibieran los datos de
+    //  un conductor de un viaje terminado.
+    const llamadas = t.split('\n').filter((l) => /esEnCurso\s*\(/.test(l)
+      && !/const\s+esEnCurso/.test(l));
+    const conFase = llamadas.filter((l) => /\.fase\b|\[['"]fase['"]\]/.test(l));
+    assert.deepStrictEqual(conFase.map((l) => l.trim().slice(0, 90)), [],
+      'donde se llama a `esEnCurso` se está mirando ADEMÁS la fase. El estado dice si el '
+      + 'viaje está vivo; la fase, por dónde va. Un viaje cancelado o expirado conserva su '
+      + 'fase pegada, así que mirarla sin mirar el estado mete viajes muertos en «en curso» '
+      + '— es el mismo fallo que hacía que el botón de pánico mandara la placa de un '
+      + 'conductor de un viaje terminado.');
+  });
+
   // ── LOS ESTADOS RETIRADOS NO VUELVEN ─────────────────────────────────────
   //  🔴 ESTE AMARRE EXISTE PORQUE UN SABOTAJE SOBREVIVIÓ (12-sep-2026). Se
   //  cambió `estado === 'aceptado'` por `estado === 'confirmado'` en la app del
