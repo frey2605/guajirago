@@ -115,7 +115,9 @@ function Seguridad({ onVolver }) {
     // EL TEXTO SE ARMA APARTE (mensajeEmergencia.js) para poder probarlo: dentro
     // de este componente no hay forma de escribir una prueba que mire lo que de
     // verdad sale.
-    const texto = armarMensajeDeEmergencia(ubicacion, viajeActivo, fallo);
+    const texto = armarMensajeDeEmergencia({
+      desde: 'ajustes', ubicacion, viaje: viajeActivo, fallo,
+    });
 
     const numero = contactoNumero.replace(/\D/g, '');
     const numeroFinal = numero.startsWith('57') ? numero : '57' + numero;

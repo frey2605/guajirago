@@ -20,6 +20,9 @@ import { RESPUESTAS_RAPIDAS, RAZONES_CANCELACION_PASAJERO } from './textosViaje'
 // archivo y misma ventanita que usan el conductor, el panel y aliados.
 import { motivoDeRechazo, apuntarRechazo } from './avisoRechazo';
 import AvisoModal from './AvisoModal';
+// El texto del mensaje de emergencia. MISMO archivo que el botón de Ajustes:
+// un proceso, un sitio (SEGUNDA LEY). Vive aparte para poder PROBARLO.
+import { armarMensajeDeEmergencia } from './mensajeEmergencia';
 
 // Valores por defecto (respaldo). Se reemplazan por los de config/global cuando cargan.
 const CONFIG_APP_DEFECTO = {
@@ -417,6 +420,18 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
   const TARIFA_MINIMA = calcularTarifaMinima(tipo, configApp);
   const [tarifa, setTarifa] = useState(calcularTarifaMinima(tipo, CONFIG_APP_DEFECTO));
   const [ubicacionPasajero, setUbicacionPasajero] = useState(centroRiohacha);
+  // 🔴 ¿ESA UBICACIÓN ES DEL GPS, O ES EL RELLENO?
+  //
+  // `ubicacionPasajero` arranca en el centro de Riohacha y vuelve al centro si
+  // el GPS falla, porque PARA DIBUJAR EL MAPA eso está bien: mejor el pueblo
+  // que una pantalla en blanco. Pero el botón de emergencia necesita saber la
+  // diferencia, y antes no podía: mandaba la plaza como «mi ubicación» con la
+  // misma seguridad que un GPS de verdad, y la familia iba a la plaza.
+  //
+  // Esta marca es lo único que lo distingue. Se pone en `true` SOLO cuando
+  // llega una posición del aparato. El mapa no la mira — sigue exactamente
+  // igual que antes, no se le tocó nada.
+  const [ubicacionEsDelGps, setUbicacionEsDelGps] = useState(false);
   // NUEVO: punto exacto del pin de recogida (se usa al crear el viaje)
   const [puntoRecogida, setPuntoRecogida] = useState(null);
   // NUEVO: centro del mapa de recogida. Arranca en el GPS y se mueve cuando el usuario elige una dirección de la lista
@@ -500,7 +515,17 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
           setContactoEmergencia(snap.data().contactoConfianzaNumero || '');
           if (snap.data().descuentoPendiente) setDescuentoPendiente(snap.data().descuentoPendiente);
         }
-      } catch (e) {}
+      } catch (e) {
+        // 🔴 ESTE `catch` ESTABA VACÍO, y aquí dentro viene el CONTACTO DE
+        // CONFIANZA. Si falla, `contactoEmergencia` se queda en nada y el botón
+        // de emergencia abre WhatsApp SIN DESTINATARIO — en una emergencia, el
+        // pasajero se encuentra eligiendo un contacto a mano sin saber por qué.
+        // También se quedan sin cargar los lugares guardados y el descuento.
+        // REGLA 9 del dueño: nada se rechaza en silencio. Y la ventanita sale
+        // de `avisoRechazo.js`, que es el único sitio donde se escribe qué
+        // decirle a la gente cuando algo del servidor no se pudo.
+        setAviso(motivoDeRechazo(e, 'cargar tus lugares guardados y tu contacto de confianza'));
+      }
     };
     cargarFavoritos();
   }, []);
@@ -511,10 +536,17 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
 
   useEffect(() => {
     if (!navigator.geolocation) return;
+    // LA MARCA SE PONE EN LOS DOS CAMINOS BUENOS y se deja en false en el
+    // relleno. El `setUbicacionPasajero(centroRiohacha)` de abajo NO se toca:
+    // es lo que mantiene el mapa dibujado, y funciona.
+    const delAparato = (pos) => {
+      setUbicacionPasajero({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+      setUbicacionEsDelGps(true);
+    };
     navigator.geolocation.getCurrentPosition(
-      (pos) => setUbicacionPasajero({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+      delAparato,
       () => navigator.geolocation.getCurrentPosition(
-        (pos) => setUbicacionPasajero({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+        delAparato,
         () => setUbicacionPasajero(centroRiohacha),
         { enableHighAccuracy: true, timeout: 20000 }
       ),
@@ -770,32 +802,52 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
   };
 
   const compartirSeguridad = () => {
-    let texto = '🚨 *EMERGENCIA - Estoy en un viaje de GuajiraGo*';
-
-    if (ubicacionPasajero) {
-      texto += `\n\n📍 *Mi ubicación:* https://maps.google.com/?q=${ubicacionPasajero.lat},${ubicacionPasajero.lng}`;
-    }
-
-    texto += '\n\n🛣️ *MI RUTA*';
-    if (origen) texto += `\n🟢 Origen: ${origen}`;
-    if (destino) texto += `\n🔴 Destino: ${destino}`;
-
-    if (viaje) {
-      texto += '\n\n🚗 *DATOS DEL CONDUCTOR*';
-      if (viaje.conductorNombre) texto += `\n👤 Nombre: ${viaje.conductorNombre}`;
-      if (viaje.conductorPlaca) texto += `\n🚘 Placa: ${viaje.conductorPlaca}`;
-      if (datosConductor?.color) texto += `\n🎨 Color: ${datosConductor.color}`;
-      if (viaje.conductorVehiculo) texto += `\n🏷️ Vehículo: ${viaje.conductorVehiculo}`;
-      if (viaje.conductorTelefono) texto += `\n📞 Teléfono: ${viaje.conductorTelefono}`;
-      if (datosConductor?.foto) texto += `\n📸 Foto: ${datosConductor.foto}`;
-    }
+    // EL TEXTO SE ARMA EN `mensajeEmergencia.js`, que es el MISMO archivo que
+    // usa el botón de Ajustes (SEGUNDA LEY: un proceso, un sitio). Antes estaba
+    // escrito a mano aquí, y los dos ya decían cosas distintas: el de Ajustes
+    // comprobaba que hubiera conductor y avisaba de lo que no había conseguido,
+    // y éste no. Ahora hay un solo texto y se puede PROBAR: dentro de este
+    // componente de React no había forma de escribir una prueba que mirara lo
+    // que de verdad le llega al familiar.
+    //
+    // 🔴 LA UBICACIÓN VA SOLO SI ES DEL GPS. Si es el relleno del centro de
+    // Riohacha, va `null` y el mensaje dice que no la pudo conseguir. Antes
+    // mandaba la plaza como si fuera cierta.
+    //
+    // Y el viaje sale de `viaje` —el documento que escucha esta pantalla—, no
+    // de `datosConductor`, que se llena una vez y NUNCA se vacía: con dos
+    // viajes seguidos se mandaba la foto del conductor del anterior.
+    // Si `viaje` todavía no ha llegado, se dice: estando en el mapa hay viaje
+    // seguro, así que no tenerlo es «no lo pude conseguir», no «no hay».
+    const texto = armarMensajeDeEmergencia({
+      desde: 'enViaje',
+      ubicacion: ubicacionEsDelGps ? ubicacionPasajero : null,
+      viaje,
+      fallo: viaje ? null : 'viaje',
+    });
 
     const numero = contactoEmergencia.replace(/\D/g, '');
     const numeroFinal = numero ? (numero.startsWith('57') ? numero : '57' + numero) : '';
+    // SIN NÚMERO, SE DICE. Antes abría WhatsApp sin destinatario y el pasajero
+    // se encontraba eligiendo un contacto a mano, en una emergencia, sin saber
+    // por qué. El mensaje va igual —se abre el selector— pero avisado.
+    if (!numeroFinal) {
+      setAviso({
+        titulo: 'No tengo a quién mandarlo',
+        texto: 'No pude leer tu contacto de confianza, así que WhatsApp te va a pedir que '
+          + 'elijas a quién. El mensaje ya va escrito. Guarda un contacto en Seguridad para '
+          + 'que la próxima vez salga solo.',
+      });
+    }
     const url = numeroFinal
       ? `https://wa.me/${numeroFinal}?text=${encodeURIComponent(texto)}`
       : `https://wa.me/?text=${encodeURIComponent(texto)}`;
-    window.location.href = url;
+    // 🔴 `window.open`, NO `window.location.href`. Con `location.href` la página
+    // se va de inmediato y la ventanita de arriba NO LLEGA A PINTARSE: el aviso
+    // quedaba escrito de adorno, que es peor que no ponerlo. Lo cazó la segunda
+    // opinión del 12-sep-2026. Así lo hace el botón de Ajustes desde el
+    // principio, y es una diferencia menos entre los dos.
+    window.open(url, '_blank');
   };
 
   const cancelarViaje = async (razon) => {

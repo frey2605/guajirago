@@ -18,7 +18,8 @@
 const { describe, it } = require('node:test');
 const assert = require('node:assert');
 // El cargador vive en cargar.cjs: un solo sitio para todas las pruebas (SEGUNDA LEY).
-const { leer, cargarDeLaApp, soloCodigo, sinTextos, trozoDelTry } = require('./cargar.cjs');
+const { leer, cargarDeLaApp, soloCodigo, sinTextos, trozoDelTry, cuerpoDeLaFuncion }
+  = require('./cargar.cjs');
 
 describe('AMARRES · la app y el servidor miden la distancia IGUAL', () => {
   it('las dos calculadoras dan los mismos kilómetros en los mismos puntos', () => {
@@ -1345,6 +1346,201 @@ describe('LA RUTINA DE VIAJES COLGADOS · obedece a la calculadora', () => {
 //  La decisión vive ahora en `guajirago/src/estadosViaje.js` y se prueba
 //  ejecutándola en `pruebas/viajeActivo.test.js`. Esto vigila que la pantalla la
 //  USE, porque volver a escribirla a mano no falla: solo vuelve a mentir.
+/**
+ * ── EL LECTOR DE LA LLAMADA AL MENSAJE, para los DOS botones ───────────────
+ *
+ * Busca `const <algo> = armarMensajeDeEmergencia({ ... });` y devuelve en qué
+ * variable cae el texto, en qué posición está la llamada, y QUÉ EXPRESIÓN le
+ * llega a cada nombre (`desde`, `ubicacion`, `viaje`, `fallo`).
+ *
+ * VIVE AQUÍ Y NO DOS VECES porque lo usan los dos amarres —el de Ajustes y el
+ * del mapa— y copiarlo sería el gemelo que prohíbe la SEGUNDA LEY. (Lo suyo
+ * sería `pruebas/cargar.cjs`, pero eso es de las 23 pruebas y pide permiso
+ * aparte; aquí dentro, con un solo dueño, basta.)
+ *
+ * SE EXIGEN LOS CUATRO NOMBRES. Un nombre que falta llega como `undefined` y el
+ * mensaje pierde ese trozo entero sin decir nada — que es la rotura que se
+ * colaba cuando los datos iban en fila.
+ */
+function laLlamadaDelMensaje(t, seguro, donde) {
+  // 🔴 SE BUSCA DENTRO DEL TROZO QUE SE PASE, NO EN TODO EL ARCHIVO. Quien
+  // llama tiene que recortar el cuerpo de SU función. La primera versión
+  // miraba el archivo entero, y la segunda opinión la burló dejando la llamada
+  // buena en una función SEÑUELO al final del archivo mientras el botón
+  // volvía a armar el texto a mano con la plaza dentro: 90 pruebas en verde y
+  // al familiar le llegaba el centro de Riohacha.
+  const m = /(?:const|let|var)\s+(\w+)\s*=\s*armarMensajeDeEmergencia\s*\(\s*\{([\s\S]*?)\}\s*\)\s*;/
+    .exec(seguro);
+  assert.ok(m, 'no encuentro en ' + donde + ' una llamada `const <algo> = '
+    + 'armarMensajeDeEmergencia({ desde, ubicacion, viaje, fallo });`. O se armó el texto '
+    + 'por otro lado —y entonces no hay forma de probar lo que le llega al familiar— o el '
+    + 'texto ya no se guarda para mandarlo.');
+
+  // LA POSICIÓN se busca en el texto SIN CADENAS —así ninguna llave ni coma
+  // dentro de un texto descuadra el reparto—, pero LOS VALORES se cortan del
+  // ORIGINAL, porque `desde: 'ajustes'` es una cadena y sin cadenas llega como
+  // `'xxxxxxx'`. `sinTextos` deja la misma longitud, así que las posiciones
+  // valen para los dos. (Esto ya dio un rojo falso una vez.)
+  const desdeLlave = m.index + m[0].indexOf('{') + 1;
+  const cuerpoObjeto = t.slice(desdeLlave, desdeLlave + m[2].length);
+
+  // Partir el objeto por las comas de PRIMER nivel: dentro puede haber un
+  // ternario con paréntesis, o otro objeto.
+  const trozos = [];
+  let hondo = 0;
+  let actual = '';
+  for (const c of cuerpoObjeto) {
+    if (c === ',' && hondo === 0) { trozos.push(actual); actual = ''; continue; }
+    if (c === '(' || c === '{' || c === '[') hondo += 1;
+    if (c === ')' || c === '}' || c === ']') hondo -= 1;
+    actual += c;
+  }
+  trozos.push(actual);
+
+  const campos = {};
+  for (const trozo of trozos) {
+    const limpio = trozo.trim();
+    if (!limpio) continue;
+    const dosPuntos = limpio.indexOf(':');
+    if (dosPuntos < 0) campos[limpio] = limpio;               // forma corta: `fallo`
+    else campos[limpio.slice(0, dosPuntos).trim()] = limpio.slice(dosPuntos + 1).trim();
+  }
+
+  for (const nombre of ['desde', 'ubicacion', 'viaje', 'fallo']) {
+    assert.ok(campos[nombre] !== undefined,
+      'la llamada de ' + donde + ' ya no le pasa «' + nombre + '» al mensaje. Lo que falta '
+      + 'llega como `undefined` y el mensaje se queda SIN ESE TROZO, sin decirlo: sin '
+      + '`viaje` desaparece la ficha del carro entera, y sin `fallo` el mensaje vuelve a '
+      + 'callarse cuando no se pudo comprobar nada.');
+  }
+
+  // 🔴 Y QUE NO SEAN UN VALOR MUERTO. Que el nombre esté no basta: `viaje: null`
+  // y `viaje: {}` pasaban la comprobación de arriba y dejaban al familiar sin
+  // ruta y sin ficha del carro, con todo en verde; y `fallo: null` devolvía al
+  // mensaje su silencio. Es LA MISMA rotura que se cerró cuando los datos iban
+  // en fila —la segunda opinión la metió cambiando el del medio por `null`— y
+  // se había reabierto al pasar a nombres. Lo cazó la segunda opinión otra vez.
+  for (const nombre of ['viaje', 'fallo', 'ubicacion']) {
+    const v = campos[nombre].trim();
+    assert.ok(!/^(?:null|undefined|''|""|\{\s*\}|0|false)$/.test(v),
+      'la llamada de ' + donde + ' le pasa «' + nombre + ': ' + v + '» al mensaje, que es '
+      + 'un valor muerto: el nombre está pero no lleva nada dentro. Sin `viaje` de verdad '
+      + 'el familiar se queda sin la ruta y sin la ficha del carro; sin `fallo` de verdad '
+      + 'el mensaje vuelve a callarse cuando no se pudo comprobar; sin `ubicacion` no sabe '
+      + 'dónde está nadie. Y nada de eso falla con estruendo: el mensaje sale más corto.');
+  }
+  return { varTexto: m[1], campos, index: m.index, largo: m[0].length };
+}
+
+/**
+ * ── EL ENVÍO · que el mensaje SALGA, y salga ÉSE ────────────────────────────
+ *
+ * Las mismas tres comprobaciones para los dos botones. Estaban escritas solo
+ * para el de Ajustes, y la segunda opinión del 12-sep-2026 midió lo que eso
+ * costaba en el del mapa —el que de verdad se aprieta—: tres roturas de un
+ * renglón, las tres con 90 pruebas en verde.
+ *   · quitarle la asignación al enlace  → al familiar no le llega NADA
+ *   · `?text=hola` en vez del texto      → le llega «hola»
+ *   · quitarle la llamada al `onClick`   → el botón no hace nada
+ * Copiar las comprobaciones de un botón y no del otro es justo lo que la
+ * SEGUNDA LEY avisa que pasa siempre: una de las dos se queda vieja.
+ */
+function elEnvioDelMensaje(cuerpo, varTexto, donde) {
+  const plantillas = (cuerpo.match(/`[^`]*`/g) || []).filter((x) => x.includes('wa.me'));
+  assert.ok(plantillas.length >= 1,
+    donde + ' no arma ningún enlace de WhatsApp. El mensaje no sale de la pantalla, y las '
+    + 'pruebas del texto siguen verdes porque el texto está bien armado: al familiar no le '
+    + 'llega NADA.');
+  // TODOS los enlaces tienen que llevar ESE texto, no «uno de ellos». El botón
+  // del mapa arma DOS a propósito —con destinatario y sin él, según haya
+  // contacto guardado—, así que exigir «uno solo» era un rojo falso. Lo que no
+  // puede pasar es que alguno lleve otra cosa: `?text=hola` dejaba 90 pruebas
+  // en verde y al familiar le llegaba «hola».
+  const conElTexto = new RegExp('encodeURIComponent\\s*\\(\\s*' + varTexto + '\\s*\\)');
+  plantillas.forEach((plantilla, n) => {
+    assert.ok(conElTexto.test(plantilla),
+      'el enlace de WhatsApp número ' + (n + 1) + ' de ' + donde + ' no lleva «' + varTexto
+      + '», el texto que arma el archivo probado, sino otra cosa: ' + plantilla.slice(0, 70)
+      + '… Las pruebas del mensaje seguirían mirando un texto que nadie envía.');
+  });
+  const abre = (cuerpo.match(/window\.open\s*\(|window\.location\.href\s*=/g) || []).length;
+  assert.strictEqual(abre, 1,
+    donde + ' abre el enlace ' + abre + ' veces, y debería ser UNA. Si se dejó de abrir '
+    + '—guardándolo en una variable, o copiándolo al portapapeles— el familiar NO RECIBE '
+    + 'NADA, y las pruebas del texto siguen verdes porque el texto está bien armado.');
+
+  // ── 3 · NADIE REESCRIBE EL TEXTO DESPUÉS DE ARMARLO ──────────────────────
+  //  Esta comprobación existía SOLO en el amarre de Ajustes. Sacar la función
+  //  compartida y dejarla fuera fue repetir el error que la función venía a
+  //  cerrar: la segunda opinión devolvió el fallo original con una línea —
+  //  `const` → `let` y detrás `texto = armar({... ubicacion: ubicacionPasajero
+  //  ...})`— y al familiar le volvió a llegar la plaza, con todo en verde.
+  const laLlamada = new RegExp('=\\s*armarMensajeDeEmergencia');
+  const trasArmar = cuerpo.slice(cuerpo.search(laLlamada) + 1);
+  assert.ok(!new RegExp('(?:^|[^.\\w=!<>])' + varTexto + '\\s*=[^=]').test(trasArmar),
+    'después de armarlo, ' + donde + ' vuelve a escribir «' + varTexto + '». El mensaje que '
+    + 'se manda ya no es el que se armó y se probó: con un solo renglón se le puede volver a '
+    + 'meter la ubicación sin filtrar —la plaza— o recortarlo entero, y ninguna prueba del '
+    + 'texto se entera.');
+
+  // ── 4 · Y LO QUE SE ABRE ES ESE ENLACE, no una cadena pegada a mano ──────
+  //  Las plantillas de arriba pueden estar perfectas y no usarse: la segunda
+  //  opinión dejó `url` sin tocar y puso
+  //  `window.open('https://wa.me/' + numeroFinal + '?text=' + encodeURIComponent('hola'))`.
+  //  Al familiar le llegaba «hola». Así que se mira QUÉ RECIBE `window.open`.
+  //  Se cuentan paréntesis para sacar el PRIMER argumento entero: cortar en el
+  //  primer `)` partía la plantilla de Ajustes por la mitad —lleva un
+  //  `encodeURIComponent(...)` dentro— y daba un rojo falso en código bueno.
+  const arranque = /window\.(?:open|location\.href)\s*(\(|=)/.exec(cuerpo);
+  assert.ok(arranque, 'no pude leer qué abre ' + donde + '.');
+  let abierto;
+  if (arranque[1] === '=') {
+    abierto = cuerpo.slice(arranque.index + arranque[0].length).split(';')[0];
+  } else {
+    let i = arranque.index + arranque[0].length;
+    let hondo = 1;
+    let coma = -1;
+    for (; i < cuerpo.length && hondo > 0; i += 1) {
+      const c = cuerpo[i];
+      if (c === '(' || c === '[' || c === '{') hondo += 1;
+      else if (c === ')' || c === ']' || c === '}') hondo -= 1;
+      else if (c === ',' && hondo === 1 && coma < 0) coma = i;
+    }
+    const fin = coma > 0 ? coma : i - 1;
+    abierto = cuerpo.slice(arranque.index + arranque[0].length, fin);
+  }
+  abierto = abierto.trim();
+  const esUnaVariable = /^\w+$/.test(abierto);
+  assert.ok(esUnaVariable || conElTexto.test(abierto),
+    donde + ' abre «' + abierto.slice(0, 60) + '», que no es el enlace que armó ni lleva «'
+    + varTexto + '» dentro. Las plantillas de arriba pueden estar perfectas y no usarse: se '
+    + 'puede dejar el enlace bueno sin tocar y abrir otro pegado a mano con cualquier texto.');
+  if (esUnaVariable) {
+    // Si abre una variable, se SIGUE LA CADENA hasta el enlace: pasar la URL
+    // por una variable intermedia —`const destino = url;`— es código normal, y
+    // exigir el `wa.me` pegado a la primera daba rojo falso. Tres saltos bastan
+    // y evitan dar vueltas para siempre si alguien escribe `a = b; b = a`.
+    let nombre = abierto;
+    let llega = false;
+    const vistos = new Set();
+    for (let salto = 0; salto < 3 && !llega; salto += 1) {
+      if (vistos.has(nombre)) break;
+      vistos.add(nombre);
+      const def = new RegExp('(?:const|let|var)\\s+' + nombre + '\\s*=([\\s\\S]{0,400}?);')
+        .exec(cuerpo);
+      if (!def) break;
+      if (/wa\.me/.test(def[1])) { llega = true; break; }
+      const otra = /^\s*([A-Za-z_$][\w$]*)\s*$/.exec(def[1]);
+      if (!otra) break;
+      nombre = otra[1];
+    }
+    assert.ok(llega,
+      donde + ' abre la variable «' + abierto + '», y siguiéndola no se llega a ningún enlace '
+      + 'de WhatsApp. El enlace bueno se queda sin usar y se manda otra cosa: al familiar le '
+      + 'puede llegar cualquier texto, o nada.');
+  }
+}
+
 describe('EL BOTÓN DE PÁNICO · usa la fuente única del viaje en curso', () => {
   const laPantalla = () => soloCodigo(leer('guajirago/src/Seguridad.js'));
 
@@ -1407,7 +1603,7 @@ describe('EL BOTÓN DE PÁNICO · usa la fuente única del viaje en curso', () =
   //  🔴 Y OJO AL NOMBRE, QUE LO TUVE MAL TODO EL DÍA: `Seguridad.js` es el
   //  compartir ubicación de AJUSTES, el preventivo. El botón de pánico de
   //  verdad es el 🚨 rojo del mapa, que arma su propio mensaje a mano en
-  //  `Solicitar.js:772` y SIGUE con tres silencios. Llamar «de pánico» a esta
+  //  `Solicitar.js` (`compartirSeguridad`). Llamar «de pánico» a esta
   //  pantalla es lo que mantuvo al otro invisible. Está anotado como deuda.
   it('EL QUE MUERDE · ningún `catch` de la pantalla de Seguridad se queda callado', () => {
     const t = soloCodigo(leer('guajirago/src/Seguridad.js'));
@@ -1586,18 +1782,32 @@ describe('EL BOTÓN DE PÁNICO · usa la fuente única del viaje en curso', () =
     //  De paso deja de exigir los nombres literales `ubicacion/viajeActivo/
     //  fallo`: los saca del propio código, así que renombrar una variable ya no
     //  da un rojo falso. Lo que se vigila es la PLOMERÍA, no los nombres.
-    const t = soloCodigo(leer('guajirago/src/Seguridad.js'));
+    const archivo = soloCodigo(leer('guajirago/src/Seguridad.js'));
+    // SOLO EL CUERPO DE `compartirUbicacion`. Mirar el archivo entero dejaba
+    // pasar un señuelo: la llamada perfecta en otra función y el botón armando
+    // el texto a mano. Lo midió la segunda opinión en el botón gemelo.
+    const arranca = archivo.indexOf('const compartirUbicacion');
+    assert.ok(arranca >= 0, 'ya no existe `compartirUbicacion` en Seguridad.js. Si se '
+      + 'renombró, hay que cambiarlo aquí, que es lo único que la vigila.');
+    const laSuya = cuerpoDeLaFuncion(archivo, arranca);
+    assert.ok(laSuya, 'no pude leer el cuerpo de `compartirUbicacion`.');
+    const t = laSuya.texto;
     const seguro = sinTextos(t);
 
-    // 1 · LA LLAMADA: de dónde salen los tres datos y dónde cae el texto.
-    const llamada = /(?:const|let|var)\s+(\w+)\s*=\s*armarMensajeDeEmergencia\s*\(\s*(\w+)\s*,\s*(\w+)\s*,\s*(\w+)\s*\)\s*;/
-      .exec(seguro);
-    assert.ok(llamada,
-      'no encuentro en Seguridad.js una llamada `const <algo> = armarMensajeDeEmergencia'
-      + '(<ubicación>, <viaje>, <fallo>);` con sus TRES datos guardada en una variable. O se '
-      + 'le quitó un argumento —y entonces el mensaje pierde ese trozo entero y sale como si '
-      + 'no existiera— o el texto ya no se guarda para mandarlo.');
-    const [, varTexto, , varViaje, varFallo] = llamada;
+    // 1 · LA LLAMADA: de dónde sale cada dato y dónde cae el texto.
+    //     Se lee la forma CON NOMBRES —`armar({ desde, ubicacion, viaje, fallo })`—
+    //     y se comprueba que estén los cuatro. Un dato que falta llega como
+    //     `undefined` y el mensaje pierde ese trozo ENTERO sin decir nada: es
+    //     exactamente la rotura que la segunda opinión metió cambiando el
+    //     argumento del medio por `null` cuando los datos iban en fila.
+    const llamada = laLlamadaDelMensaje(t, seguro, 'Seguridad.js');
+    const { varTexto, campos } = llamada;
+    const varViaje = campos.viaje;
+    const varFallo = campos.fallo;
+    assert.strictEqual(campos.desde, "'ajustes'",
+      'Seguridad.js ya no dice que su mensaje viene de «ajustes» (dice «' + campos.desde
+      + '»). Ese nombre elige el encabezado: al familiar le llegaría el texto del OTRO '
+      + 'botón, diciendo EMERGENCIA cuando esto es el compartir preventivo.');
     assert.notStrictEqual(varViaje, varFallo,
       'el viaje y el fallo llegan al mensaje en la MISMA variable. Son las dos cosas que hay '
       + 'que distinguir: «no iba en ningún viaje» y «no se pudo comprobar».');
@@ -1698,7 +1908,7 @@ describe('EL BOTÓN DE PÁNICO · usa la fuente única del viaje en curso', () =
       + 'palabra del texto para conseguirlo.');
 
     // 4 · Y EL TEXTO LLEGA A WHATSAPP TAL CUAL SALIÓ. Ni recortado ni cambiado.
-    const despues = seguro.slice(llamada.index + llamada[0].length);
+    const despues = seguro.slice(llamada.index + llamada.largo);
     assert.ok(!new RegExp('(?:^|[^.\\w=!<>])' + varTexto + '\\s*=[^=]').test(despues),
       'después de armarlo, alguien vuelve a escribir «' + varTexto + '». El mensaje que se '
       + 'manda ya no es el que se armó y se probó: se le puede recortar todo menos el '
@@ -1711,28 +1921,337 @@ describe('EL BOTÓN DE PÁNICO · usa la fuente única del viaje en curso', () =
     //      daba rojo falso, porque la llamada vive dentro de una plantilla con
     //      acentos graves y `sinTextos` las vacía enteras. La salida es mirar
     //      SOLO la plantilla que se manda.
-    //      Se mira LA PLANTILLA DEL ENLACE, no `window.open(...)` a pelo: meter
-    //      la URL en una variable antes de abrirla es código normal, y exigir la
-    //      plantilla pegada al `window.open` daba rojo falso.
-    const plantillas = (t.match(/`[^`]*`/g) || []).filter((x) => x.includes('wa.me'));
-    assert.strictEqual(plantillas.length, 1,
-      'Seguridad.js arma ' + plantillas.length + ' enlaces de WhatsApp, y debería ser UNO. '
-      + 'Con dos, uno puede llevar el mensaje bueno y el otro un texto a mano para el caso '
-      + 'del fallo —que es justo el caso que este trabajo vino a cerrar— y las pruebas no '
-      + 'ven la diferencia. Con ninguno, el mensaje no sale de la pantalla.');
-    assert.ok(new RegExp('encodeURIComponent\\s*\\(\\s*' + varTexto + '\\s*\\)')
-      .test(plantillas[0]),
-      'lo que se le manda al contacto de confianza ya no es «' + varTexto + '», el texto que '
-      + 'arma el archivo probado, sino otra cosa —un recorte, o un texto hecho a mano—. Si se '
-      + 'manda otra cosa, las pruebas del mensaje están mirando un texto que nadie envía.');
-    //      Y SOLO `window.open`, que es como se manda el mensaje. El
-    //      `window.location.href = 'tel:123'` de esta misma pantalla es OTRO
-    //      botón —llamar a la policía— y contarlo daba rojo en el archivo
-    //      limpio: el amarre habría nacido roto.
-    const envios = (t.match(/window\.open\s*\(/g) || []).length;
-    assert.strictEqual(envios, 1,
-      'Seguridad.js abre el enlace de WhatsApp ' + envios + ' veces, y debería ser UNA. Si se '
-      + 'dejó de abrir —copiarlo al portapapeles, por ejemplo— el familiar no recibe NADA, y '
-      + 'ninguna prueba del mensaje se entera: siguen mirando un texto que no sale.');
+    //      LAS MISMAS TRES QUE EL BOTÓN DEL MAPA, del mismo sitio. Estaban
+    //      escritas solo aquí, y la segunda opinión midió lo que eso costaba en
+    //      el otro botón: tres roturas de un renglón, las tres con todo verde.
+    //      (Y al acotar esto a `compartirUbicacion`, el `window.location.href =
+    //      'tel:123'` del botón de llamar al 123 ya no estorba: está en otra
+    //      función. Contarlo dio un rojo en el archivo limpio una vez.)
+    elEnvioDelMensaje(t, varTexto, 'Seguridad.js');
+  });
+});
+
+// ── 🚨 EL BOTÓN DE EMERGENCIA DEL MAPA · QUE NO SE INVENTE DÓNDE ESTÁS ──────
+//
+//  ESTE ES EL QUE DE VERDAD SE APRIETA: el 🚨 rojo que flota sobre el mapa en
+//  `fase1` y `fase2`, o sea desde que un conductor acepta hasta que el viaje
+//  acaba. Medido: 76 de los 91 viajes llegaron a tenerlo en pantalla.
+//
+//  Hasta el 12-sep-2026 armaba su propio texto A MANO dentro de `Solicitar.js`,
+//  sin ninguna prueba, y NO se callaba cuando no tenía la ubicación: DECÍA OTRA
+//  COSA. La pantalla arranca con el centro de Riohacha metido en
+//  `ubicacionPasajero` —y lo vuelve a poner si el GPS falla— porque para
+//  DIBUJAR EL MAPA eso está bien. El botón no podía distinguirlo, y mandaba
+//  «📍 *Mi ubicación:* https://maps.google.com/?q=11.5444,-72.9072»: la plaza,
+//  con la misma seguridad que un GPS de verdad. Medido: 4 de los 91 viajes
+//  nacieron con ese relleno, y el GPS se intenta UNA SOLA VEZ al abrir, así que
+//  si falló ahí se quedaba mintiendo toda la sesión.
+//
+//  UN SILENCIO Y UNA MENTIRA NO SON LO MISMO. Con un silencio, quien recibe el
+//  mensaje sabe que no sabe. Con esto se iba a la plaza a buscar a alguien que
+//  podía estar en cualquier otro sitio.
+//
+//  Lo que vigilan estos amarres es la PLOMERÍA de la pantalla. Lo que dice el
+//  texto se prueba EJECUTÁNDOLO en `pruebas/mensajeEmergencia.test.js`.
+describe('EL BOTÓN DEL MAPA · no se inventa dónde estás', () => {
+  const PANTALLA = 'guajirago/src/Solicitar.js';
+  const leerla = () => {
+    const t = soloCodigo(leer(PANTALLA));
+    return { t, seguro: sinTextos(t) };
+  };
+  const laFuncion = (t) => {
+    const desde = t.indexOf('const compartirSeguridad');
+    assert.ok(desde >= 0, 'ya no existe `compartirSeguridad` en ' + PANTALLA + '. Es la '
+      + 'función del botón 🚨 del mapa; si se renombró, hay que cambiarlo también aquí, que '
+      + 'es lo único que la vigila.');
+    const cuerpo = cuerpoDeLaFuncion(t, desde);
+    assert.ok(cuerpo, 'no pude leer el cuerpo de `compartirSeguridad`.');
+    return cuerpo.texto;
+  };
+
+  it('EL QUE MUERDE · el texto lo arma el archivo probado, no la pantalla', () => {
+    const { t } = leerla();
+    assert.match(t, /import\s*\{[^}]*armarMensajeDeEmergencia[^}]*\}\s*from\s*['"]\.\/mensajeEmergencia['"]/,
+      PANTALLA + ' dejó de importar `armarMensajeDeEmergencia`. Si volvió a armar el texto a '
+      + 'mano dentro del componente, ya no hay forma de PROBAR lo que le llega al familiar: '
+      + '`pruebas/cargar.cjs` no puede cargar un componente de React. Y vuelve a ser el '
+      + 'gemelo del de Ajustes, que la SEGUNDA LEY prohíbe.');
+    const cuerpo = laFuncion(t);
+    assert.ok(!/texto\s*\+=/.test(cuerpo),
+      'el botón del mapa volvió a pegar trozos del mensaje a mano (`texto +=`). Así fue como '
+      + 'este botón y el de Ajustes acabaron diciendo cosas distintas: el de Ajustes '
+      + 'comprobaba que hubiera conductor y avisaba de lo que le faltaba, y éste no.');
+  });
+
+  it('EL QUE MUERDE · la ubicación va SOLO si es del GPS, nunca el relleno', () => {
+    const { t } = leerla();
+    // SOLO EL CUERPO DE LA FUNCIÓN. Buscar en todo el archivo dejaba pasar un
+    // señuelo: la llamada perfecta en otra función al final, y el botón armando
+    // el texto a mano con la plaza dentro.
+    const cuerpo = laFuncion(t);
+    const { campos, varTexto } = laLlamadaDelMensaje(cuerpo, sinTextos(cuerpo), PANTALLA
+      + ' (dentro de `compartirSeguridad`)');
+
+    assert.match(campos.desde, /^['"]enViaje['"]$/,
+      'el botón del mapa ya no dice que su mensaje viene de «enViaje» (dice «' + campos.desde
+      + '»). Ese nombre elige el encabezado: al familiar le llegaría «quiero que sepas dónde '
+      + 'estoy» en vez de «EMERGENCIA», cuando algo está pasando de verdad.');
+
+    // Y QUE EL MENSAJE SALGA, Y SALGA ÉSE. Las mismas tres del otro botón.
+    elEnvioDelMensaje(cuerpo, varTexto, 'el botón del mapa');
+
+    // LO QUE MUERDE: la ubicación tiene que llegar FILTRADA por la marca del
+    // GPS, no la variable a pelo. `ubicacion: ubicacionPasajero` es justo el
+    // fallo que había, y no cambia ni una cadena del archivo.
+    // ── LA UBICACIÓN VIENE FILTRADA, Y LO QUE SALE SI NO ES `null` PELADO ──
+    //  Se parte el ternario y se mira cada mitad. Un `: null || ubicacionPasajero`
+    //  pasaba el «acaba en null» y mandaba la plaza igual. Lo cazó la segunda
+    //  opinión. Y el nombre de la marca se SACA del código en vez de exigirlo
+    //  literal, así que renombrarla ya no da un rojo falso.
+    const elFiltro = /^(\w+)\s*\?([\s\S]+?):([\s\S]+)$/.exec(campos.ubicacion.trim());
+    assert.ok(elFiltro,
+      'la ubicación llega al mensaje como «' + campos.ubicacion + '», que no es un '
+      + '«<marca> ? <la ubicación> : null». Sin ese filtro se manda `ubicacionPasajero` a '
+      + 'pelo — y esa variable arranca en el CENTRO DE RIOHACHA y vuelve al centro si el GPS '
+      + 'falla, así que el mensaje de emergencia mandaría la plaza como «mi ubicación», con '
+      + 'enlace de mapa y todo. La familia iría allí.');
+    const marca = elFiltro[1];
+    assert.strictEqual(elFiltro[3].trim(), 'null',
+      'cuando la marca «' + marca + '» dice que NO es del GPS, al mensaje le llega «'
+      + elFiltro[3].trim() + '» en vez de `null` pelado. Cualquier otra cosa vuelve a mandar '
+      + 'un punto inventado: tiene que ser `null` para que el mensaje diga «No pude obtener '
+      + 'mi ubicación exacta».');
+    assert.ok(!/centroRiohacha/.test(elFiltro[2]),
+      'lo que se manda cuando la marca dice que SÍ es del GPS lleva `centroRiohacha` dentro. '
+      + 'Ése es el relleno del mapa: no es el sitio de nadie.');
+
+    // Y EL VIAJE, DEL DOCUMENTO QUE ESCUCHA LA PANTALLA. No de
+    // `datosConductor`, que se llena una vez y nunca se vacía: con dos viajes
+    // seguidos se mandaba la foto del conductor del ANTERIOR. Medido: 3 de 4
+    // pasajeros con dos viajes están en ese caso.
+    assert.ok(!/datosConductor/.test(campos.viaje + campos.fallo + campos.ubicacion),
+      'el mensaje vuelve a sacar datos de `datosConductor`, que se llena una vez y NUNCA se '
+      + 'vacía entre viajes: se manda la foto y el color del carro del conductor ANTERIOR. '
+      + 'Los datos del conductor salen de `viaje`, que es el documento vivo.');
+
+    // ── Y EL VIAJE ES EL DOCUMENTO VIVO, no un objeto armado a mano ──────
+    //  Rechazar `viaje: null` no bastaba: la segunda opinión pasó
+    //      const viajeParaElMensaje = { origen: 'Riohacha', destino: 'Riohacha' };
+    //  y al familiar le llegó una RUTA INVENTADA y cero ficha del carro, con
+    //  todo en verde. Así que el dato tiene que salir de un `useState` de esta
+    //  pantalla —que es lo que llena el escuchador del viaje—, no de un objeto
+    //  escrito al lado.
+    const { seguro: todo } = leerla();
+    const esDeEstado = new RegExp(
+      '\\b(?:let|const|var)\\s+\\[\\s*' + campos.viaje.trim() + '\\s*,\\s*\\w+\\s*\\]\\s*=\\s*useState');
+    assert.match(todo, esDeEstado,
+      'al mensaje le llega «' + campos.viaje.trim() + '» como viaje, y eso no es un dato de '
+      + 'la pantalla (`useState`): es algo armado a mano. El escuchador de Firestore llena el '
+      + 'viaje de verdad; cualquier otra cosa es una ruta y una ficha de carro inventadas, y '
+      + 'al familiar le llegan como ciertas.');
+  });
+
+  it('EL QUE MUERDE · la marca del GPS se pone SOLO con una posición del aparato', () => {
+    const { t, seguro } = leerla();
+    // EL NOMBRE DE LA MARCA SALE DEL CÓDIGO, del propio filtro de la llamada.
+    // Exigirlo literal daba rojo falso al renombrar una variable, y un rojo
+    // falso se acaba «arreglando» borrando la prueba.
+    const cuerpo = laFuncion(t);
+    const { campos } = laLlamadaDelMensaje(cuerpo, sinTextos(cuerpo), PANTALLA);
+    const marca = /^(\w+)\s*\?/.exec(campos.ubicacion.trim())[1];
+
+    // Se declara, y una sola vez. Y EL NOMBRE DE SU FUNCIÓN SE LEE DEL PROPIO
+    // `useState`, no se adivina poniéndole «set» delante y una mayúscula:
+    // adivinarlo daba rojo a un renombrado legítimo, y un rojo falso se acaba
+    // «arreglando» borrando la prueba.
+    const declaraciones = [...seguro.matchAll(
+      new RegExp('\\b(?:let|const|var)\\s+\\[\\s*' + marca + '\\s*,\\s*(\\w+)\\s*\\]\\s*=\\s*useState', 'g'))];
+    assert.strictEqual(declaraciones.length, 1,
+      '«' + marca + '» se declara ' + declaraciones.length + ' veces con `useState`, y '
+      + 'debería ser una. Es la marca que distingue un GPS de verdad del relleno del mapa.');
+    const ponerla = new RegExp(declaraciones[0][1] + '\\s*\\(([^)]*)\\)', 'g');
+
+    // LO QUE MUERDE DE VERDAD: que no se ponga en `true` en el camino del
+    // relleno. Poner `setUbicacionEsDelGps(true)` al lado del
+    // `setUbicacionPasajero(centroRiohacha)` deshace el arreglo entero y deja
+    // todo verde — y es un renglón.
+    //
+    // 🔴 LA CERCANÍA SE MIRA SOBRE EL CÓDIGO SIN CADENAS. La primera versión la
+    // miraba con los textos dentro, y la segunda opinión la burló con esto:
+    //     useEffect(() => { const q = 'pos.coords'; setUbicacionEsDelGps(true); }, []);
+    // Una cadena que dice «pos.coords» y no es ningún GPS: la marca quedaba en
+    // `true` desde que la pantalla monta y el mensaje volvía a mandar la plaza,
+    // con 90 pruebas en verde.
+    let m;
+    let veces = 0;
+    while ((m = ponerla.exec(seguro)) !== null) {
+      veces += 1;
+      if (!/true/.test(m[1])) continue;    // ponerla en false es siempre seguro
+      const cerca = seguro.slice(Math.max(0, m.index - 400), m.index);
+      assert.match(cerca, /pos\.coords|coords\.latitude/,
+        'un `set' + marca[0].toUpperCase() + marca.slice(1) + '(true)` NO está donde acaba '
+        + 'de llegar una posición del aparato (`pos.coords`). Si se marca como de verdad en '
+        + 'el camino del relleno —o al montar la pantalla— el botón de emergencia vuelve a '
+        + 'mandar el centro de Riohacha como tu ubicación, y todo sigue en verde.');
+      assert.ok(!/centroRiohacha/.test(cerca.slice(-200)),
+        'un `set' + marca[0].toUpperCase() + marca.slice(1) + '(true)` está pegado a un '
+        + '`centroRiohacha`. Ése es el RELLENO del mapa, no un GPS: marcarlo como de verdad '
+        + 'es exactamente el fallo que este arreglo vino a cerrar.');
+    }
+    assert.ok(veces >= 1, 'nadie pone «' + marca + '», así que el botón de emergencia '
+      + 'NUNCA va a mandar la ubicación, ni cuando el GPS funciona: el mensaje diría siempre '
+      + '«no pude obtener mi ubicación». Un arreglo que se pasa de prudente también engaña.');
+
+    // ── Y AL REVÉS, que es la regresión realista ─────────────────────────
+    //  Lo de arriba vigila que la marca no se ponga donde no toca. Esto vigila
+    //  lo contrario: que no se GUARDE una posición del aparato SIN marcarla.
+    //  El día que alguien añada un tercer intento de GPS y se olvide la marca,
+    //  el mensaje dirá «no pude obtener mi ubicación» teniéndola — y un arreglo
+    //  que se pasa de prudente también engaña, solo que hacia el otro lado.
+    const guardar = [...seguro.matchAll(/setUbicacionPasajero\s*\(\s*\{[^}]*\}/g)];
+    guardar.forEach((g) => {
+      if (!/pos\.coords|coords\.latitude/.test(g[0])) return;   // no es del aparato
+      const alrededor = seguro.slice(g.index, g.index + 260);
+      assert.match(alrededor, new RegExp(declaraciones[0][1] + '\\s*\\(\\s*true'),
+        'se guarda una posición del aparato SIN poner «' + marca + '» en true justo al lado. '
+        + 'El mapa la usaría y el botón de emergencia no: el mensaje diría «no pude obtener '
+        + 'mi ubicación» teniéndola, y el familiar se quedaría sin el dato que más sirve.');
+    });
+  });
+
+// ── Y QUE EL BOTÓN LLAME A LA FUNCIÓN ─────────────────────────────────────
+  //  Todo lo de arriba vigila lo que hace `compartirSeguridad`. Si nadie la
+  //  llama, da igual lo bien que esté: el 🚨 se aprieta y no pasa nada. La
+  //  segunda opinión del 12-sep-2026 le quitó la llamada al `onClick` del panel
+  //  y las 90 pruebas siguieron en verde — el botón muerto y nadie enterado.
+  it('EL QUE MUERDE · el botón del panel de emergencia SÍ la llama', () => {
+    const { t, seguro } = leerla();
+    const veces = (seguro.match(/compartirSeguridad\s*\(\s*\)/g) || []).length;
+    assert.ok(veces >= 1,
+      'nadie llama a `compartirSeguridad()` en ' + PANTALLA + '. El 🚨 del mapa abre su '
+      + 'panel, el pasajero toca «Compartir ubicación, ruta e identidad del conductor» y NO '
+      + 'PASA NADA: no se manda ningún mensaje y nada lo avisa. Todo lo demás de este bloque '
+      + 'vigila lo que hace esa función; esto vigila que se use.');
+    // ── Y TODOS LOS QUE LA LLAMAN SON BOTONES ────────────────────────────
+    //  No basta con que HAYA un `onClick`: la segunda opinión añadió
+    //      useEffect(() => { setTimeout(() => compartirSeguridad(), 3000); }, []);
+    //  y el mensaje de emergencia se mandaba SOLO a los tres segundos de abrir
+    //  la pantalla, sin que nadie apretara nada — con las 92 pruebas en verde.
+    //  Un mensaje de emergencia que se manda solo asusta a la familia, y el día
+    //  que pase de verdad ya nadie se lo cree. Así que se mira CADA llamador.
+    const llamadas = [...seguro.matchAll(/compartirSeguridad\s*\(\s*\)/g)];
+    assert.ok(llamadas.length >= 1,
+      'nadie llama a `compartirSeguridad()`. El 🚨 se aprieta y no pasa nada.');
+    llamadas.forEach((c) => {
+      const antes = seguro.slice(Math.max(0, c.index - 260), c.index);
+      assert.match(antes, /onClick\s*=\s*\{/,
+        'hay una llamada a `compartirSeguridad()` que NO sale de un `onClick`: viene de un '
+        + 'efecto, un temporizador o un `useEffect`. El mensaje de emergencia se mandaría '
+        + 'SOLO, sin que la persona apriete nada. Eso asusta a la familia sin motivo, y el '
+        + 'día que pase de verdad ya nadie se lo cree. Solo se manda cuando se pide.');
+      assert.ok(!/useEffect|setTimeout|setInterval/.test(antes),
+        'una llamada a `compartirSeguridad()` tiene un `useEffect`, un `setTimeout` o un '
+        + '`setInterval` justo delante. El mensaje de emergencia solo sale cuando la persona '
+        + 'toca el botón, nunca solo.');
+    });
+  });
+
+  it('EL QUE MUERDE · sin contacto guardado se avisa, no se abre WhatsApp a ciegas', () => {
+    const { t } = leerla();
+    const cuerpo = laFuncion(t);
+    // Antes: si el contacto no se pudo cargar, la URL salía sin destinatario y
+    // WhatsApp abría el selector. En una emergencia, el pasajero se encontraba
+    // eligiendo un contacto a mano sin saber por qué.
+    // SE EXIGE UN TEXTO DE VERDAD, no solo la forma. La primera versión miraba
+    // que hubiera un `setAviso({ ... texto: ...})` y un sabotaje la dejó verde
+    // poniendo `titulo: 0` con el texto intacto: una ventanita sin título no
+    // avisa de nada. Se pide título Y texto con letras dentro.
+    // EL AVISO PUEDE IR INLINE O SALIR DE UN SITIO COMÚN. Exigirlo escrito
+    // dentro del `setAviso({...})` daba rojo a sacar el texto a una constante
+    // compartida — que es justo lo que manda la SEGUNDA LEY, y lo que ya hace
+    // esta misma pantalla con `motivoDeRechazo`. Un rojo falso empuja a
+    // deshacer lo correcto. Así que: si va inline, se le exige título y texto
+    // de verdad; si va por un nombre, se busca ese nombre en el archivo.
+    const { t: archivo } = leerla();
+    const inline = /setAviso\s*\(\s*\{([\s\S]{0,600}?)\}\s*\)/.exec(cuerpo);
+    const porNombre = /setAviso\s*\(\s*([A-Za-z_$][\w$]*)\s*(?:\)|,)/.exec(cuerpo);
+    let elAviso = inline ? inline[1] : null;
+    if (!elAviso && porNombre) {
+      const def = new RegExp('(?:const|let|var)\\s+' + porNombre[1]
+        + '\\s*=\\s*\\{([\\s\\S]{0,600}?)\\}').exec(archivo);
+      const llamada = /setAviso\s*\(\s*motivoDeRechazo\s*\(/.test(cuerpo);
+      elAviso = def ? def[1] : (llamada ? "titulo: 'x'.repeat(20), texto: 'y'.repeat(20)" : null);
+    }
+    assert.ok(elAviso,
+      'el botón del mapa ya no avisa cuando no tiene a quién mandarle el mensaje. Sin '
+      + 'número, WhatsApp abre el selector de contactos y el pasajero no sabe por qué: cree '
+      + 'que la app se portó raro, en el peor momento posible.');
+    assert.match(elAviso, /titulo\s*:\s*['"][^'"]{8,}|titulo\s*:\s*[A-Za-z_$]/,
+      'la ventanita del botón del mapa sale SIN TÍTULO. Una ventanita en blanco en una '
+      + 'emergencia es peor que ninguna: el pasajero pierde el tiempo cerrándola.');
+    assert.match(elAviso, /texto\s*:\s*['"][^'"]{10,}|texto\s*:\s*[A-Za-z_$]/,
+      'la ventanita del botón del mapa sale sin explicación. Tiene que decirle al pasajero '
+      + 'POR QUÉ WhatsApp le está pidiendo elegir un contacto.');
+
+    // ── Y QUE SE LLEGUE A ESE AVISO ──────────────────────────────────────
+    //  Tener el aviso escrito no es tenerlo puesto. Un sabotaje cambió
+    //  `if (!numeroFinal)` por `if (false)`: el texto seguía en el archivo,
+    //  palabra por palabra, y el aviso ya no salía nunca. Así que se comprueba
+    //  la CONDICIÓN, y se saca del propio código: el aviso tiene que estar
+    //  guardado por el mismo dato que decide el destinatario del enlace.
+    const conDestino = /wa\.me\/\$\{(\w+)\}/.exec(cuerpo);
+    assert.ok(conDestino,
+      'no encuentro en `compartirSeguridad` el enlace `wa.me/${<el número>}`. Si el '
+      + 'destinatario se pone de otra forma, hay que mirar a mano que el aviso de «no tengo '
+      + 'a quién mandarlo» siga saliendo.');
+    // ── Y QUE LA VENTANITA LLEGUE A VERSE ────────────────────────────────
+    //  `window.location.href = url` navega de inmediato: la página se va antes
+    //  de que React pinte el modal, así que el aviso queda de adorno. Es como
+    //  estaba escrito, y lo cazó la segunda opinión. `window.open(url,
+    //  '_blank')` —lo que hace el botón de Ajustes— deja la página viva y el
+    //  aviso se lee. Un aviso que no se ve es peor que ninguno: se cree que
+    //  está avisado y no lo está.
+    assert.ok(!/window\.location\.href\s*=/.test(cuerpo),
+      'el botón del mapa manda el mensaje con `window.location.href`, que se lleva la página '
+      + 'por delante: la ventanita de «no tengo a quién mandarlo» NO LLEGA A PINTARSE y el '
+      + 'aviso queda escrito de adorno. Con `window.open(url, "_blank")` la página se queda '
+      + 'y el aviso se lee — así lo hace el botón de Ajustes.');
+
+    const varNumero = conDestino[1];
+    assert.match(cuerpo,
+      new RegExp('if\\s*\\(\\s*!\\s*' + varNumero + '\\s*\\)\\s*\\{[\\s\\S]{0,500}?setAviso'),
+      'el aviso de «no tengo a quién mandarlo» ya no está guardado por `if (!' + varNumero
+      + ')`. O sale siempre —molestando a quien sí tiene contacto guardado— o no sale nunca, '
+      + 'y entonces está escrito de adorno: el texto sigue en el archivo y el pasajero no lo '
+      + 've. Eso deja todas las pruebas en verde.');
+  });
+
+  it('EL QUE MUERDE · y el `catch` que carga el contacto no se queda callado', () => {
+    const { t, seguro } = leerla();
+    // El `catch` que envuelve la carga de `usuarios/{uid}` trae el contacto de
+    // confianza. Estuvo VACÍO hasta el 12-sep-2026: si fallaba, el botón abría
+    // WhatsApp sin destinatario y nada lo decía.
+    const BLOQUE = /\bcatch\s*(?:\([^)]*\))?\s*\{/g;
+    let m;
+    let elDelContacto = null;
+    while ((m = BLOQUE.exec(seguro)) !== null) {
+      const abre = m.index + m[0].length - 1;
+      let hondo = 0;
+      let j = abre;
+      for (; j < seguro.length; j += 1) {
+        if (seguro[j] === '{') hondo += 1;
+        else if (seguro[j] === '}') { hondo -= 1; if (hondo === 0) break; }
+      }
+      const suTry = trozoDelTry(t, m.index);
+      if (/contactoConfianzaNumero/.test(suTry)) elDelContacto = t.slice(abre + 1, j);
+      BLOQUE.lastIndex = j + 1;
+    }
+    assert.ok(elDelContacto !== null,
+      'ya no hay un `try` que cargue `contactoConfianzaNumero` en ' + PANTALLA + '. Sin eso '
+      + 'el botón de emergencia no tiene a quién mandarle nada.');
+    assert.ok(/setAviso\s*\(|setError\s*\(\s*['"][^'"]{10,}/.test(elDelContacto),
+      'el `catch` que carga tu contacto de confianza volvió a quedarse callado. Si falla, el '
+      + 'botón de emergencia abre WhatsApp SIN DESTINATARIO y el pasajero no sabe por qué. '
+      + 'REGLA 9 del dueño: nada se rechaza en silencio.');
   });
 });
