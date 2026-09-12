@@ -3081,8 +3081,12 @@ describe('REGLA 10 · un viaje no lo toca cualquiera', () => {
   it('un conductor del mercado NO escribe en el documento del viaje', async () => {
     await sembrarViajes();
     const { doc, updateDoc } = FS;
+    // Se escribe un estado VIVO a proposito. Hasta el 12-sep-2026 esto usaba
+    // `en_negociacion`, que se retiro por muerto: con un estado que ya no
+    // existe, la negativa podria ser por QUE se escribe y no por QUIEN lo
+    // escribe, que es lo unico que esta prueba quiere medir.
     await RUT.assertFails(updateDoc(doc(como('conductor2'), 'viajes/vm'), {
-      estado: 'en_negociacion', nuevaOferta: '2026-08-25T12:00:00.000Z',
+      estado: 'aceptado', nuevaOferta: '2026-08-25T12:00:00.000Z',
     }), 'Su oferta va a la subcoleccion, no al viaje. Aqui no tiene nada que escribir.');
   });
 

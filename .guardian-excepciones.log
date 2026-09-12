@@ -965,3 +965,19 @@ Para tocarlo sin saltarme el candado: `git stash` del trabajo a medias, foto
 nueva desde limpio, y `git stash pop`. Asi el guardian no se queda ciego a lo ya
 tocado (memoria: guardian-foto-a-mitad-ciega).
 Autorizado por Jhon el 10-sep-2026.
+
+2026-09-12 · RENGLON TOCADO FUERA DEL ARREGLO (lo cazo la segunda opinion)
+Promesa: "Se retiran los dos estados muertos que quedaban: en_negociacion y
+confirmado (como estado de VIAJE; como estado de PEDIDO sigue vivo)"
+Archivo SI declarado, pero renglon NO involucrado:
+  · guajirago/src/estadosViaje.js:71  1 palabra de un COMENTARIO
+Que paso: al retirar los estados corregi de paso una frase rota de un comentario
+del BOTON DE PANICO ("...pasajeros de la base uno de esos" -> "...cogian uno de
+esos"). No tiene nada que ver con retirar estados.
+PRIMERA LEY, punto 2: "dentro de un archivo que SI se toca, solo se tocan los
+renglones involucrados". Es literalmente lo que la ley nombra.
+Por que se deja en vez de deshacerlo: esa frase la rompi YO el 11-sep, en este
+mismo archivo, al corregir "los tres pasajeros" por "tres de los cinco".
+Deshacerlo dejaria un comentario que no se puede leer. Una palabra, cero codigo.
+Queda dicho para que no se vuelva costumbre: un arreglo de paso, por pequeño que
+sea, es un arreglo que nadie pidio.

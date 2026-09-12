@@ -633,8 +633,9 @@ function AppConductor({ nombre, telefono, placa, vehiculo, tipoVehiculo, onCerra
     try {
       const snap = await getDocs(query(collection(db, 'viajes'), where('conductorId', '==', miId)));
       snap.docs.forEach(d => {
-        // Sin `confirmando` desde el 9-sep-2026: estado retirado del mercado.
-        if (d.id !== idViajeGanador && (d.data().estado === 'en_negociacion' || d.data().estado === 'esperando')) {
+        // Sin `confirmando` (9-sep-2026) ni `en_negociacion` (12-sep): estados
+        // retirados del mercado, que no los escribía nadie.
+        if (d.id !== idViajeGanador && d.data().estado === 'esperando') {
           updateDoc(doc(db, 'viajes', d.id), {
             estado: 'esperando',
             conductorId: null,
@@ -677,7 +678,9 @@ function AppConductor({ nombre, telefono, placa, vehiculo, tipoVehiculo, onCerra
       const data = snap.data();
 
       // El pasajero aceptó (contraoferta o directo): este viaje es mío → celebrar aunque el estado llegue junto con los datos.
-      if ((data.estado === 'confirmado' || data.estado === 'aceptado') && data.conductorId === miId && !celebrandoRef.current && !faseRef.current) {
+      // Sin `confirmado`: estado retirado el 12-sep-2026. Nadie lo escribía en
+      // `viajes`; el `confirmado` que SÍ existe es de PEDIDOS, que es otra cosa.
+      if (data.estado === 'aceptado' && data.conductorId === miId && !celebrandoRef.current && !faseRef.current) {
         const dataCopy = { id: idViaje, ...data };
         limpiarVigilantesMenos(idViaje);
         limpiarViajesOtrosConductor(miId, idViaje);
@@ -694,7 +697,7 @@ function AppConductor({ nombre, telefono, placa, vehiculo, tipoVehiculo, onCerra
         return;
       }
 
-      if ((data.estado === 'confirmado' || data.estado === 'aceptado') && data.conductorId !== miId) {
+      if (data.estado === 'aceptado' && data.conductorId !== miId) {
         cerrarEsteVigilante();
         return;
       }
@@ -735,7 +738,7 @@ function AppConductor({ nombre, telefono, placa, vehiculo, tipoVehiculo, onCerra
       const d = snap.docs.find(docu => {
         const dt = docu.data();
         const e = dt.estado;
-        if (e !== 'aceptado' && e !== 'confirmado') return false;
+        if (e !== 'aceptado') return false;
         if (dt.fase === 'en_viaje') return false; // ya arrancó, no re-celebrar
         const t = new Date(dt.nuevaOferta || dt.fechaSolicitud).getTime();
         if (isNaN(t)) return true;

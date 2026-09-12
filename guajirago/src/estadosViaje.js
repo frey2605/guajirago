@@ -25,7 +25,7 @@
  * enElMercado(). La prueba no deja hacerlo a medias.
  */
 
-// ── DOS QUE SE RETIRARON (9-sep-2026) ───────────────────────────────────────
+// ── TRES QUE SE RETIRARON (9 y 12-sep-2026) ────────────────────────────────
 // Esta lista tenía CUATRO. `confirmando` y `contraoferta` se quedaron del flujo
 // viejo, de antes de que el mercado de ofertas pasara por la función
 // `confirmarConductor`: la oferta de un conductor ya no cambia el estado del
@@ -40,7 +40,22 @@
 // OJO, QUE NO ES LO MISMO: 15 viajes tienen un CAMPO llamado `contraoferta`
 // —el monto que ofreció el conductor— y el panel lo usa para calcular lo que se
 // cobró. Ese campo NO se toca. Lo que se retira es el ESTADO.
-export const ESTADOS_MERCADO = ['esperando', 'en_negociacion'];
+// Y EL TERCERO (12-sep-2026): `en_negociacion`, por lo mismo. Medido con el
+// mismo contador: cero escritores y CERO viajes, nunca. La negociación no
+// cambia el estado del viaje desde que las ofertas viven en la subcolección
+// `contraofertas`: el viaje se queda en `esperando` mientras se negocia.
+//
+// Queda UN SOLO estado de mercado, y está bien que se vea: «buscando
+// conductor» es exactamente una cosa. Si algún día el viaje tiene que marcar
+// que está negociando, se añade aquí Y en firestore.rules — la prueba no deja
+// hacerlo a medias.
+//
+// 🔴 Y NO SE PUEDE QUEDAR VACÍA. `AppConductor.js` consulta el mercado con
+// `where('estado','in', ESTADOS_MERCADO)`, y Firestore REVIENTA en ejecución
+// con una lista vacía («A non-empty array is required for 'in' filters»). Hoy
+// el margen es de uno. Lo vigila `pruebas/reglas.test.js`, que exige que las
+// dos listas —ésta y la de las reglas— tengan algo dentro.
+export const ESTADOS_MERCADO = ['esperando'];
 
 // ═══════════════════════════════════════════════════════════════════════════
 // ¿ESTE VIAJE ESTÁ EN CURSO? — y por qué esto vive aquí
@@ -59,7 +74,7 @@ export const ESTADOS_MERCADO = ['esperando', 'en_negociacion'];
 //
 //  MEDIDO contra el servidor (`scripts/medir-panico.cjs`): 7 viajes terminados
 //  llevan una fase de viaje en marcha, y TRES DE LOS CINCO pasajeros de la base
-//  uno de ésos. O sea: aprietas emergencia sin ir en ningún viaje y a tu familia
+//  cogían uno de ésos. O sea: aprietas emergencia sin ir en ningún viaje y a tu familia
 //  le llega la ruta y la placa de un viaje de julio. Es exactamente lo que avisa
 //  `firestore.rules`: «si algo pasa, buscan el carro que no es».
 //
@@ -67,7 +82,7 @@ export const ESTADOS_MERCADO = ['esperando', 'en_negociacion'];
 //    · `confirmado` — nadie lo escribe en `viajes`. Es un estado de PEDIDOS
 //      (`aliados/flujoPedidos.js`), que es otra cosa con el mismo nombre.
 //    · `recogiendo` — una fase que vive SOLO en la memoria de la app del
-//      conductor (`AppConductor.js:963`): nunca se guarda.
+//      conductor (`AppConductor.js:966`): nunca se guarda.
 //    · `en_punto` y `en_viaje` son FASES, no estados: en `estado` no caben.
 
 // LAS DOS LISTAS SON BLANCAS A PROPÓSITO, no negras. El fallo de arriba salió de
@@ -84,9 +99,26 @@ export const ESTADOS_MERCADO = ['esperando', 'en_negociacion'];
 export const ESTADOS_EN_CURSO = [...ESTADOS_MERCADO, 'aceptado'];
 export const ESTADOS_TERMINADOS = ['finalizado', 'cancelado', 'cancelado_conductor', 'vencido', 'expirado'];
 
-// Las fases que SÍ se guardan en el viaje (`AppConductor.js:977` y `:1003`).
+// Las fases que SÍ se guardan en el viaje (`AppConductor.js:980` y `:1006`).
 // `recogiendo` no está: no se guarda nunca.
 export const FASES_GUARDADAS = ['en_punto', 'en_viaje', 'finalizado'];
+
+// ── LOS QUE SE RETIRARON, para que no vuelvan ──────────────────────────────
+//  Ninguno de éstos lo escribía nadie, y ningún viaje estuvo nunca en ellos
+//  —medido con `scripts/medir-estados-muertos.cjs`—. Se quedaron del flujo
+//  viejo, de antes de que las ofertas pasaran por `confirmarConductor`.
+//
+//  ESTA LISTA EXISTE PARA QUE UNA PRUEBA PUEDA VIGILARLOS. Un sabotaje del
+//  12-sep-2026 cambió `'aceptado'` por `'confirmado'` en la app del conductor
+//  —con lo que el conductor deja de reconocer su propio viaje y no le sale
+//  nada— y NINGUNA prueba lo vio. Ahora `pruebas/amarres.test.js` compara
+//  contra esto.
+//
+//  🔴 OJO: `confirmado` está muerto como estado de VIAJE y VIVO como estado de
+//  PEDIDO (`aliados/flujoPedidos.js`, el paso «Recepcionista recibe»). Dos cosas
+//  distintas con el mismo nombre. Esta lista es SOLO de viajes, y la prueba que
+//  la usa mira solo pantallas de viajes.
+export const ESTADOS_RETIRADOS = ['confirmando', 'contraoferta', 'en_negociacion', 'confirmado'];
 
 /**
  * EL VIAJE EN CURSO DE UN PASAJERO, de entre todos los suyos.

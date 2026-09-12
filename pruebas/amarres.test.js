@@ -274,16 +274,21 @@ describe('AMARRES · el respaldo del panel y el de la app son el MISMO número a
 });
 
 describe('AMARRES · el panel y la app dicen lo mismo', () => {
-  it('la lista de VIAJES EN CURSO del panel contiene TODO el mercado de la app, y nada inventado', () => {
+  it('la lista de VIAJES EN CURSO del panel es la MISMA que la de la app', () => {
     // El panel enseña "viajes activos" con una lista escrita a mano en
-    // guajirago-admin/src/Viajes.js. Esa lista tiene que ser: los estados del
-    // MERCADO (los que buscan conductor, de estadosViaje.js) MÁS los dos de
-    // viaje andando ('aceptado' y 'confirmado').
+    // guajirago-admin/src/Viajes.js, porque es otro repo y no puede importar
+    // nada de la app. Esto los junta.
     //
-    // EL PELIGRO: si mañana se añade un estado al mercado en la app y no aquí,
-    // el panel deja de ver esos viajes — sin error, solo una lista más corta.
-    const { ESTADOS_MERCADO } = cargarDeLaApp('guajirago/src/estadosViaje.js');
-    const EN_MARCHA = ['aceptado', 'confirmado']; // el viaje ya tiene conductor
+    // EL PELIGRO: si mañana se añade un estado vivo en la app y no aquí, el
+    // panel deja de ver esos viajes — sin error, solo una lista más corta.
+    //
+    // SE COMPARA CONTRA `ESTADOS_EN_CURSO`, que es la fuente única, y no contra
+    // una lista escrita aquí. Hasta el 12-sep-2026 esta prueba llevaba su propia
+    // copia (`EN_MARCHA = ['aceptado','confirmado']`) — una TERCERA definición de
+    // «viaje en curso», en el archivo que hace de policía de la SEGUNDA LEY. Lo
+    // señaló la segunda opinión del 11-sep. Y `confirmado` llevaba ahí desde
+    // siempre sin que nadie lo escribiera nunca.
+    const { ESTADOS_EN_CURSO } = cargarDeLaApp('guajirago/src/estadosViaje.js');
 
     const panel = leer('guajirago-admin/src/Viajes.js');
     const consulta = panel.match(/where\('estado',\s*'in',\s*\[([^\]]+)\]/);
@@ -292,13 +297,81 @@ describe('AMARRES · el panel y la app dicen lo mismo', () => {
 
     assert.deepStrictEqual(
       [...delPanel].sort(),
-      [...ESTADOS_MERCADO, ...EN_MARCHA].sort(),
+      [...ESTADOS_EN_CURSO].sort(),
       'La lista del panel y la de la app se separaron.\n' +
-      '   app (mercado + en marcha): ' + [...ESTADOS_MERCADO, ...EN_MARCHA].sort().join(', ') + '\n' +
-      '   panel (Viajes.js):         ' + [...delPanel].sort().join(', ') + '\n' +
+      '   app (ESTADOS_EN_CURSO): ' + [...ESTADOS_EN_CURSO].sort().join(', ') + '\n' +
+      '   panel (Viajes.js):      ' + [...delPanel].sort().join(', ') + '\n' +
       'Si el cambio es a propósito, se cambian LOS DOS LADOS: estadosViaje.js (y ' +
       'firestore.rules, que tiene su propio amarre) y guajirago-admin/src/Viajes.js.'
     );
+  });
+
+  // ── LOS ESTADOS RETIRADOS NO VUELVEN ─────────────────────────────────────
+  //  🔴 ESTE AMARRE EXISTE PORQUE UN SABOTAJE SOBREVIVIÓ (12-sep-2026). Se
+  //  cambió `estado === 'aceptado'` por `estado === 'confirmado'` en la app del
+  //  conductor —con lo que el conductor deja de reconocer su propio viaje: no
+  //  celebra, no entra al mapa, no le sale nada— y las 963 pruebas siguieron
+  //  verdes. No falla nada: simplemente el conductor se queda mirando.
+  //
+  //  Los cuatro estados retirados no los escribe nadie, así que compararse con
+  //  ellos es comparar con algo que no puede pasar nunca.
+  it('EL QUE MUERDE · ninguna pantalla de VIAJES compara con un estado retirado', () => {
+    const { ESTADOS_RETIRADOS } = cargarDeLaApp('guajirago/src/estadosViaje.js');
+    // SOLO PANTALLAS DE VIAJES. `confirmado` está retirado como estado de viaje
+    // pero VIVO como estado de PEDIDO, así que las pantallas de restaurantes y
+    // de aliados no entran aquí — allí es correcto y necesario.
+    //
+    // `Solicitar.js` NO está en la lista todavía, y es a propósito: le quedan
+    // los bloques muertos de `confirmando` y `contraoferta` (~175 renglones que
+    // no se pueden ejecutar), y limpiarlos es su propio trabajo. El día que se
+    // haga, se añade aquí y esto lo vigila también.
+    const PANTALLAS_DE_VIAJES = [
+      'guajirago/src/AppConductor.js',
+      'guajirago/src/Seguridad.js',
+      'guajirago/src/MisViajes.js',
+      'guajirago/src/Home.js',
+      'guajirago/src/Ganancias.js',
+      'guajirago-admin/src/Viajes.js',
+      'guajirago-admin/src/Mensajeria.js',
+      'guajirago-admin/src/Pasajeros.js',
+      'guajirago-admin/src/Conductores.js',
+    ];
+    for (const archivo of PANTALLAS_DE_VIAJES) {
+      const t = soloCodigo(leer(archivo));
+      for (const muerto of ESTADOS_RETIRADOS) {
+        // SE BUSCA LA COMPARACIÓN, NO LA PALABRA SUELTA: el panel SÍ tiene que
+        // seguir pintando las etiquetas de los estados viejos para el historial.
+        //
+        // Y SE BUSCAN SUS DISFRACES. La primera versión miraba solo
+        // `estado === 'x'` con comilla simple, y la segunda opinión la esquivó de
+        // SEIS formas distintas escribiendo la misma rotura: comillas dobles,
+        // `data['estado']`, al revés (`'x' === data.estado`), con una variable de
+        // por medio, con `==` suelto, y metiéndolo en una lista. Aquí se cubren
+        // todas las que se pueden cubrir leyendo texto — la de la variable
+        // intermedia no, y queda dicho.
+        const enComparacion = new RegExp(
+          '(?:\\[\\s*[\'"]estado[\'"]\\s*\\]|\\bestado\\b|\\be\\b)\\s*[!=]=+\\s*[\'"]' + muerto + '[\'"]'
+          + '|[\'"]' + muerto + '[\'"]\\s*[!=]=+\\s*(?:\\w+\\s*\\[\\s*[\'"]estado[\'"]\\s*\\]|\\w*\\.?\\bestado\\b)');
+        assert.ok(!enComparacion.test(t),
+          archivo + ' compara el estado del viaje con «' + muerto + '», que está RETIRADO '
+          + 'y no lo escribe nadie.\n'
+          + '   Si es una comparación que sustituyó a la buena, esa pantalla dejó de '
+          + 'reconocer el viaje y no falla nada: simplemente no hace nada.\n'
+          + '   Los estados vivos están en guajirago/src/estadosViaje.js.');
+        // Y EN UNA LISTA. La primera versión se comía la comilla de apertura, así
+        // que un estado retirado en la PRIMERA posición se escapaba:
+        //   ['esperando','confirmado'].includes(v.estado)  → lo cazaba
+        //   ['confirmado','esperando'].includes(v.estado)  → NO lo cazaba
+        // Y tampoco veía `.includes(d.data().estado)`. Las dos las encontró la
+        // segunda opinión del 12-sep-2026.
+        const enLista = new RegExp(
+          '\\[[^\\]]*[\'"]' + muerto + '[\'"][^\\]]*\\]\\s*\\.includes\\s*\\(\\s*[^)]*\\bestado\\b');
+        assert.ok(!enLista.test(t),
+          archivo + ' volvió a meter «' + muerto + '» en una lista de estados de viaje. '
+          + 'Ese estado no lo escribe nadie: la lista lo lleva de adorno, y de adorno '
+          + 'engaña al que la lea.');
+      }
+    }
   });
 });
 

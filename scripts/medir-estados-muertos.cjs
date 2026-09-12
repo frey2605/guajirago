@@ -1,17 +1,19 @@
 /**
- * ¿ESTÁN DE VERDAD MUERTOS LOS ESTADOS `confirmando` Y `contraoferta`?
+ * ¿ESTÁN DE VERDAD MUERTOS LOS ESTADOS QUE SE RETIRAN?
  *
  *   node scripts/medir-estados-muertos.cjs     <- SOLO LEE. No escribe nada.
  *
- * Este es el guion del PASO 1 del trabajo del 9-sep-2026, y se guarda para que
- * el PASO 12 lo vuelva a correr: contar dos veces con el mismo contador es la
- * única forma de saber que no se movió lo que no tocaba.
+ * Es el guion del PASO 1 de dos trabajos —el del 9 y el del 12 de sep-2026— y se
+ * guarda para que el PASO 12 lo vuelva a correr: contar dos veces con el mismo
+ * contador es la única forma de saber que no se movió lo que no tocaba.
  *
  * ── QUÉ PREGUNTA ────────────────────────────────────────────────────────────
  * `guajirago/src/estadosViaje.js` declaraba CUATRO estados de mercado —los
  * viajes que están buscando conductor— y `firestore.rules` los repetía en
- * `enElMercado()`. Dos de ellos se quedaron del flujo viejo, de antes de que el
- * mercado de ofertas pasara por la función `confirmarConductor`.
+ * `enElMercado()`. TRES se quedaron del flujo viejo, de antes de que el mercado
+ * de ofertas pasara por la función `confirmarConductor`: hoy una oferta no
+ * cambia el estado del viaje, vive en la subcolección `contraofertas`.
+ * Queda uno: `esperando`.
  *
  * Que el CÓDIGO no los escriba no basta para retirarlos: hay que mirar los
  * DATOS. Un viaje parado en un estado que se retira desaparece de la pantalla
@@ -38,8 +40,24 @@ const SES = path.join(os.homedir(), '.config', 'configstore', 'firebase-tools.js
 const BASE = 'https://firestore.googleapis.com/v1/projects/' + PROYECTO
   + '/databases/(default)/documents';
 
-// Los dos que se retiran. La lista viva está en guajirago/src/estadosViaje.js.
-const RETIRADOS = ['confirmando', 'contraoferta'];
+// TODOS los estados de VIAJE que se han retirado, para que este contador siga
+// sirviendo al paso 12 de los dos trabajos:
+//   · 9-sep-2026  `confirmando` y `contraoferta` — del flujo viejo, de antes de
+//     que las ofertas pasaran por `confirmarConductor`.
+//   · 12-sep-2026 `en_negociacion` y `confirmado` — lo mismo, medido igual:
+//     cero escritores en las tres apps y en las funciones, cero viajes nunca.
+//
+// 🔴 OJO CON `confirmado`: está muerto como estado de VIAJE y muy VIVO como
+// estado de PEDIDO (`aliados/flujoPedidos.js`, el paso «Recepcionista recibe»).
+// Son dos cosas distintas con el mismo nombre. Este guion solo mira `viajes`,
+// así que aquí no hay confusión posible — pero al tocar código, sí la hay.
+//
+// Y LA LISTA SALE DE LA APP, no de una copia de aquí. Tenerla escrita dos
+// veces es lo que hizo que este mismo guion se quedara viejo con el arreglo de
+// la rutina nocturna (10-sep-2026): el contador del paso 1 dejó de contar lo
+// que el paso 12 tenía que comparar.
+const { cargarDeLaApp } = require('../pruebas/cargar.cjs');
+const { ESTADOS_RETIRADOS: RETIRADOS } = cargarDeLaApp('guajirago/src/estadosViaje.js');
 
 const C = {
   neg: '\x1b[1m', off: '\x1b[0m', gris: '\x1b[90m',
