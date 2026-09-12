@@ -12,18 +12,19 @@
  *
  * Y no es cosmético. Se careó contra el código de las otras pantallas:
  *   · `conductorEnPunto` es lo que escucha el pasajero para ver «tu conductor
- *     llegó» (Solicitar.js:618). Si falla callado, el conductor está en la puerta
+ *     llegó» (el escuchador del viaje, en `Solicitar.js`). Si falla callado, el
+ *     conductor está en la puerta
  *     y el pasajero sigue esperando dentro.
  *   · `fase: 'en_viaje'` es lo que le pasa a la pantalla del viaje en marcha
- *     (Solicitar.js:627) y lo que el panel enseña como «En viaje»
- *     (admin/Viajes.js:63).
+ *     (`Solicitar.js`) y lo que el panel enseña como «En viaje»
+ *     (`admin/Viajes.js`).
  *
  * ── LO QUE ESTE ARREGLO NO CIERRA ──────────────────────────────────────────
- * Quedan las del lado del PASAJERO —Solicitar.js y SolicitarMensajeria.js, los
- * gemelos—, la llamada, el pedido de comida, los chats y los menores. Y DOS de
+ * Quedan las del lado del PASAJERO —`Solicitar.js`—, la llamada, el pedido de
+ * comida, los chats y los menores. Y DOS de
  * este mismo archivo que la segunda opinión encontró y no estaban en la lista:
- *   · r649  retirar tus propias ofertas cuando gana otro conductor
- *   · r855  APAGARSE para dejar de recibir viajes — el conductor cree que se
+ *   · `invalidarMisOtrasOfertas` — retirar tus propias ofertas cuando gana otro
+ *   · el `activo: false` de APAGARSE para dejar de recibir viajes — el conductor cree que se
  *           desconectó y puede no haberse desconectado
  * Quedan fuera A PROPÓSITO el GPS (se dispara a cada segundo) y los chats.
  */
@@ -370,8 +371,9 @@ describe('SEGUNDA LEY · las copias compartidas no se separan', () => {
 // ── LO QUE QUEDA ABIERTO, ESCRITO PARA QUE NO SE OLVIDE ────────────────────
 describe('ANOTADO · lo que sigue mudo en la app del pasajero y conductor', () => {
   it('ANOTADO · siguen mudas las escrituras del lado del PASAJERO', () => {
-    // Los gemelos Solicitar.js y SolicitarMensajeria.js. Se hablaron con el dueño
-    // y se dejaron para el trabajo siguiente.
+    // La pantalla del pasajero, `Solicitar.js`. Se hablaron con el dueño y se
+    // dejaron para el trabajo siguiente. (Eran dos pantallas gemelas; se
+    // juntaron en una el 5-sep-2026.)
     //
     // ESTA PRUEBA SE PONE ROJA EL DÍA QUE SE ARREGLEN, y es a propósito: entonces
     // se borra, junto con esta anotación. Mientras esté verde, queda dicho.

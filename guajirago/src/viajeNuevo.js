@@ -12,8 +12,9 @@
  * pantalla y no en la otra, el que lee deja de encontrar el dato EN SILENCIO.
  *
  * Hasta el 23-ago-2026 este documento se armaba a mano, dos veces, en
- * Solicitar.js y SolicitarMensajeria.js — 93 de 95 renglones idénticos.
- * Ahora las dos pantallas llaman esto; la de mensajería añade su paquete
+ * las dos pantallas de pedir que había entonces — 93 de 95 renglones idénticos.
+ * (Aquella segunda pantalla, `SolicitarMensajeria.js`, se borró el 5-sep-2026 al
+ * juntarlas.) Ahora la pantalla llama esto, y el mandado añade su paquete
  * con `extras`.
  *
  * DOS DECISIONES QUE VIVEN AQUÍ, en cristiano:

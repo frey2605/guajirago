@@ -3,8 +3,10 @@
  *
  * SEGUNDA LEY del proyecto: «Un proceso vive en UN archivo.» Este proceso es el
  * que el 23-ago-2026 hubo que arreglar DOS VECES, renglón por renglón igual, en
- * Solicitar.js y SolicitarMensajeria.js (REGLAS 5 y 11). Esa doble reparación es
- * la prueba de que la ley estaba rota aquí. Ya no: las dos pantallas llaman esto.
+ * las dos pantallas de pedir que había entonces (REGLAS 5 y 11). Esa doble
+ * reparación es
+ * la prueba de que la ley estaba rota aquí. Ya no: la pantalla llama esto, y desde
+ * el 5-sep-2026 la de mensajería y la de viaje son una sola.
  *
  * QUÉ ES, en cristiano: al pedir un viaje se fabrican cuatro cifras al azar. La
  * pasajera las ve en su pantalla; el conductor tiene que pedírselas en persona al

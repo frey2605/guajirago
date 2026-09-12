@@ -18,7 +18,7 @@
 const { describe, it } = require('node:test');
 const assert = require('node:assert');
 // El cargador vive en cargar.cjs: un solo sitio para todas las pruebas (SEGUNDA LEY).
-const { leer, cargarDeLaApp, soloCodigo, sinTextos, trozoDelTry, cuerpoDeLaFuncion }
+const { RAIZ, leer, cargarDeLaApp, soloCodigo, sinTextos, trozoDelTry, cuerpoDeLaFuncion }
   = require('./cargar.cjs');
 
 describe('AMARRES · la app y el servidor miden la distancia IGUAL', () => {
@@ -2253,5 +2253,99 @@ describe('EL BOTÓN DEL MAPA · no se inventa dónde estás', () => {
       'el `catch` que carga tu contacto de confianza volvió a quedarse callado. Si falla, el '
       + 'botón de emergencia abre WhatsApp SIN DESTINATARIO y el pasajero no sabe por qué. '
       + 'REGLA 9 del dueño: nada se rechaza en silencio.');
+  });
+});
+
+// ── 📝 LAS NOTAS NO MIENTEN · ninguna cita apunta a algo que no existe ──────
+//
+//  El 12-sep-2026 este fallo mordió CINCO VECES en un día, y una de ellas
+//  dentro del comentario escrito para arreglar ese mismo fallo. La peor:
+//  `firestore.rules` mandaba a mirar quién suelta un viaje en dos renglones
+//  concretos de dos pantallas. Medido: el primero era un RENGLÓN EN BLANCO, el
+//  que citaba al lado una llave de cierre, y la segunda pantalla llevaba una
+//  semana borrada. (Aquí no se escriben esos nombres a propósito: este amarre
+//  se cazaría a sí mismo, y una excepción más es una excusa más.) Y la tabla de
+//  `CLAUDE.md` seguía cobrando una deuda —«~390 renglones idénticos»— que se
+//  había cerrado siete días antes.
+//
+//  Un comentario que miente es PEOR que no tener comentario: el que no está
+//  hace mirar el código; el que miente manda al sitio equivocado, y con
+//  confianza. Esto lo pone rojo antes de que llegue a nadie.
+//
+//  Lo que NO puede ver: un renglón que existe pero ya no es el que dice. Contra
+//  eso solo hay una defensa y es no poner números — se cita el NOMBRE de la
+//  función, que no se mueve. Los números nacen viejos.
+describe('LAS NOTAS NO MIENTEN · ninguna cita apunta a algo que no existe', () => {
+  // Se ejecuta el mismo guion del paso 1, para que no haya dos contadores
+  // (SEGUNDA LEY). Si se separaran, el que nadie mira se quedaría viejo — que
+  // es exactamente la enfermedad que este amarre vigila.
+  const correr = () => {
+    const { execFileSync } = require('node:child_process');
+    const path = require('node:path');
+    const guion = path.join(RAIZ, 'scripts', 'medir-citas.cjs');
+    try {
+      return { salida: execFileSync(process.execPath, [guion], { encoding: 'utf8' }), ok: true };
+    } catch (e) {
+      return { salida: (e.stdout || '') + (e.stderr || ''), ok: false };
+    }
+  };
+
+  it('EL QUE MUERDE · ningún comentario cita un archivo borrado', () => {
+    const { salida } = correr();
+    const limpia = salida.replace(/\x1b\[[0-9;]*m/g, '');
+    const cuantas = /citas a un ARCHIVO que no existe: (\d+)/.exec(limpia);
+    assert.ok(cuantas, 'el guion `scripts/medir-citas.cjs` no dijo cuántas citas rotas hay. '
+      + 'O se rompió, o le cambiaron el texto: es lo único que vigila esto.');
+    const rotas = limpia.split('\n')
+      .filter((l) => / {8}\S+:\d+ {3}→/.test(l))
+      .map((l) => l.trim());
+    assert.strictEqual(Number(cuantas[1]), 0,
+      'hay ' + cuantas[1] + ' comentarios que citan un archivo QUE NO EXISTE:\n   '
+      + rotas.join('\n   ') + '\n'
+      + '   Arréglalos, o —si la nota cuenta HISTORIA a propósito, en pasado y diciendo que '
+      + 'ese archivo se fue— añádela a la lista HISTORIA de `scripts/medir-citas.cjs`, con '
+      + 'su motivo escrito.');
+  });
+
+  it('EL QUE MUERDE · ninguna cita manda a un renglón que no existe', () => {
+    const { salida } = correr();
+    const limpia = salida.replace(/\x1b\[[0-9;]*m/g, '');
+    const cuantas = /citas a un RENGLÓN fuera del archivo: (\d+)/.exec(limpia);
+    assert.ok(cuantas, 'el guion `scripts/medir-citas.cjs` no dijo cuántas citas se salen '
+      + 'del archivo.');
+    assert.strictEqual(Number(cuantas[1]), 0,
+      'hay ' + cuantas[1] + ' comentarios que mandan a un renglón que se sale del archivo. '
+      + 'Un número dentro de un comentario nace viejo: quítalo y nombra la función.');
+  });
+
+  // ── Y QUE EL MEDIDOR NO SE HAYA QUEDADO MEDIO CIEGO ──────────────────────
+  //  Un cero puede querer decir dos cosas: que no hay citas rotas, o que el
+  //  guion dejó de mirar. Se ven igual. La segunda opinión lo midió: quitando
+  //  una carpeta de la lista, esa parte se apagaba EN SILENCIO y el amarre
+  //  seguía verde. Así que se exige un SUELO: el proyecto tiene cientos de
+  //  citas en comentarios, y si de golpe salen cuatro es que el guion se rompió.
+  it('EL QUE MUERDE · el medidor sigue mirando todo el proyecto', () => {
+    const { salida } = correr();
+    const limpia = salida.replace(/\x1b\[[0-9;]*m/g, '');
+    const cuantas = /citas de archivos en comentarios \.+ (\d+)/.exec(limpia);
+    assert.ok(cuantas, 'el guion `scripts/medir-citas.cjs` ya no dice cuántas citas mira. '
+      + 'Sin ese número no hay forma de saber si se quedó ciego.');
+    // Medido el 12-sep-2026: 982. El suelo se pone holgado a propósito, para
+    // que borrar comentarios de verdad no lo dispare, pero apagar una carpeta sí.
+    assert.ok(Number(cuantas[1]) >= 700,
+      'el medidor solo encuentra ' + cuantas[1] + ' citas en todo el proyecto, y el '
+      + '12-sep-2026 había 982. O se borraron cientos de comentarios, o el guion dejó de '
+      + 'mirar alguna carpeta y se apagó en silencio — que es como fallan los vigilantes.');
+  });
+
+  it('y en la lista HISTORIA no sobra ninguna fila', () => {
+    // Si se limpia una nota y su fila se queda aquí, la lista empieza a mentir
+    // por el otro lado: perdonaría una cita rota futura con el mismo nombre.
+    const { salida } = correr();
+    const limpia = salida.replace(/\x1b\[[0-9;]*m/g, '');
+    assert.ok(!/en HISTORIA sobran/.test(limpia),
+      'en la lista HISTORIA de `scripts/medir-citas.cjs` hay filas que ya no corresponden a '
+      + 'ninguna nota:\n' + limpia.split('en HISTORIA sobran')[1]
+      + '\n   Quítalas: una excusa que sobra perdonaría una cita rota de verdad.');
   });
 });

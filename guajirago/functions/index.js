@@ -529,7 +529,7 @@ exports.celularDisponible = onCall(async (request) => {
 // Estaba desplegada y no preguntaba quién llamaba: permitía reescribir el precio de
 // CUALQUIER viaje al valor que fuera y devolverlo a "esperando". Medido: ninguna de
 // las tres apps la llamaba. El botón "+" de subir tarifa que ve el pasajero es una
-// función LOCAL de la pantalla (Solicitar.js:876 y SolicitarMensajeria.js:881), que
+// función LOCAL de la pantalla de pedir (`Solicitar.js`), que
 // escribe el viaje directamente — nunca pasó por aquí.
 // No se le pone candado a una puerta que no lleva a ningún sitio: se quita la puerta.
 // Su código queda en el historial de git (commit 9404aba y anteriores) por si vuelve.

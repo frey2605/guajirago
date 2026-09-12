@@ -2833,11 +2833,18 @@ describe('REGLA 10 · un viaje no lo toca cualquiera', () => {
   });
 
   // ── LO QUE NO SE PUEDE ROMPER ────────────────────────────────────────────
-  // Los tres sitios que SI escriben ese campo, y todos escriben null: el
-  // conductor soltando los viajes que no gano (AppConductor.js:619) y el pasajero
-  // cancelando (Solicitar.js:966, SolicitarMensajeria.js:980). Los tres llevan un
-  // .catch(()=>{}) vacio: si esto se negara, los viajes se quedarian pegados a un
-  // conductor que ya no los lleva, sin que nada fallara a la vista.
+  // Los DOS sitios que SI escriben ese campo, y los dos escriben null: el
+  // conductor soltando los viajes que no gano (`AppConductor.js`) y la pasajera
+  // con `rechazarConfirmacion` (`Solicitar.js`).
+  //
+  // Y NO se portan igual si esto se negara, que es lo que importa aqui:
+  //   · `AppConductor.js` lleva un `.catch(() => {})` VACIO. El viaje se quedaria
+  //     pegado a un conductor que ya no lo lleva, sin que nada fallara a la vista.
+  //   · `rechazarConfirmacion` SI avisa: apunta el rechazo, saca la ventanita y le
+  //     devuelve la tarjeta a la pasajera para que vuelva a intentarlo.
+  // (Una version anterior de esta nota decia que los dos eran mudos. Era falso, y
+  //  lo cazo la segunda opinion en el commit que venia a cerrar las notas que
+  //  mienten — de todos los sitios donde podia colarse, ese.)
   it('SOLTAR un viaje sigue funcionando: conductorId a null', async () => {
     await sembrarViajes();
     const { doc, updateDoc } = FS;
