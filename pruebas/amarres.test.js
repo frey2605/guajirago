@@ -18,7 +18,7 @@
 const { describe, it } = require('node:test');
 const assert = require('node:assert');
 // El cargador vive en cargar.cjs: un solo sitio para todas las pruebas (SEGUNDA LEY).
-const { leer, cargarDeLaApp, soloCodigo } = require('./cargar.cjs');
+const { leer, cargarDeLaApp, soloCodigo, sinTextos, trozoDelTry } = require('./cargar.cjs');
 
 describe('AMARRES · la app y el servidor miden la distancia IGUAL', () => {
   it('las dos calculadoras dan los mismos kilómetros en los mismos puntos', () => {
@@ -1378,16 +1378,361 @@ describe('EL BOTÓN DE PÁNICO · usa la fuente única del viaje en curso', () =
       + 'estadosViaje.js, y allí hay pruebas que la ejecutan.');
   });
 
-  it('EL QUE MUERDE · los datos del conductor solo salen si hay conductor', () => {
-    const t = laPantalla();
-    const i = t.indexOf('DATOS DEL CONDUCTOR');
-    assert.ok(i > 0, 'Seguridad.js ya no manda los datos del conductor en la emergencia.');
-    // El encabezado tiene que ir DENTRO de un `if` que compruebe el conductor.
-    const antes = t.slice(Math.max(0, i - 400), i);
-    assert.match(antes, /if\s*\([^)]*conductorId/,
-      'el encabezado «DATOS DEL CONDUCTOR» se pinta sin comprobar que haya conductor. '
-      + 'Cuando el pasajero todavía está buscando, sale un encabezado vacío en un mensaje '
-      + 'de emergencia — y eso hace dudar de todo el mensaje. Lo decidió el dueño el '
-      + '11-sep-2026: la ruta sí, el conductor solo si lo hay.');
+  // AQUÍ HABÍA UN AMARRE DE TEXTO que buscaba el encabezado «DATOS DEL
+  // CONDUCTOR» dentro de `Seguridad.js` y comprobaba que estuviera detrás de un
+  // `if (...conductorId)`. El 12-sep-2026 ese texto se mudó al archivo puro
+  // `mensajeEmergencia.js`, y allí hay algo MEJOR: una prueba que lo EJECUTA y
+  // mira el mensaje que de verdad sale
+  // (`pruebas/mensajeEmergencia.test.js`, «sin conductor va la ruta, y NO el
+  // encabezado del conductor»).
+  //
+  // No se deja el de texto además del de ejecución: dos pruebas de la misma cosa
+  // es el gemelo que prohíbe la SEGUNDA LEY, y la que sobrevive es la que
+  // ejecuta. Lo que sí queda vigilado, más abajo, es que la pantalla SIGA usando
+  // ese archivo Y le pase los tres datos, porque volver a armarlo a mano no
+  // falla: solo deja la regla sin nadie que la pruebe.
+  //
+  // (Y aquí puse además un segundo «no vuelva a mirar la fase», copiado del que
+  //  está 32 renglones más arriba. Cobertura nueva: CERO — el mismo sabotaje
+  //  ponía rojos a los dos. Lo cazó la segunda opinión, y era un gemelo justo
+  //  debajo de un comentario que invoca la SEGUNDA LEY para borrar otro gemelo.)
+
+  // ── REGLA 9 · QUE NADA SE CALLE EN ESTA PANTALLA ─────────────────────────
+  //  «Nada se rechaza en silencio.» El 12-sep-2026 esta pantalla tenía DOS
+  //  `catch` vacíos —cargar el contacto guardado, y buscar el viaje en curso— y
+  //  el del viaje era el grave: el mensaje salía sin ruta ni conductor y quien
+  //  lo recibía no podía distinguir «no iba en ningún viaje» de «no se pudo
+  //  comprobar».
+  //
+  //  🔴 Y OJO AL NOMBRE, QUE LO TUVE MAL TODO EL DÍA: `Seguridad.js` es el
+  //  compartir ubicación de AJUSTES, el preventivo. El botón de pánico de
+  //  verdad es el 🚨 rojo del mapa, que arma su propio mensaje a mano en
+  //  `Solicitar.js:772` y SIGUE con tres silencios. Llamar «de pánico» a esta
+  //  pantalla es lo que mantuvo al otro invisible. Está anotado como deuda.
+  it('EL QUE MUERDE · ningún `catch` de la pantalla de Seguridad se queda callado', () => {
+    const t = soloCodigo(leer('guajirago/src/Seguridad.js'));
+    // Se parte por cada `catch` y se mira si dentro hay algo que avise. Un
+    // `catch (e) {}` no avisa a nadie: la pantalla sigue como si todo hubiera
+    // ido bien.
+    //
+    // 🔴 LAS LLAVES SE CUENTAN SOBRE EL TEXTO SIN CADENAS (`sinTextos`), y esto
+    // NO es una precaución teórica: la primera versión las contaba a pelo y la
+    // segunda opinión la cegó con UN RENGLÓN dentro del catch:
+    //       } catch (e) { console.log('no pude leer el contacto {{{'); }
+    // Con esas tres llaves sueltas dentro de un texto, el recorrido dejaba de
+    // ver TRES catch y veía UNO de 8.456 letras —se tragaba el resto del
+    // componente, encontraba allí dentro cualquier `setError` y lo daba por
+    // «avisa»—, así que los otros dos, INCLUIDO EL GRAVE, no se miraban nunca.
+    // El amarre seguía verde con el arreglo deshecho.
+    //
+    // `sinTextos` deja la MISMA longitud, así que los índices siguen cuadrando
+    // y el cuerpo se corta del original, con sus textos dentro.
+    const seguro = sinTextos(t);
+    const vacios = [];
+    const cuerpos = [];
+    // BLOQUES `catch (...) {`, no la palabra a secas: un `.catch(avisar)` no
+    // lleva llave, y buscando la palabra el contador se agarraba una llave de
+    // más adelante y daba ROJO FALSO en código correcto.
+    const BLOQUE = /\bcatch\s*(?:\([^)]*\))?\s*\{/g;
+    let m;
+    while ((m = BLOQUE.exec(seguro)) !== null) {
+      const i = m.index;
+      const abre = i + m[0].length - 1;
+      let hondo = 0, j = abre;
+      for (; j < seguro.length; j++) {
+        if (seguro[j] === '{') hondo++;
+        else if (seguro[j] === '}') { hondo--; if (hondo === 0) break; }
+      }
+      const cuerpo = t.slice(abre + 1, j);
+      // QUÉ CUENTA COMO «AVISAR», y esto lo apretó la segunda opinión del
+      // 12-sep-2026, que encontró TRES formas de callarse con el amarre verde:
+      //   · `console.error(e)` — un log NO avisa: el pasajero no abre la
+      //     consola. La REGLA 9 dice que se entere el AFECTADO.
+      //   · `setError('')` — la cadena vacía no pinta nada (`:181` pinta con
+      //     `error &&`). Mudo total.
+      //   · `setMensaje('Listo ✅')` — peor: pinta en VERDE DE ÉXITO un fallo.
+      // Así que se exige un texto de VERDAD dentro, y que no sea de éxito.
+      // Y SE ACEPTA LA VENTANITA, que es como manda avisar el dueño («todos los
+      // avisos al usuario son modales»). Exigiendo solo `setError` se daba rojo
+      // a un catch que avisa BIEN con un modal. Lo cazó la segunda opinión.
+      const avisaAlPasajero = /setError\s*\(\s*['"][^'"]{10,}/.test(cuerpo)
+        || /set(?:Aviso|Modal)\s*\(\s*\{[^}]*texto\s*:\s*['"][^'"]{10,}/.test(cuerpo);
+      const marcaElFallo = /fallo\s*(?:\|\|)?=[^;]*'[a-z]+'/.test(cuerpo);
+      const vaALaBandeja = /guardarRechazo\s*\(/.test(cuerpo);
+      if (!(avisaAlPasajero || marcaElFallo || vaALaBandeja)) {
+        vacios.push('renglón ~' + t.slice(0, i).split('\n').length);
+      }
+      cuerpos.push(cuerpo);
+      BLOQUE.lastIndex = j + 1;
+    }
+
+    // ── Y QUE EL RECORRIDO NO SE HAYA CEGADO ────────────────────────────────
+    // Lo de arriba solo vale si el recorrido vio TODOS los catch. Un contador
+    // que se sale de sitio no falla: mira menos y sigue verde, que es la peor
+    // forma de fallar. Así que se comprueba el propio contador:
+    //   · encontró tantos cuerpos como bloques `catch (...) {` hay, y
+    //   · ninguno es absurdamente largo (un catch de esta pantalla son 1 o 2
+    //     renglones; 1.500 letras significa que se tragó media pantalla).
+    const cuantosCatch = (seguro.match(/\bcatch\s*(?:\([^)]*\))?\s*\{/g) || []).length;
+    assert.strictEqual(cuerpos.length, cuantosCatch,
+      'el recorrido de los `catch` se descuadró: hay ' + cuantosCatch + ' bloques `catch {` '
+      + 'y solo se miraron ' + cuerpos.length + ' cuerpos. Un contador que mira de '
+      + 'menos SIGUE VERDE con el arreglo roto, así que esto es rojo a propósito.');
+    const gordo = cuerpos.find((c) => c.length > 1500);
+    assert.strictEqual(gordo, undefined,
+      'un `catch` de esta pantalla salió con ' + (gordo || '').length + ' letras dentro. '
+      + 'Los de aquí son de uno o dos renglones: esto quiere decir que el contador de llaves '
+      + 'se salió del catch y se tragó media pantalla — y entonces los DEMÁS catch ya no se '
+      + 'miran. Pasó una vez con tres llaves dentro de un texto.');
+
+    assert.deepStrictEqual(vacios, [],
+      'estos `catch` de Seguridad.js no avisan de nada: ' + vacios.join(', ') + '\n'
+      + '   Es la pantalla que le manda tu ubicación a tu contacto de confianza. Un fallo '
+      + 'callado aquí sale como un mensaje de emergencia incompleto, y quien lo recibe no '
+      + 'sabe que falta algo.\n'
+      + '   REGLA 9 del dueño: nada se rechaza en silencio.');
+  });
+
+  // ── SEGUNDA LEY · EL MISMO CRITERIO, EN LOS DOS SITIOS ───────────────────
+  //  El recorrido de arriba está escrito DOS VECES: aquí y en el guion del paso
+  //  1/12, `scripts/medir-silencios-seguridad.cjs`. El sitio bueno sería
+  //  `pruebas/cargar.cjs` —los dos repos ya lo comparten— pero ese archivo no
+  //  estaba en la foto de este trabajo y mudarlo pide permiso aparte. Está
+  //  anotado en la tabla de deuda de CLAUDE.md.
+  //
+  //  Mientras sean dos, esto es lo que los mantiene juntos. Y no es teórico: se
+  //  separaron EL MISMO DÍA que nacieron —el guion daba por bueno un
+  //  `console.error` y aquí está prohibido—, así que el guion decía «avisa»
+  //  donde el amarre decía «MUDO». Un contador que miente en verde es peor que
+  //  no tener contador: el paso 12 lo habría dado por bueno. Lo cazó la segunda
+  //  opinión del 12-sep-2026.
+  it('EL QUE MUERDE · el guion del paso 1 y este amarre miden «avisar» IGUAL', () => {
+    const guion = leer('scripts/medir-silencios-seguridad.cjs');
+    assert.ok(guion, 'ya no está scripts/medir-silencios-seguridad.cjs, que es el guion del '
+      + 'paso 1 y el que vuelve a correr el paso 12.');
+    // ── EL CRITERIO · los tres patrones, tal cual están arriba ─────────────
+    [
+      ["/setError\\s*\\(\\s*['\"][^'\"]{10,}/", 'el texto de verdad en pantalla'],
+      ["/set(?:Aviso|Modal)\\s*\\(\\s*\\{[^}]*texto\\s*:\\s*['\"][^'\"]{10,}/", 'la ventanita'],
+      ["/fallo\\s*(?:\\|\\|)?=[^;]*'[a-z]+'/", 'la marca del fallo para el mensaje'],
+      ['/guardarRechazo\\s*\\(/', 'la bandeja de rechazos'],
+    ].forEach(([patron, queEs]) => {
+      assert.ok(guion.includes(patron),
+        'el guion del paso 1 ya no mide «avisar» como este amarre: le falta el patrón de ' +
+        queEs + ' (' + patron + '). Los dos cuentan el MISMO proceso, así que uno de los ' +
+        'dos está mintiendo — y el que miente es el que nadie mira. Pon los dos iguales, o ' +
+        'saca el recorrido a pruebas/cargar.cjs (pide permiso: lo usan 23 archivos).');
+    });
+
+    // ── Y EL RECORRIDO, que es lo que de verdad se separó la segunda vez ────
+    //  La primera versión de esta prueba solo miraba los patrones de arriba, y
+    //  la segunda opinión lo midió: se le podía quitar el `sinTextos` al guion
+    //  —dejándolo ciego a una llave dentro de un texto— y esto seguía verde.
+    //  O sea que la prueba escrita para impedir que se separaran no miraba la
+    //  mitad que se había separado. Ahora mira las dos.
+    [
+      ['sinTextos(texto)', 'cuenta las llaves sobre el texto SIN CADENAS (si no, un '
+        + '`console.log(\'algo { raro\')` lo ciega y mira de menos)'],
+      ['/\\bcatch\\s*(?:\\([^)]*\\))?\\s*\\{/', 'busca BLOQUES `catch {`, no la palabra suelta '
+        + '(un `.catch(avisar)` no lleva llave y descuadraba la cuenta)'],
+      ['fuera.descuadre', 'avisa cuando su propia cuenta no cuadra, en vez de dar un número '
+        + 'más bajo y quedarse tan tranquilo'],
+    ].forEach(([trozo, queHace]) => {
+      assert.ok(guion.includes(trozo),
+        'al guion del paso 1 le falta «' + trozo + '»: ya no ' + queHace + '. Este amarre y '
+        + 'ese guion recorren los `catch` de la MISMA pantalla, y si uno se ciega da un '
+        + 'número tranquilizador que nadie va a dudar — el paso 12 lo daría por bueno.');
+    });
+  });
+
+  it('EL QUE MUERDE · el texto del mensaje se arma APARTE, no a mano en la pantalla', () => {
+    const t = soloCodigo(leer('guajirago/src/Seguridad.js'));
+    assert.match(t, /import\s*\{[^}]*armarMensajeDeEmergencia[^}]*\}\s*from\s*['"]\.\/mensajeEmergencia['"]/,
+      'Seguridad.js dejó de importar `armarMensajeDeEmergencia`. Si volvió a armar el '
+      + 'texto a mano dentro del componente, ya no hay forma de PROBAR lo que de verdad '
+      + 'le llega al familiar: `pruebas/cargar.cjs` no puede cargar un componente de '
+      + 'React, y por eso ese texto vive en un archivo puro.');
+    assert.ok(!/texto\s*\+=/.test(t),
+      'Seguridad.js volvió a pegar trozos del mensaje a mano (`texto +=`). Ese texto se '
+      + 'arma en mensajeEmergencia.js, donde hay pruebas que lo ejecutan.');
+  });
+
+  it('EL QUE MUERDE · y el mensaje distingue «no hay viaje» de «no se pudo comprobar»', () => {
+    // El amarre de verdad está en pruebas/mensajeEmergencia.test.js, que EJECUTA
+    // el armado. Esto vigila lo otro: que la pantalla siga PASÁNDOLE el aviso de
+    // fallo. Sin eso, el archivo puro nunca se enteraría y el mensaje volvería a
+    // callarse — con todas las pruebas del otro archivo en verde.
+    // ── SE SIGUE LA TUBERÍA ENTERA, NO SE BUSCAN CADENAS SUELTAS ───────────
+    //  La primera versión miraba que ciertos textos ESTUVIERAN en el archivo, y
+    //  la segunda opinión del 12-sep-2026 la esquivó TRES veces, cada una
+    //  dejando el mensaje otra vez callado con los 67 amarres en verde:
+    //    · `fallo = null;` metido en el renglón de ANTES de la llamada.
+    //    · `let t2 = armar...(); t2 = t2.split(...)[0]; const texto = t2;`
+    //      —la llamada intacta, y al familiar le llega solo el encabezado.
+    //    · `fallo = 'nada';` en el catch, y un señuelo `let fallo = 'viaje'`
+    //      dentro de otra función para que la cadena siguiera apareciendo.
+    //  Lo que las tres tienen en común: la CADENA seguía en el archivo. Así que
+    //  esto ya no busca cadenas sueltas. Comprueba SEIS cosas de la plomería:
+    //  de dónde salen los tres datos, que el catch que marca el fallo sea el que
+    //  envuelve la consulta, que no haya un `try` dentro de ese `try`, que el
+    //  mensaje se arme DESPUÉS, que nadie pise el aviso ni el texto en medio, y
+    //  que el enlace que se abre lleve ese texto y no otro.
+    //
+    //  Y lo que NO comprueba, dicho aquí para que nadie se confíe: esto lee el
+    //  código, no ejecuta la pantalla. Un React que no llame a esta función, o
+    //  un `if` alrededor del botón, se le escapan. Las pruebas que EJECUTAN
+    //  están en pruebas/mensajeEmergencia.test.js, y solo ven el texto.
+    //
+    //  De paso deja de exigir los nombres literales `ubicacion/viajeActivo/
+    //  fallo`: los saca del propio código, así que renombrar una variable ya no
+    //  da un rojo falso. Lo que se vigila es la PLOMERÍA, no los nombres.
+    const t = soloCodigo(leer('guajirago/src/Seguridad.js'));
+    const seguro = sinTextos(t);
+
+    // 1 · LA LLAMADA: de dónde salen los tres datos y dónde cae el texto.
+    const llamada = /(?:const|let|var)\s+(\w+)\s*=\s*armarMensajeDeEmergencia\s*\(\s*(\w+)\s*,\s*(\w+)\s*,\s*(\w+)\s*\)\s*;/
+      .exec(seguro);
+    assert.ok(llamada,
+      'no encuentro en Seguridad.js una llamada `const <algo> = armarMensajeDeEmergencia'
+      + '(<ubicación>, <viaje>, <fallo>);` con sus TRES datos guardada en una variable. O se '
+      + 'le quitó un argumento —y entonces el mensaje pierde ese trozo entero y sale como si '
+      + 'no existiera— o el texto ya no se guarda para mandarlo.');
+    const [, varTexto, , varViaje, varFallo] = llamada;
+    assert.notStrictEqual(varViaje, varFallo,
+      'el viaje y el fallo llegan al mensaje en la MISMA variable. Son las dos cosas que hay '
+      + 'que distinguir: «no iba en ningún viaje» y «no se pudo comprobar».');
+
+    // 2 · EL CATCH DEL VIAJE marca ese mismo `fallo`. No vale que la cadena
+    //     aparezca en cualquier rincón del archivo: tiene que estar DENTRO.
+    // SE BUSCAN BLOQUES `catch (...) {`, NO LA PALABRA A SECAS. Un
+    // `.catch(avisarDelFallo)` —estilo legítimo, y cargar.cjs lo documenta en
+    // AppConductor.js— no lleva llave detrás, así que buscando `catch` a pelo
+    // el contador se iba a agarrar una llave de más adelante y daba ROJO FALSO
+    // en código correcto. Un rojo falso se acaba «arreglando» borrando la
+    // prueba. Lo cazó la segunda opinión.
+    const BLOQUE = /\bcatch\s*(?:\([^)]*\))?\s*\{/g;
+    const cuerpos = [];
+    let m;
+    BLOQUE.lastIndex = 0;
+    while ((m = BLOQUE.exec(seguro)) !== null) {
+      const abre = m.index + m[0].length - 1;
+      let hondo = 0, j = abre;
+      for (; j < seguro.length; j++) {
+        if (seguro[j] === '{') hondo++;
+        else if (seguro[j] === '}') { hondo--; if (hondo === 0) break; }
+      }
+      cuerpos.push({ desde: m.index, cuerpo: t.slice(abre + 1, j), fin: j });
+      BLOQUE.lastIndex = j + 1;
+    }
+    // EL CENTINELA LO DICE EL ARCHIVO DEL MENSAJE, no esta prueba. Los dos
+    // lados tienen que estar de acuerdo en la palabra, y ése es el contrato
+    // (SEGUNDA LEY): si uno la cambia, esto se pone rojo. Escrita a mano aquí,
+    // se podía marcar `fallo = 'nada'` —que el mensaje no reconoce— y el amarre
+    // seguía verde, porque cualquier palabra en minúsculas le valía.
+    const puro = soloCodigo(leer('guajirago/src/mensajeEmergencia.js'));
+    const centinela = /fallo\s*===\s*'([a-z]+)'/.exec(puro);
+    assert.ok(centinela,
+      'mensajeEmergencia.js ya no compara `fallo` con ninguna palabra, así que el aviso de '
+      + '«no se pudo comprobar» no puede salir nunca, diga lo que diga la pantalla.');
+    // Se acepta `= 'viaje'`, `||= 'viaje'` y `= algo ? 'viaje' : null`: las tres
+    // marcan el fallo igual, y exigir solo la primera daba rojo falso.
+    const marca = new RegExp('(?:^|[^.\\w])' + varFallo + "\\s*(?:\\|\\|)?=[^;]*'"
+      + centinela[1] + "'");
+    const elDelViaje = cuerpos.find((c) => marca.test(c.cuerpo));
+    assert.ok(elDelViaje,
+      'ningún `catch` de Seguridad.js marca «' + varFallo + " = '" + centinela[1] + "'», que "
+      + 'es la palabra que el mensaje reconoce. La pantalla dejó de avisarle al mensaje que '
+      + 'la consulta del viaje se cayó, así que el mensaje vuelve a salir sin ruta ni '
+      + 'conductor SIN DECIRLO — el fallo que este trabajo vino a cerrar. (Y se mira DENTRO '
+      + 'del catch a propósito: la primera versión aceptaba la cadena en cualquier rincón '
+      + 'del archivo.)');
+
+    // 2b · Y ESA VARIABLE SE DECLARA UNA SOLA VEZ. El escape era meter dentro
+    //      del catch un señuelo —`const pin = () => { let fallo = 'viaje'; }`—
+    //      para que la palabra apareciera mientras el `fallo` de verdad se
+    //      marcaba con otra. Dos declaraciones del mismo nombre en una función
+    //      son eso: una tapando a la otra.
+    const declaraciones = (seguro.match(
+      new RegExp('\\b(?:let|const|var)\\s+' + varFallo + '\\b', 'g')) || []).length;
+    assert.strictEqual(declaraciones, 1,
+      '«' + varFallo + '» se declara ' + declaraciones + ' veces en Seguridad.js, y debería '
+      + 'ser una. Una segunda declaración con el mismo nombre tapa a la primera: la de dentro '
+      + 'puede llevar la palabra buena mientras la que de verdad viaja al mensaje lleva otra.');
+
+    // 2c · Y ES EL CATCH QUE ENVUELVE LA CONSULTA, no otro cualquiera.
+    //      Dos escapes medidos vivían aquí:
+    //        · UN `try` DENTRO DEL `try`, con su propio catch que solo hace
+    //          `setError`. El catch de fuera —el que marca el fallo— no se
+    //          dispara nunca, y el familiar recibe el mensaje de ANTES del
+    //          arreglo: sin ruta, sin conductor y sin aviso.
+    //        · Mover la marca al catch de cargar el contacto y sacar `fallo` al
+    //          módulo, para que siguiera habiendo UNA sola declaración.
+    //      Los dos dejaban todo verde. `trozoDelTry` sale de cargar.cjs, que es
+    //      el sitio compartido de estos recorridos (SEGUNDA LEY).
+    const suTry = trozoDelTry(t, elDelViaje.desde);
+    assert.match(suTry, /getDocs\s*\(/,
+      'el `catch` que marca «' + varFallo + '» ya no es el que envuelve la consulta de los '
+      + 'viajes (`getDocs`). Si el fallo de la consulta lo recoge otro `catch` —uno de dentro, '
+      + 'o el de cargar el contacto— el aviso no se marca cuando hace falta y el mensaje sale '
+      + 'otra vez callado.');
+    assert.ok(!/\btry\s*\{/.test(sinTextos(suTry)),
+      'hay un `try` DENTRO del `try` que protege la consulta del viaje. El de dentro se come '
+      + 'el fallo y el de fuera —el que marca «' + varFallo + '»— no se dispara nunca. Todo '
+      + 'seguiría verde y el mensaje volvería a salir sin ruta ni conductor, sin decirlo.');
+
+    // 3 · EL ORDEN · el mensaje se arma DESPUÉS del catch, y nadie pisa el aviso
+    //     en medio. Dos escapes: un `fallo = null;` en el renglón de antes, y
+    //     armar el mensaje ANTES del `try` — que es peor que el fallo original,
+    //     porque entonces no lleva ruta ni conductor NUNCA, ni cuando todo va
+    //     bien. Ese segundo pasaba porque un trozo «de fin a principio» sale
+    //     vacío, y una comprobación sobre una cadena vacía siempre pasa.
+    assert.ok(llamada.index > elDelViaje.fin,
+      'el mensaje se arma ANTES del `try` que consulta el viaje, así que se arma con el viaje '
+      + 'todavía en nada: sale sin ruta y sin conductor SIEMPRE, hasta cuando la consulta va '
+      + 'bien. Tiene que armarse después.');
+    const enMedio = seguro.slice(elDelViaje.fin, llamada.index);
+    assert.ok(!new RegExp('(?:^|[^.\\w=!<>])' + varFallo + '\\s*=[^=]').test(enMedio),
+      'entre el `catch` y el armado del mensaje alguien vuelve a escribir «' + varFallo
+      + '». Eso borra el aviso justo antes de usarlo: el mensaje sale igual que ANTES del '
+      + 'arreglo —sin ruta, sin conductor y sin avisar— y no hace falta cambiar ni una '
+      + 'palabra del texto para conseguirlo.');
+
+    // 4 · Y EL TEXTO LLEGA A WHATSAPP TAL CUAL SALIÓ. Ni recortado ni cambiado.
+    const despues = seguro.slice(llamada.index + llamada[0].length);
+    assert.ok(!new RegExp('(?:^|[^.\\w=!<>])' + varTexto + '\\s*=[^=]').test(despues),
+      'después de armarlo, alguien vuelve a escribir «' + varTexto + '». El mensaje que se '
+      + 'manda ya no es el que se armó y se probó: se le puede recortar todo menos el '
+      + 'encabezado sin que ninguna prueba se entere.');
+
+    // 4b · SE MIRA EL SITIO DE ENVÍO, NO EL ARCHIVO ENTERO. Buscar la cadena
+    //      `encodeURIComponent(texto)` en cualquier parte se engañaba con un
+    //      señuelo de una sola línea —`console.log('encodeURIComponent(texto)')`—
+    //      mientras al familiar se le mandaba un recorte. Y buscarla en `seguro`
+    //      daba rojo falso, porque la llamada vive dentro de una plantilla con
+    //      acentos graves y `sinTextos` las vacía enteras. La salida es mirar
+    //      SOLO la plantilla que se manda.
+    //      Se mira LA PLANTILLA DEL ENLACE, no `window.open(...)` a pelo: meter
+    //      la URL en una variable antes de abrirla es código normal, y exigir la
+    //      plantilla pegada al `window.open` daba rojo falso.
+    const plantillas = (t.match(/`[^`]*`/g) || []).filter((x) => x.includes('wa.me'));
+    assert.strictEqual(plantillas.length, 1,
+      'Seguridad.js arma ' + plantillas.length + ' enlaces de WhatsApp, y debería ser UNO. '
+      + 'Con dos, uno puede llevar el mensaje bueno y el otro un texto a mano para el caso '
+      + 'del fallo —que es justo el caso que este trabajo vino a cerrar— y las pruebas no '
+      + 'ven la diferencia. Con ninguno, el mensaje no sale de la pantalla.');
+    assert.ok(new RegExp('encodeURIComponent\\s*\\(\\s*' + varTexto + '\\s*\\)')
+      .test(plantillas[0]),
+      'lo que se le manda al contacto de confianza ya no es «' + varTexto + '», el texto que '
+      + 'arma el archivo probado, sino otra cosa —un recorte, o un texto hecho a mano—. Si se '
+      + 'manda otra cosa, las pruebas del mensaje están mirando un texto que nadie envía.');
+    //      Y SOLO `window.open`, que es como se manda el mensaje. El
+    //      `window.location.href = 'tel:123'` de esta misma pantalla es OTRO
+    //      botón —llamar a la policía— y contarlo daba rojo en el archivo
+    //      limpio: el amarre habría nacido roto.
+    const envios = (t.match(/window\.open\s*\(/g) || []).length;
+    assert.strictEqual(envios, 1,
+      'Seguridad.js abre el enlace de WhatsApp ' + envios + ' veces, y debería ser UNA. Si se '
+      + 'dejó de abrir —copiarlo al portapapeles, por ejemplo— el familiar no recibe NADA, y '
+      + 'ninguna prueba del mensaje se entera: siguen mirando un texto que no sale.');
   });
 });

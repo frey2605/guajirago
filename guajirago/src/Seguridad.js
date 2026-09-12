@@ -6,6 +6,10 @@ import Logo from './Logo';
 // pantalla lo tenía escrito a mano y por eso mandaba los datos de un viaje
 // terminado — lee el porqué entero en estadosViaje.js.
 import { elViajeEnCurso } from './estadosViaje';
+// Y el texto del mensaje se arma aparte, en un archivo puro que SÍ se puede
+// probar (mismo trato que avisoCalificacion.js). Ahí está escrito por qué el
+// mensaje tiene que DECIR lo que no pudo conseguir — REGLA 9.
+import { armarMensajeDeEmergencia } from './mensajeEmergencia';
 
 function Seguridad({ onVolver }) {
   const [contactoNombre, setContactoNombre] = useState('');
@@ -29,7 +33,13 @@ function Seguridad({ onVolver }) {
           setContactoNombre(d.contactoConfianzaNombre || '');
           setContactoNumero(d.contactoConfianzaNumero || '');
         }
-      } catch (e) {}
+      } catch (e) {
+        // ESTE `catch` ESTABA VACÍO. Si falla, los campos se quedan en blanco y
+        // el pasajero cree que nunca guardó un contacto de confianza — cuando a
+        // lo mejor lo tiene guardado y lo que falló fue leerlo. Peor todavía: si
+        // escribe otro encima, pisa el que había. REGLA 9: que se entere.
+        setError('No pude cargar tu contacto guardado. Revisa tu conexión antes de cambiarlo.');
+      }
     };
     cargar();
 
@@ -70,14 +80,20 @@ function Seguridad({ onVolver }) {
     }
     setError('');
 
-    let texto = '🚨 *Estoy usando GuajiraGo* y quiero que sepas dónde estoy.';
-    if (ubicacion) {
-      texto += `\n\n📍 *Mi ubicación:* https://maps.google.com/?q=${ubicacion.lat},${ubicacion.lng}`;
-    } else {
-      texto += '\n\n📍 No pude obtener mi ubicación exacta en este momento.';
-    }
-
-    // Buscar si el pasajero tiene un viaje en curso para añadir ruta y datos del conductor
+    // BUSCAR EL VIAJE EN CURSO, para meterle al mensaje la ruta y el conductor.
+    //
+    // 🔴 ESTE `catch` ESTABA VACÍO, y era el peor sitio del sistema para un
+    // fallo callado: si la consulta se caía —sin cobertura, la sesión vencida,
+    // las reglas negando— el mensaje de emergencia salía SIN ruta y SIN
+    // conductor, y no lo decía. Quien lo recibía no podía distinguir «no iba en
+    // ningún viaje» de «no se pudo comprobar». REGLA 9 del dueño.
+    //
+    // `fallo` es lo que arregla eso, y hay que ver la diferencia con `viaje`:
+    //   viaje = null, fallo = null   →  se comprobó y NO hay viaje
+    //   viaje = null, fallo = 'viaje' →  NO se pudo comprobar
+    // El mensaje dice cada cosa distinto. Eso es todo el arreglo.
+    let viajeActivo = null;
+    let fallo = null;
     try {
       const user = auth.currentUser;
       if (user) {
@@ -88,29 +104,18 @@ function Seguridad({ onVolver }) {
         // estuviera vivo: un viaje cancelado o expirado EN MARCHA se queda con su
         // fase pegada, así que entraba. Medido el 11-sep-2026: tres de los cinco
         // de la base recibían los datos de un conductor de un viaje terminado.
-        const viajeActivo = elViajeEnCurso(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-
-        if (viajeActivo) {
-          texto += '\n\n🛣️ *MI RUTA*';
-          if (viajeActivo.origen) texto += `\n🟢 Origen: ${viajeActivo.origen}`;
-          if (viajeActivo.destino) texto += `\n🔴 Destino: ${viajeActivo.destino}`;
-
-          // LOS DATOS DEL CONDUCTOR, SOLO SI HAY CONDUCTOR. Si el pasajero
-          // todavía está buscando, va la ruta y nada más: un encabezado «DATOS
-          // DEL CONDUCTOR» vacío en un mensaje de emergencia hace dudar de todo
-          // el mensaje. Lo decidió el dueño el 11-sep-2026.
-          if (viajeActivo.conductorId) {
-            texto += '\n\n🚗 *DATOS DEL CONDUCTOR*';
-            if (viajeActivo.conductorNombre) texto += `\n👤 Nombre: ${viajeActivo.conductorNombre}`;
-            if (viajeActivo.conductorPlaca) texto += `\n🚘 Placa: ${viajeActivo.conductorPlaca}`;
-            if (viajeActivo.conductorColor) texto += `\n🎨 Color: ${viajeActivo.conductorColor}`;
-            if (viajeActivo.conductorVehiculo) texto += `\n🏷️ Vehículo: ${viajeActivo.conductorVehiculo}`;
-            if (viajeActivo.conductorTelefono) texto += `\n📞 Teléfono: ${viajeActivo.conductorTelefono}`;
-            if (viajeActivo.conductorFoto) texto += `\n📸 Foto: ${viajeActivo.conductorFoto}`;
-          }
-        }
+        viajeActivo = elViajeEnCurso(snap.docs.map(d => ({ id: d.id, ...d.data() })));
       }
-    } catch (e) {}
+    } catch (e) {
+      fallo = 'viaje';
+      // Y también en la pantalla, que el pasajero lo vea antes de mandar.
+      setError('No pude leer los datos de tu viaje. El mensaje va igual, avisando de eso.');
+    }
+
+    // EL TEXTO SE ARMA APARTE (mensajeEmergencia.js) para poder probarlo: dentro
+    // de este componente no hay forma de escribir una prueba que mire lo que de
+    // verdad sale.
+    const texto = armarMensajeDeEmergencia(ubicacion, viajeActivo, fallo);
 
     const numero = contactoNumero.replace(/\D/g, '');
     const numeroFinal = numero.startsWith('57') ? numero : '57' + numero;
