@@ -378,10 +378,17 @@ const FALLOS = [
     + C.gris + 'viajes con el relleno (' + centroRiohacha.lat + ', '
     + centroRiohacha.lng + ')' + C.off);
   if (conRelleno.length > 0) {
-    console.log(C.roj + '      🔴 cada uno es una vez que el GPS no se consiguió. Si en ese '
-      + 'viaje se aprieta' + C.off);
-    console.log(C.roj + '         el 🚨, el mensaje manda la plaza de Riohacha como «mi '
-      + 'ubicación».' + C.off);
+    // OJO A LO QUE DICE ESTE AVISO. Hasta el 12-sep-2026 decía que el mensaje
+    // de emergencia mandaba la plaza — y eso SE ARREGLÓ ese mismo día, así que
+    // la frase se quedó mintiendo a la hora siguiente de escribirla. Lo que
+    // sigue vivo es otra cosa, y es la que hay que decir.
+    console.log(C.roj + '      🔴 cada uno es una vez que el GPS no se consiguió, y el viaje '
+      + 'NACIÓ con la plaza' + C.off);
+    console.log(C.roj + '         como punto de recogida: EL CONDUCTOR VA ALLÍ. Está en la '
+      + 'tabla de deuda,' + C.off);
+    console.log(C.roj + '         esperando decisión del dueño.' + C.off);
+    console.log(C.gris + '         (El MENSAJE de emergencia ya no manda la plaza: eso se '
+      + 'cerró el 12-sep-2026.)' + C.off);
   }
 
   // 2 · la foto pegada del conductor anterior
