@@ -373,6 +373,112 @@ describe('AMARRES · el panel y la app dicen lo mismo', () => {
       + 'conductor de un viaje terminado.');
   });
 
+  // ── Y LA CAJA DE «CANCELADOS», QUE SE DEJABA DOS FUERA ───────────────────
+  //  Medido el 12-sep-2026 con `scripts/medir-mandados.cjs`: `esCancelado` solo
+  //  conocía `['cancelado', 'vencido']`, así que los mandados en `expirado` y
+  //  `cancelado_conductor` NO CABÍAN EN NINGUNA CAJA. Caían en el cajón de
+  //  sastre de `etiquetaEstado` y se pintaban «En curso» en naranja — CINCO de
+  //  los doce mandados que hay— mientras desaparecían de «CANCELADOS HOY».
+  //
+  //  Un mandado que terminó mal y se ve como si fuera de camino no es un número
+  //  feo: es alguien esperando en la puerta un repartidor que no va a llegar.
+  it('EL QUE MUERDE · la caja de CANCELADOS del panel conoce todos los finales', () => {
+    const { ESTADOS_TERMINADOS } = cargarDeLaApp('guajirago/src/estadosViaje.js');
+    const t = soloCodigo(leer('guajirago-admin/src/Mensajeria.js'));
+
+    const m = /const\s+esCancelado\s*=\s*\(\w+\)\s*=>\s*\[([^\]]*)\]\.includes/.exec(t);
+    assert.ok(m, 'guajirago-admin/src/Mensajeria.js ya no decide «cancelado» con una lista '
+      + 'de estados. Si se cambió de forma, hay que mirar a mano que no se deje ninguno '
+      + 'fuera: los que no caben en ninguna caja se pintan como si el mandado siguiera vivo.');
+    const suya = m[1].replace(/['"\s]/g, '').split(',').filter(Boolean);
+
+    // TODOS los finales menos `finalizado`, que tiene su propia caja («Entregado»).
+    const deberia = ESTADOS_TERMINADOS.filter((e) => e !== 'finalizado');
+    assert.deepStrictEqual([...suya].sort(), [...deberia].sort(),
+      'La caja de «cancelados» del panel de mensajería y la lista de finales de la app se '
+      + 'separaron.\n'
+      + '   app (ESTADOS_TERMINADOS, sin `finalizado`): ' + [...deberia].sort().join(', ') + '\n'
+      + '   panel (esCancelado):                        ' + [...suya].sort().join(', ') + '\n'
+      + 'Lo que se quede fuera NO cae en ninguna caja: se pinta «En curso» en naranja aunque '
+      + 'el mandado esté muerto, y no se cuenta en «CANCELADOS HOY». Si el cambio es a '
+      + 'propósito, se cambian LOS DOS LADOS.');
+
+    // Y QUE CADA FINAL TENGA SU NOMBRE EN PALABRAS. Que entren en la caja no
+    // basta: si los cuatro dicen «Cancelado», quien mira el panel no sabe si el
+    // cliente se arrepintió, si el repartidor lo soltó o si no lo cogió nadie.
+    const nombres = /const\s+NOMBRE_DEL_FINAL\s*=\s*\{([\s\S]*?)\}/.exec(t);
+    assert.ok(nombres, 'el panel ya no tiene `NOMBRE_DEL_FINAL`, que es lo que pone en '
+      + 'palabras cada forma de terminar.');
+    for (const e of deberia) {
+      assert.ok(new RegExp('\\b' + e + '\\s*:').test(nombres[1]),
+        'a `NOMBRE_DEL_FINAL` le falta «' + e + '», así que ese final saldría con el nombre '
+        + 'de otro. No es lo mismo que el cliente cancele, que el repartidor suelte el '
+        + 'mandado, o que no lo tome nadie.');
+    }
+
+    // ── Y EL CAJÓN DE SASTRE NO VUELVE ────────────────────────────────────
+    //  Lo que de verdad escondió el fallo no fue la lista corta: fue que lo
+    //  desconocido se pintara «En curso». Con eso, cualquier estado que la
+    //  pantalla no conozca se disfraza de mandado vivo y nadie se entera.
+    //  🔴 LA PRIMERA VERSIÓN DE ESTA COMPROBACIÓN MIRABA EL PENÚLTIMO RENGLÓN
+    //  de la función, y buscaba la palabra «En curso» ahí. La segunda opinión
+    //  la burló de CINCO formas, todas devolviendo el mismo disfraz: poniendo
+    //  el cajón ANTES en vez de al final, partiéndolo en varios renglones,
+    //  llamándolo «En camino», metiendo `'En curso'` dentro de
+    //  `NOMBRE_DEL_FINAL`, o dejando `NOMBRE_DEL_FINAL` escrito y sin usar.
+    //  Un amarre que mira un renglón deja abiertas las otras puertas.
+    //
+    //  Lo que de verdad define el disfraz no es la palabra: es EL COLOR. El
+    //  naranja `#FF7A2F` significa «esto sigue vivo». Así que se mira eso:
+    //  solo los estados vivos pueden devolverlo.
+    const final = /const\s+etiquetaEstado\s*=[\s\S]*?\n {2}\};/.exec(t);
+    assert.ok(final, 'no encuentro `etiquetaEstado` en el panel de mensajería.');
+    const cuerpo = final[0];
+
+    const NARANJA = /#FF7A2F/gi;
+    const enNaranja = cuerpo.split('\n').filter((l) => NARANJA.test(l));
+    NARANJA.lastIndex = 0;
+    //  Y TIENE QUE SER UNA COMPARACIÓN POSITIVA, `e === 'esperando'`. Con solo
+    //  exigir que la palabra APAREZCA, el sabotaje
+    //      if (!['esperando'].includes(e)) return { t: 'En curso', naranja }
+    //  pasaba: nombra `esperando` para excluirlo, y pinta de naranja todo lo
+    //  demás. Es el cajón de sastre otra vez, puesto al principio en vez de al
+    //  final. Mencionar un estado no es lo mismo que ser ese estado.
+    for (const l of enNaranja) {
+      assert.match(l, /e\s*===\s*['"](esperando|aceptado)['"]/,
+        'en `etiquetaEstado` hay un renglón que pinta de NARANJA —el color de «esto sigue '
+        + 'vivo»— sin ser un `e === \'esperando\'` o `e === \'aceptado\'`:\n     '
+        + l.trim().slice(0, 100) + '\n'
+        + '   Ése es el cajón de sastre que tuvo 5 de 12 mandados muertos disfrazados de '
+        + 'vivos durante meses. Lo desconocido se dice, no se pinta de naranja.');
+    }
+
+    // Y QUE LOS NOMBRES SE USEN, no solo que estén escritos. Dejar la tabla
+    // declarada y devolver «Cancelado» a pelo la dejaba de adorno — es la misma
+    // lección del amarre que tuvo que mirar el `exports.` de un disparador.
+    assert.match(cuerpo, /NOMBRE_DEL_FINAL\s*\[/,
+      '`etiquetaEstado` ya no usa `NOMBRE_DEL_FINAL`. La tabla puede estar perfecta y no '
+      + 'servir de nada: los cuatro finales volverían a salir con el mismo nombre.');
+
+    // Y que ninguno de los nombres diga que el mandado sigue vivo.
+    assert.ok(!/En curso|En camino|Buscando/i.test(nombres[1]),
+      'uno de los nombres de `NOMBRE_DEL_FINAL` dice que el mandado sigue vivo. Son los '
+      + 'finales: si uno dice «En curso», vuelve el disfraz por la puerta de al lado.');
+
+    // Y que la tarjeta siga preguntándole a `etiquetaEstado`. Si deja de
+    // llamarla, todo lo de arriba vigila una función que nadie usa.
+    assert.match(t, /etiquetaEstado\s*\(/,
+      'nadie llama a `etiquetaEstado` en el panel de mensajería: la etiqueta que ve el dueño '
+      + 'sale de otro sitio, y todo lo que vigila este amarre da igual.');
+
+    // Y `esCancelado`, definida UNA vez: una segunda dentro del componente tapa
+    // a la de fuera y la pantalla cuenta con la lista vieja, todo en verde.
+    const cuantas = (t.match(/const\s+esCancelado\s*=/g) || []).length;
+    assert.strictEqual(cuantas, 1,
+      '`esCancelado` está definida ' + cuantas + ' veces. La de dentro tapa a la de fuera, '
+      + 'así que la pantalla puede estar usando una lista que este amarre ni mira.');
+  });
+
   // ── LOS ESTADOS RETIRADOS NO VUELVEN ─────────────────────────────────────
   //  🔴 ESTE AMARRE EXISTE PORQUE UN SABOTAJE SOBREVIVIÓ (12-sep-2026). Se
   //  cambió `estado === 'aceptado'` por `estado === 'confirmado'` en la app del
