@@ -373,6 +373,116 @@ describe('AMARRES · el panel y la app dicen lo mismo', () => {
       + 'conductor de un viaje terminado.');
   });
 
+  // ── LAS PESTAÑAS DEL PANEL DE VIAJES · QUE NO SE PIERDA NINGUNO ──────────
+  //  El panel tiene tres pestañas y cada una con su filtro. Un viaje cuyo
+  //  estado no esté en ninguno NO APARECE EN NINGÚN SITIO: no da error, no sale
+  //  en rojo, simplemente no está. Y nadie echa de menos lo que nunca vio.
+  //
+  //  Medido el 12-sep-2026 con `scripts/medir-pestanas-viajes.cjs`: NUEVE de
+  //  los 91 viajes —los `expirado`— desaparecían del panel, y el porcentaje de
+  //  cancelación salía 80% cuando era 82%, calculado sobre una lista a la que
+  //  le faltaban esos nueve.
+  it('EL QUE MUERDE · todos los estados caben en alguna pestaña del panel', () => {
+    const { ESTADOS_EN_CURSO, ESTADOS_TERMINADOS }
+      = cargarDeLaApp('guajirago/src/estadosViaje.js');
+    const t = soloCodigo(leer('guajirago-admin/src/Viajes.js'));
+
+    // La lista de «no completados», que usan la pestaña y la estadística.
+    const m = /const\s+NO_COMPLETADOS\s*=\s*\[([^\]]*)\]/.exec(t);
+    assert.ok(m, 'guajirago-admin/src/Viajes.js ya no tiene `NO_COMPLETADOS`. Esa lista es la '
+      + 'que recoge todo lo que no acabó bien; sin ella, los estados que no estén en ninguna '
+      + 'pestaña desaparecen del panel sin que nada avise.');
+    const noCompletados = m[1].replace(/['"\s]/g, '').split(',').filter(Boolean);
+
+    const deberia = ESTADOS_TERMINADOS.filter((e) => e !== 'finalizado');
+    assert.deepStrictEqual([...noCompletados].sort(), [...deberia].sort(),
+      'La lista de «no completados» del panel y la de la app se separaron.\n'
+      + '   app (ESTADOS_TERMINADOS, sin `finalizado`): ' + [...deberia].sort().join(', ') + '\n'
+      + '   panel (NO_COMPLETADOS):                     ' + [...noCompletados].sort().join(', ')
+      + '\nLo que se quede fuera no sale en NINGUNA pestaña: desaparece del panel.');
+
+    // Y AHORA LO QUE DE VERDAD IMPORTA: que entre las tres pestañas no se
+    // quede ningún estado suelto. Se comprueba contra la lista entera de la
+    // app, no contra una copia de aquí.
+    const enCurso = /where\('estado',\s*'in',\s*\[([^\]]+)\]/.exec(t);
+    assert.ok(enCurso, 'el panel ya no consulta los viajes en curso con where(estado, in, [...]).');
+    const acogidos = new Set([
+      ...enCurso[1].replace(/['"\s]/g, '').split(',').filter(Boolean),
+      'finalizado',
+      ...noCompletados,
+    ]);
+    const huerfanos = [...ESTADOS_EN_CURSO, ...ESTADOS_TERMINADOS].filter((e) => !acogidos.has(e));
+    assert.deepStrictEqual(huerfanos, [],
+      'estos estados NO CABEN EN NINGUNA PESTAÑA del panel: ' + huerfanos.join(', ') + '\n'
+      + '   Un viaje en uno de ellos no sale en «en curso», ni en «completados», ni en '
+      + '«cancelados». No da error: desaparece. Pasó con los 9 `expirado` hasta el '
+      + '12-sep-2026.');
+
+    // ── Y QUE LA LISTA SE LEA DEL CAMPO BUENO ───────────────────────────
+    //  La segunda opinión cambió `NO_COMPLETADOS.includes(v.estado)` por
+    //  `v.fase` y dejó las 80 pruebas EN VERDE, el guion diciendo «✓ todos
+    //  caben» y el 82% intacto — mientras el panel real enseñaba la pestaña
+    //  VACÍA y 0% de cancelación. Comprobar la lista sin comprobar de dónde se
+    //  lee es vigilar la mitad.
+    const ayudante = /const\s+(\w+)\s*=\s*\(\w+\)\s*=>\s*NO_COMPLETADOS\.includes\(\s*(\w+)\.(\w+)\s*\)/
+      .exec(t);
+    assert.ok(ayudante, 'no encuentro el ayudante `(v) => NO_COMPLETADOS.includes(v.estado)` '
+      + 'en el panel de viajes. Si se escribió de otra forma, hay que mirar a mano que lea '
+      + 'el ESTADO y no otro campo.');
+    assert.strictEqual(ayudante[3], 'estado',
+      'el ayudante de «no completados» lee `' + ayudante[2] + '.' + ayudante[3] + '` en vez '
+      + 'del ESTADO. La fase se queda pegada a un viaje muerto y no dice si terminó: con '
+      + 'esto la pestaña sale VACÍA y el porcentaje de cancelación en 0, sin un solo rojo.');
+    const elAyudante = ayudante[1];
+
+    // Y QUE NO HAYA DOS. Una segunda `NO_COMPLETADOS` dentro de un bloque tapa
+    // a la de fuera: vuelven las dos calculadoras, cada una con su número, y
+    // las dos parecen ciertas. Probado por la segunda opinión: 80 en verde.
+    for (const nombre of ['NO_COMPLETADOS', elAyudante]) {
+      const veces = (t.match(new RegExp('const\\s+' + nombre + '\\s*=', 'g')) || []).length;
+      assert.strictEqual(veces, 1,
+        '«' + nombre + '» se declara ' + veces + ' veces en Viajes.js. La de dentro tapa a la '
+        + 'de fuera, así que una parte de la pantalla cuenta con una lista y otra con otra.');
+    }
+
+    // Y que la lista se use en LOS DOS sitios, no solo en la pestaña: la
+    // estadística del porcentaje de cancelación sale de la misma.
+    //
+    // 🔴 SE CUENTAN LOS USOS SIN LOS COMENTARIOS DE COLA. `soloCodigo` solo
+    // quita los `//` que EMPIEZAN el renglón, así que un
+    // `... // antes: viajes.filter(noCompleto)` al final de la línea contaba
+    // como uso y dejaba el sabotaje en verde. Lo midió la segunda opinión.
+    const sinCola = t.split('\n').map((l) => {
+      const seguro = sinTextos(l);
+      const i = seguro.indexOf('//');
+      return i < 0 ? l : l.slice(0, i);
+    }).join('\n');
+    const USO = new RegExp('viajes\\.filter\\(' + elAyudante + '\\)', 'g');
+    const usos = (sinCola.match(USO) || []).length;
+    assert.ok(usos >= 2,
+      '`' + elAyudante + '` se usa ' + usos + ' vez/veces, y hacen falta DOS: la pestaña de '
+      + 'cancelados y la estadística. Si una de las dos vuelve a llevar su propia lista, el '
+      + 'porcentaje de cancelación se calcula sobre otra cosa que la pestaña — y las dos '
+      + 'parecen ciertas.');
+
+    // Y que nadie le encadene OTRO filtro detrás, que es quitar estados por la
+    // puerta de atrás dejando la lista intacta.
+    assert.ok(!new RegExp('viajes\\.filter\\(' + elAyudante + '\\)\\s*\\.filter\\(').test(sinCola),
+      'hay un `.filter(...)` encadenado detrás de `' + elAyudante + '`. Eso quita viajes de '
+      + 'la pestaña sin tocar la lista, así que este amarre no lo ve venir y los viajes '
+      + 'vuelven a desaparecer.');
+
+    // Y que cada final tenga nombre en la etiqueta: sin entrada en el mapa
+    // salen con el nombre crudo del estado.
+    const mapa = /const\s+etiquetaEstado[\s\S]*?const\s+mapa\s*=\s*\{([\s\S]*?)\n {4}\};/.exec(t);
+    assert.ok(mapa, 'no encuentro el mapa de `etiquetaEstado` en el panel de viajes.');
+    for (const e of ESTADOS_TERMINADOS) {
+      assert.ok(new RegExp('\\b' + e + '\\s*:').test(mapa[1]),
+        'al mapa de `etiquetaEstado` le falta «' + e + '», así que ese viaje sale con el '
+        + 'nombre crudo del estado en vez de en cristiano.');
+    }
+  });
+
   // ── Y LA CAJA DE «CANCELADOS», QUE SE DEJABA DOS FUERA ───────────────────
   //  Medido el 12-sep-2026 con `scripts/medir-mandados.cjs`: `esCancelado` solo
   //  conocía `['cancelado', 'vencido']`, así que los mandados en `expirado` y
