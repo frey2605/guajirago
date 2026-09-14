@@ -373,6 +373,250 @@ describe('AMARRES · el panel y la app dicen lo mismo', () => {
       + 'conductor de un viaje terminado.');
   });
 
+  // ── EL HISTORIAL DEL CONDUCTOR · QUE VEA TODO SU TRABAJO ─────────────────
+  //  La pantalla «Mis viajes» del conductor pedía los suyos y se quedaba con
+  //  `finalizado || cancelado`. Los que cancelaba él mismo y los que se
+  //  quedaban colgados NO APARECÍAN: sin error, sin rojo, no estaban.
+  //
+  //  Medido el 13-sep-2026 con `node scripts/medir-historial-conductor.cjs`
+  //  contra el código de antes: **40 viajes** invisibles entre 5 conductores;
+  //  `XfXCz3rgYSXC` veía **16 de sus 47**.
+  //
+  //  Y hay una SEGUNDA MITAD que va junta: una bandera decide si el viaje sale
+  //  verde «Completado» con su tarifa debajo. Decía `estado === 'cancelado'` a
+  //  secas, así que arreglar solo el filtro habría metido esos 40 Y LOS HABRÍA
+  //  PINTADO VERDES —ninguno de los 40 es `finalizado` ni `cancelado`—: el
+  //  conductor viendo un trabajo hecho y cobrado que no lo fue. Peor que el
+  //  fallo original. Por eso este amarre vigila LAS DOS.
+  //
+  //  🔴 EL RECORRIDO NO SE ESCRIBE AQUÍ. Se importa de
+  //  `scripts/medir-historial-conductor.cjs`, que es donde vive: el mismo
+  //  lector para el paso 1, el paso 12 y cada `npm test`. Estaba copiado con
+  //  regex casi calcadas y LOS DOS SE SEPARARON EL MISMO DÍA. SEGUNDA LEY.
+  it('EL QUE MUERDE · el conductor ve TODOS sus viajes terminados', () => {
+    const { loQueHaceLaPantalla, elTrozoDelResultado } = require('../scripts/medir-historial-conductor.cjs');
+    const { ESTADOS_TERMINADOS } = cargarDeLaApp('guajirago/src/estadosViaje.js');
+    const p = loQueHaceLaPantalla();
+
+    // Las quejas vienen con su explicación entera desde el guion: aquí no se
+    // reescriben, que sería empezar a separarlos otra vez por el otro lado.
+    assert.strictEqual(p.quejas.length, 0,
+      'la pantalla del historial del conductor no pasa:\n   · ' + p.quejas.join('\n   · '));
+
+    // 🔴 ESTO YA NO ES UNA TAUTOLOGÍA. `p.entran` sale de CORRER el filtro de la
+    // pantalla estado por estado, no de copiar la lista porque el nombre esté
+    // escrito. Con la versión de antes, esta misma línea comparaba
+    // `ESTADOS_TERMINADOS` consigo mismo y no podía ponerse roja nunca — y
+    // `.filter(v => v.estado !== 'expirado' && ESTADOS_TERMINADOS.includes(...))`
+    // escondía 9 viajes con todo en verde. Lo midió la segunda opinión.
+    assert.deepStrictEqual(p.entran, [...ESTADOS_TERMINADOS],
+      'corriendo el filtro de la pantalla, los viajes que entran en el historial del conductor '
+      + 'ya no son todos los terminados. Lo que se quede fuera NO SALE en su pantalla: no da '
+      + 'error, no sale en rojo, no está — y nadie echa de menos lo que nunca vio.');
+
+    assert.deepStrictEqual(p.rojos, ESTADOS_TERMINADOS.filter((e) => e !== 'finalizado'),
+      'corriendo la bandera de la tarjeta, los que se pintan de rojo ya no son todos los que '
+      + 'no se completaron. Lo que no esté ahí sale VERDE «Completado», con su tarifa debajo.');
+
+    // ── 🔴 Y QUE EL RENDER LO USE ───────────────────────────────────────
+    //  Esto es lo que de verdad ve el conductor. Una versión anterior solo
+    //  comprobaba que la tabla de nombres ESTUVIERA declarada, así que poner
+    //  el verde y «Completado» a pelo en la tarjeta pasaba sin un solo rojo.
+    //  Aquí entra también la tabla de nombres en palabras —que cada final diga
+    //  CUÁL de las cuatro cosas pasó—, porque vive en el lector: si se
+    //  comprobara solo aquí, el guion del paso 1 no la miraría.
+    const trozo = elTrozoDelResultado(p);
+    assert.ok(!trozo.error, trozo.error);
+  });
+
+  // ── 🔴 Y QUIÉN VIGILA AL VIGILANTE ───────────────────────────────────────
+  //  El amarre de arriba se cree lo que le diga `medir-historial-conductor.cjs`.
+  //  O sea que ablandando ESE archivo —que además está en la foto del guardián,
+  //  así que el guardián lo aprueba— se puede dejar la pantalla rota con todo
+  //  en verde. Lo probó la segunda opinión: un `if (false)` en el lector y la
+  //  pantalla de vuelta a `finalizado || cancelado`, 81 pruebas en verde.
+  //
+  //  Así que aquí se le da de comer al lector PANTALLAS DE MENTIRA —cada escape
+  //  conocido, escrito como texto— y se exige que se queje de todas. Nada se
+  //  escribe en disco: el lector acepta la fuente por parámetro.
+  //
+  //  Cada renglón de esta lista es un escape que alguien encontró de verdad.
+  //  Si aparece uno nuevo, se añade aquí y deja de ser gratis para siempre.
+  it('EL QUE MUERDE · y el medidor del historial no se puede ablandar', () => {
+    const { loQueHaceLaPantalla, elTrozoDelResultado } = require('../scripts/medir-historial-conductor.cjs');
+    // Se trabaja sobre el archivo YA SIN COMENTARIOS, que es lo que el lector
+    // mira: así los trozos que devuelve se encuentran aquí tal cual.
+    const bueno = soloCodigo(leer('guajirago/src/AppConductor.js'));
+    const base = loQueHaceLaPantalla(bueno);
+    assert.strictEqual(base.quejas.length, 0,
+      'el lector se queja de la pantalla BUENA, así que esta prueba no puede saber si ve los '
+      + 'escapes:\n   · ' + base.quejas.join('\n   · '));
+
+    // 🔴 LAS ANCLAS SALEN DEL PROPIO ARCHIVO, no copiadas aquí. Con el texto a
+    // mano, renombrar la bandera o pasar Prettier ponía ROJA esta prueba sobre
+    // código correcto — y su mensaje culpaba a la lista, no al cambio.
+    const Z = base.trozos;
+    const T = elTrozoDelResultado(base);
+    assert.ok(!T.error, T.error);
+    const EL_P = T.texto + '</p>';
+    const CORTO = ".filter(v => v.estado === 'finalizado' || v.estado === 'cancelado')";
+    // Un ancla puede no existir hoy (quitar el `limit`, partir la cadena en dos
+    // `const`: los dos son arreglos legítimos, y el segundo lo anuncia esta
+    // misma tabla de deuda). Antes se le llamaba `.replace` a `null` AL ARMAR
+    // ESTA LISTA y la prueba reventaba con un `TypeError` sin mensaje.
+    const ojo = (x, hacer) => (x == null ? [null, null] : [x, hacer(x)]);
+
+    const ESCAPES = [
+      ['la lista corta de siempre', Z.filtro, CORTO],
+      ['un filtro corto DELANTE del bueno', Z.filtro, CORTO + '\n          ' + Z.filtro],
+      ['otro filtro encadenado detrás', Z.filtro,
+        Z.filtro + "\n          .filter(x => x.estado !== 'expirado')"],
+      ['una condición de más DENTRO del filtro bueno', Z.filtro,
+        ".filter(v => v.estado !== 'expirado' && ESTADOS_TERMINADOS.includes(v.estado))"],
+      ['el filtro al revés, con un `!`', Z.filtro,
+        '.filter(v => !ESTADOS_TERMINADOS.includes(v.estado))'],
+      ['un `.slice(0, 20)` detrás', Z.filtro, Z.filtro + '\n          .slice(0, 20)'],
+      ['una lista a mano tapa la importada', 'function HistorialConductor',
+        "const ESTADOS_TERMINADOS = ['finalizado', 'cancelado'];\nfunction HistorialConductor"],
+      ['el import con alias', ...ojo(Z.importe,
+        () => "import { ESTADOS_MERCADO as ESTADOS_TERMINADOS } from './estadosViaje'")],
+      // Se ancla a la CONSULTA, que siempre está, no al `limit`: quitar el
+      // `limit` es un arreglo legítimo —lo anuncia la propia tabla de deuda— y
+      // con el ancla en él este escape se saltaba EN SILENCIO.
+      ['el filtro mudado al servidor', Z.consulta,
+        Z.consulta + ", where('estado', 'in', ['finalizado'])"],
+      ['`setViajes` dos veces, la segunda recorta', ...ojo(
+        Z.alaPantalla == null ? null : Z.alaPantalla + ';',
+        () => Z.alaPantalla + ';\n        ' + Z.alaPantalla.replace(')', '.slice(0, 5))') + ';')],
+      ['el `.map` le pone el estado a todos', ...ojo(Z.mapa,
+        (x) => x.replace('}))', ", estado: 'finalizado' }))"))],
+      ['la bandera vuelve a la lista corta', Z.banderaEntera,
+        'const ' + base.bandera + " = v.estado === 'cancelado';"],
+      ['la bandera con una condición de más', Z.banderaEntera,
+        Z.banderaEntera.replace(';', " && v.estado === 'cancelado';")],
+      // 🔴 EL SEÑUELO DE LA BANDERA necesita DOS cambios, Y EN ESTE ORDEN: la
+      // MALA en la tarjeta primero, y la buena arriba después. La primera
+      // versión los hacía al revés —ponía la buena arriba y luego reemplazaba
+      // «la buena», que ya casaba con la de arriba—, así que montaba el señuelo
+      // dado la vuelta y el control «una sola bandera» PARECÍA vigilado sin
+      // estarlo: se le podía cambiar el `!== 1` por `< 1` y nadie chistaba.
+      ['un señuelo de la bandera, arriba', [
+        [Z.banderaEntera, 'const ' + base.bandera + " = v.estado === 'cancelado';"],
+        ['function HistorialConductor',
+          "const v = { estado: '' };\n" + Z.banderaEntera + '\nfunction HistorialConductor'],
+      ]],
+      ['las tarjetas se recortan al pintarlas', T.tarjetas,
+        T.tarjetas.replace('.map(', '.slice(0, 5).map(')],
+      // Tres formas de NO pintar la tarjeta. La primera versión buscaba la
+      // palabra `null`, así que las otras dos pasaban con todo en verde.
+      ['la tarjeta devuelve null para algunos', T.flechaTarjeta,
+        T.flechaTarjeta.replace('=> {', "=> { if (v.estado !== 'finalizado') return null;")],
+      ['la tarjeta devuelve un hueco', T.flechaTarjeta,
+        T.flechaTarjeta.replace('=> {', "=> { if (v.estado !== 'finalizado') return <span key={v.id} />;")],
+      ['la tarjeta devuelve `false`', T.flechaTarjeta,
+        T.flechaTarjeta.replace('=> {', "=> { if (v.estado !== 'finalizado') return false;")],
+      // 🔴 EL COLOR SE ANCLA AL COLOR QUE HAY ESCRITO (`T.color`), no a un texto
+      // copiado. Con `"'#FF4444' : '#2ECC71'"` a mano, unas comillas dobles o un
+      // espacio de menos —lo que deja Prettier por defecto— ponían esta prueba
+      // ROJA acusando al medidor, sobre código correcto.
+      ['el color, verde siempre, con un rojo de adorno', T.color,
+        'color: ' + base.bandera + " ? '#2ECC71' : '#2ECC71', borderColor: '#FF4444'"],
+      ['el color escondido: una tercera pregunta a la bandera', T.color,
+        T.color + ', display: ' + base.bandera + " ? 'none' : 'block'"],
+      ['el texto a mano, dejando el color bueno', T.elTexto, "'Cancelado'"],
+      // Dos formas de esconder la tarjeta entera SIN tocar el color ni la
+      // lista. Las dos sacan el uso de la bandera un renglón afuera del `<p>`,
+      // que es donde antes se contaba.
+      ['la tarjeta no se pinta: `return bandera ? null :`', T.tarjetaVuelve,
+        T.tarjetaVuelve.replace('return (', 'return ' + base.bandera + ' ? null : (')],
+      ['la tarjeta escondida con `display: none`', T.tarjetaAbre,
+        T.tarjetaAbre.replace('style={{ ', 'style={{ display: ' + base.bandera
+          + " ? 'none' : 'block', ")],
+      ['los nombres, todos vacíos', T.declTabla,
+        T.declTabla.replace(/: '[^']*'/g, ": ''")],
+      ['los nombres, todos iguales', T.declTabla,
+        T.declTabla.replace(/: '[^']*'/g, ": 'Terminado'")],
+      ['el resultado, a pelo', EL_P,
+        "<p style={{ color: '#2ECC71', fontSize: '13px' }}>{'Completado'}</p>"],
+      ['la pantalla apagada desde donde se abre', ...ojo(Z.abreLaPantalla,
+        (x) => x.replace('if (', 'if (false && '))],
+      ['la pantalla renombrada', 'function HistorialConductor', 'function Historial2'],
+    ];
+
+    // Los finales de renglón del archivo, que aquí se escriben con `\n`: los
+    // de `guajirago/src` vienen de git en CRLF y una sola ancla de dos
+    // renglones no encontraba su sitio. Ya ha mordido varias veces.
+    // OJO: se normaliza a `\n` ANTES de convertir. Las anclas que salen del
+    // propio archivo ya vienen con `\r\n`, y convertirlas a pelo las dejaba con
+    // `\r\r\n` — no encontraban su sitio y la prueba se ponía roja acusando a
+    // la lista de estar vieja, sobre código correcto.
+    const NL = bueno.indexOf('\r\n') >= 0 ? '\r\n' : '\n';
+    const alDelArchivo = (s) => s.split('\r\n').join('\n').split('\n').join(NL);
+
+    const saltados = [];
+    for (const entrada of ESCAPES) {
+      const nombre = entrada[0];
+      // Un escape puede necesitar varios cambios a la vez (el señuelo de la
+      // bandera, por ejemplo): se admite un par suelto o una lista de pares.
+      const pares = Array.isArray(entrada[1]) ? entrada[1] : [[entrada[1], entrada[2]]];
+      // Si un ancla no existe HOY, este escape no se puede montar y se salta.
+      // No es dejarlo pasar: es que el sitio ya no está. Antes reventaba con un
+      // `TypeError` sin mensaje ante dos arreglos legítimos que la propia tabla
+      // de deuda anuncia —partir la cadena en dos `const`, y quitar el
+      // `limit(50)`—, y quien lo viera no sabría ni qué le pasó.
+      if (pares.some((par) => par[0] == null || par[1] == null)) {
+        saltados.push(nombre);
+        continue;
+      }
+      let roto = bueno;
+      for (const par of pares) {
+        const de = alDelArchivo(par[0]);
+        assert.ok(roto.indexOf(de) >= 0,
+          'el escape «' + nombre + '» ya no encuentra su sitio en AppConductor.js («'
+          + de.slice(0, 50) + '…»). Esta lista se quedó vieja: hay que rehacerla mirando el '
+          + 'archivo, no borrarla.');
+        roto = roto.replace(de, alDelArchivo(par[1]));
+      }
+      const q = loQueHaceLaPantalla(roto);
+      const seQueja = q.quejas.length > 0
+        || !q.entran || q.entran.length !== base.entran.length
+        || !q.rojos || q.rojos.length !== base.rojos.length
+        || (q.cuerpo ? !!elTrozoDelResultado(q).error : true);
+      assert.ok(seQueja,
+        '🔴 EL MEDIDOR NO VE EL ESCAPE «' + nombre + '». Con eso puesto, el conductor pierde '
+        + 'viajes de su historial —o los ve en verde «Completado» con su tarifa— y tanto este '
+        + 'amarre como `node scripts/medir-historial-conductor.cjs` firman que todo está bien. '
+        + 'Se arregla el LECTOR (`loQueHaceLaPantalla`), no esta lista.');
+    }
+
+    // 🔴 Y UNA LECTURA INDEPENDIENTE, A PROPÓSITO.
+    //  Todo lo demás de esta prueba le pregunta al lector si ve los escapes; lo
+    //  que no puede es cazarle una MENTIRA SOBRE SÍ MISMO. Con un `const elTope
+    //  = null;` en el guion, el tope dejaba de leerse, el `limit` bajaba a 1 y
+    //  todo seguía en verde: el amarre no tiene datos para juzgar un tope, y el
+    //  guion, que sí los tiene, ya no sabía cuál era.
+    //  Así que el tope se lee AQUÍ TAMBIÉN, aparte, y los dos tienen que decir
+    //  lo mismo. Sí, es una segunda lectura de lo mismo — es la única que hay, y
+    //  está puesta para eso: como cuando se cuenta la caja dos veces.
+    const elLimite = /\blimit\(\s*(\d+)\s*\)/.exec(bueno);
+    assert.strictEqual(base.tope, elLimite ? Number(elLimite[1]) : null,
+      'el guion dice que la pantalla pide «' + base.tope + '» viajes como mucho, y en el '
+      + 'archivo pone «' + (elLimite ? elLimite[0] : 'nada') + '». El medidor se equivoca sobre '
+      + 'sí mismo: es el conteo «al tope» del paso 1 y del paso 12 el que deja de valer.');
+
+    // 🔴 NI UNO SOLO PUEDE SALTARSE EN SILENCIO.
+    //  Todas las anclas salen de trozos que, si faltan, YA son una queja del
+    //  lector — así que en una pantalla sana no falta ninguna. La versión
+    //  anterior dejaba saltar hasta un tercio sin decir nada, y con eso bastaba
+    //  un `const iMap = -1;` en el guion para que el escape que lo vigila
+    //  desapareciera de la lista sin ruido, y luego colar el fallo entero.
+    assert.deepStrictEqual(saltados, [],
+      'se saltaron ' + saltados.length + ' de ' + ESCAPES.length + ' escapes porque su sitio ya '
+      + 'no existe en AppConductor.js (' + saltados.join(', ') + '). O la pantalla cambió de '
+      + 'forma —y hay que rehacer esta lista mirando el archivo—, o alguien ablandó el lector '
+      + 'para que dejara de encontrar ese trozo, que es justo lo que esta prueba vigila.');
+  });
+
   // ── LAS PESTAÑAS DEL PANEL DE VIAJES · QUE NO SE PIERDA NINGUNO ──────────
   //  El panel tiene tres pestañas y cada una con su filtro. Un viaje cuyo
   //  estado no esté en ninguno NO APARECE EN NINGÚN SITIO: no da error, no sale

@@ -7,7 +7,7 @@ import { getFunctions, httpsCallable } from 'firebase/functions';
 import { COMISIONES_DEFECTO, comisionSegunTipo } from './comisiones';
 import { CONFIG_TARIFAS_DEFECTO, calcularTarifaMinima } from './tarifas';
 import { CONFIG_COMPARTIDA } from './configApp';
-import { ESTADOS_MERCADO } from './estadosViaje';
+import { ESTADOS_MERCADO, ESTADOS_TERMINADOS } from './estadosViaje';
 // Los datos que comparten las pantallas salen de archivos únicos (SEGUNDA LEY).
 import { centroRiohacha } from './riohacha';
 // REGLA 9 · qué se le dice al conductor cuando el servidor dice que no. Mismo
@@ -240,7 +240,21 @@ function HistorialConductor({ onVolver }) {
         const snap = await getDocs(q);
         const lista = snap.docs
           .map(d => ({ id: d.id, ...d.data() }))
-          .filter(v => v.estado === 'finalizado' || v.estado === 'cancelado')
+          // 🔴 TODOS LOS VIAJES TERMINADOS, NO DOS DE CINCO.
+          //
+          // Hasta el 13-sep-2026 aquí decía `finalizado || cancelado`, así que
+          // los que canceló el propio conductor y los que se quedaron colgados
+          // NO APARECÍAN en su historial. No daba error ni salía en rojo:
+          // simplemente no estaban, y nadie echa de menos lo que nunca vio.
+          //
+          // Medido ese día con `node scripts/medir-historial-conductor.cjs`:
+          // 40 viajes invisibles entre 5 conductores. Uno de ellos veía 16 de
+          // sus 47 — se perdía 31 de su propio trabajo.
+          //
+          // La lista sale de `estadosViaje.js`, que está en esta misma carpeta:
+          // aquí NO hace falta copiarla ni amarrarla, se importa y ya. (El
+          // panel sí tiene que copiarla, porque es otro repo.)
+          .filter(v => ESTADOS_TERMINADOS.includes(v.estado))
           .sort((a, b) => new Date(b.fechaSolicitud) - new Date(a.fechaSolicitud));
         setViajes(lista);
         const hoy = new Date().toDateString();
@@ -279,7 +293,26 @@ function HistorialConductor({ onVolver }) {
         )}
         {viajes.map((v) => {
           const fecha = v.fechaSolicitud ? new Date(v.fechaSolicitud).toLocaleDateString('es-CO', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
-          const cancelado = v.estado === 'cancelado';
+          // 🔴 ESTA BANDERA DECIDE SI EL VIAJE SALE VERDE «Completado» CON SU
+          // TARIFA, o rojo. Decía `estado === 'cancelado'` a secas, así que
+          // cualquier otra forma de no terminar salía EN VERDE: el conductor
+          // veía un trabajo hecho y cobrado que no lo fue.
+          //
+          // Hoy no se notaba porque esos viajes ni entraban en la lista. Al
+          // arreglar el filtro de arriba habrían entrado los 40 —y LOS 40
+          // habrían salido verdes, porque ninguno es `finalizado` ni
+          // `cancelado`—, así que las dos mitades van juntas: arreglar solo una
+          // hace un fallo peor que el que había.
+          //
+          // Completado es UNO; todo lo demás que entra aquí es un final que no
+          // se completó.
+          const noCompletado = v.estado !== 'finalizado';
+          const QUE_PASO = {
+            cancelado: 'Lo canceló el cliente',
+            cancelado_conductor: 'Lo cancelaste tú',
+            vencido: 'Nadie lo tomó',
+            expirado: 'Quedó sin terminar',
+          };
           return (
             <div key={v.id} style={{ background: '#FFFFFF', borderRadius: '20px', padding: '20px', marginBottom: '12px', border: '1.5px solid #ECECEF' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
@@ -291,7 +324,7 @@ function HistorialConductor({ onVolver }) {
                   </div>
                 </div>
                 <div style={{ textAlign: 'right' }}>
-                  <p style={{ color: cancelado ? '#FF4444' : '#2ECC71', fontSize: '13px', fontWeight: 'bold', margin: '0' }}>{cancelado ? 'Cancelado' : 'Completado'}</p>
+                  <p style={{ color: noCompletado ? '#FF4444' : '#2ECC71', fontSize: '13px', fontWeight: 'bold', margin: '0' }}>{noCompletado ? (QUE_PASO[v.estado] || v.estado) : 'Completado'}</p>
                   <p style={{ color: '#1A1A1E', fontSize: '18px', fontWeight: '900', margin: '4px 0 0' }}>{v.tarifa}</p>
                 </div>
               </div>
@@ -305,7 +338,7 @@ function HistorialConductor({ onVolver }) {
                   <p style={{ color: '#1A1A1E', fontSize: '13px', margin: '0' }}>{v.destino}</p>
                 </div>
               </div>
-              {cancelado && v.razonCancelacion && <p style={{ color: '#6B7280', fontSize: '12px', margin: '10px 0 0' }}>Razón: {v.razonCancelacion}</p>}
+              {noCompletado && v.razonCancelacion && <p style={{ color: '#6B7280', fontSize: '12px', margin: '10px 0 0' }}>Razón: {v.razonCancelacion}</p>}
             </div>
           );
         })}
