@@ -236,7 +236,37 @@ function HistorialConductor({ onVolver }) {
       try {
         const user = auth.currentUser;
         if (!user) return;
-        const q = query(collection(db, 'viajes'), where('conductorId', '==', user.uid), limit(50));
+        // 🔴 LOS ÚLTIMOS 50, NO 50 CUALESQUIERA.
+        //
+        // Hasta el 15-sep-2026 esto pedía `limit(50)` **sin decirle al servidor
+        // por cuál empezar**. Con menos de 50 no se notaba; al pasar de 50, el
+        // servidor manda los que le salgan y el `.sort` de abajo ordena bien una
+        // lista a la que YA le faltan viajes. Y no avisa: ni error, ni rojo.
+        // Medido ese día: el conductor con más viajes iba por 47 de 50.
+        //
+        // 🔴 EL ÍNDICE VA ANTES QUE ESTA APP, SIEMPRE.
+        // El `orderBy` necesita un índice (viajes: conductorId ASC +
+        // fechaSolicitud DESC) que no existía. Está declarado en
+        // `firestore.indexes.json` y se despliega **desde la raíz**, ANTES de
+        // publicar esta app — y hay que ESPERAR a que esté construido, porque
+        // mientras se construye la consulta falla igual que si no existiera.
+        // Al revés, o a medias, el conductor ve «Mis viajes» EN BLANCO y este
+        // `catch` no lo dice (deuda anotada). La dirección importa: un índice
+        // ascendente NO sirve para este `'desc'`.
+        // Los índices que ya había se bajan antes con
+        // `node scripts/bajar-indices.cjs` para no borrarlos al desplegar.
+        //
+        // Se ordena por `fechaSolicitud`, que la escribe el celular del cliente
+        // (deuda anotada). Medido contra la hora del SERVIDOR el 15-sep-2026:
+        // los 76 viajes con conductor tienen fecha, ninguno se desvía ni un
+        // minuto, y los dos órdenes coinciden viaje por viaje. Se cuenta con
+        // `node scripts/medir-tope-historial.cjs`.
+        const q = query(
+          collection(db, 'viajes'),
+          where('conductorId', '==', user.uid),
+          orderBy('fechaSolicitud', 'desc'),
+          limit(50),
+        );
         const snap = await getDocs(q);
         const lista = snap.docs
           .map(d => ({ id: d.id, ...d.data() }))
@@ -255,6 +285,11 @@ function HistorialConductor({ onVolver }) {
           // aquí NO hace falta copiarla ni amarrarla, se importa y ya. (El
           // panel sí tiene que copiarla, porque es otro repo.)
           .filter(v => ESTADOS_TERMINADOS.includes(v.estado))
+          // Este `.sort` SE QUEDA a propósito, aunque el servidor ya los manda
+          // ordenados desde el 15-sep-2026. No es código muerto: es lo que
+          // garantiza el orden EN PANTALLA si algún día la consulta cambia. Lo
+          // que era un error antes no era ordenar aquí, era ordenar aquí
+          // **en vez de** decirle al servidor por cuál empezar.
           .sort((a, b) => new Date(b.fechaSolicitud) - new Date(a.fechaSolicitud));
         setViajes(lista);
         const hoy = new Date().toDateString();

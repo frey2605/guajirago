@@ -1005,3 +1005,66 @@ quién lee o escribe. Y después: lo publicado y el repo dicen lo mismo.
 
 Lección: cuando el arreglo de una nota vive en algo PUBLICADO, la foto tiene que
 incluir desde el principio la copia del servidor. Se supo tarde.
+
+=== 2026-09-15 · EL TOPE DEL HISTORIAL DEL CONDUCTOR ===
+DOS ARCHIVOS FUERA DE LA LISTA, CON PERMISO PEDIDO Y DADO.
+
+Pedidos:  firestore.indexes.json (nuevo) y firebase.json (una linea: "indexes")
+Concedido: si, y con la condicion del dueno -> "baja primero los que hay"
+
+POR QUE aparecieron: el arreglo es ordenar en el servidor
+(orderBy fechaSolicitud), y eso pide un indice compuesto que HOY NO EXISTE.
+Se comprobo corriendo la consulta contra Firestore, no suponiendolo:
+  "The query requires an index. You can create it here: ..."
+
+POR QUE hacen falta los DOS:
+  - el indice tiene que vivir en el repo, con historial, como las reglas.
+    Crearlo a mano en la consola lo deja sin rastro: es la misma trampa que
+    ya morderia una vez con firestore.rules (agosto).
+  - firebase.json no declara "indexes", asi que sin esa linea el despliegue
+    no sabe de donde sacarlos.
+
+EL RIESGO QUE OBLIGO A PREGUNTAR, y por eso el dueno dijo "baja primero":
+  los 2 indices que YA existen (conductorId+estado+fechaSolicitud y
+  pasajeroId+estado+fechaSolicitud) viven SOLO en la consola. Desplegar
+  indices con un archivo que no los incluya puede BORRARLOS, y los usan el
+  panel y la app. Se bajan del servidor antes, con scripts/bajar-indices.cjs.
+
+LA LECCION: el guion de medir no solo conto cuantos viajes tiene cada
+conductor -- corrio la consulta nueva contra el servidor. Eso es lo que
+descubrio los dos archivos de mas ANTES de tocar nada, en vez de a mitad del
+trabajo. Medir incluye preguntarle al servidor si lo que se piensa hacer se
+puede hacer.
+
+--- Y UNA TRAMPA DEL PROPIO GUARDIAN, el mismo dia ---
+Escribir esta nota PARO EL TRABAJO: ".guardian-excepciones.log" no estaba en la
+foto, asi que el guardian lo conto como cambio fuera de la lista. O sea que la
+ley manda escribir aqui cuando uno se sale de la lista, y escribir aqui es
+salirse de la lista.
+
+No es un falso positivo tonto: el guardian tiene razon en lo que mira. Lo que
+esta mal es que su propio libro no este siempre permitido.
+
+Lo que se hizo AHORA: declararlo en la foto, con los mismos 7 archivos de antes.
+La revision anterior ya habia dado los 6 tocados en verde y nada fuera de la
+lista -- esa comprobacion esta hecha y guardada, no se perdio al rehacer la foto.
+
+ANOTADO, NO ARREGLADO: que scripts/guardian.cjs permita SIEMPRE su propio libro
+de excepciones. Es un arreglo de una linea, pero guardian.cjs no estaba en la
+foto y tocarlo de paso es justo lo que prohibe la PRIMERA LEY. Va aparte, con
+sus 12 pasos.
+
+--- CORRECCION del mismo dia, la encontro la segunda opinion ---
+Arriba escribi que los 2 indices que ya existian "los usan el panel y la app".
+NO ES CIERTO, y nadie lo midio: es una suposicion que se colo como si fuera un
+dato. El revisor busco en los tres repos y en functions/ y no hay NI UNA
+consulta que junte conductorId/pasajeroId + estado + orderBy('fechaSolicitud').
+functions/index.js no tiene ningun orderBy.
+
+La DECISION sigue siendo la buena -- no se borran --, pero el motivo bueno es
+otro: NADIE SABE QUIEN LOS USA. Borrar algo que no se sabe quien usa es
+exactamente lo que no se hace. Ese es el motivo, no el que escribi.
+
+La leccion es la de siempre, y ya esta en CLAUDE.md como fila: un dato sin
+medicion detras se lee igual que uno medido. Escribi "los usa el panel y la
+app" porque sonaba razonable.

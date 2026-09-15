@@ -617,6 +617,171 @@ describe('AMARRES · el panel y la app dicen lo mismo', () => {
       + 'para que dejara de encontrar ese trozo, que es justo lo que esta prueba vigila.');
   });
 
+  // ── EL TOPE DE LAS CONSULTAS · QUE DIGAN POR DÓNDE EMPEZAR ───────────────
+  //  Una consulta con `limit(N)` y SIN `orderBy` no es «casi correcta»: es el
+  //  servidor eligiendo qué se ve. Con pocos registros no se nota, y el día que
+  //  se note NO HABRÁ AVISO — el mismo silencio de la lista de estados que se
+  //  cerró el 13-sep-2026.
+  //
+  //  El historial del conductor lo tenía así: `limit(50)` a pelo, y el orden por
+  //  fecha hecho DESPUÉS, en el teléfono, sobre una lista ya recortada. Medido
+  //  el 15-sep-2026: el conductor con más viajes iba por 47 de 50.
+  //
+  //  🔴 EL RECORRIDO SE IMPORTA de `scripts/medir-tope-historial.cjs`, no se
+  //  copia aquí (SEGUNDA LEY). El de los `catch` ya se escribió dos veces y se
+  //  separó el mismo día.
+  //
+  //  Y esta prueba NO vigila solo la que se arregló: cuenta TODAS las consultas
+  //  con tope de la app del cliente. Las que siguen sin orden están en una lista
+  //  declarada, con su archivo, su cuenta y su motivo — así no se pueden
+  //  olvidar, y una consulta NUEVA sin orden se pone roja el mismo día.
+  it('EL QUE MUERDE · ninguna consulta con tope elige a ciegas', () => {
+    const { lasConsultasConTope } = require('../scripts/medir-tope-historial.cjs');
+    const { consultas, PENDIENTES } = lasConsultasConTope();
+
+    assert.ok(consultas.length >= 4,
+      'solo encuentro ' + consultas.length + ' consultas con `limit(...)` en `guajirago/src`, y '
+      + 'el 15-sep-2026 había 4. O se quitaron topes —bien—, o este recorrido dejó de '
+      + 'encontrarlas y esta prueba ya no vigila nada.');
+
+    // Cada archivo de la lista declarada perdona EXACTAMENTE las que dice.
+    const quedanPorPerdonar = {};
+    for (const [archivo, cuantas] of PENDIENTES) quedanPorPerdonar[archivo] = cuantas;
+
+    const aCiegas = [];
+    for (const c of consultas) {
+      if (c.ordena) continue;
+      if (quedanPorPerdonar[c.archivo] > 0) { quedanPorPerdonar[c.archivo] -= 1; continue; }
+      aCiegas.push(c.archivo + ':' + c.renglon + ' (' + c.colecciona + ', tope ' + c.tope + ')');
+    }
+    assert.deepStrictEqual(aCiegas, [],
+      'estas consultas piden un tope SIN decirle al servidor por dónde empezar:\n   · '
+      + aCiegas.join('\n   · ') + '\n   Cuando haya más registros que el tope, el servidor '
+      + 'manda los que le salgan y al usuario le faltan sin que nada avise. Se arregla con un '
+      + '`orderBy`, y eso pide un índice: `node scripts/medir-tope-historial.cjs` dice cuál y '
+      + 'comprueba si ya está puesto. Si es a propósito, va a `PENDIENTES` con su motivo.');
+
+    // Y AL REVÉS: una pendiente que ya se arregló tiene que salir de la lista.
+    // Si no, la lista se queda perdonando algo que ya no existe — y entonces
+    // deja de ser un recordatorio y pasa a ser un agujero.
+    const sobran = Object.entries(quedanPorPerdonar).filter(([, n]) => n > 0)
+      .map(([a, n]) => a + ' (perdona ' + n + ' de más)');
+    assert.deepStrictEqual(sobran, [],
+      'la lista `PENDIENTES` de `medir-tope-historial.cjs` perdona consultas que ya no están '
+      + 'sin orden:\n   · ' + sobran.join('\n   · ') + '\n   O se arreglaron —enhorabuena, hay '
+      + 'que bajarles la cuenta o quitar la fila—, o se movieron a otro archivo. Una lista de '
+      + 'perdones que se queda vieja es un agujero: perdona lo siguiente que caiga ahí.');
+  });
+
+  // ── EL ÍNDICE QUE LA CONSULTA NECESITA · QUE ESTÉ EN EL REPO ─────────────
+  //  Un `orderBy` junto a un `where` pide un índice compuesto en Firestore. Si
+  //  no está puesto, la consulta **falla en la cara del usuario** — y el
+  //  despliegue de la app no avisa de nada, porque el fallo es del servidor.
+  //
+  //  🔴 Y los índices de este proyecto vivían SOLO en la consola, sin
+  //  historial, igual que las reglas hasta agosto de 2026. Peor: el despliegue
+  //  de índices SINCRONIZA, así que un archivo hecho a mano al que le falte uno
+  //  de los que ya hay ofrece BORRARLO — y un índice borrado no da error de
+  //  despliegue, hace que la consulta que lo usaba deje de funcionar.
+  //  Se bajan con `node scripts/bajar-indices.cjs` ANTES de tocar el archivo.
+  it('EL QUE MUERDE · el índice que pide el historial del conductor está declarado', () => {
+    const { elTopeDeLaPantalla, lasConsultasConTope } = require('../scripts/medir-tope-historial.cjs');
+    const p = elTopeDeLaPantalla();
+
+    // 🔴 AQUÍ NO SE HACE `return` EN SILENCIO.
+    //  La primera versión decía «sin tope o sin orden no hace falta índice» y se
+    //  callaba. Con eso, quitarle el `orderBy` a la pantalla Y meterla en
+    //  `PENDIENTES` dejaba los dos amarres mudos: uno perdonaba y el otro se iba
+    //  sin decir nada. Un vigilante que no entiende lo que mira tiene que
+    //  QUEJARSE, no aprobar. Lo midió la segunda opinión.
+    assert.ok(p.tope, 'no encuentro el `limit(...)` de `HistorialConductor`. Si de verdad se '
+      + 'quitó el tope —que es un arreglo legítimo— hay que quitar también este amarre y el del '
+      + 'índice; si no, es que este recorrido dejó de leer la pantalla.');
+    assert.ok(p.ordena, 'la pantalla del conductor pide `limit(' + p.tope + ')` y NO ordena en '
+      + 'el servidor. Con más de ' + p.tope + ' viajes, el servidor elige cuáles manda.');
+
+    // Y esta consulta YA está arreglada, así que no puede estar perdonada: una
+    // fila de más en `PENDIENTES` taparía su vuelta al fallo.
+    const { PENDIENTES } = lasConsultasConTope();
+    assert.ok(!PENDIENTES.some(([a]) => a === 'guajirago/src/AppConductor.js'),
+      '`AppConductor.js` está en la lista `PENDIENTES` de `medir-tope-historial.cjs`, y su '
+      + 'consulta se arregló el 15-sep-2026. Perdonar lo que ya está bien es abrir la puerta a '
+      + 'que vuelva el fallo sin que nada chiste.');
+
+    // 🔴 Y UNA LECTURA INDEPENDIENTE, A PROPÓSITO.
+    //  El amarre se cree lo que le diga el lector, y el lector está en la foto:
+    //  la segunda opinión le añadió «...|| (es AppConductor ? 'fechaSolicitud' :
+    //  null)» y, con el `orderBy` quitado de la pantalla, las 84 siguieron en
+    //  verde. Así que el orden y su dirección se leen AQUÍ TAMBIÉN, a pelo, y
+    //  los dos tienen que decir lo mismo. Es una segunda lectura de lo mismo, sí
+    //  — puesta para esto, como contar la caja dos veces.
+    const aPelo = /orderBy\(\s*['"]([^'"]+)['"]\s*,\s*['"](\w+)['"]\s*\)[\s\S]{0,80}?limit\(/
+      .exec(soloCodigo(leer('guajirago/src/AppConductor.js')));
+    assert.ok(aPelo, 'no encuentro en AppConductor.js un `orderBy(campo, direccion)` seguido de '
+      + 'un `limit(...)`. El lector dice que ordena por «' + p.ordena + '» ' + p.direccion
+      + ', y leyéndolo a pelo no lo veo: uno de los dos se equivoca.');
+    assert.strictEqual(aPelo[1], p.ordena,
+      'el lector dice que la pantalla ordena por «' + p.ordena + '» y en el archivo pone «'
+      + aPelo[1] + '». El medidor se equivoca sobre sí mismo.');
+    assert.strictEqual(aPelo[2].toLowerCase() === 'desc' ? 'DESCENDING' : 'ASCENDING', p.direccion,
+      'el lector dice que la pantalla ordena «' + p.direccion + '» y en el archivo pone «'
+      + aPelo[2] + '». Y la dirección decide qué índice hace falta.');
+
+    const fs = require('fs');
+    const path = require('path');
+    const archivo = path.join(RAIZ, 'firestore.indexes.json');
+    assert.ok(fs.existsSync(archivo),
+      'no existe `firestore.indexes.json`. La pantalla del conductor ordena por «' + p.ordena
+      + '» en el servidor, y eso pide un índice: sin el archivo, el índice vive solo en la '
+      + 'consola y nadie sabe que existe hasta que falta.');
+    const dentro = JSON.parse(fs.readFileSync(archivo, 'utf8'));
+
+    // 🔴 EL NOMBRE NO BASTA: LA DIRECCIÓN Y EL ALCANCE TAMBIÉN.
+    //  La primera versión solo comparaba los nombres de los campos, y la segunda
+    //  opinión la burló TRES veces, cada una dejando el historial del conductor
+    //  EN BLANCO con las 84 pruebas en verde:
+    //    · el índice con `fechaSolicitud: ASCENDING` (probado contra el
+    //      servidor: no sirve para un `orderBy` descendente; aquí no hay lectura
+    //      al revés, Firestore pide otro índice distinto),
+    //    · el índice con `queryScope: COLLECTION_GROUP` —o sin él—, que no
+    //      sirve a un `collection(db, 'viajes')`,
+    //    · y la pantalla cambiando `'desc'` por `'asc'`, que pide el otro.
+    //  El `--dry-run` del despliegue tampoco los ve: solo lee el archivo.
+    const sirve = (dentro.indexes || []).some((i) => {
+      const campos = (i.fields || []).filter((f) => f.fieldPath !== '__name__');
+      return i.collectionGroup === 'viajes'
+        // ESCRITO, no supuesto. El ensayo del despliegue (`--dry-run`) NO valida
+        // índices —solo lee el archivo y compila las reglas—, así que no se
+        // puede saber con él si un `queryScope` ausente vale. Ante la duda, el
+        // lado estricto: el archivo que baja del propio `firebase` siempre lo
+        // trae, así que exigirlo no puede dar un rojo falso.
+        && i.queryScope === 'COLLECTION'
+        && campos.length === 2
+        && campos[0].fieldPath === 'conductorId'
+        && campos[0].order === 'ASCENDING'
+        && campos[1].fieldPath === p.ordena
+        && campos[1].order === p.direccion;
+    });
+    assert.ok(sirve,
+      '`firestore.indexes.json` no declara el índice que la pantalla del conductor necesita: '
+      + 'viajes (COLLECTION) · conductorId ASCENDING + ' + p.ordena + ' ' + p.direccion
+      + '.\n   Los que hay son:\n   · '
+      + (dentro.indexes || []).map((i) => i.collectionGroup + ' (' + (i.queryScope || 'COLLECTION')
+        + '): ' + (i.fields || []).map((f) => f.fieldPath + ' ' + (f.order || f.arrayConfig))
+          .join(' + ')).join('\n   · ')
+      + '\n   Sin ese índice —o con la dirección o el alcance cambiados, que es igual de malo— '
+      + 'la consulta falla y el conductor ve «Mis viajes» EN BLANCO, sin aviso. El despliegue '
+      + 'de la app no avisa: el fallo es del servidor. Primero el índice, después la app.');
+
+    // Y que `firebase.json` sepa de dónde sacarlos: sin esa línea, el archivo
+    // puede estar perfecto y el despliegue no mirarlo nunca.
+    const config = JSON.parse(fs.readFileSync(path.join(RAIZ, 'firebase.json'), 'utf8'));
+    assert.strictEqual((config.firestore || {}).indexes, 'firestore.indexes.json',
+      '`firebase.json` no dice `"indexes": "firestore.indexes.json"`, así que `firebase deploy '
+      + '--only firestore:indexes` no sabe de dónde sacarlos. El archivo estaría bien y no se '
+      + 'desplegaría nunca.');
+  });
+
   // ── LAS PESTAÑAS DEL PANEL DE VIAJES · QUE NO SE PIERDA NINGUNO ──────────
   //  El panel tiene tres pestañas y cada una con su filtro. Un viaje cuyo
   //  estado no esté en ninguno NO APARECE EN NINGÚN SITIO: no da error, no sale
