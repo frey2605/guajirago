@@ -24,6 +24,25 @@ import AvisoModal from './AvisoModal';
 // un proceso, un sitio (SEGUNDA LEY). Vive aparte para poder PROBARLO.
 import { armarMensajeDeEmergencia } from './mensajeEmergencia';
 
+/**
+ * EL AVISO DE «NO SÉ DÓNDE RECOGERTE» — ESCRITO UNA SOLA VEZ.
+ *
+ * Sale en los dos sitios donde la pantalla se queda sin saber dónde está el
+ * pasajero: cuando no ha dicho nada, y cuando escribió una dirección que no se
+ * pudo encontrar. Es el MISMO aviso, así que vive en un solo sitio (SEGUNDA
+ * LEY); escribirlo dos veces es cómo empiezan a decir cosas distintas.
+ *
+ * Nombra LAS DOS SALIDAS —el marcador y escribir la dirección— porque ésas son
+ * las que decidió el dueño el 15-sep-2026, y un aviso que no dice cómo salir
+ * deja igual de atascado que el silencio.
+ */
+const NO_SE_DONDE_ESTAS = (esMensajeria, porque) => ({
+  titulo: esMensajeria ? 'No sé dónde recoger' : 'No sé dónde recogerte',
+  texto: (porque ? porque + ' ' : '')
+    + 'Mueve el marcador 📍 del mapa hasta el sitio exacto, o escribe la dirección y '
+    + 'escógela de la lista.',
+});
+
 // Valores por defecto (respaldo). Se reemplazan por los de config/global cuando cargan.
 const CONFIG_APP_DEFECTO = {
   // Las tarifas mínimas salen de tarifas.js: una sola calculadora para toda la app.
@@ -196,25 +215,65 @@ function MapaRecogida({ ubicacionInicial, onCambioPunto }) {
   const ultimoPuntoRef = useRef(null);
   const [expandido, setExpandido] = useState(false);
   const [ubicUsada, setUbicUsada] = useState(false);
+  // 🔴 ¿ESTE PUNTO LO ELIGIÓ ALGUIEN, O ES DONDE EL MAPA SE ABRIÓ SOLO?
+  //
+  // Google lanza `idle` en cuanto el mapa termina de dibujarse, sin que nadie
+  // haya tocado nada. Hasta el 15-sep-2026 ese primer `idle` geocodificaba el
+  // centro del mapa —que sin GPS es el relleno, la plaza—, la pantalla escribía
+  // esa dirección en el campo de origen ella sola y daba el pin por bueno.
+  // Medido: 4 de 91 viajes nacieron en la plaza, y a los 4 fue un conductor a
+  // buscar a alguien que podía estar en cualquier otro sitio.
+  //
+  // Esta marca distingue las dos cosas. Se prende cuando el pasajero ARRASTRA
+  // el mapa o cuando aprieta «Usar mi ubicación»: las dos formas de elegir un
+  // punto desde aquí. NO se prende con un toque, porque tocar no es elegir —
+  // el contenedor ya se agranda al tocarlo, y aceptar el relleno por un toque
+  // accidental sería el mismo fallo con otro disfraz.
+  //
+  // El mapa se dibuja exactamente igual que antes: esto no le toca nada.
+  const loEligioRef = useRef(false);
+  const arrastreRef = useRef(null);
 
   const resolverDireccion = useCallback((lat, lng) => {
     const clave = lat.toFixed(6) + ',' + lng.toFixed(6);
     ultimoPuntoRef.current = clave;
+    // La marca se lee AQUÍ, no cuando llegue la respuesta: pertenece al momento
+    // en que este punto se calculó. Si el pasajero arrastra mientras el
+    // geocodificador contesta, esa respuesta se descarta igual por la clave.
+    const loEligio = loEligioRef.current;
     if (!geocoderRef.current) {
-      onCambioPunto({ lat, lng }, '');
+      onCambioPunto({ lat, lng }, '', loEligio);
       return;
     }
     geocoderRef.current.geocode({ location: { lat, lng } }, (results, status) => {
       if (ultimoPuntoRef.current !== clave) return; // llegó tarde, el usuario ya movió el mapa
       if (status === 'OK' && results && results[0]) {
-        onCambioPunto({ lat, lng }, results[0].formatted_address);
+        onCambioPunto({ lat, lng }, results[0].formatted_address, loEligio);
       } else {
         // Diagnóstico para F12: si aquí sale REQUEST_DENIED, falta habilitar la Geocoding API en el key de Maps.
         console.log('Geocodificación inversa status:', status);
-        onCambioPunto({ lat, lng }, ''); // si falla, dejamos el campo de recogida como está (no metemos texto raro)
+        onCambioPunto({ lat, lng }, '', loEligio); // si falla, dejamos el campo de recogida como está (no metemos texto raro)
       }
     });
   }, [onCambioPunto]);
+
+  // 🔴 EL OYENTE DEL MAPA SE REGISTRA UNA SOLA VEZ, ASÍ QUE TIENE QUE LLAMAR A
+  // LA VERSIÓN DE AHORA, NO A LA DEL PRIMER DIBUJO.
+  //
+  // El `useEffect` de abajo va con `[]`: corre al montar y nunca más. Si el
+  // `idle` llamara directamente a `resolverDireccion`, se quedaría con la del
+  // primer render — y con ella, con la `onCambioPunto` del primer render, que
+  // lee un `ubicacionEsDelGps` que en ese momento es SIEMPRE `false` (el GPS
+  // puede tardar hasta 28 segundos en contestar: un intento de 8 y, si ese
+  // falla, otro de 20). Resultado: al pasajero con GPS bueno
+  // dejaba de escribírsele la dirección sola, que es justo lo que esta pantalla
+  // ya hacía bien. Lo cazó la segunda opinión.
+  //
+  // Es el mismo patrón que `AutocompleteInput` ya usa aquí al lado con
+  // `onChangeRef` y `onPlaceCoordsRef`, por lo mismo: un solo modo de resolver
+  // esto en el archivo (SEGUNDA LEY).
+  const resolverRef = useRef(resolverDireccion);
+  useEffect(() => { resolverRef.current = resolverDireccion; }, [resolverDireccion]);
 
   useEffect(() => {
     if (!window.google || !mapRef.current || mapaRef.current) return;
@@ -231,13 +290,21 @@ function MapaRecogida({ ubicacionInicial, onCambioPunto }) {
     });
     geocoderRef.current = new window.google.maps.Geocoder();
 
+    // ARRASTRAR EL MAPA SÍ ES ELEGIR. Google solo lanza `dragstart` cuando el
+    // mapa empieza a moverse de verdad, así que esta es la señal limpia: a
+    // partir de aquí, el punto del centro lo está poniendo el pasajero.
+    arrastreRef.current = mapaRef.current.addListener('dragstart', () => {
+      loEligioRef.current = true;
+    });
+
     listenerRef.current = mapaRef.current.addListener('idle', () => {
       const centro = mapaRef.current.getCenter();
-      resolverDireccion(centro.lat(), centro.lng());
+      resolverRef.current(centro.lat(), centro.lng());
     });
 
     return () => {
       if (listenerRef.current) listenerRef.current.remove();
+      if (arrastreRef.current) arrastreRef.current.remove();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -283,6 +350,10 @@ function MapaRecogida({ ubicacionInicial, onCambioPunto }) {
     if (!navigator.geolocation || !mapaRef.current) return;
     navigator.geolocation.getCurrentPosition(
       (pos) => {
+        // Se prende ANTES de mover el mapa: mover dispara el `idle`, y cuando
+        // ese `idle` llegue la marca ya tiene que estar puesta. Esto es una
+        // ubicación del aparato, o sea de las buenas.
+        loEligioRef.current = true;
         mapaRef.current.setCenter({ lat: pos.coords.latitude, lng: pos.coords.longitude });
         mapaRef.current.setZoom(16);
         setUbicUsada(true);
@@ -437,7 +508,15 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
   // NUEVO: centro del mapa de recogida. Arranca en el GPS y se mueve cuando el usuario elige una dirección de la lista
   const [centroMapa, setCentroMapa] = useState(centroRiohacha);
   // true = la recogida corresponde al pin (moviste el mapa o elegiste una sugerencia). false = escribiste a mano.
-  const pinActivoRef = useRef(true);
+  // 🔴 ARRANCA EN `false`, no en `true`. Arrancaba dado por bueno, así que el
+  // pin valía antes de que nadie lo hubiera puesto en ningún sitio: sin GPS,
+  // el punto que valía era el relleno. Se prende de CUATRO maneras, y la cuarta
+  // es la del 95% de la gente: el pasajero mueve el mapa, aprieta «Usar mi
+  // ubicación», escoge una sugerencia de la lista... o el mapa está donde dice
+  // el GPS del aparato, y entonces no hizo falta que tocara nada. Esa cuarta es
+  // la que mantiene vivo el caso bueno, y una versión de esta nota se la dejaba
+  // fuera: hacía creer que el pin solo se enciende por decisión del pasajero.
+  const pinActivoRef = useRef(false);
   const [ubicacionConductor, setUbicacionConductor] = useState(null);
   // NUEVO: punto real de recogida del viaje, para que el mapa del pasajero muestre lo mismo que ve el conductor (no el GPS)
   const [ubicacionRecogida, setUbicacionRecogida] = useState(null);
@@ -958,7 +1037,25 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
       if (!notaEnvio.trim()) faltan.push('Nota para el domiciliario');
       if (faltan.length > 0) { setAvisoFaltan(faltan); return; }
     } else {
-      if (!origen || !destino) { setError('Por favor escribe el origen y destino'); return; }
+      // 🔴 SI LO QUE FALTA ES DÓNDE ESTÁ, SE DICE CÓMO DECIRLO.
+      //
+      // Desde el 15-sep-2026 el campo de origen ya no se rellena solo con la
+      // plaza cuando no hay GPS: se queda vacío, que es la verdad. Pero
+      // entonces el pasajero choca aquí, y lo que había era un renglón rojo que
+      // solo dice «escribe» — sin nombrar el marcador, que es la otra forma de
+      // decir dónde estás, y la que el dueño puso por delante. Un aviso que no
+      // nombra la salida deja igual de atascado que el silencio (REGLA 9), y en
+      // esta app los avisos son ventanitas. Lo de FALTAR EL DESTINO se queda
+      // exactamente como estaba: no es este fallo.
+      if (!origen || !destino) {
+        // El renglón rojo de un intento anterior se limpia ANTES de abrir la
+        // ventanita: si no, se queda debajo diciendo otra cosa. Aquí arriba no
+        // se limpiaba nunca, porque el `setError('')` de siempre está más abajo
+        // y estos dos `return` se van antes de llegar a él.
+        if (!origen) { setError(''); setAviso(NO_SE_DONDE_ESTAS(esMensajeria)); return; }
+        setError('Por favor escribe el origen y destino');
+        return;
+      }
     }
     activarAudioiOS();
     precargarAudio();
@@ -967,10 +1064,17 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
     // Punto de recogida:
     // - Si lo escrito COINCIDE con la dirección del pin (movió el mapa o eligió una sugerencia) → usamos el pin (exacto).
     // - Si el usuario ESCRIBIÓ otra dirección a mano (ej: pide para otra persona) → geocodificamos ese texto, NO el pin.
+    // 🔴 Y SI NO HAY PIN, NO SE CAE AL RELLENO.
+    //
+    // Antes, sin pin, esto arrancaba en `ubicacionPasajero` — que sin GPS es la
+    // plaza. Así, una dirección escrita que Google no encontrara terminaba con
+    // el texto diciendo una cosa y las coordenadas diciendo la plaza, y el
+    // conductor va por las coordenadas. Ahora arranca SIN punto: hay que
+    // conseguir uno, y si no se consigue, el viaje no se crea.
     const usarPin = puntoRecogida && pinActivoRef.current;
     let coordsRecogida = usarPin
       ? { lat: puntoRecogida.lat, lng: puntoRecogida.lng }
-      : { lat: ubicacionPasajero.lat, lng: ubicacionPasajero.lng };
+      : null;
     if (!usarPin) {
       try {
         if (window.google) {
@@ -987,6 +1091,27 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
           if (resultado) coordsRecogida = resultado;
         }
       } catch (e) {}
+      // Si el texto no se pudo convertir en un punto, queda la ubicación del
+      // aparato — pero SOLO si de verdad viene del aparato. Ese caso ya
+      // funcionaba (sin Google cargado pero con GPS bueno, el viaje nacía donde
+      // está el pasajero) y no se toca. Lo que se cierra es el otro: sin GPS,
+      // `ubicacionPasajero` es el relleno, y el relleno ya no vale.
+      if (!coordsRecogida && ubicacionEsDelGps) {
+        coordsRecogida = { lat: ubicacionPasajero.lat, lng: ubicacionPasajero.lng };
+      }
+    }
+
+    // 🔴 NADIE SABE DÓNDE RECOGER: NO SE CREA EL VIAJE, Y SE DICE POR QUÉ.
+    //
+    // Decisión del dueño, 15-sep-2026: sin saber dónde está el pasajero no se
+    // puede pedir, y las dos formas de decirlo son mover el marcador del mapa o
+    // escribir la dirección. La ventanita las nombra las dos, porque un botón
+    // que no responde y no explica es la REGLA 9 rota.
+    if (!coordsRecogida) {
+      setCargando(false);
+      setAviso(NO_SE_DONDE_ESTAS(esMensajeria,
+        'Tu celular no dio la ubicación y no pude encontrar la dirección que escribiste.'));
+      return;
     }
 
     try {
@@ -1544,7 +1669,24 @@ const PanelEmergencia = () => (
         <p style={{ color: '#1A1A1E', fontSize: '11px', letterSpacing: '2px', margin: '0 0 8px' }}>MUEVE EL MAPA PARA MARCAR TU RECOGIDA</p>
         <MapaRecogida
           ubicacionInicial={centroMapa}
-          onCambioPunto={(punto, direccion) => { setPuntoRecogida(punto); pinActivoRef.current = true; if (direccion) setOrigen(direccion); }}
+          onCambioPunto={(punto, direccion, loEligio) => {
+            // 🔴 EL RELLENO NO SE DA POR BUENO.
+            //
+            // El punto vale de dos maneras: porque lo eligió el pasajero (movió
+            // el mapa o apretó «Usar mi ubicación»), o porque el mapa está
+            // donde dice el GPS del aparato. Si no es ninguna de las dos, este
+            // aviso viene del `idle` que Google lanza él solo al terminar de
+            // dibujar el mapa, y el punto es el centro de relleno: la plaza.
+            //
+            // Darlo por bueno es lo que hacía que el viaje naciera allí, que el
+            // conductor fuera allí y que el servidor avisara a los conductores
+            // de allí. Aquí no se hace nada: ni se escribe la dirección en el
+            // campo de origen, ni se activa el pin.
+            if (!loEligio && !ubicacionEsDelGps) return;
+            setPuntoRecogida(punto);
+            pinActivoRef.current = true;
+            if (direccion) setOrigen(direccion);
+          }}
         />
 
         {/* Los datos del paquete solo existen en mensajería. Un viaje de taxi no

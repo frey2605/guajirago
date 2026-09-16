@@ -3040,3 +3040,253 @@ describe('LAS NOTAS NO MIENTEN · ninguna cita apunta a algo que no existe', () 
       + '\n   Quítalas: una excusa que sobra perdonaría una cita rota de verdad.');
   });
 });
+
+// ══════════════════════════════════════════════════════════════════════════
+describe('EL VIAJE NO NACE EN LA PLAZA · sin GPS no se pide a ciegas', () => {
+  // ── QUÉ SE VIGILA AQUÍ ──────────────────────────────────────────────────
+  //  Sin GPS, el mapa de recogida se abre centrado en el relleno —el centro de
+  //  Riohacha, la plaza—. Eso está bien PARA DIBUJAR. Lo que no estaba bien es
+  //  que Google lanza `idle` en cuanto el mapa termina de dibujarse, sin que
+  //  nadie toque nada, y la pantalla daba ese aviso por bueno: escribía la
+  //  dirección de la plaza en el campo de origen ella sola, activaba el pin, y
+  //  al pedir el viaje nacía allí.
+  //
+  //  Y no es solo que el conductor fuera al sitio equivocado: el servidor busca
+  //  a quién avisar ALREDEDOR DE ESE PUNTO, así que el aviso salía desde la
+  //  plaza, no desde donde estaba el pasajero. (Con los 6 conductores de prueba
+  //  que hay, los 4 avisos alcanzaron a los 6, así que ahí todavía NO se ve
+  //  daño: se dice lo medido. Una primera versión de esta nota afirmaba que
+  //  «los que tenían cerca al pasajero no se enteraban», y el propio conteo del
+  //  guion lo desmentía. Se corrigió en CLAUDE.md y esta copia se quedó vieja
+  //  EL MISMO DÍA — la misma historia contada en dos sitios, que es lo que
+  //  persigue la SEGUNDA LEY.)
+  //  Medido el 15-sep-2026: 4 de 91 viajes nacieron así, los 4 con
+  //  la misma dirección escrita, y a los 4 fue un conductor.
+  //
+  //  Había un SEGUNDO camino, que no estaba anotado: escribir la dirección a
+  //  mano y que Google no la encontrara dejaba las coordenadas en la plaza —
+  //  con el texto diciendo una cosa y el mapa otra, y el conductor va por el
+  //  mapa.
+  //
+  //  🔴 EL RECORRIDO NO SE ESCRIBE AQUÍ. Se importa de
+  //  `scripts/medir-origen-del-viaje.cjs`, que es donde vive: el mismo lector
+  //  para el paso 1, el paso 12 y cada `npm test`. El recorrido del historial
+  //  del conductor estuvo copiado en dos sitios con regex casi calcadas y LOS
+  //  DOS SE SEPARARON EL MISMO DÍA. SEGUNDA LEY.
+  it('EL QUE MUERDE · corriendo el camino entero, ningún viaje nace en el relleno', async () => {
+    const { elVeredicto } = require('../scripts/medir-origen-del-viaje.cjs');
+    const v = await elVeredicto();
+
+    // Las quejas vienen con su explicación entera desde el guion: aquí no se
+    // reescriben, que sería empezar a separarlos otra vez por el otro lado.
+    const puestos = v.FALLOS.filter(([, hay]) => hay);
+    assert.deepStrictEqual(puestos.map(([que, , porQue]) => que + '  —  ' + porQue), [],
+      'corriendo el camino entero de la pantalla de pedir —el `idle` del mapa, lo que la '
+      + 'pantalla hace con él, y la decisión del pedido con el estado que queda— hay eslabones '
+      + 'que han vuelto atrás. Si el viaje nace en el relleno, el conductor va a la plaza y el '
+      + 'servidor avisa a los conductores de la plaza: no da error, no sale en rojo, sale un '
+      + 'viaje a un sitio donde no hay nadie.');
+  });
+
+  // ── Y LO QUE NO SE PUEDE ROMPER ARREGLÁNDOLO ────────────────────────────
+  //  Un arreglo que cierra el agujero dejando fuera a todo el mundo no es un
+  //  arreglo. Aquí «en verde» quiere decir que lo que ya servía sigue sirviendo:
+  //  con GPS bueno el viaje nace donde está el pasajero, moviendo el marcador
+  //  nace donde lo pusieron, y una dirección escrita que sí se encuentra sigue
+  //  valiendo. Va aparte a propósito, para que no se confunda con los fallos.
+  it('y lo que ya servía sigue sirviendo', async () => {
+    const { elVeredicto } = require('../scripts/medir-origen-del-viaje.cjs');
+    const v = await elVeredicto();
+    const rotos = v.NOROMPER.filter(([, ok]) => !ok).map(([que]) => que);
+    assert.deepStrictEqual(rotos, [],
+      'el arreglo de la plaza se ha llevado por delante un camino que ya funcionaba. Eso es '
+      + 'peor que el fallo que vino a cerrar: el fallo dejaba mal 4 viajes de 91, y esto '
+      + 'dejaría sin poder pedir a gente que hoy pide bien.');
+  });
+
+  // ── 🔴 Y QUIÉN VIGILA AL VIGILANTE ──────────────────────────────────────
+  //  Los dos amarres de arriba se creen lo que les diga
+  //  `medir-origen-del-viaje.cjs`. O sea que ablandando ESE archivo —que además
+  //  está en la foto del guardián, así que el guardián lo aprueba— se puede
+  //  dejar la pantalla rota con todo en verde. Ya pasó con el historial del
+  //  conductor: un `if (false)` en el lector y 81 pruebas en verde con el fallo
+  //  entero puesto.
+  //
+  //  Así que aquí se le da de comer al lector PANTALLAS DE MENTIRA: la pantalla
+  //  de verdad con un escape metido dentro, uno por uno, y se exige que se
+  //  queje de todas. Los escapes son parches sobre el archivo real —no copias
+  //  de la pantalla escritas a mano—, porque una copia a mano se queda vieja en
+  //  la siguiente edición y entonces esta prueba vigila un fantasma.
+  it('y el medidor no se puede ablandar', async () => {
+    const { elVeredicto } = require('../scripts/medir-origen-del-viaje.cjs');
+    const real = leer('guajirago/src/Solicitar.js');
+
+    const ESCAPES = [
+      ['la guardia del aviso, quitada del todo',
+        (s) => s.replace(/if \(!loEligio && !ubicacionEsDelGps\) return;/, '')],
+      ['la guardia del aviso, que nunca se cumple',
+        (s) => s.replace(/if \(!loEligio && !ubicacionEsDelGps\) return;/, 'if (false) return;')],
+      ['la guardia mira solo si lo eligió, y se olvida del GPS',
+        (s) => s.replace(/if \(!loEligio && !ubicacionEsDelGps\) return;/,
+          'if (!loEligio && !loEligio) return;')],
+      ['el pin vuelve a arrancar dado por bueno',
+        (s) => s.replace(/const pinActivoRef = useRef\(false\)/, 'const pinActivoRef = useRef(true)')],
+      ['arrastrar el mapa ya no marca el punto como elegido',
+        (s) => s.replace(/addListener\('dragstart', \(\) => \{[\s\S]*?\}\)/,
+          "addListener('dragstart', () => {})")],
+      // 🔴 NINGÚN `\n` SUELTO EN ESTOS PARCHES. `Solicitar.js` tiene finales de
+      // línea de Windows, así que un `;\n` no casa nunca: entre el `;` y el
+      // `\n` hay un `\r`. Tres de estos parches nacieron con ese fallo, no
+      // encontraban dónde morder, y su escape no probaba nada — verde por no
+      // haber roto nada. Lo cazó el aviso de abajo, que por eso está.
+      ['el botón «Usar mi ubicación» ya no marca el punto como elegido',
+        (s) => s.replace(/loEligioRef\.current = true;\s+mapaRef\.current\.setCenter/,
+          'mapaRef.current.setCenter')],
+      ['sin pin, el pedido vuelve a caer en el relleno',
+        (s) => s.replace(/\? \{ lat: puntoRecogida\.lat, lng: puntoRecogida\.lng \}\s+: null;/,
+          '? { lat: puntoRecogida.lat, lng: puntoRecogida.lng } '
+          + ': { lat: ubicacionPasajero.lat, lng: ubicacionPasajero.lng };')],
+      ['el respaldo del GPS se aplica aunque no haya GPS',
+        (s) => s.replace(/if \(!coordsRecogida && ubicacionEsDelGps\) \{/, 'if (!coordsRecogida) {')],
+      ['se deja de pedir, pero sin decir por qué',
+        (s) => s.replace(/if \(!coordsRecogida\) \{[\s\S]*?\n(\s*)\}/,
+          'if (!coordsRecogida) {\n$1  setCargando(false);\n$1  return;\n$1}')],
+      ['al que no dice dónde está se le deja de avisar',
+        (s) => s.replace(/if \(!origen\) \{[^}]*\}/, 'if (!origen) { return; }')],
+      ['el aviso deja de nombrar el marcador y solo dice «escribe»',
+        (s) => s.replace(/Mueve el marcador 📍 del mapa hasta el sitio exacto, o escribe/,
+          'Escribe')],
+      ['el oyente del mapa vuelve a quedarse con la versión del primer dibujo',
+        (s) => s.replace(/resolverRef\.current\(centro\.lat\(\), centro\.lng\(\)\);/,
+          'resolverDireccion(centro.lat(), centro.lng());')],
+      // ── LOS TRES QUE ENCONTRÓ LA SEGUNDA OPINIÓN ───────────────────────
+      //  Los tres dejaban el fallo original ENTERO puesto con las 88 pruebas en
+      //  verde, porque el medidor se inventaba la marca en vez de sacarla del
+      //  código. Quedan aquí para que no haya que volver a descubrirlos.
+      ['`resolverDireccion` se inventa la marca en vez de leerla',
+        (s) => s.replace(/const loEligio = loEligioRef\.current;/, 'const loEligio = true;')],
+      ['la marca arranca dada por buena',
+        (s) => s.replace(/const loEligioRef = useRef\(false\);/,
+          'const loEligioRef = useRef(true);')],
+      ['tocar el mapa para agrandarlo cuenta como haber elegido el punto',
+        (s) => s.replace(/const abrir = \(\) => \{\s*setExpandido\(true\);/,
+          'const abrir = () => { loEligioRef.current = true; setExpandido(true);')],
+      // 🔴 EL MISMO ESCAPE, ESCRITO DE OTRA FORMA. Éste se coló en la segunda
+      //  ronda: el detector contaba el texto literal `= true`, así que un
+      //  `= !false` en otro sitio del componente encendía la marca antes del
+      //  primer `idle` y devolvía el fallo ENTERO con las 1007 pruebas en verde.
+      //  Un escape que solo se prueba en una forma de escribirlo solo vigila esa
+      //  forma. Sirven igual `||= true`, `= !0`, `= Boolean(1)`.
+      ['la marca se enciende sola, escrito de otra manera',
+        (s) => s.replace(/\}, \[expandido\]\);/,
+          '  loEligioRef.current = !false;\n  }, [expandido]);')],
+      // ── LOS CUATRO DE LA TERCERA RONDA ─────────────────────────────────
+      //  Los dos primeros son el OTRO valor de la guardia: el guion sacaba del
+      //  archivo con qué arrancan el pin y la marca, pero «esta ubicación es
+      //  del aparato» se lo inventaba él por escenario. El segundo es el peor
+      //  porque parece código normal: la app declara que la ubicación es del
+      //  GPS justo en el camino en que el GPS FALLÓ.
+      ['la marca del GPS arranca dada por buena',
+        (s) => s.replace(
+          /const \[ubicacionEsDelGps, setUbicacionEsDelGps\] = useState\(false\);/,
+          'const [ubicacionEsDelGps, setUbicacionEsDelGps] = useState(true);')],
+      ['la app declara que el relleno viene del aparato',
+        (s) => s.replace(/\(\) => setUbicacionPasajero\(centroRiohacha\),/,
+          '() => { setUbicacionPasajero(centroRiohacha); setUbicacionEsDelGps(true); },')],
+      //  Y los dos de la forma de escribir: perseguir maneras de escribir no
+      //  acaba nunca, así que el detector pasó a mirar DÓNDE aparece el nombre.
+      ['la marca se enciende por un camino que el nombre disfraza',
+        (s) => s.replace(/\}, \[expandido\]\);/,
+          '  Object.assign(loEligioRef, { current: true });\n  }, [expandido]);')],
+      //  Y el señuelo: un `if (!origen)` de adorno delante del bueno hacía que
+      //  el guion midiera el adorno y diera por buena la comprobación de verdad
+      //  aunque ésta se hubiera quedado muda.
+      ['un señuelo delante, y la comprobación de verdad muda',
+        (s) => s
+          .replace(/ {6}if \(!origen \|\| !destino\) \{/, '      if (!origen) { }\n      if (!origen || !destino) {')
+          .replace(/if \(!origen\) \{ setError\(''\); setAviso\(NO_SE_DONDE_ESTAS\(esMensajeria\)\); return; \}/,
+            'if (!origen) { return; }')],
+      // ── LOS CUATRO DE LA CUARTA RONDA ──────────────────────────────────
+      //  El del permiso negado es daño de verdad, no teórico: el pasajero
+      //  aprieta el botón verde, DICE QUE NO al permiso de ubicación, y la
+      //  marca se quedaba encendida — el siguiente `idle` daba el relleno por
+      //  bueno y el viaje volvía a nacer en la plaza. Pasaba porque el lector
+      //  del botón solo corría la mitad buena de la función.
+      ['el botón verde marca al apretarlo, antes de saber si hay GPS',
+        (s) => s.replace(/ {4}if \(!navigator\.geolocation \|\| !mapaRef\.current\) return;/,
+          '    if (!navigator.geolocation || !mapaRef.current) return;\n'
+          + '    loEligioRef.current = true;')],
+      ['el botón verde marca aunque el pasajero NIEGUE el permiso',
+        (s) => s.replace(/\(\) => \{\},\s*\{ enableHighAccuracy: true, timeout: 10000 \}/,
+          '() => { loEligioRef.current = true; },\n'
+          + '      { enableHighAccuracy: true, timeout: 10000 }')],
+      //  El señuelo, ahora DENTRO del marco: el arreglo anterior lo ancló al
+      //  marco y el señuelo se mudó dentro. Por eso ahora se corre el bloque
+      //  entero en vez de elegir un `if`.
+      ['un señuelo DENTRO del marco, y la comprobación de verdad muda',
+        (s) => s.replace(
+          /if \(!origen\) \{ setError\(''\); setAviso\(NO_SE_DONDE_ESTAS\(esMensajeria\)\); return; \}/,
+          'if (!origen) { }\n        if (!origen) { return; }')],
+      //  Y el oyente desenchufado: un cuerpo perfecto en un oyente que se quita
+      //  en el acto deja de marcar el arrastre, que es la primera salida que
+      //  nombró el dueño. Hermano de «un amarre tiene que mirar el `exports.`».
+      ['el arrastre se registra y se quita en el acto',
+        (s) => s.replace(/ {4}listenerRef\.current = mapaRef\.current\.addListener\('idle',/,
+          "    arrastreRef.current.remove();\n"
+          + "    listenerRef.current = mapaRef.current.addListener('idle',")],
+    ];
+
+    // Y QUE LA LISTA NO SE VACÍE. Sin esto, borrar escapes pondría esta prueba
+    // más verde cuanto menos vigilara — que es como se apagan los vigilantes.
+    assert.ok(ESCAPES.length >= 24,
+      'esta prueba solo vigila ' + ESCAPES.length + ' escapes, y el 15-sep-2026 vigilaba 24. '
+      + 'Quitar escapes la pone verde por mirar menos, no por estar mejor.');
+
+    const saltados = [];
+    for (const [nombre, romper] of ESCAPES) {
+      const rota = romper(real);
+      // 🔴 SI EL PARCHE NO ENCONTRÓ NADA, ESTA PRUEBA SE ESTARÍA APROBANDO SOLA.
+      //  Una pantalla que no se llegó a romper sale limpia, y el lector diría
+      //  «bien» con toda la razón — verde por no haber mirado nada. Así que se
+      //  apunta y se falla al final con el nombre, en vez de dejarlo pasar.
+      if (rota === real) { saltados.push(nombre); continue; }
+      // eslint-disable-next-line no-await-in-loop
+      const v = await elVeredicto(rota);
+      const seQueja = v.FALLOS.some(([, hay]) => hay) || v.NOROMPER.some(([, ok]) => !ok);
+      assert.ok(seQueja,
+        'con este escape metido en la pantalla —«' + nombre + '»— el medidor '
+        + '`scripts/medir-origen-del-viaje.cjs` sigue diciendo que todo está bien. O sea que '
+        + 'ese escape se puede poner en la app de verdad y ninguna prueba se entera. '
+        + 'Arregla el MEDIDOR, no esta prueba.');
+    }
+    assert.deepStrictEqual(saltados, [],
+      'estos escapes ya no encuentran dónde morder en `guajirago/src/Solicitar.js`, así que no '
+      + 'probaron nada y su verde no vale:\n   · ' + saltados.join('\n   · ')
+      + '\n   O el código se movió y hay que actualizar el parche, o el arreglo ya no está.');
+  });
+
+  // ── Y QUE EL VEREDICTO NO SE VACÍE ──────────────────────────────────────
+  //  Las tres pruebas de arriba comprueban listas VACÍAS: sin fallos puestos,
+  //  sin caminos rotos, sin escapes saltados. Una lista vacía es lo que se
+  //  quiere ver... y también lo que sale si el lector deja de mirar. Un
+  //  `FALLOS = []` en el guion pondría las tres en verde de golpe.
+  it('y el medidor sigue mirando todos los eslabones que decía mirar', async () => {
+    const { elVeredicto, ESCENARIOS } = require('../scripts/medir-origen-del-viaje.cjs');
+    const v = await elVeredicto();
+    assert.ok(v.FALLOS.length >= 15,
+      'el medidor del origen del viaje solo mira ' + v.FALLOS.length + ' eslabones, y el '
+      + '15-sep-2026 miraba 15. Se le quitó vigilancia, y sus listas vacías dejaron de '
+      + 'querer decir «todo bien» para querer decir «no miré».');
+    assert.ok(v.NOROMPER.length >= 4,
+      'el medidor solo comprueba ' + v.NOROMPER.length + ' caminos de los que ya funcionaban, '
+      + 'y el 15-sep-2026 comprobaba 4.');
+    assert.ok(ESCENARIOS.length >= 6,
+      'el medidor corre ' + ESCENARIOS.length + ' escenarios, y el 15-sep-2026 corría 6.');
+    // Y que de verdad los haya CORRIDO: un escenario que reventó no mide nada,
+    // y su `falla` no aparece en las listas de fallos.
+    const nopudo = v.salidas.filter(([, , r]) => r.falla).map(([n, , r]) => n + ': ' + r.falla);
+    assert.deepStrictEqual(nopudo, [],
+      'el medidor no pudo correr estos caminos, así que lo que diga de ellos no vale:\n   · '
+      + nopudo.join('\n   · '));
+  });
+});
