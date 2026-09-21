@@ -42,11 +42,11 @@ Esta manda sobre todas las demás. Antes de cada cambio:
 
 ---
 
-## 🔢 LOS 12 GRANDES PASOS — el orden de TODO arreglo
+## 🔢 LOS 14 GRANDES PASOS — el orden de TODO arreglo
 
 > Un «dale» autoriza el arreglo, NO autoriza saltarse pasos.
 
-**Los 12 pasos NO se escriben aquí.** Viven en `~/.claude/CLAUDE.md`, que se carga en TODOS
+**Los 14 pasos NO se escriben aquí.** Viven en `~/.claude/CLAUDE.md`, que se carga en TODOS
 los proyectos: **una sola copia**, por la SEGUNDA LEY. Escribirlos otra vez aquí sería crear
 el gemelo que se queda viejo. Aquí queda el índice, y lo que es de GuajiraGo y de nadie más.
 
@@ -55,6 +55,7 @@ el gemelo que se queda viejo. Aquí queda el índice, y lo que es de GuajiraGo y
 | 1 · MEDIR | 4 · CONSTRUIR | 7 · AUDITAR OTRA VEZ | 10 · APLICAR |
 | 2 · AUDITAR | 5 · PROBAR | 8 · SIMULACRO | 11 · VERIFICAR CONTRA LA NUBE |
 | 3 · PROPONER y **PARAR** | 6 · **SABOTEAR** | 9 · GUARDAR | 12 · RE-AUDITAR |
+| 13 · **DECIR QUÉ SE HIZO Y QUÉ QUEDÓ** | 14 · **ENSEÑAR LOS PENDIENTES** | | |
 
 ### Y aquí, además
 
