@@ -723,6 +723,157 @@ async function correrElPedido({ punto, pin, ubicacion, esDelGps, origen, encuent
 }
 
 /**
+ * 🔴 LOS `useEffect` DEL PADRE, SACADOS DEL ARCHIVO Y CORRIDOS.
+ *
+ * Éste era EL HUECO, y estaba escrito en CLAUDE.md desde el 15-sep-2026: «no
+ * ejecuta los `useEffect` del componente padre, que es donde vive el recentrado
+ * del mapa». La segunda opinión lo demostró entonces metiendo UN efecto al lado
+ * del que ya había y devolviendo el fallo entero con el veredicto limpio.
+ *
+ * No se busca un texto concreto: perseguir formas de escribir no acaba nunca
+ * —lección pagada tres veces en esta misma pantalla—. Se buscan TODOS los
+ * efectos del padre cuya lista de dependencias nombre `ubicacionPasajero`, y se
+ * CORREN. Si alguno recentra el mapa, el mapa se recentra, esté escrito como
+ * esté y sea uno o sean cuatro.
+ *
+ * Se mira solo dentro de `Solicitar`: `MapaPasajero` —el mapa de seguimiento,
+ * que es OTRO mapa— también depende de `ubicacionPasajero`, y colarlo aquí
+ * sería medir otra pantalla.
+ */
+function losEfectosDelPadre(pinRef, ubicacionDelGps) {
+  const inicio = codigo.indexOf('function Solicitar(');
+  if (inicio < 0) return { falla: 'no encuentro el componente `Solicitar`' };
+  // El `{` del CUERPO, no el de los parámetros: `function Solicitar({ tipo,
+  // onVolver, destinoInicial })` empieza por una llave que no es el cuerpo, y
+  // cogerla deja la región en la lista de parámetros — sin un solo efecto que
+  // mirar, y por tanto en verde sin haber medido nada.
+  const abre = codigo.indexOf('{', elQueCierra(codigo, codigo.indexOf('(', inicio)));
+  if (abre < 0) return { falla: 'no entiendo la forma de `Solicitar`' };
+  const dentro = codigo.slice(abre, elQueCierra(codigo, abre) + 1);
+
+  const cuerpos = [];
+  for (let d = dentro.indexOf('useEffect('); d >= 0; d = dentro.indexOf('useEffect(', d + 1)) {
+    const a = dentro.indexOf('(', d);
+    const c = elQueCierra(dentro, a);
+    if (c < 0) continue;
+    const llamada = dentro.slice(a + 1, c);
+    // La lista de dependencias es lo que va después de la ÚLTIMA COMA A NIVEL
+    // CERO, no el último `[` del trozo: un corchete dentro del cuerpo mandaría
+    // a mirar donde no es.
+    const seguro = sinTextos(llamada);
+    let hondo = 0; let ultima = -1;
+    for (let i = 0; i < seguro.length; i += 1) {
+      const ch = seguro[i];
+      if (ch === '(' || ch === '{' || ch === '[') hondo += 1;
+      else if (ch === ')' || ch === '}' || ch === ']') hondo -= 1;
+      else if (ch === ',' && hondo === 0) ultima = i;
+    }
+    if (ultima < 0) continue;
+    if (!/\bubicacionPasajero\b/.test(llamada.slice(ultima + 1))) continue;
+    const f = llamada.indexOf('=>');
+    const ab = llamada.indexOf('{', f);
+    if (f < 0 || ab < 0) return { falla: 'un efecto del padre no lleva una función con llaves' };
+    const cuerpo = llamada.slice(ab + 1, elQueCierra(llamada, ab));
+    const pega = pareceSeguro(cuerpo);
+    if (pega) return { falla: 'no corro un efecto del padre porque ' + pega };
+    cuerpos.push(cuerpo);
+  }
+  if (!cuerpos.length) {
+    return { falla: 'ningún `useEffect` del padre reacciona ya a `ubicacionPasajero`' };
+  }
+
+  let centro = null;
+  for (const cuerpo of cuerpos) {
+    try {
+      // 🔴 EL MISMO `pinActivoRef` QUE VIENE USANDO LA CORRIDA, no uno limpio.
+      // En React es un solo ref compartido; darle uno nuevo aquí sería
+      // inventarse justo el valor que decide, que es la enfermedad que este
+      // repo ya pagó tres veces.
+      // eslint-disable-next-line no-new-func
+      new Function('setCentroMapa', 'ubicacionPasajero', 'pinActivoRef', cuerpo)(
+        (c) => { centro = c; }, ubicacionDelGps, pinRef);
+    } catch (e) {
+      return { falla: 'un efecto del padre reventó al correrlo: ' + e.message };
+    }
+  }
+  return { cuantos: cuerpos.length, centro };
+}
+
+/** Una flecha de las que el campo de origen le pasa al autocompletar. */
+function laFlechaDelCampo(prop, desdeTag) {
+  const p = codigo.indexOf(prop + '={', desdeTag);
+  if (p < 0) return { falla: 'no encuentro el `' + prop + '` del campo de origen' };
+  const abre = codigo.indexOf('{', p + prop.length);
+  const cierra = elQueCierra(codigo, abre);
+  if (cierra < 0) return { falla: 'no entiendo el `' + prop + '` del campo de origen' };
+  const flecha = codigo.slice(abre + 1, cierra).trim();
+  if (!/=>/.test(flecha)) return { falla: 'el `' + prop + '` no lleva una flecha' };
+  const pega = pareceSeguro(flecha);
+  if (pega) return { falla: 'no corro el `' + prop + '` porque ' + pega };
+  return { flecha };
+}
+
+/**
+ * ESCOGER LA DIRECCIÓN DE LA LISTA — la otra forma de decir dónde estás.
+ *
+ * No pasa por el mapa: el autocompletar de Google avisa y la pantalla pone el
+ * punto y enciende el pin ella misma. Sin correrlo, esa puerta no se mide.
+ *
+ * 🔴 Y EL ORDEN LO PONE EL ARCHIVO, NO YO. Aquí hay dos flechas que se pisan a
+ * propósito: `onChange` APAGA el pin (quien escribe a mano no tiene pin) y
+ * `onPlaceCoords` lo vuelve a ENCENDER. Corriendo solo la segunda —que es lo
+ * que hacía la primera versión de este lector— el tramo en que el pin se apaga
+ * no se ejecutaba, y una inversión del orden en la app habría dejado el pin
+ * APAGADO con esta medición en verde. Así que se corre el `place_changed` de
+ * verdad, tal como está escrito, y que él llame a las dos en su orden.
+ */
+function elEscogerDeLaLista(pinRef, puesto, lugar) {
+  const i = codigo.indexOf('onPlaceCoords={');
+  if (i < 0) return { falla: 'no encuentro el `onPlaceCoords` del campo de origen' };
+  // El campo de origen es el ÚNICO que lleva `onPlaceCoords`; el de destino no.
+  // Se ancla ahí y se sube a su etiqueta, en vez de coger «el primer
+  // AutocompleteInput del archivo», que es la forma de acabar midiendo el otro.
+  const tag = codigo.lastIndexOf('<AutocompleteInput', i);
+  if (tag < 0) return { falla: 'no encuentro el campo de origen' };
+
+  const fCambio = laFlechaDelCampo('onChange', tag);
+  if (fCambio.falla) return fCambio;
+  const fCoords = laFlechaDelCampo('onPlaceCoords', tag);
+  if (fCoords.falla) return fCoords;
+
+  let onChange; let onPlaceCoords;
+  try {
+    // eslint-disable-next-line no-new-func
+    onChange = new Function('setOrigen', 'pinActivoRef', 'return (' + fCambio.flecha + ');')(
+      (t) => { puesto.origen = t; }, pinRef);
+    // eslint-disable-next-line no-new-func
+    onPlaceCoords = new Function('setPuntoRecogida', 'setCentroMapa', 'pinActivoRef',
+      'return (' + fCoords.flecha + ');')(
+      (p) => { puesto.punto = p; }, (c) => { puesto.centro = c; }, pinRef);
+  } catch (e) {
+    return { falla: 'las flechas del campo de origen no se pudieron preparar: ' + e.message };
+  }
+
+  const o = elOyente('place_changed');
+  if (o.falla) return { falla: o.falla };
+  const pega = pareceSeguro(o.cuerpo);
+  if (pega) return { falla: 'no corro el `place_changed` porque ' + pega };
+  const place = {
+    name: lugar.nombre,
+    geometry: { location: { lat: () => lugar.lat, lng: () => lugar.lng } },
+  };
+  try {
+    // eslint-disable-next-line no-new-func
+    new Function('autocompleteRef', 'onChangeRef', 'onPlaceCoordsRef', 'window', o.cuerpo)(
+      { current: { getPlace: () => place } },
+      { current: onChange }, { current: onPlaceCoords }, windowFalso(null));
+  } catch (e) {
+    return { falla: 'el `place_changed` reventó al correrlo: ' + e.message };
+  }
+  return {};
+}
+
+/**
  * 🔴 EL CAMINO ENTERO, DE PUNTA A PUNTA.
  *
  * Se arranca como arranca la pantalla —el pin como lo deje el archivo—, se
@@ -730,7 +881,9 @@ async function correrElPedido({ punto, pin, ubicacion, esDelGps, origen, encuent
  * que el `idle` diga, y con el estado que quede se corre la decisión del
  * pedido. Lo que sale es dónde nacería el viaje. O nada, si no se puede crear.
  */
-async function elViajeQueNace({ hayGps, loEligio, escribe, encuentra, sinDireccion }) {
+async function elViajeQueNace({
+  hayGps, loEligio, escribe, encuentra, sinDireccion, gpsTardio, escogeDeLaLista,
+}) {
   // LOS DOS ARRANQUES SALEN DEL ARCHIVO, no de lo que yo crea que valen.
   const arrPin = /pinActivoRef\s*=\s*useRef\(\s*(true|false)\s*\)/.exec(codigo);
   const arrMarca = /loEligioRef\s*=\s*useRef\(\s*(true|false)\s*\)/.exec(codigo);
@@ -764,14 +917,33 @@ async function elViajeQueNace({ hayGps, loEligio, escribe, encuentra, sinDirecci
   // del mundo, no del código. Lo que la pantalla HACE con esa respuesta sale de
   // correr su propio efecto del GPS. Antes este valor se lo inyectaba el guion,
   // y por ahí volvía el fallo entero con todo en verde.
-  const gps = elGpsDeLaPantalla(hayGps);
+  // 🔴 `gpsTardio` NO ES OTRO MUNDO: ES EL MISMO, ANTES. El GPS puede tardar
+  // hasta 28 segundos (un intento de 8 y, si falla, otro de 20), y en ese rato
+  // el pasajero ya dijo dónde está. Así que la primera mitad del camino se
+  // corre con el aparato TODAVÍA CALLADO, y el aparato contesta más abajo.
+  const gps = elGpsDeLaPantalla(gpsTardio ? false : hayGps);
   if (gps.falla) return { falla: gps.falla };
   const esDelGps = gps.esDelGps;
   const delGps = gps.delAparato;
 
-  // Dónde está centrado el mapa: donde la pantalla dejó la ubicación, y donde
-  // lo haya dejado el pasajero si lo movió.
-  const centro = loEligio ? { lat: 11.5388, lng: -72.9155 } : gps.ubicacion;
+  // 🔴 LA OTRA FORMA DE DECIR DÓNDE ESTÁS: escribir la dirección y escogerla de
+  // la lista. No pasa por el mapa —el `onPlaceCoords` pone el punto, mueve el
+  // centro y enciende el pin él solo—, así que se corre aquí, de verdad, antes
+  // de que el mapa se quede quieto.
+  const deLaLista = { punto: null, centro: null, origen: null };
+  if (escogeDeLaLista) {
+    const r = elEscogerDeLaLista(pinRef, deLaLista, escogeDeLaLista);
+    if (r.falla) return { falla: r.falla };
+    // El texto lo escribe la propia pantalla al escoger de la lista, igual que
+    // en la app. Dárselo yo sería inventarme el eslabón que quiero medir.
+    if (deLaLista.origen) origen = deLaLista.origen;
+  }
+
+  // Dónde está centrado el mapa: donde la pantalla dejó la ubicación, donde lo
+  // haya dejado el pasajero si lo movió, y donde lo haya puesto la dirección
+  // que escogió de la lista.
+  const centro = deLaLista.centro
+    || (loEligio ? { lat: 11.5388, lng: -72.9155 } : gps.ubicacion);
 
   const i = elIdle(centro);
   if (i.falla) return { falla: i.falla };
@@ -788,15 +960,64 @@ async function elViajeQueNace({ hayGps, loEligio, escribe, encuentra, sinDirecci
     if (mal) return { falla: mal };
   }
   if (flecha.puesto.origen) origen = flecha.puesto.origen;
+  let puntoPuesto = flecha.puesto.punto || deLaLista.punto;
+
+  // Lo que el pasajero tenía puesto ANTES de que el aparato dijera nada. Es
+  // contra esto contra lo que se carea después: sin la foto de antes, «lo pisó»
+  // no se puede medir, solo suponer.
+  const antesDelGps = { punto: puntoPuesto, origen };
+
+  // ── 🔴 Y AHORA EL APARATO CONTESTA, TARDE ────────────────────────────────
+  //
+  // Aquí es donde estaba el daño, y donde ningún lector miraba. Al llegar el
+  // GPS, los efectos del padre recentran el mapa; recentrar lanza OTRO `idle`
+  // —Google lo lanza SOLO, sin que nadie toque nada—; y ese aviso volvía a
+  // entrar por la guardia, pisando el punto y el texto del pasajero.
+  let ubicacionFinal = gps.ubicacion;
+  let esDelGpsFinal = esDelGps;
+  let delGpsFinal = delGps;
+  let tardio = null;
+  if (gpsTardio) {
+    const gps2 = elGpsDeLaPantalla(true);
+    if (gps2.falla) return { falla: gps2.falla };
+    ubicacionFinal = gps2.ubicacion;
+    esDelGpsFinal = gps2.esDelGps;
+    delGpsFinal = gps2.delAparato;
+
+    const efectos = losEfectosDelPadre(pinRef, gps2.ubicacion);
+    if (efectos.falla) return { falla: efectos.falla };
+    tardio = { cuantos: efectos.cuantos, recentro: !!efectos.centro };
+
+    if (efectos.centro) {
+      const i2 = elIdle(efectos.centro);
+      if (i2.falla) return { falla: i2.falla };
+      if (i2.pedidas.length === 0) {
+        return { falla: 'el `idle` del mapa ya no manda ningún punto a resolver' };
+      }
+      // LA FLECHA ES LA DE AHORA. La pantalla se ha vuelto a dibujar, así que
+      // `onCambioPunto` se rehizo con `ubicacionEsDelGps` ya en `true` — que es
+      // precisamente lo que abría una de las dos puertas. Reusar la de antes
+      // sería medir un render que ya no existe.
+      const flecha2 = laFlechaDelAviso(esDelGpsFinal, pinRef);
+      if (flecha2.falla) return { falla: flecha2.falla };
+      for (const p of i2.pedidas) {
+        const mal = correrResolver(p, loEligioRef, flecha2.hacer, 'Cra. 9 # 12-40, Riohacha');
+        if (mal) return { falla: mal };
+      }
+      if (flecha2.puesto.punto) puntoPuesto = flecha2.puesto.punto;
+      if (flecha2.puesto.origen) origen = flecha2.puesto.origen;
+    }
+  }
 
   const r = await correrElPedido({
-    punto: flecha.puesto.punto, pin: pinRef.current,
-    ubicacion: gps.ubicacion, esDelGps, origen, encuentra,
+    punto: puntoPuesto, pin: pinRef.current,
+    ubicacion: ubicacionFinal, esDelGps: esDelGpsFinal, origen, encuentra,
   });
   if (r.falla) return { falla: r.falla };
   return {
-    coords: r.coords, avisos: r.avisos, origen, pin: pinRef.current, delGps,
-    punto: flecha.puesto.punto, esDelGps, arrancaEnFalse: gps.arrancaEnFalse,
+    coords: r.coords, avisos: r.avisos, origen, pin: pinRef.current, delGps: delGpsFinal,
+    punto: puntoPuesto, esDelGps: esDelGpsFinal, arrancaEnFalse: gps.arrancaEnFalse,
+    antesDelGps, tardio,
   };
 }
 
@@ -826,6 +1047,9 @@ function loQueGuardaElViaje() {
 const esLaPlaza = (c) => !!c && typeof c.lat === 'number'
   && c.lat === centroRiohacha.lat && c.lng === centroRiohacha.lng;
 
+/** ¿Son el mismo punto? Dos nulos NO lo son: nada no es «lo que había». */
+const mismoPunto = (a, b) => !!a && !!b && a.lat === b.lat && a.lng === b.lng;
+
 // ── LOS CAMINOS QUE SE CORREN ──────────────────────────────────────────────
 const ESCENARIOS = [
   ['sin GPS y sin tocar nada', { hayGps: false, loEligio: false }],
@@ -841,6 +1065,16 @@ const ESCENARIOS = [
   // se quedó igual (PRIMERA LEY). Está aquí para que se vea, no para acusar.
   ['sin GPS, moviendo el marcador y sin que Google dé la dirección',
     { hayGps: false, loEligio: true, sinDireccion: true }],
+  // 🔴 LOS TRES DEL GPS QUE LLEGA TARDE (21-sep-2026). El aparato puede tardar
+  // 28 segundos, y en ese rato el pasajero ya dijo dónde está. Los dos primeros
+  // son las DOS PUERTAS por las que el aviso del recentrado volvía a entrar; el
+  // tercero es el caso del 95%, que tiene que seguir funcionando igual.
+  ['el GPS llega tarde, después de mover el marcador',
+    { gpsTardio: true, loEligio: true }],
+  ['el GPS llega tarde, después de escoger la dirección de la lista',
+    { gpsTardio: true,
+      escogeDeLaLista: { lat: 11.5389, lng: -72.9155, nombre: 'Cl. 15 # 7-22' } }],
+  ['el GPS llega tarde y el pasajero no tocó nada', { gpsTardio: true }],
 ];
 
 /**
@@ -1001,6 +1235,31 @@ async function elVeredictoDe() {
     ['el aviso nombra el marcador, no solo escribir   (ejecutado)',
       () => !!AVISO.falla || !/marcador/i.test((AVISO.ejemplo || {}).texto || ''),
       'es una de las dos salidas que decidió el dueño, y la que puso primero'],
+    // 🔴 LAS DOS PUERTAS DEL GPS TARDÍO (21-sep-2026).
+    //
+    // Es el MISMO daño que el del viaje que nacía en la plaza, entrando por
+    // otro sitio: el conductor va a donde el pasajero no pidió, y el servidor
+    // avisa a los conductores de ALREDEDOR DE ESE PUNTO. Son dos filas y no una
+    // a propósito: las dos puertas se abren por motivos DISTINTOS —por el
+    // arrastre porque `loEligio` sigue encendido, por la lista porque para
+    // entonces `ubicacionEsDelGps` ya es `true`—, así que una guardia que
+    // cerrara solo una dejaría la otra en verde.
+    ['el GPS que llega tarde no le pisa el marcador al pasajero   (ejecutado)',
+      () => {
+        const r = busca('el GPS llega tarde, después de mover el marcador');
+        return !!r.falla || !r.antesDelGps
+          || !mismoPunto(r.antesDelGps.punto, r.punto)
+          || r.antesDelGps.origen !== r.origen;
+      },
+      'el pasajero puso el pin donde está y el viaje nace donde el aparato diga'],
+    ['ni la dirección que escogió de la lista   (ejecutado)',
+      () => {
+        const r = busca('el GPS llega tarde, después de escoger la dirección de la lista');
+        return !!r.falla || !r.antesDelGps
+          || !mismoPunto(r.antesDelGps.punto, r.punto)
+          || r.antesDelGps.origen !== r.origen;
+      },
+      'el texto dice una cosa y el mapa otra, y el conductor va por el mapa'],
   ];
 
   // Y esto es lo que NO se puede romper arreglando lo de arriba. Va aparte para
@@ -1034,6 +1293,23 @@ async function elVeredictoDe() {
       () => {
         const r = busca('con GPS bueno, sin tocar nada');
         return !r.falla && !!r.origen;
+      }],
+    // 🔴 ESTA ES LA QUE IMPIDE «ARREGLARLO» APAGANDO EL RECENTRADO.
+    //
+    // La forma más fácil de que las dos filas de arriba salgan verdes es que el
+    // mapa no se recentre NUNCA. Y sería peor que el fallo: al pasajero que
+    // abre la pantalla y no toca nada —el 95%— dejaría de escribírsele la
+    // dirección sola, que es lo que esta pantalla ya hacía bien. Por eso aquí
+    // se EXIGE que con el GPS tardío y sin que el pasajero toque nada el mapa
+    // SÍ se recentre y el viaje SÍ nazca en el aparato. Ese error exacto —
+    // castigar al 95% por cerrarle el paso al 5%— ya se cometió una vez en esta
+    // pantalla, y lo cazó la segunda opinión, no las pruebas.
+    ['y si el pasajero no tocó nada, el GPS tardío sí manda   (ejecutado)',
+      () => {
+        const r = busca('el GPS llega tarde y el pasajero no tocó nada');
+        return !r.falla && !!r.tardio && r.tardio.recentro === true
+          && !!r.origen && !!r.coords && !esLaPlaza(r.coords)
+          && r.coords.lat === r.delGps.lat && r.coords.lng === r.delGps.lng;
       }],
   ];
 

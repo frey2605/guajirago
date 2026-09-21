@@ -3234,12 +3234,51 @@ describe('EL VIAJE NO NACE EN LA PLAZA · sin GPS no se pide a ciegas', () => {
         (s) => s.replace(/ {4}listenerRef\.current = mapaRef\.current\.addListener\('idle',/,
           "    arrastreRef.current.remove();\n"
           + "    listenerRef.current = mapaRef.current.addListener('idle',")],
+      // ── LOS CINCO DEL GPS QUE LLEGA TARDE (21-sep-2026) ────────────────
+      //  El GPS puede tardar 28 segundos en contestar, y en ese rato el
+      //  pasajero ya dijo dónde está. Cuando llegaba, el efecto del padre
+      //  recentraba el mapa IGUAL; recentrar lanza otro `idle` —Google lo lanza
+      //  SOLO—, y ese aviso volvía a entrar por la guardia y le PISABA el punto
+      //  y el texto. Es el mismo daño que el de la plaza por otra puerta.
+      //
+      //  Los tres primeros son la guardia nueva. El cuarto es el que importa de
+      //  verdad: CLAUDE.md tenía escrito desde el 15-sep-2026 que el medidor no
+      //  corría los `useEffect` del padre, y que «añadiendo UN efecto al lado
+      //  del que ya hay el fallo vuelve completo y el veredicto sale limpio».
+      //  Eso ya no cuela: ahora los corre TODOS, sean uno o sean cuatro.
+      ['el recentrado del mapa vuelve a pisar el punto del pasajero',
+        (s) => s.replace(/if \(pinActivoRef\.current\) return;\s+setCentroMapa\(ubicacionPasajero\);/,
+          'setCentroMapa(ubicacionPasajero);')],
+      ['la guardia del recentrado, que nunca se cumple',
+        (s) => s.replace(/if \(pinActivoRef\.current\) return;/, 'if (false) return;')],
+      //  Ésta no rompe la puerta: rompe al 95%. Con la guardia al revés, el
+      //  pasajero que no toca nada deja de recibir su dirección escrita sola.
+      //  Tiene que caer por NOROMPER, no por FALLOS.
+      ['la guardia del recentrado, al revés (deja tirado al 95%)',
+        (s) => s.replace(/if \(pinActivoRef\.current\) return;/,
+          'if (!pinActivoRef.current) return;')],
+      ['un SEGUNDO efecto que recentra, sin guardia, al lado del bueno',
+        (s) => s.replace(/\}, \[ubicacionPasajero\]\);/,
+          '}, [ubicacionPasajero]);\n'
+          + '  useEffect(() => { setCentroMapa(ubicacionPasajero); }, [ubicacionPasajero]);')],
+      //  Y el orden del campo de origen, que no es un detalle: `onChange` APAGA
+      //  el pin y `onPlaceCoords` lo ENCIENDE. Invertirlos deja el pin apagado,
+      //  y con él la guardia nueva no protege nada. Se mide corriendo el
+      //  `place_changed` de verdad, no llamando a las flechas en el orden que yo
+      //  crea. Tiene que caer SOLO por la puerta de la lista.
+      ['el campo de origen invierte el orden y deja el pin apagado',
+        (s) => s
+          .replace(/if \(place && place\.name\) onChangeRef\.current\(place\.name\);\s*/, '')
+          .replace(
+            /(onPlaceCoordsRef\.current\(\{ lat: place\.geometry\.location\.lat\(\), lng: place\.geometry\.location\.lng\(\) \}\);)/,
+            '$1 if (place && place.name) onChangeRef.current(place.name);')],
     ];
 
     // Y QUE LA LISTA NO SE VACÍE. Sin esto, borrar escapes pondría esta prueba
     // más verde cuanto menos vigilara — que es como se apagan los vigilantes.
-    assert.ok(ESCAPES.length >= 24,
-      'esta prueba solo vigila ' + ESCAPES.length + ' escapes, y el 15-sep-2026 vigilaba 24. '
+    assert.ok(ESCAPES.length >= 29,
+      'esta prueba solo vigila ' + ESCAPES.length + ' escapes, y el 21-sep-2026 vigilaba 29 '
+      + '(eran 24 el 15-sep-2026, y los 5 del GPS tardío entraron el 21). '
       + 'Quitar escapes la pone verde por mirar menos, no por estar mejor.');
 
     const saltados = [];
@@ -3273,15 +3312,17 @@ describe('EL VIAJE NO NACE EN LA PLAZA · sin GPS no se pide a ciegas', () => {
   it('y el medidor sigue mirando todos los eslabones que decía mirar', async () => {
     const { elVeredicto, ESCENARIOS } = require('../scripts/medir-origen-del-viaje.cjs');
     const v = await elVeredicto();
-    assert.ok(v.FALLOS.length >= 15,
+    assert.ok(v.FALLOS.length >= 17,
       'el medidor del origen del viaje solo mira ' + v.FALLOS.length + ' eslabones, y el '
-      + '15-sep-2026 miraba 15. Se le quitó vigilancia, y sus listas vacías dejaron de '
+      + '21-sep-2026 miraba 17 (eran 15 el 15-sep-2026; las 2 puertas del GPS tardío entraron '
+      + 'el 21). Se le quitó vigilancia, y sus listas vacías dejaron de '
       + 'querer decir «todo bien» para querer decir «no miré».');
-    assert.ok(v.NOROMPER.length >= 4,
+    assert.ok(v.NOROMPER.length >= 5,
       'el medidor solo comprueba ' + v.NOROMPER.length + ' caminos de los que ya funcionaban, '
-      + 'y el 15-sep-2026 comprobaba 4.');
-    assert.ok(ESCENARIOS.length >= 6,
-      'el medidor corre ' + ESCENARIOS.length + ' escenarios, y el 15-sep-2026 corría 6.');
+      + 'y el 21-sep-2026 comprobaba 5 (eran 4 el 15-sep-2026).');
+    assert.ok(ESCENARIOS.length >= 9,
+      'el medidor corre ' + ESCENARIOS.length + ' escenarios, y el 21-sep-2026 corría 9 '
+      + '(eran 6 el 15-sep-2026, y los 3 del GPS tardío entraron el 21).');
     // Y que de verdad los haya CORRIDO: un escenario que reventó no mide nada,
     // y su `falla` no aparece en las listas de fallos.
     const nopudo = v.salidas.filter(([, , r]) => r.falla).map(([n, , r]) => n + ': ' + r.falla);

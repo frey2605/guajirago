@@ -634,7 +634,36 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
   }, []);
 
   // El mapa de recogida arranca centrado en el GPS del pasajero cuando este se obtiene
-  useEffect(() => { setCentroMapa(ubicacionPasajero); }, [ubicacionPasajero]);
+  //
+  // 🔴 PERO NO LE PISA EL PUNTO AL QUE YA DIJO DÓNDE ESTÁ.
+  //
+  // El GPS puede tardar hasta 28 segundos en contestar (un intento de 8 y, si
+  // falla, otro de 20). En ese rato al pasajero le da tiempo de sobra a decir
+  // dónde está: arrastrando el pin, o escogiendo su dirección de la lista.
+  // Cuando el GPS llegaba, este efecto recentraba el mapa IGUAL, sin preguntar
+  // si ya había un punto puesto. Recentrar lanza otro `idle`, y ese `idle`
+  // pasaba la guardia de `onCambioPunto` por las DOS puertas —por el arrastre
+  // porque `loEligio` sigue encendido, y por la dirección escrita porque para
+  // entonces `ubicacionEsDelGps` ya es `true`—, así que le PISABA el punto y
+  // el texto, sin avisar. Medido corriendo el camino entero: 2 de 2.
+  //
+  // Es el mismo daño que el del viaje que nacía en la plaza, entrando por otra
+  // puerta: el conductor va a un sitio que el pasajero no pidió, y el servidor
+  // avisa a los conductores de ALREDEDOR DE ESE PUNTO (`tokensConductoresCerca`
+  // en `functions/index.js`), no de donde está la persona.
+  //
+  // La marca que lo distingue ya existe y es `pinActivoRef`: encendida
+  // significa que hay una recogida puesta —la puso el pasajero, o la puso el
+  // propio GPS cuando llegó a tiempo—. No se inventa una segunda marca para lo
+  // mismo (SEGUNDA LEY).
+  //
+  // Y el caso del 95% NO cambia: quien abre la pantalla y no toca nada llega
+  // aquí con la marca APAGADA, así que el mapa se recentra en su GPS y la
+  // dirección se le sigue escribiendo sola.
+  useEffect(() => {
+    if (pinActivoRef.current) return;
+    setCentroMapa(ubicacionPasajero);
+  }, [ubicacionPasajero]);
 
   // Cuando el viaje ya tiene guardado el punto de recogida, el mapa del pasajero usa ESE punto (el mismo del conductor), no el GPS
   useEffect(() => {
