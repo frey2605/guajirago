@@ -796,3 +796,115 @@ describe('EL BOTÓN DE LA NUBE · 19 funciones, y ninguna se puede quedar por el
       + ':\n  · ' + mudos.join('\n  · '));
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  EL BOTÓN QUE MIDE Y EL QUE DESPLIEGA TIENEN QUE MEDIR LO MISMO.
+//
+//  El botón que mide existe para contestar UNA pregunta: «¿el paso 5 del botón
+//  de desplegar —la suite entera, con los tres repos— corre en una máquina de
+//  GitHub?». Esa respuesta solo vale si mide EXACTAMENTE lo que el otro hace.
+//
+//  🔴 Si uno trae los tres repos y el otro dos, o uno corre `npm test` y el otro
+//  una lista escrita a mano, la medición sale verde y el despliegue se para
+//  igual — y nadie entendería por qué, porque «ya lo habíamos medido». Ese es el
+//  peor tipo de vigilante: el que da permiso para no mirar.
+//
+//  Por eso esto no pregunta si el YAML «está bien»: pregunta si los DOS hacen lo
+//  mismo, comparándolos entre sí. Que no se separen no lo cuida la buena
+//  intención, lo cuida esta prueba.
+const BOTON_MEDIR = '.github/workflows/medir-pruebas.yml';
+const YML_MEDIR = leer(BOTON_MEDIR);
+
+describe('EL BOTÓN QUE MIDE · mide lo mismo que el que despliega, o no vale', () => {
+  it('trae los MISMOS tres repos, y a las mismas carpetas', () => {
+    const medir = sinComentarios(YML_MEDIR);
+    const desplegar = sinComentarios(YML);
+    for (const repo of ['frey2605/guajirago-admin', 'frey2605/guajirago-aliados']) {
+      assert.ok(desplegar.includes(repo),
+        '⛔ el botón de DESPLEGAR ya no trae ' + repo + '. Esta prueba compara los dos, así que '
+        + 'arréglalo ahí: si él deja de traerlo, medirlo aquí no prueba nada.');
+      assert.ok(medir.includes(repo),
+        '⛔ el botón que MIDE no trae ' + repo + ', y el de desplegar sí. Entonces lo que mide NO '
+        + 'es la suite entera: le faltan los amarres que leen los dos lados de cada contrato, y '
+        + 'su verde daría permiso para fusionar algo que se va a parar en el paso 5.');
+    }
+    //  Y a la MISMA carpeta. `pruebas/cargar.cjs` los busca por nombre en la raíz;
+    //  traerlos a otro sitio es no traerlos, solo que sin decirlo.
+    for (const carpeta of ['path: guajirago-admin', 'path: guajirago-aliados']) {
+      assert.ok(medir.includes(carpeta),
+        '⛔ el botón que mide trae el repo a otra carpeta (' + carpeta + ' no aparece). Las '
+        + 'pruebas los buscan por nombre en la raíz: en otro sitio es como no tenerlos.');
+    }
+  });
+
+  it('corre `npm test`, no una lista de archivos escrita a mano', () => {
+    const pasos = losPasos(YML_MEDIR);
+    const i = elPasoQue(pasos, 'npm test');
+    assert.ok(i >= 0,
+      '⛔ el botón que mide ya no corre `npm test`. La lista de archivos de prueba, las cuatro '
+      + 'tandas y los emuladores viven UNA sola vez en `pruebas/correr.cjs` (SEGUNDA LEY). Una '
+      + 'lista copiada aquí mediría una suite parecida a la de verdad, que se separa de ella en '
+      + 'cuanto alguien añada una prueba — o sea, una medición que miente sin avisar.');
+    //  Y las librerías de los DOS paquetes antes, igual que el de desplegar: sin
+    //  las de la app, `npm test` ni arranca.
+    assert.ok(elPasoQue(pasos, 'npm ci --prefix guajirago') >= 0,
+      '⛔ no instala las librerías de la app (`npm ci --prefix guajirago`), que el botón de '
+      + 'desplegar sí instala. Mediría con menos de lo que el otro tiene.');
+  });
+
+  //  🔴 Y QUE SIGA SIENDO UNA CINTA MÉTRICA QUE NO MIENTE. Estas tres se
+  //  sabotean, porque una comprobación que nadie rompe no está comprobada — la
+  //  primera versión de esto preguntaba si el archivo contiene un «4», y el 4
+  //  aparece por todas partes: era verde pasara lo que pasara.
+  const FALLOS_DEL_MEDIDOR = [
+    ['la cuenta se lee de lo que escribe `node --test`, no se cuenta a mano',
+      (t) => !t.includes('grep -oP "^# $1 \\K'),
+      'un número contado a mano es un número inventado en cuanto el formato cambie'],
+    ['distingue «no falló ninguna» de «NO CORRIÓ ninguna»',
+      (t) => !t.includes('if [ "$TANDAS" = "0" ]'),
+      'un cero sin pruebas detrás se lee como un ✅ y da permiso para fusionar a ciegas'],
+    ['exige que las CUATRO tandas hayan corrido',
+      (t) => !t.includes('[ "$TANDAS" = "4" ]'),
+      '`npm test` encadena con `&&`: una tanda caída deja a las siguientes sin arrancar, '
+      + 'y salen pocas pruebas y CERO fallos — que parece perfecto'],
+    ['mira también la salida de `npm test`, no solo el conteo',
+      (t) => !t.includes('[ "$SALIDA" = "0" ]'),
+      'una tanda puede morir después de escribir su cuenta; solo la salida lo dice'],
+  ];
+
+  it('sigue siendo una CINTA MÉTRICA que no puede fingir un número', () => {
+    const medir = sinComentarios(YML_MEDIR);
+    for (const [que, falla, porque] of FALLOS_DEL_MEDIDOR) {
+      assert.ok(!falla(medir), '⛔ el botón que mide ya no ' + que + '. ' + porque);
+    }
+  });
+
+  it('y no se puede ablandar: cuatro medidores rotos, y se queja de los cuatro', () => {
+    const real = sinComentarios(YML_MEDIR);
+    const ESCAPES = [
+      ['la cuenta pasa a contarse a mano',
+        (t) => t.replace(/grep -oP "\^# \$1 \\K\\d\+"/, 'echo 0')],
+      ['deja de distinguir «no corrió ninguna»',
+        (t) => t.replace(/if \[ "\$TANDAS" = "0" \]/, 'if false')],
+      ['ya no exige las cuatro tandas',
+        (t) => t.replace(/\[ "\$TANDAS" = "4" \]/g, 'true')],
+      ['ya no mira la salida de npm test',
+        (t) => t.replace(/\[ "\$SALIDA" = "0" \]/g, 'true')],
+    ];
+    const saltados = [];
+    for (const [nombre, romper] of ESCAPES) {
+      const rota = romper(real);
+      //  Un parche que no encuentra dónde morder se estaría aprobando solo: el
+      //  archivo sale limpio y el verde no vale nada. Se apunta y se falla.
+      if (rota === real) { saltados.push(nombre); continue; }
+      const seQueja = FALLOS_DEL_MEDIDOR.some(([, falla]) => falla(rota));
+      assert.ok(seQueja,
+        'con este medidor roto —«' + nombre + '»— las comprobaciones de arriba siguen diciendo '
+        + 'que todo está bien. O sea que se puede poner en el botón de verdad y ninguna prueba '
+        + 'se entera. Arregla la COMPROBACIÓN, no este sabotaje.');
+    }
+    assert.deepStrictEqual(saltados, [],
+      'estos sabotajes ya no encuentran dónde morder en `' + BOTON_MEDIR + '`, así que no '
+      + 'probaron nada:\n   · ' + saltados.join('\n   · '));
+  });
+});

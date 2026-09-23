@@ -1,39 +1,35 @@
 # ══════════════════════════════════════════════════════════════════════════════════════════════
-#  EL BOTÓN QUE SOLO MIDE — paso A, orden del dueño (23-sep-2026): «dale la a».
+#  EL BOTÓN QUE SOLO MIDE
 #
-#  QUÉ PREGUNTA, Y NADA MÁS. En el contenedor de la nube donde se trabaja, `pruebas/storage.test.js`
-#  sale en ROJO: 43 pruebas, 29 pasan, 14 fallan. La pregunta es UNA:
+#  🔴 QUÉ PREGUNTA HOY (23-sep-2026, segunda pregunta): ¿el paso 5 del botón de desplegar —la
+#  SUITE ENTERA, con los tres repos juntos— corre de verdad en una máquina de GitHub?
 #
-#      ¿esas 14 están rotas de verdad, o es la máquina donde se midió?
+#  Nadie lo ha probado NUNCA. El botón de desplegar corre `npm test` antes de publicar, y si eso
+#  se para allí, se para con el despliegue a medio camino. Y hay un motivo concreto para dudar:
+#  en el contenedor donde se trabaja, el emulador de FUNCIONES no arranca —«Unable to parse JSON
+#  … "request bl…"»—, así que `pruebas/funciones.test.js` lleva todo el día sin poder correr.
+#  Descubrir eso ANTES de fusionar cuesta diez minutos; descubrirlo después cuesta un despliegue
+#  a medias de la app que usan los clientes.
 #
-#  Importa porque el botón de desplegar que viene después lleva el candado del paso 5 —si una
-#  prueba falla, NO se despliega—. Construirlo sin saber esto sería construir un botón que no
-#  puede funcionar nunca: se pararía en las pruebas cada vez que se apriete.
+#  LA PRIMERA PREGUNTA YA SE CONTESTÓ, y su respuesta queda en CLAUDE.md: `storage.test.js` daba
+#  43/29/14 en el contenedor y 43/43/0 aquí (run 35873533595). Los 14 eran de la máquina, no del
+#  código. Esa medición no se pierde: la suite entera incluye ese archivo y su cuenta sale igual.
 #
-#  🔴 ESTO NO ES UN CANDADO, ES UNA CINTA MÉTRICA. Sale en VERDE aunque las pruebas fallen, y es
-#  a propósito: lo que se busca es el NÚMERO, no un veredicto. Un rojo aquí no diría nada que el
+#  🔴 ESTO SIGUE SIN SER UN CANDADO: ES UNA CINTA MÉTRICA. Sale en VERDE aunque las pruebas
+#  fallen, y es a propósito: lo que se busca es el NÚMERO. Un rojo aquí no diría nada que el
 #  número no diga, y enseñaría a ignorar los rojos. El candado de verdad va en el botón de
 #  desplegar, donde sí tiene consecuencias.
 #
-#  🔑 MISMO COMANDO QUE SE CORRIÓ EN EL CONTENEDOR, A PROPÓSITO. Se levantan `firestore,storage`
-#  y se corre ese archivo solo — exactamente lo que dio 29/14 allá. Si se cambiaran los emuladores
-#  o se corriera la tanda entera, lo que saliera no se podría carear con nada: serían dos cosas
-#  distintas medidas de dos formas distintas, que es como se fabrica una conclusión falsa.
+#  🔑 SE CORRE `npm test`, NO UNA LISTA ESCRITA AQUÍ. La lista de archivos de prueba, las cuatro
+#  tandas y los emuladores que hacen falta viven UNA sola vez, en `pruebas/correr.cjs` (SEGUNDA
+#  LEY). Copiarlos aquí sería medir una suite que se parece a la de verdad y que se separa de
+#  ella en el primer cambio — o sea, una medición que miente en cuanto alguien añade una prueba.
 #
-#  🔴 POR QUÉ SOLO ESE ARCHIVO, Y NO `npm test`. Medido el 23-sep-2026: NUEVE archivos de
-#  `pruebas/` leen `guajirago-admin/` y `guajirago-aliados/`, que son repos APARTE y privados
-#  —`grep -rlE "guajirago-admin|guajirago-aliados" pruebas/`—. Un runner que clona solo este repo
-#  no los tiene, y `pruebas/cargar.cjs` lo corta en seco y bien: «Las pruebas necesitan los tres
-#  repos juntos en la carpeta raíz». O sea que `npm test` aquí fallaría por NO TENER LOS REPOS,
-#  no por las pruebas — y ese ruido taparía justo lo que se viene a medir.
-#  `storage.test.js` no los nombra ninguna vez (medido: 0), así que se puede medir sola.
-#  Traer los tres repos hace falta para el botón de DESPLEGAR, y necesita un permiso de lectura
-#  que hoy no existe. Va en ese trabajo, no en éste.
-#
-#  Y NO SE COPIA AQUÍ LA LISTA DE ARCHIVOS DE PRUEBA. Esa lista vive UNA sola vez, en
-#  `pruebas/correr.cjs` (SEGUNDA LEY). Aquí se nombra UN archivo, el que se está midiendo.
+#  🔑 Y LOS TRES REPOS SE TRAEN IGUAL QUE EN EL BOTÓN DE DESPLEGAR. Si se trajeran de otra forma,
+#  esto mediría OTRA cosa y la conclusión no valdría para el botón — que es todo el punto. Que no
+#  se separen lo vigila `pruebas/elBotonDeDesplegar.test.js`, no la buena intención.
 # ══════════════════════════════════════════════════════════════════════════════════════════════
-name: Medir · ¿las pruebas del almacén están rojas de verdad?
+name: Medir · ¿la suite entera corre en una máquina limpia?
 
 on:
   push:
@@ -41,88 +37,155 @@ on:
 
 jobs:
   medir:
-    name: Correr storage.test.js en una máquina limpia
+    name: Correr npm test con los tres repos, en una máquina limpia
     runs-on: ubuntu-latest
     steps:
+      #  Antes de gastar nada: si falta el permiso de lectura, los otros dos repos no se pueden
+      #  traer y lo que se mida no será la suite entera. Se dice y se para, en vez de medir a
+      #  medias y presentarlo como si fuera el total.
+      - name: ¿Está el permiso para traer los otros dos repos?
+        env:
+          LEER: ${{ secrets.LEER_REPOS_HERMANOS }}
+        run: |
+          if [ -z "$LEER" ]; then
+            echo "⛔ FALTA EL SECRETO 'LEER_REPOS_HERMANOS'."
+            echo "   Sin él no se pueden traer guajirago-admin y guajirago-aliados, y sin los tres"
+            echo "   repos juntos NUEVE archivos de pruebas no corren. Medir sin ellos daría un"
+            echo "   número que NO es el de la suite entera, y ese es justo el engaño que este"
+            echo "   botón existe para evitar."
+            echo "   Se crea en: https://github.com/settings/personal-access-tokens/new"
+            {
+              echo "## ⛔ No se pudo medir: falta el permiso de lectura"
+              echo "Sin \`LEER_REPOS_HERMANOS\` no se traen los repos hermanos, y sin ellos esto"
+              echo "no sería la suite entera. No se da un número a medias."
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          echo "✅ El permiso está. Se sigue."
+
+      # ── LOS TRES REPOS, Y EN ESTE ORDEN ────────────────────────────────────────────────────
+      #  El principal va PRIMERO: `checkout` limpia la carpeta donde entra, así que si fuera al
+      #  revés se llevaría por delante a los otros dos.
       - name: Traer el código
         uses: actions/checkout@v4
+
+      #  Los dos hermanos, a la carpeta raíz, que es donde las pruebas los buscan. Medido:
+      #     grep -rcE "guajirago-admin|guajirago-aliados" pruebas/  →  9 archivos, 122 renglones
+      #  Son los amarres que leen los DOS lados de cada contrato entre apps — para eso existen.
+      #  `persist-credentials: false`: el permiso se usa para traerlos y no se queda escrito.
+      - name: Traer guajirago-admin (el otro lado de los contratos)
+        uses: actions/checkout@v4
+        with:
+          repository: frey2605/guajirago-admin
+          token: ${{ secrets.LEER_REPOS_HERMANOS }}
+          path: guajirago-admin
+          persist-credentials: false
+
+      - name: Traer guajirago-aliados (el otro lado de los contratos)
+        uses: actions/checkout@v4
+        with:
+          repository: frey2605/guajirago-aliados
+          token: ${{ secrets.LEER_REPOS_HERMANOS }}
+          path: guajirago-aliados
+          persist-credentials: false
 
       - name: Preparar Node
         uses: actions/setup-node@v4
         with:
           node-version: '22'
-          cache: 'npm'
 
-      # El emulador de Firestore corre sobre Java. En el PC del dueño se busca solo dentro de
-      # Android Studio (`pruebas/correr.cjs`); aquí se pone explícito para que no dependa de lo
-      # que la imagen de GitHub traiga puesto ese día — una versión que cambia sola es la misma
-      # enfermedad que `firebase-tools@latest`.
+      #  El emulador corre sobre Java. Se FIJA la versión en vez de fiarse de lo que la imagen de
+      #  GitHub traiga ese día: una versión que cambia sola es la misma enfermedad que un
+      #  `firebase-tools@latest`.
       - name: Preparar Java (lo necesita el emulador)
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '21'
 
-      - name: Instalar las librerías
+      - name: Instalar las librerías de las pruebas
         run: npm ci
 
-      # Se deja por escrito CON QUÉ se midió. Un número sin las condiciones que lo produjeron no
-      # se puede carear, y carearlo contra el contenedor es todo el punto de este botón.
+      #  La app tiene su propio paquete, aparte. Va con `npm ci` y no con `install`, igual que en
+      #  el botón de desplegar: `ci` instala EXACTAMENTE lo que dice el lock commiteado.
+      - name: Instalar las librerías de la app
+        run: npm ci --prefix guajirago
+
       - name: Decir con qué se está midiendo
         run: |
           echo "sistema : $(uname -sr)"
           echo "node    : $(node -v)"
           echo "java    : $(java -version 2>&1 | head -1)"
           echo "firebase: $(npx --yes firebase-tools@15 --version)"
+          echo "repos   : $(ls -d guajirago guajirago-admin guajirago-aliados 2>&1 | tr '\n' ' ')"
 
-      - name: Correr storage.test.js y ENSEÑAR la cuenta
+      - name: Correr la suite ENTERA y ENSEÑAR la cuenta
         run: |
           set +e
-          npx --yes firebase-tools@15 emulators:exec \
-            --only firestore,storage --project demo-guajirago \
-            "node --test pruebas/storage.test.js" 2>&1 | tee "$RUNNER_TEMP/salida.txt"
+          npm test 2>&1 | tee "$RUNNER_TEMP/salida.txt"
+          SALIDA=${PIPESTATUS[0]}
           set -e
 
-          # Las cuentas las escribe `node --test` al final, en renglones que empiezan por `# `.
-          # Se leen de ahí y no se cuentan a mano: quien sabe cuántas pruebas corrieron es él.
-          TOTAL=$(grep -oP '^# tests \K\d+'  "$RUNNER_TEMP/salida.txt" | tail -1)
-          PASAN=$(grep -oP '^# pass \K\d+'   "$RUNNER_TEMP/salida.txt" | tail -1)
-          FALLAN=$(grep -oP '^# fail \K\d+'  "$RUNNER_TEMP/salida.txt" | tail -1)
+          #  Las cuentas las escribe `node --test` al final de CADA tanda, en renglones que
+          #  empiezan por `# `. Se SUMAN las de todas las tandas: `npm test` encadena cuatro con
+          #  `&&`, así que si una se cae las de después ni corren — y eso también hay que verlo.
+          #  No se cuenta a mano: quien sabe cuántas pruebas corrieron es `node --test`.
+          suma() { grep -oP "^# $1 \K\d+" "$RUNNER_TEMP/salida.txt" | awk '{s+=$1} END {print s+0}'; }
+          TANDAS=$(grep -cP '^# tests \d+' "$RUNNER_TEMP/salida.txt" || true)
+          TOTAL=$(suma tests); PASAN=$(suma pass); FALLAN=$(suma fail)
 
-          if [ -z "$TOTAL" ]; then
-            echo "⛔ NO SE PUDO LEER LA CUENTA: las pruebas ni siquiera llegaron a correr."
-            echo "   Eso YA es una respuesta, y no es la que se buscaba. Mira el registro de arriba:"
-            echo "   lo más probable es que el emulador no arrancara, no que una prueba fallara."
+          if [ "$TANDAS" = "0" ]; then
+            echo "⛔ NO SE PUDO LEER NINGUNA CUENTA: las pruebas ni llegaron a correr."
+            echo "   Eso YA es una respuesta, y es la que se temía. Mira el registro de arriba:"
+            echo "   lo más probable es que un emulador no arrancara, no que una prueba fallara."
             {
-              echo "## ⛔ Las pruebas no llegaron a correr"
-              echo "El emulador no arrancó, o se cayó antes. No hay cuenta que carear."
+              echo "## ⛔ La suite no llegó a correr en GitHub"
+              echo ""
+              echo "No hay ninguna cuenta que leer. **El paso 5 del botón de desplegar NO"
+              echo "funcionaría aquí**, y se pararía con el despliegue a medio camino."
+              echo ""
+              echo "Salida de \`npm test\`: \`$SALIDA\`. El motivo está en el registro."
             } >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
 
           echo ""
           echo "══════════════════════════════════════════════════════════════"
-          echo "  EN ESTA MÁQUINA LIMPIA:   $TOTAL pruebas · $PASAN pasan · $FALLAN fallan"
-          echo "  EN EL CONTENEDOR ERA:     43 pruebas · 29 pasan · 14 fallan"
+          echo "  EN ESTA MÁQUINA LIMPIA:  $TOTAL pruebas · $PASAN pasan · $FALLAN fallan"
+          echo "  tandas que llegaron a correr: $TANDAS de 4"
+          echo "  salida de npm test: $SALIDA"
           echo "══════════════════════════════════════════════════════════════"
 
-          # El veredicto va TAMBIÉN al resumen, que es lo que se ve desde el celular sin tener que
-          # abrir el registro y buscar entre cientos de renglones.
+          #  El veredicto va TAMBIÉN al resumen, que es lo que se ve desde el celular sin abrir el
+          #  registro y buscar entre cientos de renglones.
           {
-            echo "## La cuenta"
+            echo "## La cuenta, con los tres repos juntos"
             echo ""
-            echo "| Dónde | Pruebas | Pasan | Fallan |"
-            echo "|---|---|---|---|"
-            echo "| Máquina limpia de GitHub | $TOTAL | $PASAN | **$FALLAN** |"
-            echo "| Contenedor de la nube | 43 | 29 | **14** |"
+            echo "| | |"
+            echo "|---|---|"
+            echo "| Pruebas | $TOTAL |"
+            echo "| Pasan | $PASAN |"
+            echo "| Fallan | **$FALLAN** |"
+            echo "| Tandas que corrieron | $TANDAS de 4 |"
+            echo "| Salida de \`npm test\` | \`$SALIDA\` |"
             echo ""
-            if [ "$FALLAN" = "0" ]; then
-              echo "### ✅ El rojo NO era de verdad: era la máquina."
-              echo "Aquí pasan todas. El candado del botón de desplegar se puede poner tal cual."
+            if [ "$FALLAN" = "0" ] && [ "$TANDAS" = "4" ] && [ "$SALIDA" = "0" ]; then
+              echo "### ✅ El paso 5 del botón de desplegar SÍ funciona aquí."
+              echo ""
+              echo "Las cuatro tandas corrieron y no falló ninguna prueba. Se puede fusionar a"
+              echo "\`main\` sin que el despliegue se pare en las pruebas."
+            elif [ "$TANDAS" != "4" ]; then
+              echo "### 🔴 Faltaron tandas: solo corrieron $TANDAS de 4."
+              echo ""
+              echo "Una tanda se cayó y las de después ni arrancaron. **El botón de desplegar se"
+              echo "pararía aquí**, con el despliegue a medio camino. Hay que arreglarlo ANTES de"
+              echo "fusionar. La tanda 4 es \`storage.test.js\`; la 2, \`funciones.test.js\`, que es"
+              echo "la que el contenedor de trabajo no puede correr."
             else
-              echo "### 🔴 El rojo SÍ es de verdad: fallan $FALLAN aquí también."
-              echo "Hay que arreglarlas ANTES de automatizar despliegues; si no, el botón"
-              echo "se pararía en las pruebas cada vez que se apriete."
+              echo "### 🔴 Fallan $FALLAN pruebas aquí también."
+              echo ""
+              echo "No es la máquina: corrieron las cuatro tandas. **El botón de desplegar se"
+              echo "pararía en el paso 5.** Hay que arreglarlas antes de fusionar."
             fi
             echo ""
             echo "_Esto es una medición, no un candado: sale en verde igual. El número es el producto._"
