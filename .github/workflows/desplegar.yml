@@ -1,0 +1,283 @@
+# ══════════════════════════════════════════════════════════════════════════════════════════════
+#  EL BOTÓN DE DESPLIEGUE — orden del dueño (23-sep-2026): «despleguemos como lo estoy haciendo
+#  con Control Elite». Copiado de allá y adaptado a lo que se midió aquí.
+#
+#  QUÉ RESUELVE. Hasta hoy desplegar exigía el PC del dueño: la sesión de `firebase` vive allá y
+#  no viaja con el código. Medido el 23-sep: la rama de trabajo llevaba CUATRO arreglos hechos,
+#  probados y guardados, parados esperando a que él se sentara. Con esto lo despliega GitHub, y
+#  él aprieta desde donde esté.
+#
+#  🔴 LO QUE NO SE COPIÓ TAL CUAL, Y POR QUÉ. Aquí NO hay APK que traer, NO hay espejo de Dropbox,
+#  el compilador es react-scripts (`build/`, `static/js/main.<huella>.js`) y no Vite, y hay TRES
+#  repos en vez de uno. Cada diferencia sale de una medición de hoy, escrita abajo donde muerde.
+# ══════════════════════════════════════════════════════════════════════════════════════════════
+name: Desplegar a guajirago.web.app
+
+on:
+  #  Entra algo a main → sale al aire. Igual que en control-elite: allá se midió que con el
+  #  despliegue a mano el trabajo se queda QUIETO —el paso 10 y el 11 dependen de que alguien se
+  #  acuerde— y el dueño ordenó el 22-sep que fuera automático.
+  push:
+    branches: [main]
+  #  🔴 Y EL BOTÓN A MANO SIRVE DESDE CUALQUIER RAMA. Eso es potente y hay que decirlo: lo que
+  #  dispares es lo que SALE AL AIRE, venga de main o no. No hay red debajo.
+  workflow_dispatch:
+
+concurrency:
+  group: despliegue-guajirago
+  cancel-in-progress: false
+
+jobs:
+  desplegar:
+    name: Comprobar, probar, compilar, desplegar y VERIFICAR
+    runs-on: ubuntu-latest
+    steps:
+      # ── ⏱️ LO PRIMERO DE TODO: ¿SE PUEDE, SIQUIERA? ────────────────────────────────────────
+      #  Es la REGLA 1407 de control-elite («antes de gastar en aplicar, se comprueba que se puede
+      #  aplicar»), adelantada todo lo posible: esto no gasta ni un segundo de red. Si falta un
+      #  secreto, morir aquí en vez de dentro de diez minutos es la diferencia entre un aviso y
+      #  una espera — y además el fallo de un `checkout` sin permiso es un error de git que no le
+      #  dice nada a nadie.
+      - name: ⏱️ ¿Están los dos secretos? (antes de gastar nada)
+        env:
+          LLAVE: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          LECTURA: ${{ secrets.LEER_REPOS_HERMANOS }}
+        run: |
+          FALTA=0
+          if [ -z "$LLAVE" ]; then
+            echo "⛔ FALTA LA LLAVE DE FIREBASE (secreto: FIREBASE_SERVICE_ACCOUNT)"
+            echo "   Se pega en: https://github.com/frey2605/guajirago/settings/secrets/actions/new"
+            echo "   El valor es el contenido entero del archivo JSON de la cuenta de servicio."
+            FALTA=1
+          fi
+          if [ -z "$LECTURA" ]; then
+            echo "⛔ FALTA EL PERMISO DE LECTURA (secreto: LEER_REPOS_HERMANOS)"
+            echo "   Sin él no se pueden traer guajirago-admin y guajirago-aliados, y sin los tres"
+            echo "   repos juntos NUEVE archivos de pruebas no pueden correr: el candado del paso 5"
+            echo "   quedaría más flojo que el del PC y no lo diría."
+            echo "   Se crea en: https://github.com/settings/personal-access-tokens/new"
+            echo "     · Only select repositories → guajirago-admin y guajirago-aliados"
+            echo "     · Repository permissions → Contents → Read-only"
+            echo "   🔴 Y CADUCA. Si el botón falla aquí algún día y antes funcionaba, es esto:"
+            echo "      se renueva en la misma página, en un minuto."
+            FALTA=1
+          fi
+          [ "$FALTA" = "0" ] || exit 1
+          echo "✅ Los dos secretos están. Se sigue."
+
+      # ── LOS TRES REPOS, Y EN ESTE ORDEN ────────────────────────────────────────────────────
+      #  El principal va PRIMERO: `checkout` limpia la carpeta donde entra, así que si fuera al
+      #  revés se llevaría por delante a los otros dos.
+      - name: Traer el código
+        uses: actions/checkout@v4
+
+      #  🔴 POR QUÉ HACEN FALTA LOS OTROS DOS (medido el 23-sep-2026):
+      #     grep -rcE "guajirago-admin|guajirago-aliados" pruebas/  →  9 archivos, 122 renglones
+      #  Son los amarres que leen los DOS lados de cada contrato entre apps — para eso existen.
+      #  `pruebas/cargar.cjs` corta en seco si falta uno: «Las pruebas necesitan los tres repos
+      #  juntos en la carpeta raíz; sin el otro lado del contrato no se puede comprobar nada».
+      #  Se traen a la carpeta raíz, que es donde las pruebas los buscan.
+      #  `persist-credentials: false`: el permiso se usa para traerlos y no se queda escrito en
+      #  el `.git` de la máquina. No hace falta después.
+      - name: Traer guajirago-admin (el otro lado de los contratos)
+        uses: actions/checkout@v4
+        with:
+          repository: frey2605/guajirago-admin
+          token: ${{ secrets.LEER_REPOS_HERMANOS }}
+          path: guajirago-admin
+          persist-credentials: false
+
+      - name: Traer guajirago-aliados (el otro lado de los contratos)
+        uses: actions/checkout@v4
+        with:
+          repository: frey2605/guajirago-aliados
+          token: ${{ secrets.LEER_REPOS_HERMANOS }}
+          path: guajirago-aliados
+          persist-credentials: false
+
+      - name: Preparar Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      #  El emulador de Firestore corre sobre Java, y las pruebas no se pueden saltar. Se fija la
+      #  versión en vez de fiarse de lo que traiga la imagen ese día.
+      - name: Preparar Java (lo necesita el emulador)
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Instalar las librerías de las pruebas
+        run: npm ci
+
+      #  🔴 LA APP TIENE SU PROPIO PAQUETE, APARTE (`guajirago/`). Sin esto no hay con qué
+      #  compilar. Y va con `npm ci`, no con `npm install`, a propósito: `ci` instala EXACTAMENTE
+      #  lo que dice el lock commiteado. Un `install` resolvería versiones nuevas en cada
+      #  despliegue, y entonces lo que sale al aire no es lo que se probó — que es la misma
+      #  enfermedad que un `firebase-tools@latest`.
+      - name: Instalar las librerías de la app
+        run: npm ci --prefix guajirago
+
+      # ── ⏱️ VIGÍA DE PERMISOS · REGLA 1407, ANTES DE LAS PRUEBAS ────────────────────────────
+      #  Preguntarle a Google si esta llave sirve tarda segundos; las pruebas tardan minutos.
+      #  De dónde sale la regla (control-elite, 21-sep-2026): subir la nube costó CUATRO viajes
+      #  del dueño a la consola de Google porque los permisos salían de uno en uno, y CADA intento
+      #  corría las pruebas enteras antes de morir. Las pruebas no causaron la demora: la
+      #  multiplicaron por cuatro.
+      #
+      #  ⚠️ QUÉ COMPRUEBA Y QUÉ NO, dicho en vez de presumido. Se le pide a Hosting la lista de
+      #  canales: eso es una llamada de VERDAD, con esta llave, contra este proyecto, y no
+      #  necesita nada compilado. Caza que la llave falte, esté rota, no tenga acceso a Hosting o
+      #  apunte a otro proyecto. NO caza que tenga lectura pero no ESCRITURA: eso solo lo dice el
+      #  despliegue. Se eligió así porque el simulacro de despliegue (`--dry-run`) necesita el
+      #  paquete ya compilado, y entonces ya se habrían gastado las pruebas — que es justo lo que
+      #  esta regla existe para evitar.
+      #
+      #  🔑 Y NO PUEDE DAR FALSA ALARMA: solo PARA si lo que Google contesta habla de un permiso.
+      #  Cualquier otro tropiezo avisa y SIGUE, porque el despliegue de verdad es quien manda. Un
+      #  vigía que grita sin fuego se deja de mirar, y éste protege al que más falta hace.
+      - name: ⏱️ ¿Esta llave PUEDE desplegar? (segundos, antes de las pruebas)
+        env:
+          LLAVE: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          printf '%s' "$LLAVE" > "$RUNNER_TEMP/llave.json"
+          export GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/llave.json"
+          set +e
+          SALIDA=$(npx --yes firebase-tools@15 hosting:channel:list \
+            --project guajirago --non-interactive 2>&1)
+          CODIGO=$?
+          set -e
+          rm -f "$RUNNER_TEMP/llave.json"
+          if [ "$CODIGO" -eq 0 ]; then
+            echo "✅ La llave habla con Hosting de este proyecto. Se sigue a las pruebas."
+            exit 0
+          fi
+          echo "$SALIDA"
+          echo ""
+          if echo "$SALIDA" | grep -qiE "permission|permisos|403|401|denied|PERMISSION_DENIED|lacks IAM|Please ask a project owner|invalid_grant|Failed to authenticate"; then
+            echo "⛔ LA LLAVE NO PUEDE. Se para aquí, ANTES de gastar las pruebas en un despliegue"
+            echo "   que iba a morir igual. Arriba está lo que contestó Google."
+            echo ""
+            echo "   La cuenta de la llave necesita, en:"
+            echo "   https://console.cloud.google.com/iam-admin/iam?project=guajirago"
+            echo "     · Administrador de Firebase Hosting"
+            echo ""
+            echo "   Si dice «invalid_grant» o «Failed to authenticate», la llave está mal pegada"
+            echo "   o fue borrada en Google. Se pega el JSON ENTERO, sin cortar, en el secreto"
+            echo "   FIREBASE_SERVICE_ACCOUNT."
+            exit 1
+          fi
+          echo "::warning title=El vigía de permisos no pudo comprobar::Falló por algo que NO parece"
+          echo "un permiso. NO se para: el despliegue de verdad decide."
+          echo "🔁 SE SIGUE."
+
+      # ── PASO 5 · PROBAR — EL CANDADO ───────────────────────────────────────────────────────
+      #  Si una prueba falla, aquí se para y NO se despliega. Es el paso 5 de los catorce
+      #  convertido en cerrojo, no en buena intención.
+      #  🔴 Y AHORA SÍ SIGNIFICA LO MISMO QUE EN EL PC, porque arriba se trajeron los tres repos.
+      #  Con uno solo, nueve archivos ni arrancarían: sería un candado más flojo y no lo diría.
+      - name: Correr TODAS las pruebas (si una falla, aquí se para)
+        run: npm test
+
+      # ── PASO 10 · APLICAR ──────────────────────────────────────────────────────────────────
+      #  🔴 DESDE DENTRO DE `guajirago/`, Y ESTO NO ES UN DETALLE. El `firebase.json` de la RAÍZ
+      #  también dice `"public": "build"`, y ese `build` de la raíz es un resto de JUNIO. Compilar
+      #  o desplegar desde la raíz publica ese resto y tumba la app del cliente. Está escrito en
+      #  las TRAMPAS del repo y en el paso 10: «desde dentro de la carpeta de cada app».
+      - name: Compilar la app (desde dentro de guajirago/)
+        working-directory: guajirago
+        run: npm run build
+
+      #  Lo compilado lleva HUELLA en el nombre (main.22a620c9.js). Se anota ANTES de desplegar:
+      #  es contra esto que se le pregunta después a la nube si de verdad sirve lo nuevo.
+      - name: Anotar qué se acaba de compilar
+        id: compilado
+        run: |
+          ARCHIVO=$(grep -oE 'static/js/main\.[a-z0-9]+\.js' guajirago/build/index.html | head -1)
+          if [ -z "$ARCHIVO" ]; then
+            echo "⛔ no se encontró el archivo compilado dentro de guajirago/build/index.html."
+            echo "   Sin saber qué se compiló, el paso 11 no puede comprobar nada: se para."
+            exit 1
+          fi
+          echo "archivo=$ARCHIVO" >> "$GITHUB_OUTPUT"
+          echo "Se compiló: $ARCHIVO"
+
+      #  La llave se escribe a un archivo temporal del propio trabajo y se borra en cuanto se usa.
+      #  Nunca se imprime: GitHub tapa los secretos en el registro, pero igual no se le pide que
+      #  los enseñe.
+      - name: Desplegar a Firebase (desde dentro de guajirago/)
+        working-directory: guajirago
+        env:
+          LLAVE: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          printf '%s' "$LLAVE" > "$RUNNER_TEMP/llave.json"
+          export GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/llave.json"
+          npx --yes firebase-tools@15 deploy --only hosting \
+            --project guajirago --non-interactive
+          rm -f "$RUNNER_TEMP/llave.json"
+
+      # ── PASO 11 · VERIFICAR CONTRA LA NUBE ─────────────────────────────────────────────────
+      #  Que el despliegue diga «listo» NO es prueba de nada. Aquí no se le cree al comando: se le
+      #  pregunta al sitio.
+      #  🔑 CON PACIENCIA, y no por blandura (control-elite, 17-sep-2026, medido): preguntarle a
+      #  la nube 0,3 segundos después de desplegar la pilló repartiendo todavía y puso el botón
+      #  ROJO con el despliegue bien hecho. Una alarma que grita sin fuego enseña a ignorar la
+      #  alarma — precisamente ésta. El límite es duro: al pasarlo se pone rojo igual, y dice que
+      #  a esas alturas ya no es la repartición.
+      - name: Preguntarle a la nube si de verdad quedó puesto
+        run: |
+          SITIO="https://guajirago.web.app"
+          ESPERADO="${{ steps.compilado.outputs.archivo }}"
+          LIMITE=120
+          ESPERA=5
+          INICIO=$SECONDS
+          INTENTO=0
+          echo "Se le pregunta a $SITIO, con paciencia: hasta ${LIMITE}s."
+          while :; do
+            INTENTO=$((INTENTO + 1))
+            CODIGO=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 "$SITIO/" || true)
+            # Se busca el nombre CON HUELLA, que no miente: el minificador renombra las funciones,
+            # pero este nombre lo pone el compilador y cambia con cada compilado.
+            SERVIDO=$(curl -s --max-time 30 "$SITIO/" | grep -oE 'static/js/main\.[a-z0-9]+\.js' | head -1)
+            echo "  intento $INTENTO · responde $CODIGO · sirve ${SERVIDO:-(nada)}"
+
+            FALLA=""
+            if [ "$CODIGO" != "200" ]; then
+              FALLA="el sitio no está respondiendo bien (respondió $CODIGO)"
+            elif [ "$SERVIDO" != "$ESPERADO" ]; then
+              FALLA="LA NUBE SIGUE SIRVIENDO OTRO ARCHIVO: se compiló «$ESPERADO» y sirve «${SERVIDO:-nada}»"
+            fi
+
+            [ -z "$FALLA" ] && break
+
+            if [ $((SECONDS - INICIO)) -ge "$LIMITE" ]; then
+              echo ""
+              echo "⛔ $FALLA"
+              echo "   Se reintentó durante ${LIMITE}s ($INTENTO veces). Esto YA NO es que la nube"
+              echo "   esté repartiendo: el sitio NO quedó como se esperaba."
+              {
+                echo "## ⛔ El despliegue NO quedó comprobado"
+                echo ""
+                echo "$FALLA"
+              } >> "$GITHUB_STEP_SUMMARY"
+              exit 1
+            fi
+            sleep "$ESPERA"
+          done
+
+          echo ""
+          echo "✅ DESPLEGADO Y COMPROBADO a los $((SECONDS - INICIO))s: la nube sirve lo que se acaba de compilar."
+          # El veredicto va también al resumen, que es lo que se ve desde el celular sin abrir el
+          # registro y buscar entre cientos de renglones.
+          {
+            echo "## ✅ Desplegado y comprobado"
+            echo ""
+            echo "| | |"
+            echo "|---|---|"
+            echo "| Sitio | $SITIO |"
+            echo "| Sirve | \`$ESPERADO\` |"
+            echo "| Commit | \`${GITHUB_SHA:0:7}\` |"
+            echo ""
+            echo "No se le creyó al despliegue: se le preguntó al sitio, y contestó lo esperado."
+          } >> "$GITHUB_STEP_SUMMARY"
