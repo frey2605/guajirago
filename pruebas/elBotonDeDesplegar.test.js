@@ -47,6 +47,9 @@ const YML_REGLAS = leer(BOTON_REGLAS);
 const BOTON_PANEL = '.github/workflows/desplegar-panel-y-aliados.yml';
 const YML_PANEL = leer(BOTON_PANEL);
 
+const BOTON_NUBE = '.github/workflows/desplegar-funciones.yml';
+const YML_NUBE = leer(BOTON_NUBE);
+
 /** Fuera los comentarios: de YAML y de shell. Son el señuelo, no el código. */
 function sinComentarios(yml) {
   return yml.split('\n').filter((l) => !l.trimStart().startsWith('#')).join('\n');
@@ -633,6 +636,163 @@ describe('EL BOTÓN DEL PANEL Y ALIADOS · publica dos apps, y no puede confundi
     }
     assert.deepEqual(mudos, [],
       '🔴 EL AMARRE DEL PANEL NO MUERDE en ' + mudos.length + ' de ' + SABOTAJES.length
+      + ':\n  · ' + mudos.join('\n  · '));
+  });
+});
+
+/**
+ * ══════════════════════════════════════════════════════════════════════════════
+ *  EL QUINTO BOTÓN: LA NUBE (functions)
+ *
+ *  Publica las 19 funciones que mueven el negocio: los avisos al conductor, el
+ *  cierre de los viajes colgados, el canje de recargas, los cobros. Sus peligros
+ *  propios:
+ *
+ *    · **`--force`**. Si la nube tiene una función que el código ya no trae, el
+ *      despliegue OFRECE borrarla; `--force` la borra. Borrar una función viva
+ *      deja a los conductores sin avisos, o sin cobrar.
+ *    · **el vigía sin librerías**. `firebase` LEE el código de las funciones para
+ *      descubrir los disparadores; si el vigía corre antes de instalarlas, falla
+ *      por falta de librerías y no por permisos — una falsa alarma puesta por
+ *      nosotros, que es lo que enseña a ignorar al vigía.
+ *    · **la lista de funciones copiada**. El paso 11 exige que estén TODAS, y esa
+ *      lista sale de `index.js`. Copiada en el YAML, el día que se añada una
+ *      función nadie actualiza el botón y el paso 11 firma verde sin mirarla.
+ * ══════════════════════════════════════════════════════════════════════════════
+ */
+function losFallosDeLaNube(yml) {
+  const q = [];
+  const pasos = losPasos(yml);
+  const limpio = sinComentarios(yml);
+
+  if (/--force/.test(limpio)) {
+    q.push('FORCE: `--force` convierte «ofrece borrar una función» en «la borra», y una '
+      + 'función borrada deja a los conductores sin avisos o sin cobrar');
+  }
+  if (/--only\s+\S*hosting/.test(limpio)) {
+    q.push('HOSTING: este botón es de la nube y nombra `hosting`');
+  }
+
+  const iLibs = elPasoQue(pasos, 'npm ci --prefix guajirago/functions');
+  const iVigia = elPasoQue(pasos, '--dry-run');
+  const iPruebas = elPasoQue(pasos, 'npm test');
+  const iDespliega = elPasoQue(pasos, 'deploy --only functions', 'working-directory');
+  const iComprueba = elPasoQue(pasos, 'functions:list');
+
+  if (iLibs < 0) q.push('LIBRERIAS: ya no se instalan las librerías de la nube');
+  if (iVigia < 0) q.push('VIGIA: desapareció el simulacro de permisos (`--dry-run`)');
+  if (iPruebas < 0) q.push('PRUEBAS: el botón ya no corre `npm test`');
+  if (iComprueba < 0) q.push('COMPRUEBA: ya nadie le pregunta a la nube qué funciones tiene');
+
+  if (iVigia >= 0 && iPruebas >= 0 && iVigia > iPruebas) {
+    q.push('VIGIA: quedó DESPUÉS de las pruebas, así que no ahorra nada y es un adorno');
+  }
+  if (iLibs >= 0 && iVigia >= 0 && iLibs > iVigia) {
+    q.push('LIBRERIAS: se instalan DESPUÉS del vigía, así que el vigía fallaría por falta de '
+      + 'librerías y no por permisos: una falsa alarma puesta por nosotros');
+  }
+  //  El despliegue va desde dentro de `guajirago/`, y se mira EN SU PROPIO PASO.
+  if (elPasoQue(pasos, 'deploy --only functions') >= 0 && iDespliega < 0) {
+    q.push('CARPETA: el paso que despliega la nube perdió su `working-directory`');
+  }
+  if (iComprueba >= 0) {
+    const c = pasos[iComprueba];
+    if (!c.includes('guajirago/functions/index.js')) {
+      q.push('LISTA: la comprobación ya no saca los nombres de `index.js`. Una lista copiada '
+        + 'en el YAML se queda vieja en cuanto se añada una función, y el paso 11 firma verde '
+        + 'sin haberla mirado');
+    }
+    if (!c.includes('exit 1')) {
+      q.push('COMPRUEBA: ya no puede ponerse ROJA: mira y sigue en verde pase lo que pase');
+    }
+  }
+  for (const repo of ['frey2605/guajirago-admin', 'frey2605/guajirago-aliados']) {
+    const i = elPasoQue(pasos, repo);
+    if (i < 0) q.push('REPOS: ya no se trae ' + repo);
+    else if (iPruebas >= 0 && i > iPruebas) q.push('REPOS: ' + repo + ' llega tarde');
+  }
+  if (!/firebase-tools@15/.test(limpio) || /firebase-tools@latest/.test(limpio)) {
+    q.push('VERSION: la herramienta no está fijada en 15');
+  }
+  return q;
+}
+
+describe('EL BOTÓN DE LA NUBE · 19 funciones, y ninguna se puede quedar por el camino', () => {
+  it('hoy no tiene ninguna queja', () => {
+    const q = losFallosDeLaNube(YML_NUBE);
+    assert.deepEqual(q, [], '🔴 perdió una protección:\n  · ' + q.join('\n  · '));
+  });
+
+  it('NUNCA usa `--force`: eso borra funciones vivas', () => {
+    assert.ok(!/--force/.test(sinComentarios(YML_NUBE)),
+      '⛔ `--force` borra la función que el código ya no trae, sin preguntar');
+  });
+
+  it('las librerías de la nube se instalan ANTES del vigía, o el vigía miente', () => {
+    const pasos = losPasos(YML_NUBE);
+    const iLibs = elPasoQue(pasos, 'npm ci --prefix guajirago/functions');
+    const iVigia = elPasoQue(pasos, '--dry-run');
+    assert.ok(iLibs >= 0 && iVigia >= 0, '⛔ falta una de las dos piezas');
+    assert.ok(iLibs < iVigia,
+      '⛔ el vigía correría sin las librerías: fallaría por falta de librerías, no por permisos');
+  });
+
+  it('la lista de funciones se SACA de index.js, no se copia', () => {
+    const pasos = losPasos(YML_NUBE);
+    const i = elPasoQue(pasos, 'functions:list');
+    assert.ok(i >= 0, '⛔ ya nadie le pregunta a la nube');
+    assert.ok(pasos[i].includes('guajirago/functions/index.js'),
+      '⛔ la lista dejó de salir de index.js: una copia se queda vieja con la primera función nueva');
+    assert.ok(pasos[i].includes('exit 1'), '⛔ la comprobación ya no puede parar');
+  });
+
+  it('y no se puede ablandar: ocho botones de nube rotos, y se queja de los ocho', () => {
+    const { cabeza, pasos } = enTrozos(YML_NUBE);
+    const juntar = (ps) => cabeza + '\n' + ps.join('\n');
+    const idx = (t) => pasos.findIndex((p) => sinComentarios(p).includes(t));
+    const quitar = (t) => juntar(pasos.filter((p, i) => i !== idx(t)));
+    const cambiar = (viejo, nuevo) => juntar(pasos).replace(viejo, nuevo);
+    //  Cambia DENTRO de un paso concreto. Hace falta porque `exit 1` aparece en varios
+    //  pasos: tocar «el primero del archivo» saboteaba otro y el sabotaje no mordía —
+    //  lo cazó el propio contador de sabotajes mudos el 23-sep-2026.
+    const enElPaso = (donde, viejo, nuevo) => {
+      const ps = [...pasos];
+      const i = idx(donde);
+      ps[i] = ps[i].replace(viejo, nuevo);
+      return juntar(ps);
+    };
+    const mover = (de, tras) => {
+      const ps = [...pasos];
+      const [trozo] = ps.splice(idx(de), 1);
+      const j = ps.findIndex((p) => sinComentarios(p).includes(tras));
+      ps.splice(j + 1, 0, trozo);
+      return juntar(ps);
+    };
+
+    const SABOTAJES = [
+      ['forzando el despliegue (borra funciones)',
+        cambiar('--project guajirago --non-interactive\n          rm -f',
+          '--project guajirago --non-interactive --force\n          rm -f'), 'FORCE'],
+      ['el vigía, movido detrás de las pruebas', mover('--dry-run', 'npm test'), 'VIGIA'],
+      ['las librerías de la nube, después del vigía',
+        mover('npm ci --prefix guajirago/functions', '--dry-run'), 'LIBRERIAS'],
+      ['sin las librerías de la nube', quitar('npm ci --prefix guajirago/functions'), 'LIBRERIAS'],
+      ['la lista de funciones, copiada a mano en el YAML',
+        cambiar("grep -oE '^exports\\.[a-zA-Z0-9_]+' guajirago/functions/index.js",
+          "echo 'notificarNuevoViaje'"), 'LISTA'],
+      ['la comprobación, sin poder ponerse roja',
+        enElPaso('functions:list', /exit 1/g, 'exit 0'), 'COMPRUEBA'],
+      ['sin correr las pruebas', cambiar('run: npm test', 'run: echo saltado'), 'PRUEBAS'],
+      ['la herramienta suelta', cambiar(/firebase-tools@15/g, 'firebase-tools@latest'), 'VERSION'],
+    ];
+
+    const mudos = [];
+    for (const [nombre, roto, marca] of SABOTAJES) {
+      const q = losFallosDeLaNube(roto);
+      if (!q.some((x) => x.startsWith(marca))) mudos.push(nombre + ' (esperaba ' + marca + ')');
+    }
+    assert.deepEqual(mudos, [],
+      '🔴 EL AMARRE DE LA NUBE NO MUERDE en ' + mudos.length + ' de ' + SABOTAJES.length
       + ':\n  · ' + mudos.join('\n  · '));
   });
 });
