@@ -22,6 +22,15 @@ on:
   #  🔴 Y EL BOTÓN A MANO SIRVE DESDE CUALQUIER RAMA. Eso es potente y hay que decirlo: lo que
   #  dispares es lo que SALE AL AIRE, venga de main o no. No hay red debajo.
   workflow_dispatch:
+    inputs:
+      #  🔴 POR QUÉ ESTE BOTÓN PREGUNTA Y EL AUTOMÁTICO NO. Al apretarlo a mano no hay «commit de
+      #  antes» contra el que comparar, así que la guardia de las reglas NO PUEDE mirar nada. En vez
+      #  de adivinar —o de dejar pasar en silencio, que es lo que mata la app— se le pregunta a
+      #  quien lo aprieta, UNA vez, en la pantalla. Un «no sé» declarado vale más que un «supongo».
+      reglas_ya_estan:
+        description: '¿Las reglas e índices que este código necesita YA están puestos en el servidor?'
+        type: boolean
+        default: false
 
 concurrency:
   group: despliegue-guajirago
@@ -68,8 +77,94 @@ jobs:
       # ── LOS TRES REPOS, Y EN ESTE ORDEN ────────────────────────────────────────────────────
       #  El principal va PRIMERO: `checkout` limpia la carpeta donde entra, así que si fuera al
       #  revés se llevaría por delante a los otros dos.
+      #  La historia ENTERA, y no por gusto: la guardia de las reglas que va justo debajo compara
+      #  este commit contra el de antes, y con un clon cortado ese commit no existe en la máquina.
       - name: Traer el código
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # ── ⛔ LA GUARDIA DE LAS REGLAS · ESTE BOTÓN PUBLICA LA APP, NO LAS REGLAS ──────────────
+      #  🔴 DE DÓNDE SALE (23-sep-2026, el mismo día que nació este botón). El paso 1 de las leyes
+      #  lo dice con todas las letras: «desplegar las apps antes que las reglas mata la app EN
+      #  SILENCIO». Hasta hoy eso lo cuidaba una persona, que desplegaba en orden. Desde que este
+      #  botón sale solo al entrar algo a main, la mitad peligrosa del par quedó automatizada y la
+      #  otra no: si un cambio toca las reglas, la app se publica sin ellas y nadie se entera.
+      #
+      #  🔴 Y NO ES UN CASO RARO. Medido ese día: de los ÚLTIMOS 30 commits de main, **11** tocaron
+      #  reglas o índices; en todo el historial, **22 de 50**. Casi cuatro de cada diez. Así que
+      #  esta guardia va a saltar a menudo — y eso no es un defecto suyo, es la prueba de que el
+      #  botón de las reglas hace falta ya.
+      #
+      #  🔑 LA LISTA DE ARCHIVOS NO SE COPIA AQUÍ: SE LE PREGUNTA A `firebase.json`, que es quien
+      #  de verdad decide qué se despliega (SEGUNDA LEY). Si mañana alguien renombra las reglas,
+      #  una lista escrita a mano aquí se quedaría vieja y la guardia miraría un archivo que ya no
+      #  existe — ciega, y en verde. Preguntándole al que manda, un renombrado no la engaña.
+      #  Y `firestore.rules.LIVE` NO entra: es la copia BAJADA del servidor, no se despliega
+      #  (comprobado: `firebase.json` no la nombra ninguna vez).
+      - name: ⛔ ¿Este cambio toca las REGLAS? (este botón no las publica)
+        run: |
+          ARCHIVOS=$(node -e "
+            const d = require('./firebase.json');
+            const l = [
+              d.firestore && d.firestore.rules,
+              d.firestore && d.firestore.indexes,
+              d.storage && d.storage.rules,
+            ].filter(Boolean);
+            if (!l.length) { console.error('vacio'); process.exit(1); }
+            console.log(l.join(' '));
+          ") || {
+            echo "⛔ NO SE PUDO LEER QUÉ REGLAS DESPLIEGA firebase.json."
+            echo "   O le quitaron las secciones \`firestore\`/\`storage\`, o el archivo está roto."
+            echo "   Sin saber qué proteger, esta guardia sería un adorno: se para."
+            exit 1
+          }
+          echo "Vigilando: $ARCHIVOS"
+
+          ANTES="${{ github.event.before }}"
+          if [ -n "$ANTES" ] && [ "$ANTES" != "0000000000000000000000000000000000000000" ] \
+             && git cat-file -e "$ANTES^{commit}" 2>/dev/null; then
+            TOCADAS=$(git diff --name-only "$ANTES" "$GITHUB_SHA" -- $ARCHIVOS)
+            if [ -z "$TOCADAS" ]; then
+              echo "✅ Este cambio no toca reglas ni índices. Se sigue."
+              exit 0
+            fi
+            echo "⛔ ESTE CAMBIO TOCA LAS REGLAS, Y ESTE BOTÓN NO LAS PUBLICA:"
+            for t in $TOCADAS; do echo "     · $t"; done
+            echo ""
+            echo "   Publicar la app sin las reglas que necesita la mata EN SILENCIO: no da error,"
+            echo "   no sale nada en rojo, simplemente deja de funcionar en la cara del usuario."
+            echo "   Está en el paso 1 de las leyes del proyecto."
+            echo ""
+            echo "   QUÉ HACER HOY: desplegar las reglas primero (desde la RAÍZ), comprobar que"
+            echo "   están puestas, y entonces apretar este botón a mano marcando la casilla"
+            echo "   «¿Las reglas ya están puestas?»."
+            echo "   QUÉ FALTA PARA NO TENER QUE HACERLO A MANO: el botón de las reglas."
+            {
+              echo "## ⛔ Parado: este cambio toca las reglas"
+              echo ""
+              for t in $TOCADAS; do echo "- \`$t\`"; done
+              echo ""
+              echo "Este botón publica **la app**, no las reglas. Publicarla sin ellas la mata en silencio."
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+
+          # Sin commit anterior: es el botón a mano, o una rama nueva. Aquí no hay nada que mirar,
+          # así que decide quien lo apretó — y si no dijo nada, se para. El silencio no vale.
+          if [ "${{ github.event.inputs.reglas_ya_estan }}" = "true" ]; then
+            echo "::warning title=Las reglas no se comprobaron::Nadie las miró: quien apretó el botón"
+            echo "dijo que ya están puestas. Si no lo estaban, la app va a fallar en silencio."
+            echo "⚠ Se sigue porque lo dijiste tú, no porque se haya comprobado."
+            exit 0
+          fi
+          echo "⛔ NO HAY CON QUÉ COMPARAR, así que no se puede saber si este cambio toca las reglas."
+          echo "   (Es el botón a mano, o una rama nueva: no hay «commit de antes».)"
+          echo ""
+          echo "   Si ya comprobaste que las reglas e índices están puestos en el servidor, vuelve a"
+          echo "   apretar el botón MARCANDO la casilla «¿Las reglas ya están puestas?»."
+          echo "   Si no lo has comprobado, esto te acaba de ahorrar tumbar la app."
+          exit 1
 
       #  🔴 POR QUÉ HACEN FALTA LOS OTROS DOS (medido el 23-sep-2026):
       #     grep -rcE "guajirago-admin|guajirago-aliados" pruebas/  →  9 archivos, 122 renglones

@@ -137,6 +137,34 @@ function losFallos(yml) {
     }
   }
 
+  // ── 4bis · Este botón publica la APP, no las reglas ──────────────────────────
+  //  Publicar la app sin las reglas que necesita la mata EN SILENCIO (paso 1 de las
+  //  leyes). Antes lo cuidaba una persona; desde que el botón sale solo, lo tiene
+  //  que cuidar el botón. Y no es un caso raro: 11 de los últimos 30 commits de
+  //  main tocaron reglas o índices.
+  const iReglas = elPasoQue(pasos, 'github.event.before');
+  if (iReglas < 0) {
+    q.push('REGLAS: desapareció la guardia que para si el cambio toca reglas o índices. '
+      + 'El botón publicaría la app sin ellas y la mataría en silencio');
+  } else {
+    const g = pasos[iReglas];
+    if (!g.includes("require('./firebase.json')")) {
+      q.push('REGLAS: la guardia ya no le pregunta a `firebase.json` qué archivos protege. '
+        + 'Una lista copiada aquí se queda vieja con un renombrado, y entonces mira en verde '
+        + 'un archivo que ya no existe');
+    }
+    if (!g.includes('exit 1')) {
+      q.push('REGLAS: la guardia ya no puede PARAR: mira y deja pasar');
+    }
+    if (iDespliega >= 0 && iReglas > iDespliega) {
+      q.push('REGLAS: la guardia quedó DESPUÉS de desplegar, así que avisa cuando ya no sirve');
+    }
+    if (!/reglas_ya_estan/.test(limpio)) {
+      q.push('REGLAS: el botón a mano perdió la casilla `reglas_ya_estan`, así que no hay forma '
+        + 'de decir «ya las comprobé»: o queda trancado, o alguien le quitará la guardia entera');
+    }
+  }
+
   // ── 5 · El orden del final ───────────────────────────────────────────────────
   if (iPruebas >= 0 && iDespliega >= 0 && iPruebas > iDespliega) {
     q.push('CANDADO: las pruebas corren DESPUÉS de desplegar: el paso 5 dejó de ser candado');
@@ -200,6 +228,18 @@ describe('EL BOTÓN DE DESPLEGAR · sus cuatro protecciones siguen donde sirven'
       '⛔ la comprobación ya no puede fallar: mira y sigue en verde pase lo que pase');
   });
 
+  it('para si el cambio toca las REGLAS, y le pregunta a firebase.json cuáles son', () => {
+    const pasos = losPasos(YML);
+    const i = elPasoQue(pasos, 'github.event.before');
+    assert.ok(i >= 0, '⛔ desapareció la guardia de las reglas: el botón publicaría la app sin ellas');
+    assert.ok(pasos[i].includes("require('./firebase.json')"),
+      '⛔ la guardia dejó de preguntarle a `firebase.json` qué proteger: una lista copiada '
+      + 'se queda vieja con un renombrado y la guardia mira en verde un archivo que ya no existe');
+    assert.ok(pasos[i].includes('exit 1'), '⛔ la guardia ya no puede parar el despliegue');
+    assert.ok(i < elPasoQue(pasos, 'deploy --only hosting'),
+      '⛔ la guardia avisa DESPUÉS de desplegar: cuando ya no sirve de nada');
+  });
+
   it('la herramienta de desplegar está FIJADA, no `@latest`', () => {
     assert.ok(!/firebase-tools@latest/.test(sinComentarios(YML)),
       '⛔ `@latest`: el despliegue cambiaría de comportamiento sin commit');
@@ -244,6 +284,15 @@ describe('EL BOTÓN DE DESPLEGAR · sus cuatro protecciones siguen donde sirven'
       ['la nube, sin poder ponerse roja', enElPaso('guajirago.web.app', 'exit 1', 'exit 0'), 'NUBE'],
       ['la nube, comparándose consigo misma', enElPaso('guajirago.web.app', '"$SERVIDO" != "$ESPERADO"', '"$SERVIDO" != "$SERVIDO"'), 'NUBE'],
       ['la herramienta suelta otra vez', juntar(pasos).replace(/firebase-tools@15/g, 'firebase-tools@latest'), 'VERSION'],
+      ['sin la guardia de las reglas', quitar('github.event.before'), 'REGLAS'],
+      ['la guardia de las reglas, que mira y deja pasar',
+        enElPaso('github.event.before', /exit 1/g, 'exit 0'), 'REGLAS'],
+      ['la guardia con la lista copiada a mano en vez de preguntarle a firebase.json',
+        enElPaso('github.event.before', "require('./firebase.json')", "({firestore:{rules:'firestore.rules'}})"), 'REGLAS'],
+      ['la guardia de las reglas, movida detrás del despliegue',
+        mover('github.event.before', 'deploy --only hosting'), 'REGLAS'],
+      ['el botón a mano, sin la casilla para decir «ya las comprobé»',
+        juntar(pasos).replace(/reglas_ya_estan/g, 'otra_cosa'), 'REGLAS'],
     ];
 
     const mudos = [];
