@@ -3302,14 +3302,40 @@ describe('EL VIAJE NO NACE EN LA PLAZA · sin GPS no se pide a ciegas', () => {
       ['el aviso del botón verde se le pasa a un `() => {}`',
         (s) => s.replace(/onNoSePudo=\{\(porque\) => setAviso\(NO_SE_DONDE_ESTAS\(esMensajeria, porque\)\)\}/,
           'onNoSePudo={() => {}}')],
+      //  🔴 EL ORDEN DE LOS DOS INTENTOS DEL GPS (23-sep-2026). El fallo que el
+      //  dueño midió con su teléfono dentro de su casa: el respaldo pedía algo
+      //  MÁS DIFÍCIL que el intento que ya había fallado.
+      ['vuelve el orden de antes: primero el aproximado, y de respaldo el satélite',
+        (s) => s.replace(/\{ enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 \}/,
+          '{ enableHighAccuracy: false, timeout: 8000, maximumAge: 0 }')
+          .replace(/\{ enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 \}/,
+            '{ enableHighAccuracy: true, timeout: 20000 }')],
+      //  Y el disfraz del mismo fallo: pedir satélite LAS DOS VECES. El respaldo
+      //  no pide «más» que el primero —pide lo mismo—, así que la fila del orden
+      //  lo deja pasar; el que lo caza es el pasajero bajo techo, ejecutado.
+      //  Sin el aparato que niega el SATÉLITE (y no el turno) esto pasaba.
+      ['los dos intentos piden satélite, que bajo techo no hay',
+        (s) => s.replace(/\{ enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 \}/,
+          '{ enableHighAccuracy: true, timeout: 10000, maximumAge: 300000 }')],
+      ['vuelve el `maximumAge: 0`: una posición buena de hace un momento se tira',
+        (s) => s.replace(/maximumAge: 60000/, 'maximumAge: 0')],
+      ['el respaldo desaparece y solo queda un intento',
+        (s) => s.replace(
+          /\(\) => navigator\.geolocation\.getCurrentPosition\([\s\S]*?maximumAge: 300000 \}\s*\)/,
+          '() => setUbicacionPasajero(centroRiohacha)')],
+      //  Y la forma fácil de poner verde todo lo de arriba: esperar más hasta que
+      //  el aparato acabe contestando. Eso empeora justo lo que se vino a
+      //  mejorar, así que tiene que caer por NOROMPER, no por FALLOS.
+      ['se alarga la espera hasta que el aparato ceda (el pasajero, callado)',
+        (s) => s.replace(/timeout: 10000, maximumAge: 300000/, 'timeout: 45000, maximumAge: 300000')],
     ];
 
     // Y QUE LA LISTA NO SE VACÍE. Sin esto, borrar escapes pondría esta prueba
     // más verde cuanto menos vigilara — que es como se apagan los vigilantes.
-    assert.ok(ESCAPES.length >= 34,
-      'esta prueba solo vigila ' + ESCAPES.length + ' escapes, y el 23-sep-2026 vigilaba 34 '
-      + '(eran 24 el 15-sep-2026, los 5 del GPS tardío entraron el 21, y los 5 de las '
-      + 'tres salidas mudas del botón verde el 23). '
+    assert.ok(ESCAPES.length >= 39,
+      'esta prueba solo vigila ' + ESCAPES.length + ' escapes, y el 23-sep-2026 vigilaba 39 '
+      + '(eran 24 el 15-sep-2026, los 5 del GPS tardío entraron el 21, y el 23 entraron '
+      + 'los 5 de las tres salidas mudas del botón verde y los 5 del orden de los intentos). '
       + 'Quitar escapes la pone verde por mirar menos, no por estar mejor.');
 
     const saltados = [];

@@ -503,12 +503,31 @@ function elGpsDeLaPantalla(contesta) {
 
   const delAparato = { lat: 11.5312, lng: -72.9241 };
   const puesto = { ubicacion: null, esDelGps: null };
-  // Un aparato de mentira: o contesta con una posición, o falla las dos veces.
+  // 🔴 EL APARATO DE MENTIRA AHORA SABE PONERSE «BAJO TECHO», que es el caso
+  //  que este arreglo existe para cubrir: dentro de una casa el satélite no
+  //  aparece y el wifi sí. Antes solo sabía decir «siempre» o «nunca», y con
+  //  esas dos el respaldo no se ejercitaba NUNCA — daba igual lo que pidiera, y
+  //  por eso pudo estar meses pidiendo lo imposible sin que nada chistara.
+  //  Y de paso APUNTA lo que se le pide en cada intento, en el orden en que se
+  //  ejecutan. Eso no se lee del texto: se recoge al correrlo, así que da igual
+  //  cómo esté escrito o anidado el código.
+  const intentos = [];
   const navigatorFalso = {
     geolocation: {
-      getCurrentPosition: (bien, mal) => (contesta
-        ? bien({ coords: { latitude: delAparato.lat, longitude: delAparato.lng } })
-        : (mal ? mal({ code: 1 }) : undefined)),
+      getCurrentPosition: (bien, mal, opts) => {
+        intentos.push(opts || {});
+        // 🔴 `bajoTecho` NO es «falla el primero y contesta el segundo». Es lo
+        //  que de verdad pasa dentro de una casa: el SATÉLITE no aparece y el
+        //  wifi sí — da igual en qué puesto de la cola vaya cada uno. Una
+        //  primera versión de este aparato contestaba al segundo intento fuera
+        //  cual fuera, y con ella pedir satélites LAS DOS VECES pasaba por
+        //  bueno: el fallo del dueño entero, con todo en verde.
+        const acierta = contesta === true
+          || (contesta === 'bajoTecho' && (opts || {}).enableHighAccuracy !== true);
+        return acierta
+          ? bien({ coords: { latitude: delAparato.lat, longitude: delAparato.lng } })
+          : (mal ? mal({ code: 1 }) : undefined);
+      },
     },
   };
   try {
@@ -531,6 +550,43 @@ function elGpsDeLaPantalla(contesta) {
     esDelGps: puesto.esDelGps === null ? arranque[1] === 'true' : puesto.esDelGps === true,
     ubicacion: puesto.ubicacion || centroRiohacha,
     delAparato,
+    // Lo que se le pidió al aparato, en el ORDEN EN QUE SE EJECUTÓ.
+    intentos,
+  };
+}
+
+/**
+ * 🔴 ¿EL RESPALDO DEL GPS PIDE ALGO MÁS FÁCIL QUE EL PRIMER INTENTO?
+ *
+ * Hasta el 23-sep-2026 pedía lo CONTRARIO: el intento 1 iba por wifi y antenas
+ * —el camino fácil— y el respaldo, cuando ése fallaba, pedía SATÉLITES. Dentro
+ * de una casa el satélite es justo lo que no hay, así que cuando el camino fácil
+ * no servía la pantalla se iba por el imposible y se rendía a los 28 segundos.
+ * El dueño lo midió con su teléfono, en su casa: no llegó ninguno de los dos.
+ *
+ * Esto NO se lee del texto: los dos intentos se sacan CORRIENDO el efecto, así
+ * que da igual cómo esté escrito, anidado o reordenado. Un respaldo que pida lo
+ * mismo o menos vale; uno que pida más, no — sea con la palabra que sea.
+ */
+function elRespaldoEsMasFacil() {
+  const r = elGpsDeLaPantalla(false);
+  if (r.falla) return { falla: r.falla };
+  const i = r.intentos;
+  if (i.length < 2) return { falla: 'la pantalla solo intenta ' + i.length + ' vez el GPS' };
+  const alta = (o) => o.enableHighAccuracy === true;
+  return {
+    // El primero pide el punto BUENO: quien está en la calle recibe el de
+    // satélite, no el aproximado. Antes era al revés y nadie lo miraba.
+    elPrimeroPideElBueno: alta(i[0]),
+    // Y ninguno de los siguientes puede pedir MÁS que el que ya falló.
+    ningunRespaldoPideMas: i.slice(1).every((o) => !alta(o) || alta(i[0])),
+    // Una posición que el aparato ya tiene vale. Con `maximumAge: 0` —o sin
+    // decirlo, que es lo mismo— se tira una buena de hace medio minuto y se
+    // vuelve a empezar de cero.
+    todosAceptanGuardada: i.every((o) => Number(o.maximumAge) > 0),
+    // Y que el silencio no crezca. 28 segundos era lo que había; más sería
+    // empeorar lo que este arreglo vino a mejorar.
+    silencioTotal: i.reduce((a, o) => a + (Number(o.timeout) || 0), 0),
   };
 }
 
@@ -1162,6 +1218,7 @@ async function elVeredictoDe() {
   const BOTON = elBotonVerdeMarca();
   const AVISO = elAvisoDeNoSaber();
   const CADENA = laCadenaDelPedido();
+  const RESPALDO = elRespaldoEsMasFacil();
   const MARCA = dondeSeTocaLaMarca();
   const OYENTES = losOyentesQuedanPuestos();
   const ELVIAJE = loQueGuardaElViaje();
@@ -1293,6 +1350,30 @@ async function elVeredictoDe() {
         return !!r.falla || r.esDelGps !== false;
       },
       'si la app declara que el relleno es del GPS, la guardia queda muerta'],
+    // 🔴 EL ORDEN DE LOS DOS INTENTOS DEL GPS (23-sep-2026). Medido con el
+    // teléfono del dueño, dentro de su casa: no llegó ninguno de los dos, y el
+    // botón verde sí — no por mejor, sino porque estos dos ya llevaban 28
+    // segundos despertando el aparato. Las cuatro filas salen de CORRER el
+    // efecto con aparatos de mentira, no de leer cómo está escrito.
+    ['el primer intento del GPS pide el punto BUENO   (ejecutado)',
+      () => !!RESPALDO.falla || RESPALDO.elPrimeroPideElBueno !== true,
+      'yendo primero por el aproximado, el que está en la calle recibe el punto malo'],
+    ['y el respaldo NO pide algo más difícil que el que ya falló   (ejecutado)',
+      () => !!RESPALDO.falla || RESPALDO.ningunRespaldoPideMas !== true,
+      'era al revés: fallaba el wifi y se pedían SATÉLITES, que bajo techo no hay'],
+    ['los dos aceptan una posición que el aparato ya tiene   (ejecutado)',
+      () => !!RESPALDO.falla || RESPALDO.todosAceptanGuardada !== true,
+      'con `maximumAge: 0` se tira una buena de hace medio minuto y se empieza de cero'],
+    // Y LA QUE DE VERDAD PRUEBA EL ARREGLO: el pasajero bajo techo, donde el
+    // satélite no aparece y el wifi sí. Con el aparato de «siempre» o «nunca»
+    // este camino no se ejercitaba NUNCA, y por eso el respaldo pudo estar
+    // pidiendo lo imposible sin que nada chistara.
+    ['si el primero falla, el respaldo SÍ consigue la ubicación   (ejecutado)',
+      () => {
+        const r = elGpsDeLaPantalla('bajoTecho');
+        return !!r.falla || r.esDelGps !== true;
+      },
+      'es el caso del pasajero dentro de una casa: el que falló el 23-sep-2026'],
     ['y esa marca arranca apagada',
       () => {
         const r = busca('sin GPS y sin tocar nada');
@@ -1336,6 +1417,14 @@ async function elVeredictoDe() {
   // que no se confunda con la lista de fallos: aquí «en verde» quiere decir que
   // lo que ya servía sigue sirviendo.
   const NOROMPER = [
+    // 🔴 EL SILENCIO NO PUEDE CRECER. Antes del 23-sep-2026 eran 28 segundos
+    //  (8 + 20) sin que la pantalla dijera ni hiciera nada, y ése era medio
+    //  problema. La forma fácil de poner verdes las filas de arriba es alargar
+    //  los tiempos hasta que el aparato acabe contestando — y eso sería empeorar
+    //  justo lo que este arreglo vino a mejorar. El tope sale de lo que HABÍA,
+    //  no de un número bonito: si hoy se tarda más que antes, es un retroceso.
+    ['el pasajero no espera más callado que antes (28 s)   (ejecutado)',
+      () => !RESPALDO.falla && RESPALDO.silencioTotal <= 28000],
     ['con GPS bueno y sin tocar nada, el viaje nace donde está el pasajero   (ejecutado)',
       () => {
         const r = busca('con GPS bueno, sin tocar nada');

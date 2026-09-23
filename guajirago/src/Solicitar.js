@@ -649,14 +649,42 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
       setUbicacionPasajero({ lat: pos.coords.latitude, lng: pos.coords.longitude });
       setUbicacionEsDelGps(true);
     };
+    // 🔴 EL RESPALDO PEDÍA ALGO MÁS DIFÍCIL QUE EL PRIMER INTENTO (23-sep-2026).
+    //
+    // Estaba al revés: el intento 1 pedía precisión BAJA —wifi y antenas, el
+    // camino fácil— y, cuando ése fallaba, el respaldo pedía precisión ALTA,
+    // o sea SATÉLITES, que es lo más difícil que hay. Dentro de una casa los
+    // satélites son justo lo que no se ve, así que cuando el camino fácil no
+    // servía la app se iba por el imposible y se rendía a los 28 segundos.
+    //
+    // MEDIDO EN UN TELÉFONO DE VERDAD, no razonado: el 23-sep-2026 el dueño
+    // abrió la pantalla dentro de su casa, esperó 30 segundos y no llegó
+    // ninguno de los dos. El botón verde sí le funcionó — pero no por ser
+    // mejor: para entonces estos dos intentos ya llevaban 28 segundos
+    // despertando el GPS del aparato, y el botón se encontró el trabajo hecho.
+    //
+    // Ahora el orden es el que tiene sentido: primero el BUENO, y si no
+    // aparece, el que SIEMPRE contesta. Y de paso el que está al aire libre
+    // gana también, porque hasta hoy recibía el punto malo primero.
+    //
+    // `maximumAge` deja valer una posición que el aparato ya tiene. Antes los
+    // dos decían 0 —«no me sirve nada guardado»—, así que un teléfono que sacó
+    // su ubicación hace medio minuto la tiraba y la pedía otra vez desde cero.
+    // Un minuto para la buena, cinco para el respaldo: nadie se muda de barrio
+    // en ese rato, y quien lo haga tiene el marcador y la dirección a mano.
+    //
+    // 🔴 LO QUE ESTO CUESTA, y lo decidió el dueño sabiéndolo: una posición de
+    // wifi puede estar desviada 100 o 300 metros, y el conductor iría a esa
+    // zona. Se acepta porque lo que había antes cuando fallaban los dos era la
+    // PLAZA o nada, y 300 metros es mucho mejor que eso.
     navigator.geolocation.getCurrentPosition(
       delAparato,
       () => navigator.geolocation.getCurrentPosition(
         delAparato,
         () => setUbicacionPasajero(centroRiohacha),
-        { enableHighAccuracy: true, timeout: 20000 }
+        { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 }
       ),
-      { enableHighAccuracy: false, timeout: 8000, maximumAge: 0 }
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
     );
   }, []);
 
