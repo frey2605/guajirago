@@ -257,6 +257,33 @@ las reglas de Firestore**. Lo que se blinde en las reglas hay que moverlo allí,
   sin historial. La copia bajada del servidor quedó en `firestore.rules.LIVE`.
 - **(23-ago-2026) `firebase` no tiene comando para LEER reglas.** Se bajan con la API
   `firebaserules.googleapis.com` usando la sesión que el CLI ya tiene abierta.
+- **(23-sep-2026) Un canal de prueba NO es una copia fiel de producción: comparte el código
+  pero no el dominio, y todo lo que está atado al dominio se queda fuera.** El 23-sep se
+  publicó el arreglo del GPS tardío en el canal `prueba-gps` y la app abrió **sin mapa**:
+  «Se produjo un error. Esta página no cargó bien Google Maps». **El código era el mismo** —
+  `git diff 38a9e48 2f59b3c -- guajirago/public/index.html` sale **vacío**, y la llave de
+  Maps va escrita a pelo en ese archivo (`index.html:16`), así que viaja en el paquete: se
+  comprobó con `grep -c` sobre el `build/index.html` publicado. Lo único distinto era **la
+  dirección**. Son **DOS puertas**, las dos por dominio y las dos fuera del repo:
+  · la **llave de Google Maps** lleva una lista de sitios web permitidos (Google Cloud →
+    APIs y servicios → Credenciales), y el dominio del canal no está en ella;
+  · **Firebase Auth** lleva su propia lista de dominios autorizados — el propio despliegue lo
+    avisó: *«Unable to add channel domain to Firebase Auth»*—, así que el inicio de sesión
+    puede fallar con `auth/unauthorized-domain`.
+  🔴 **Lo que esto le hace al paso 8 (SIMULACRO, «probar todo antes de desplegar»)**: mientras
+  esas dos listas no tengan el dominio del canal, el canal **no puede probar nada** — no
+  porque el arreglo esté mal, sino porque la pantalla ni arranca. Se abren **una sola vez**:
+  el nombre del canal fija su dirección, así que re-publicar en `prueba-gps` reusa
+  `guajirago--prueba-gps-xjycd2qb.web.app` y no hay que volver a autorizarla.
+  🔴 **Y lo que NO está medido**: que la causa sea la lista de la llave de Maps. Se intentó
+  preguntárselo a Google desde el contenedor y **no se pudo**: el endpoint `Authenticate`
+  contestó lo MISMO a los dos dominios (`NotLoadingAPIFromGoogleMapsError`, que es una queja
+  sobre cómo se llamó, no sobre el dominio), y pedir `maps/api/js` con tres referentes
+  distintos —producción, el canal, y un dominio inventado— devolvió **los mismos 1.364.343
+  bytes las tres veces**. O sea: **Google lo comprueba en el navegador, no al descargar**, y
+  desde aquí no se puede medir. El careo que lo decide es **en el teléfono**: abrir
+  producción y el canal en el mismo momento; si el mapa sale en uno y no en el otro, con el
+  mismo código, lo único que queda es el dominio.
 
 ---
 
