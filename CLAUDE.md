@@ -284,6 +284,26 @@ las reglas de Firestore**. Lo que se blinde en las reglas hay que moverlo allí,
   desde aquí no se puede medir. El careo que lo decide es **en el teléfono**: abrir
   producción y el canal en el mismo momento; si el mapa sale en uno y no en el otro, con el
   mismo código, lo único que queda es el dominio.
+- **(23-sep-2026) `npm test` NO se puede correr con este repo solo: NUEVE archivos de `pruebas/`
+  necesitan los otros dos repos, que son APARTE y PRIVADOS.** Salió preparando el botón que mide
+  (`.github/workflows/medir-pruebas.yml`). Medido con
+  `grep -rcE "guajirago-admin|guajirago-aliados" pruebas/`: **9 archivos, 122 renglones** —
+  `amarres.test.js` (57), `avisosPanel.test.js` (28), `avisoCalificacion.test.js` (13),
+  `tipoNegocio.test.js` (9), `chatRecarga.test.js` (4), `avisosConductor.test.js` (3),
+  `cobrosPanel.test.js` (3), `repartoMesa.test.js` (3), `vaciado.test.js` (2). Y **está bien que
+  sea así**: son los amarres que leen los dos lados de cada contrato entre apps, que es
+  exactamente para lo que existen. `pruebas/cargar.cjs` (`leer`) lo corta en seco y lo dice con
+  todas las letras — *«Las pruebas necesitan los tres repos juntos en la carpeta raíz; sin el
+  otro lado del contrato no se puede comprobar nada»*—, así que **no falla en silencio**.
+  🔴 **Lo que esto le hace al botón de desplegar**: una máquina de GitHub clona UN repo. El paso 5
+  (PROBAR, la suite entera) no se puede cumplir allí hasta que el botón traiga los tres, y traer
+  dos repos privados pide un permiso de lectura que **hoy no existe** — es trabajo del dueño,
+  y va ANTES de que el candado del paso 5 signifique algo. Un botón que corriera solo las pruebas
+  que sí caben sería un candado más flojo que el del PC, **y no lo diría**.
+  🔴 **Y ojo al orden al construirlo**: si el botón corre `npm test` sin los tres repos, revienta
+  por NO TENER LOS REPOS, no por las pruebas. Ese ruido tapa lo que se viniera a medir, y ya casi
+  cuesta una vuelta entera. Por eso el botón que mide corre **`pruebas/storage.test.js` sola**,
+  que no los nombra ninguna vez (medido: 0).
 
 ---
 

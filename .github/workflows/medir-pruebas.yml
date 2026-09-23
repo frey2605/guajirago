@@ -1,0 +1,129 @@
+# ══════════════════════════════════════════════════════════════════════════════════════════════
+#  EL BOTÓN QUE SOLO MIDE — paso A, orden del dueño (23-sep-2026): «dale la a».
+#
+#  QUÉ PREGUNTA, Y NADA MÁS. En el contenedor de la nube donde se trabaja, `pruebas/storage.test.js`
+#  sale en ROJO: 43 pruebas, 29 pasan, 14 fallan. La pregunta es UNA:
+#
+#      ¿esas 14 están rotas de verdad, o es la máquina donde se midió?
+#
+#  Importa porque el botón de desplegar que viene después lleva el candado del paso 5 —si una
+#  prueba falla, NO se despliega—. Construirlo sin saber esto sería construir un botón que no
+#  puede funcionar nunca: se pararía en las pruebas cada vez que se apriete.
+#
+#  🔴 ESTO NO ES UN CANDADO, ES UNA CINTA MÉTRICA. Sale en VERDE aunque las pruebas fallen, y es
+#  a propósito: lo que se busca es el NÚMERO, no un veredicto. Un rojo aquí no diría nada que el
+#  número no diga, y enseñaría a ignorar los rojos. El candado de verdad va en el botón de
+#  desplegar, donde sí tiene consecuencias.
+#
+#  🔑 MISMO COMANDO QUE SE CORRIÓ EN EL CONTENEDOR, A PROPÓSITO. Se levantan `firestore,storage`
+#  y se corre ese archivo solo — exactamente lo que dio 29/14 allá. Si se cambiaran los emuladores
+#  o se corriera la tanda entera, lo que saliera no se podría carear con nada: serían dos cosas
+#  distintas medidas de dos formas distintas, que es como se fabrica una conclusión falsa.
+#
+#  🔴 POR QUÉ SOLO ESE ARCHIVO, Y NO `npm test`. Medido el 23-sep-2026: NUEVE archivos de
+#  `pruebas/` leen `guajirago-admin/` y `guajirago-aliados/`, que son repos APARTE y privados
+#  —`grep -rlE "guajirago-admin|guajirago-aliados" pruebas/`—. Un runner que clona solo este repo
+#  no los tiene, y `pruebas/cargar.cjs` lo corta en seco y bien: «Las pruebas necesitan los tres
+#  repos juntos en la carpeta raíz». O sea que `npm test` aquí fallaría por NO TENER LOS REPOS,
+#  no por las pruebas — y ese ruido taparía justo lo que se viene a medir.
+#  `storage.test.js` no los nombra ninguna vez (medido: 0), así que se puede medir sola.
+#  Traer los tres repos hace falta para el botón de DESPLEGAR, y necesita un permiso de lectura
+#  que hoy no existe. Va en ese trabajo, no en éste.
+#
+#  Y NO SE COPIA AQUÍ LA LISTA DE ARCHIVOS DE PRUEBA. Esa lista vive UNA sola vez, en
+#  `pruebas/correr.cjs` (SEGUNDA LEY). Aquí se nombra UN archivo, el que se está midiendo.
+# ══════════════════════════════════════════════════════════════════════════════════════════════
+name: Medir · ¿las pruebas del almacén están rojas de verdad?
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  medir:
+    name: Correr storage.test.js en una máquina limpia
+    runs-on: ubuntu-latest
+    steps:
+      - name: Traer el código
+        uses: actions/checkout@v4
+
+      - name: Preparar Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      # El emulador de Firestore corre sobre Java. En el PC del dueño se busca solo dentro de
+      # Android Studio (`pruebas/correr.cjs`); aquí se pone explícito para que no dependa de lo
+      # que la imagen de GitHub traiga puesto ese día — una versión que cambia sola es la misma
+      # enfermedad que `firebase-tools@latest`.
+      - name: Preparar Java (lo necesita el emulador)
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Instalar las librerías
+        run: npm ci
+
+      # Se deja por escrito CON QUÉ se midió. Un número sin las condiciones que lo produjeron no
+      # se puede carear, y carearlo contra el contenedor es todo el punto de este botón.
+      - name: Decir con qué se está midiendo
+        run: |
+          echo "sistema : $(uname -sr)"
+          echo "node    : $(node -v)"
+          echo "java    : $(java -version 2>&1 | head -1)"
+          echo "firebase: $(npx --yes firebase-tools@15 --version)"
+
+      - name: Correr storage.test.js y ENSEÑAR la cuenta
+        run: |
+          set +e
+          npx --yes firebase-tools@15 emulators:exec \
+            --only firestore,storage --project demo-guajirago \
+            "node --test pruebas/storage.test.js" 2>&1 | tee "$RUNNER_TEMP/salida.txt"
+          set -e
+
+          # Las cuentas las escribe `node --test` al final, en renglones que empiezan por `# `.
+          # Se leen de ahí y no se cuentan a mano: quien sabe cuántas pruebas corrieron es él.
+          TOTAL=$(grep -oP '^# tests \K\d+'  "$RUNNER_TEMP/salida.txt" | tail -1)
+          PASAN=$(grep -oP '^# pass \K\d+'   "$RUNNER_TEMP/salida.txt" | tail -1)
+          FALLAN=$(grep -oP '^# fail \K\d+'  "$RUNNER_TEMP/salida.txt" | tail -1)
+
+          if [ -z "$TOTAL" ]; then
+            echo "⛔ NO SE PUDO LEER LA CUENTA: las pruebas ni siquiera llegaron a correr."
+            echo "   Eso YA es una respuesta, y no es la que se buscaba. Mira el registro de arriba:"
+            echo "   lo más probable es que el emulador no arrancara, no que una prueba fallara."
+            {
+              echo "## ⛔ Las pruebas no llegaron a correr"
+              echo "El emulador no arrancó, o se cayó antes. No hay cuenta que carear."
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          echo ""
+          echo "══════════════════════════════════════════════════════════════"
+          echo "  EN ESTA MÁQUINA LIMPIA:   $TOTAL pruebas · $PASAN pasan · $FALLAN fallan"
+          echo "  EN EL CONTENEDOR ERA:     43 pruebas · 29 pasan · 14 fallan"
+          echo "══════════════════════════════════════════════════════════════"
+
+          # El veredicto va TAMBIÉN al resumen, que es lo que se ve desde el celular sin tener que
+          # abrir el registro y buscar entre cientos de renglones.
+          {
+            echo "## La cuenta"
+            echo ""
+            echo "| Dónde | Pruebas | Pasan | Fallan |"
+            echo "|---|---|---|---|"
+            echo "| Máquina limpia de GitHub | $TOTAL | $PASAN | **$FALLAN** |"
+            echo "| Contenedor de la nube | 43 | 29 | **14** |"
+            echo ""
+            if [ "$FALLAN" = "0" ]; then
+              echo "### ✅ El rojo NO era de verdad: era la máquina."
+              echo "Aquí pasan todas. El candado del botón de desplegar se puede poner tal cual."
+            else
+              echo "### 🔴 El rojo SÍ es de verdad: fallan $FALLAN aquí también."
+              echo "Hay que arreglarlas ANTES de automatizar despliegues; si no, el botón"
+              echo "se pararía en las pruebas cada vez que se apriete."
+            fi
+            echo ""
+            echo "_Esto es una medición, no un candado: sale en verde igual. El número es el producto._"
+          } >> "$GITHUB_STEP_SUMMARY"
