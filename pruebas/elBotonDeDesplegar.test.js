@@ -44,6 +44,9 @@ const YML = leer(BOTON);
 const BOTON_REGLAS = '.github/workflows/desplegar-reglas.yml';
 const YML_REGLAS = leer(BOTON_REGLAS);
 
+const BOTON_PANEL = '.github/workflows/desplegar-panel-y-aliados.yml';
+const YML_PANEL = leer(BOTON_PANEL);
+
 /** Fuera los comentarios: de YAML y de shell. Son el señuelo, no el código. */
 function sinComentarios(yml) {
   return yml.split('\n').filter((l) => !l.trimStart().startsWith('#')).join('\n');
@@ -472,5 +475,164 @@ describe('LA COMPARACIÓN DE ÍNDICES · distingue crear de BORRAR', () => {
 
   it('un archivo vacío no engaña: faltan todos', () => {
     assert.equal(cuantos({ indexes: [A, B] }, {}), 2);
+  });
+});
+
+/**
+ * ══════════════════════════════════════════════════════════════════════════════
+ *  EL TERCER BOTÓN: EL PANEL Y ALIADOS, EN UN SOLO ARCHIVO
+ *
+ *  Publica dos apps distintas, y de ahí salen sus peligros propios:
+ *
+ *    · **publicar en el sitio equivocado**. A qué sitio va cada app lo dicen su
+ *      `firebase.json` (el target) y su `.firebaserc` (qué sitio es ese target).
+ *      Si el botón se los COPIA, un renombrado los separa en silencio y publica
+ *      el panel encima de aliados. Tiene que LEERLOS.
+ *    · **la marca invisible**. Los dos `firebase.json` de esas apps empiezan con
+ *      un BOM. El archivo se ve perfecto y `JSON.parse` revienta. Lo cazó el
+ *      simulacro del 23-sep-2026: las DOS fallaban. Si alguien quita ese
+ *      `replace`, el botón deja de arrancar — y parecerá culpa de otra cosa.
+ *    · **`--only hosting` a secas**. Hay varios sitios en este proyecto: sin
+ *      nombrar el target, un despliegue puede tocar el que no era.
+ *    · **la carpeta fija**. Compilar y desplegar van con la carpeta que salió de
+ *      la casilla; si alguien la escribe a mano, el botón publica siempre la
+ *      misma app diga lo que diga quien lo aprieta.
+ * ══════════════════════════════════════════════════════════════════════════════
+ */
+function losFallosDelPanel(yml) {
+  const q = [];
+  const pasos = losPasos(yml);
+  const limpio = sinComentarios(yml);
+
+  const iQuien = elPasoQue(pasos, 'firebase.json');
+  const iVigia = elPasoQue(pasos, 'hosting:channel:list');
+  const iPruebas = elPasoQue(pasos, 'npm test');
+  const iCompila = elPasoQue(pasos, 'npm run build');
+  const iDespliega = elPasoQue(pasos, 'deploy \\');
+  const iNube = elPasoQue(pasos, 'steps.app.outputs.url');
+
+  if (iQuien < 0) {
+    q.push('SITIO: ya no se le pregunta a `firebase.json` a qué sitio publica cada app. '
+      + 'Copiar el target aquí lo separa en silencio de donde vive de verdad');
+  } else {
+    //  🔴 NO BASTA CON QUE EL NOMBRE APAREZCA: el paso lo nombra también en su mensaje de
+    //  error («su .firebaserc no dice qué SITIO es el target…»), así que un `includes` daba
+    //  por bueno un botón que ya no lo leía. Lo cazó el contador de sabotajes mudos el
+    //  23-sep-2026. Se pregunta DÓNDE aparece el nombre: tiene que estar en un renglón que
+    //  además lo LEA.
+    const seLee = sinComentarios(pasos[iQuien]).split('\n')
+      .some((l) => l.includes('.firebaserc') && /leerJson|readFileSync|require\(/.test(l));
+    if (!seLee) {
+      q.push('SITIO: `.firebaserc` se nombra pero ya no se LEE, y es quien dice qué sitio es '
+        + 'cada target. Nombrarlo en un mensaje de error no es leerlo');
+    }
+    if (!/charCodeAt\(0\) === 0xFEFF/.test(pasos[iQuien])) {
+      q.push('BOM: se quitó el descarte de la marca invisible. Los firebase.json de esas dos '
+        + 'apps empiezan con ella y `JSON.parse` revienta: el botón no arranca');
+    }
+  }
+  if (!/--only hosting:\$\{\{ steps\.app\.outputs\.target \}\}/.test(limpio)) {
+    q.push('TARGET: el despliegue ya no nombra el target leído. Un `--only hosting` a secas '
+      + 'puede publicar en el sitio que no era');
+  }
+  for (const [i, qué] of [[iCompila, 'compila'], [iDespliega, 'despliega']]) {
+    if (i >= 0 && !pasos[i].includes('steps.app.outputs.carpeta')) {
+      q.push('CARPETA: el paso que ' + qué + ' no usa la carpeta que salió de la casilla: '
+        + 'publicaría siempre la misma app');
+    }
+  }
+  if (iVigia < 0) q.push('VIGIA: desapareció el vigía de permisos');
+  else if (iPruebas >= 0 && iVigia > iPruebas) {
+    q.push('VIGIA: quedó después de las pruebas, así que no ahorra nada');
+  }
+  if (iPruebas < 0) q.push('PRUEBAS: el botón ya no corre `npm test`');
+  for (const repo of ['frey2605/guajirago-admin', 'frey2605/guajirago-aliados']) {
+    const i = elPasoQue(pasos, repo);
+    if (i < 0) q.push('REPOS: ya no se trae ' + repo);
+    else if (iPruebas >= 0 && i > iPruebas) q.push('REPOS: ' + repo + ' llega tarde');
+  }
+  if (iNube >= 0) {
+    if (!pasos[iNube].includes('"$SERVIDO" != "$ESPERADO"')) {
+      q.push('NUBE: desapareció la comparación con lo compilado');
+    }
+    if (!pasos[iNube].includes('exit 1')) {
+      q.push('NUBE: ya no puede ponerse roja');
+    }
+  } else {
+    q.push('NUBE: ya nadie le pregunta al sitio si quedó puesto');
+  }
+  if (!/firebase-tools@15/.test(limpio) || /firebase-tools@latest/.test(limpio)) {
+    q.push('VERSION: la herramienta no está fijada en 15');
+  }
+  return q;
+}
+
+describe('EL BOTÓN DEL PANEL Y ALIADOS · publica dos apps, y no puede confundirlas', () => {
+  it('hoy no tiene ninguna queja', () => {
+    const q = losFallosDelPanel(YML_PANEL);
+    assert.deepEqual(q, [], '🔴 perdió una protección:\n  · ' + q.join('\n  · '));
+  });
+
+  it('el sitio y el target se LEEN de los archivos de cada app, no se copian', () => {
+    const pasos = losPasos(YML_PANEL);
+    const i = elPasoQue(pasos, 'firebase.json');
+    assert.ok(i >= 0, '⛔ ya no lee firebase.json');
+    // Que lo LEA, no que lo nombre: el mensaje de error de ese mismo paso también lo nombra.
+    assert.ok(
+      pasos[i].split('\n').some((l) => l.includes('.firebaserc') && /leerJson|readFileSync/.test(l)),
+      '⛔ `.firebaserc` se nombra pero no se lee: de ahí sale a qué SITIO va cada target',
+    );
+  });
+
+  it('le quita la marca invisible al JSON, o no arranca', () => {
+    const pasos = losPasos(YML_PANEL);
+    const i = elPasoQue(pasos, 'firebase.json');
+    assert.match(pasos[i], /charCodeAt\(0\) === 0xFEFF/,
+      '⛔ sin descartar el BOM, `JSON.parse` revienta con los firebase.json de esas apps');
+  });
+
+  it('nombra el target al desplegar: nunca `--only hosting` a secas', () => {
+    assert.match(sinComentarios(YML_PANEL), /--only hosting:\$\{\{ steps\.app\.outputs\.target \}\}/,
+      '⛔ sin nombrar el target, puede publicar en el sitio que no era');
+  });
+
+  it('y no se puede ablandar: siete botones rotos, y se queja de los siete', () => {
+    const { cabeza, pasos } = enTrozos(YML_PANEL);
+    const juntar = (ps) => cabeza + '\n' + ps.join('\n');
+    const idx = (t) => pasos.findIndex((p) => sinComentarios(p).includes(t));
+    const quitar = (t) => juntar(pasos.filter((p, i) => i !== idx(t)));
+    const cambiar = (viejo, nuevo) => juntar(pasos).replace(viejo, nuevo);
+    const mover = (de, tras) => {
+      const ps = [...pasos];
+      const [trozo] = ps.splice(idx(de), 1);
+      const j = ps.findIndex((p) => sinComentarios(p).includes(tras));
+      ps.splice(j + 1, 0, trozo);
+      return juntar(ps);
+    };
+
+    const SABOTAJES = [
+      ['sin leer .firebaserc (el sitio, copiado a mano)',
+        cambiar("leerJson(c + '/.firebaserc')", "({targets:{guajirago:{hosting:{admin:['guajirago-admin']}}}})"), 'SITIO'],
+      ['sin quitarle la marca invisible al JSON',
+        cambiar('if (t.charCodeAt(0) === 0xFEFF) t = t.slice(1);', ''), 'BOM'],
+      ['desplegando sin nombrar el target',
+        cambiar('--only hosting:${{ steps.app.outputs.target }}', '--only hosting'), 'TARGET'],
+      ['compilando siempre la misma carpeta',
+        cambiar('working-directory: ${{ steps.app.outputs.carpeta }}\n        run: npm run build',
+          'working-directory: guajirago-admin\n        run: npm run build'), 'CARPETA'],
+      ['el vigía, detrás de las pruebas', mover('hosting:channel:list', 'npm test'), 'VIGIA'],
+      ['sin traer aliados', quitar('frey2605/guajirago-aliados'), 'REPOS'],
+      ['la nube, sin poder ponerse roja',
+        cambiar('exit 1\n            fi\n            sleep 5', 'exit 0\n            fi\n            sleep 5'), 'NUBE'],
+    ];
+
+    const mudos = [];
+    for (const [nombre, roto, marca] of SABOTAJES) {
+      const q = losFallosDelPanel(roto);
+      if (!q.some((x) => x.startsWith(marca))) mudos.push(nombre + ' (esperaba ' + marca + ')');
+    }
+    assert.deepEqual(mudos, [],
+      '🔴 EL AMARRE DEL PANEL NO MUERDE en ' + mudos.length + ' de ' + SABOTAJES.length
+      + ':\n  · ' + mudos.join('\n  · '));
   });
 });

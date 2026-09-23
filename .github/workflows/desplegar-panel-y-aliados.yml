@@ -1,0 +1,300 @@
+# ══════════════════════════════════════════════════════════════════════════════════════════════
+#  EL BOTÓN DEL PANEL Y DE ALIADOS — orden del dueño (23-sep-2026): «sigue con los tres botones».
+#
+#  QUÉ RESUELVE. De las cinco cosas que hay que desplegar en GuajiraGo, hasta hoy solo dos tenían
+#  botón: la app del pasajero/conductor y las reglas. El panel de administración
+#  (`guajirago-admin`) y la app de restaurantes y turismo (`guajirago-aliados`) seguían saliendo
+#  únicamente desde el PC del dueño. Éste es el tercero.
+#
+#  🔴 UN SOLO ARCHIVO PARA LAS DOS, Y ESO ES LA SEGUNDA LEY, NO PEREZA. El proceso es el MISMO:
+#  traer los tres repos, probar, compilar, subir desde dentro de su carpeta y preguntarle a la
+#  nube. Dos YAML casi idénticos serían el gemelo que se queda viejo — se arregla uno, el otro no,
+#  y el que nadie mira es el que rompe. Lo único que cambia entre las dos es la CARPETA, y eso
+#  entra por la casilla de arriba.
+#
+#  🔴 Y EL SITIO Y EL TARGET TAMPOCO SE COPIAN AQUÍ: se LEEN del `firebase.json` y del
+#  `.firebaserc` de cada app, que es donde viven de verdad. Escribirlos en este archivo sería una
+#  segunda versión de un dato que ya existe, y el día que alguien renombre un target, este botón
+#  publicaría en el sitio equivocado sin que nada avisara.
+#
+#  🔴 A MANO, Y NO ES UN OLVIDO. El botón de la app sale SOLO al entrar algo a `main` porque esa
+#  app se toca casi a diario. Estas dos no: medido el 23-sep-2026, el último commit del panel era
+#  del **12-sep** y el de aliados del **9-sep**. Un disparo automático pediría meter la llave y el
+#  permiso de lectura como secretos en los OTROS DOS repos —cuatro secretos más que mantener y
+#  que caducan— para algo que se usa cada dos semanas. Si algún día cambian a diario, se cambia.
+#
+#  ⚠️ LO QUE ESTE BOTÓN NO MIRA: si el cambio necesita reglas nuevas. Aquí no hay «commit de
+#  antes» contra el que comparar —siempre se aprieta a mano—, así que no hay nada que medir. En
+#  vez de poner una casilla que se marcaría siempre sin leerla —eso no es una guardia, es un
+#  trámite—, se AVISA fuerte en el registro y en el resumen. Lo que sí está medido y sí para es
+#  la guardia del botón de la app (`desplegar.yml`), donde el camino normal sí tiene rango.
+#
+#  DÓNDE SE APRIETA: github.com → guajirago → Actions → «Desplegar el PANEL o ALIADOS» →
+#  «Run workflow» → se elige cuál.
+# ══════════════════════════════════════════════════════════════════════════════════════════════
+name: Desplegar el PANEL o ALIADOS
+
+on:
+  workflow_dispatch:
+    inputs:
+      cual:
+        description: '¿Cuál se publica?'
+        type: choice
+        required: true
+        options:
+          - panel
+          - aliados
+
+concurrency:
+  #  Por app: publicar el panel y aliados a la vez no se estorba —son sitios distintos—, pero dos
+  #  despliegues del MISMO sitio a la vez es justo como se sirve una versión a medias.
+  group: despliegue-${{ github.event.inputs.cual }}-guajirago
+  cancel-in-progress: false
+
+jobs:
+  desplegar:
+    name: Comprobar, probar, compilar, desplegar y VERIFICAR
+    runs-on: ubuntu-latest
+    steps:
+      - name: ⏱️ ¿Están los dos secretos? (antes de gastar nada)
+        env:
+          LLAVE: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          LECTURA: ${{ secrets.LEER_REPOS_HERMANOS }}
+        run: |
+          FALTA=0
+          if [ -z "$LLAVE" ]; then
+            echo "⛔ FALTA LA LLAVE DE FIREBASE (secreto: FIREBASE_SERVICE_ACCOUNT)"
+            echo "   https://github.com/frey2605/guajirago/settings/secrets/actions/new"
+            FALTA=1
+          fi
+          if [ -z "$LECTURA" ]; then
+            echo "⛔ FALTA EL PERMISO DE LECTURA (secreto: LEER_REPOS_HERMANOS)"
+            echo "   Sin él no se pueden traer los otros dos repos — y aquí uno de ellos ES"
+            echo "   lo que se va a publicar."
+            echo "   https://github.com/settings/personal-access-tokens/new"
+            echo "   🔴 Y CADUCA. Si esto fallaba antes y ahora no, es eso: se renueva en un minuto."
+            FALTA=1
+          fi
+          [ "$FALTA" = "0" ] || exit 1
+          echo "✅ Los dos secretos están."
+
+      - name: Traer el código (el repo de las pruebas)
+        uses: actions/checkout@v4
+
+      - name: Traer guajirago-admin
+        uses: actions/checkout@v4
+        with:
+          repository: frey2605/guajirago-admin
+          token: ${{ secrets.LEER_REPOS_HERMANOS }}
+          path: guajirago-admin
+          persist-credentials: false
+
+      - name: Traer guajirago-aliados
+        uses: actions/checkout@v4
+        with:
+          repository: frey2605/guajirago-aliados
+          token: ${{ secrets.LEER_REPOS_HERMANOS }}
+          path: guajirago-aliados
+          persist-credentials: false
+
+      # ── QUIÉN ES LA APP ELEGIDA ────────────────────────────────────────────────────────────
+      #  Lo único que decide la casilla es la CARPETA. El target y el sitio se le preguntan a los
+      #  archivos de esa app, que es donde viven: `firebase.json` dice a qué target publica, y
+      #  `.firebaserc` dice qué SITIO es ese target. Copiarlos aquí sería una segunda versión de
+      #  un dato que ya existe — y un renombrado los separaría en silencio.
+      - name: Quién se publica, y a qué sitio (leído de sus archivos)
+        id: app
+        run: |
+          case "${{ github.event.inputs.cual }}" in
+            panel)   CARPETA=guajirago-admin ;;
+            aliados) CARPETA=guajirago-aliados ;;
+            *) echo "⛔ no sé qué es «${{ github.event.inputs.cual }}»"; exit 1 ;;
+          esac
+          DATOS=$(node -e "
+            const fs = require('fs');
+            const c = '$CARPETA';
+            // 🔴 SE LE QUITA LA MARCA INVISIBLE DEL PRINCIPIO (BOM), Y ESTO NO ES ADORNO:
+            //  los \`firebase.json\` de guajirago-admin y guajirago-aliados EMPIEZAN con ella.
+            //  El archivo se ve perfecto al leerlo, y \`JSON.parse\` revienta con
+            //  «Unexpected token» con el carácter U+FEFF. Lo cazó el simulacro del 23-sep-2026
+            //  fallaban— antes de que el botón existiera de verdad. (\`require\` la quita solo;
+            //  \`JSON.parse\` no, y por eso el botón de las reglas no se tropezaba con esto.)
+            const leerJson = (r) => {
+              let t = fs.readFileSync(r, 'utf8');
+              if (t.charCodeAt(0) === 0xFEFF) t = t.slice(1);
+              return JSON.parse(t);
+            };
+            const fb = leerJson(c + '/firebase.json');
+            const rc = leerJson(c + '/.firebaserc');
+            const target = fb.hosting && fb.hosting.target;
+            if (!target) { console.error('su firebase.json no dice a qué target publica'); process.exit(1); }
+            const mapa = ((rc.targets || {}).guajirago || {}).hosting || {};
+            const sitios = mapa[target];
+            if (!sitios || !sitios.length) {
+              console.error('su .firebaserc no dice qué SITIO es el target «' + target + '»');
+              process.exit(1);
+            }
+            console.log(target + ' ' + sitios[0]);
+          ") || {
+            echo "⛔ NO SE PUDO SABER DÓNDE PUBLICA «${{ github.event.inputs.cual }}»."
+            echo "   Se para: publicar sin saber a qué sitio es como no publicar."
+            exit 1
+          }
+          TARGET=$(echo "$DATOS" | cut -d' ' -f1)
+          SITIO=$(echo "$DATOS" | cut -d' ' -f2)
+          echo "carpeta=$CARPETA" >> "$GITHUB_OUTPUT"
+          echo "target=$TARGET"   >> "$GITHUB_OUTPUT"
+          echo "url=https://$SITIO.web.app" >> "$GITHUB_OUTPUT"
+          echo "Se publica: $CARPETA  →  target «$TARGET»  →  https://$SITIO.web.app"
+          echo ""
+          echo "::warning title=Las reglas no se comprobaron::Este botón publica una app, NO las"
+          echo "reglas. Si este cambio necesita reglas nuevas, súbelas ANTES con el botón de las"
+          echo "reglas: publicar una app sin las reglas que necesita la deja rota EN SILENCIO."
+
+      - name: Preparar Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Preparar Java (lo necesita el emulador de las pruebas)
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Instalar las librerías de las pruebas
+        run: npm ci
+
+      #  `npm ci` y no `npm install`: instala EXACTAMENTE lo que dice el lock commiteado. Un
+      #  `install` resolvería versiones nuevas en cada despliegue y entonces lo que sale al aire
+      #  no es lo que se probó.
+      #  🔴 OJO (medido el 23-sep-2026): HOY esto FALLA en las dos apps, porque sus locks están
+      #  desincronizados — al panel le falta la familia de `firebase`, a aliados le falta `yaml`.
+      #  Está anotado en CLAUDE.md. Hasta que se arreglen (un `npm install` en cada repo y
+      #  commitear su lock), este botón se para aquí. Es el mismo muro que tuvo el de la app.
+      - name: Instalar las librerías de la app elegida
+        run: npm ci --prefix ${{ steps.app.outputs.carpeta }}
+
+      # ── ⏱️ VIGÍA DE PERMISOS · REGLA 1407, ANTES DE LAS PRUEBAS ────────────────────────────
+      #  Preguntarle a Google si la llave sirve tarda segundos; las pruebas tardan minutos.
+      #  ⚠️ Caza que la llave falte, esté rota o no tenga acceso a Hosting. NO caza que pueda
+      #  ESCRIBIR en este sitio concreto: eso solo lo dice el despliegue.
+      - name: ⏱️ ¿Esta llave PUEDE desplegar? (segundos, antes de las pruebas)
+        env:
+          LLAVE: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          printf '%s' "$LLAVE" > "$RUNNER_TEMP/llave.json"
+          export GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/llave.json"
+          set +e
+          SALIDA=$(npx --yes firebase-tools@15 hosting:channel:list \
+            --project guajirago --non-interactive 2>&1)
+          CODIGO=$?
+          set -e
+          rm -f "$RUNNER_TEMP/llave.json"
+          if [ "$CODIGO" -eq 0 ]; then
+            echo "✅ La llave habla con Hosting de este proyecto."
+            exit 0
+          fi
+          echo "$SALIDA"
+          if echo "$SALIDA" | grep -qiE "permission|permisos|403|401|denied|PERMISSION_DENIED|lacks IAM|Please ask a project owner|invalid_grant|Failed to authenticate"; then
+            echo ""
+            echo "⛔ LA LLAVE NO PUEDE. Se para aquí, antes de gastar las pruebas."
+            echo "   Necesita «Administrador de Firebase Hosting» en:"
+            echo "   https://console.cloud.google.com/iam-admin/iam?project=guajirago"
+            exit 1
+          fi
+          echo "::warning title=El vigía no pudo comprobar::Falló por algo que NO parece un permiso."
+          echo "🔁 SE SIGUE: el despliegue de verdad decide."
+
+      # ── PASO 5 · PROBAR — EL CANDADO ───────────────────────────────────────────────────────
+      #  La suite ENTERA, que vive en este repo y lee los tres: son los amarres que comprueban los
+      #  dos lados de cada contrato entre apps. Publicar el panel sin correrlos sería publicar
+      #  media verdad, porque lo que el panel rompe se ve en el otro lado.
+      - name: Correr TODAS las pruebas (si una falla, aquí se para)
+        run: npm test
+
+      # ── PASO 10 · APLICAR — DESDE DENTRO DE SU CARPETA ─────────────────────────────────────
+      - name: Compilar la app elegida
+        working-directory: ${{ steps.app.outputs.carpeta }}
+        run: npm run build
+
+      - name: Anotar qué se acaba de compilar
+        id: compilado
+        run: |
+          ARCHIVO=$(grep -oE 'static/js/main\.[a-z0-9]+\.js' \
+            "${{ steps.app.outputs.carpeta }}/build/index.html" | head -1)
+          if [ -z "$ARCHIVO" ]; then
+            echo "⛔ no se encontró el archivo compilado. Sin eso el paso 11 no comprueba nada."
+            exit 1
+          fi
+          echo "archivo=$ARCHIVO" >> "$GITHUB_OUTPUT"
+          echo "Se compiló: $ARCHIVO"
+
+      #  Con `--only hosting:<target>`: se nombra EXACTAMENTE el sitio que se publica. Un
+      #  `--only hosting` a secas desde una carpeta con varios targets publicaría todos.
+      - name: Desplegar a Firebase
+        working-directory: ${{ steps.app.outputs.carpeta }}
+        env:
+          LLAVE: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          printf '%s' "$LLAVE" > "$RUNNER_TEMP/llave.json"
+          export GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/llave.json"
+          npx --yes firebase-tools@15 deploy \
+            --only hosting:${{ steps.app.outputs.target }} \
+            --project guajirago --non-interactive
+          rm -f "$RUNNER_TEMP/llave.json"
+
+      # ── PASO 11 · VERIFICAR CONTRA LA NUBE ─────────────────────────────────────────────────
+      #  Que el despliegue diga «listo» no es prueba de nada. Con paciencia, porque Firebase tarda
+      #  unos segundos en repartir lo nuevo y una alarma que grita sin fuego se deja de mirar.
+      - name: Preguntarle a la nube si de verdad quedó puesto
+        run: |
+          SITIO="${{ steps.app.outputs.url }}"
+          ESPERADO="${{ steps.compilado.outputs.archivo }}"
+          LIMITE=120
+          INICIO=$SECONDS
+          INTENTO=0
+          echo "Se le pregunta a $SITIO, con paciencia: hasta ${LIMITE}s."
+          while :; do
+            INTENTO=$((INTENTO + 1))
+            CODIGO=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 "$SITIO/" || true)
+            SERVIDO=$(curl -s --max-time 30 "$SITIO/" | grep -oE 'static/js/main\.[a-z0-9]+\.js' | head -1)
+            echo "  intento $INTENTO · responde $CODIGO · sirve ${SERVIDO:-(nada)}"
+
+            FALLA=""
+            if [ "$CODIGO" != "200" ]; then
+              FALLA="el sitio no está respondiendo bien (respondió $CODIGO)"
+            elif [ "$SERVIDO" != "$ESPERADO" ]; then
+              FALLA="LA NUBE SIGUE SIRVIENDO OTRO ARCHIVO: se compiló «$ESPERADO» y sirve «${SERVIDO:-nada}»"
+            fi
+            [ -z "$FALLA" ] && break
+
+            if [ $((SECONDS - INICIO)) -ge "$LIMITE" ]; then
+              echo ""
+              echo "⛔ $FALLA"
+              echo "   Se reintentó durante ${LIMITE}s ($INTENTO veces): ya no es la repartición."
+              {
+                echo "## ⛔ El despliegue NO quedó comprobado"
+                echo ""
+                echo "$FALLA"
+              } >> "$GITHUB_STEP_SUMMARY"
+              exit 1
+            fi
+            sleep 5
+          done
+
+          echo ""
+          echo "✅ DESPLEGADO Y COMPROBADO a los $((SECONDS - INICIO))s."
+          {
+            echo "## ✅ Desplegado y comprobado"
+            echo ""
+            echo "| | |"
+            echo "|---|---|"
+            echo "| Qué | ${{ github.event.inputs.cual }} (\`${{ steps.app.outputs.carpeta }}\`) |"
+            echo "| Sitio | $SITIO |"
+            echo "| Sirve | \`$ESPERADO\` |"
+            echo "| Commit | \`${GITHUB_SHA:0:7}\` |"
+            echo ""
+            echo "> ⚠️ Este botón publica **la app**, no las reglas. Si este cambio necesitaba"
+            echo "> reglas nuevas, tenían que ir antes por su propio botón."
+          } >> "$GITHUB_STEP_SUMMARY"
