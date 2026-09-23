@@ -304,6 +304,30 @@ las reglas de Firestore**. Lo que se blinde en las reglas hay que moverlo allí,
   por NO TENER LOS REPOS, no por las pruebas. Ese ruido tapa lo que se viniera a medir, y ya casi
   cuesta una vuelta entera. Por eso el botón que mide corre **`pruebas/storage.test.js` sola**,
   que no los nombra ninguna vez (medido: 0).
+- **(23-sep-2026) 🔴 EL CONTENEDOR DE LA NUBE DA CATORCE FALSOS ROJOS en `pruebas/storage.test.js`.
+  El código está bien; la máquina, no.** Aquí salía **43 pruebas · 29 pasan · 14 fallan**, y las 14
+  eran todas del mismo tipo: «el que SÍ debería poder, no puede» (`storage/unauthorized` donde la
+  prueba espera que entre). Se careó corriendo **el MISMO comando** en una máquina limpia de
+  GitHub —mismo commit `79dc1b5`, mismo `firebase-tools@15`, mismos emuladores
+  (`emulators:exec --only firestore,storage --project demo-guajirago "node --test
+  pruebas/storage.test.js"`)— y allá salió **43 · 43 · 0**, las nueve suites en `ok`, en 9,9
+  segundos. Run: `github.com/frey2605/guajirago/actions/runs/35873533595`.
+  🔴 **POR QUÉ falla aquí NO está medido.** Se probó una hipótesis y se descartó: el
+  `JAVA_TOOL_OPTIONS` que este contenedor le mete al Java (sale como «⚠ Unexpected rules runtime
+  error: Picked up JAVA_TOOL_OPTIONS…») — quitándolo con `env -u` sale **la misma cuenta exacta**,
+  29/14. Lo que sí encaja con la forma de los fallos es que las reglas del almacén le PREGUNTAN a
+  Firestore quién es quién, y esa consulta entre servicios no llega; pero eso es una sospecha
+  escrita, **no una medición**. En el mismo contenedor el emulador de FUNCIONES tampoco arranca
+  («Unable to parse JSON … "request bl…"»), así que hay más de una cosa cortada por aquí.
+  ⚠️ **Lo que esto cambia en el día a día**: aquí `npm test` **no puede dar veredicto** sobre el
+  almacén, y el guardián va a seguir diciendo «pruebas base: YA FALLABAN antes de tocar» — lo cual
+  es cierto **de esta máquina**, no del repo. Quien lea eso como «el proyecto está roto» lo está
+  leyendo mal.
+  🔴 **Y AL REVÉS, que es el peligro de verdad**: esto **NO es una excusa para dar por falso
+  cualquier rojo que salga aquí.** Lo establecido son esos 14, en ese archivo, con ese comando.
+  Cualquier otro rojo se carea igual —mismo commit, mismo comando, máquina limpia— antes de
+  llamarlo del contenedor. Un «eso es la caja» sin careo es exactamente cómo se firma en verde un
+  fallo de verdad.
 
 ---
 
