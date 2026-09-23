@@ -3212,14 +3212,23 @@ describe('EL VIAJE NO NACE EN LA PLAZA · sin GPS no se pide a ciegas', () => {
       //  marca se quedaba encendida — el siguiente `idle` daba el relleno por
       //  bueno y el viaje volvía a nacer en la plaza. Pasaba porque el lector
       //  del botón solo corría la mitad buena de la función.
+      //  🔴 ESTOS DOS PARCHES SE REESCRIBIERON EL 23-sep-2026, y el motivo vale
+      //  más que ellos: el arreglo de las salidas mudas cambió los renglones a
+      //  los que se agarraban —el `if` de dos condiciones se partió en dos, y el
+      //  `() => {}` pasó a decir algo—, así que dejaron de encontrar dónde
+      //  morder. No se pusieron en rojo por eso: se pusieron en rojo porque esta
+      //  prueba APUNTA los parches que no muerden y falla con sus nombres. Sin
+      //  esa guardia habrían quedado dos escapes de adorno, verdes por no haber
+      //  tocado nada, y nadie se habría enterado.
       ['el botón verde marca al apretarlo, antes de saber si hay GPS',
-        (s) => s.replace(/ {4}if \(!navigator\.geolocation \|\| !mapaRef\.current\) return;/,
-          '    if (!navigator.geolocation || !mapaRef.current) return;\n'
-          + '    loEligioRef.current = true;')],
+        (s) => s.replace(/const usarMiUbicacion = \(e\) => \{/,
+          'const usarMiUbicacion = (e) => { loEligioRef.current = true;')],
+      //  Ojo al detalle: este escape SIGUE HABLANDO. Si además lo dejara mudo,
+      //  caería por el silencio y no probaría lo suyo —que es marcar sin tener
+      //  la ubicación—. Un escape que cae por dos motivos no prueba ninguno.
       ['el botón verde marca aunque el pasajero NIEGUE el permiso',
-        (s) => s.replace(/\(\) => \{\},\s*\{ enableHighAccuracy: true, timeout: 10000 \}/,
-          '() => { loEligioRef.current = true; },\n'
-          + '      { enableHighAccuracy: true, timeout: 10000 }')],
+        (s) => s.replace(/\(\) => onNoSePudo\('Tu celular([^']*)'\),/,
+          "() => { loEligioRef.current = true; onNoSePudo('Tu celular$1'); },")],
       //  El señuelo, ahora DENTRO del marco: el arreglo anterior lo ancló al
       //  marco y el señuelo se mudó dentro. Por eso ahora se corre el bloque
       //  entero en vez de elegir un `if`.
@@ -3272,13 +3281,35 @@ describe('EL VIAJE NO NACE EN LA PLAZA · sin GPS no se pide a ciegas', () => {
           .replace(
             /(onPlaceCoordsRef\.current\(\{ lat: place\.geometry\.location\.lat\(\), lng: place\.geometry\.location\.lng\(\) \}\);)/,
             '$1 if (place && place.name) onChangeRef.current(place.name);')],
+      //  🔴 LAS TRES SALIDAS MUDAS DEL BOTÓN VERDE (23-sep-2026). Las tres se
+      //  sabotean POR SEPARADO, porque son tres caminos distintos: taparlas con
+      //  un solo escape dejaría dos sin probar, que es exactamente cómo la nota
+      //  vieja de la tabla de deuda nombraba SOLO una de las tres.
+      ['el botón verde vuelve a callarse cuando el aparato no contesta',
+        (s) => s.replace(/\(\) => onNoSePudo\('Tu celular[^']*'\),/, '() => {},')],
+      ['el botón verde habla, pero no dice nada (texto vacío)',
+        (s) => s.replace(/\(\) => onNoSePudo\('Tu celular[^']*'\),/, "() => onNoSePudo(''),")],
+      ['vuelve el `return` seco cuando el teléfono no deja dar ubicación',
+        (s) => s.replace(/if \(!navigator\.geolocation\) \{[\s\S]*?\}/,
+          'if (!navigator.geolocation) return;')],
+      ['vuelve el `return` seco cuando el mapa no está listo',
+        (s) => s.replace(/if \(!mapaRef\.current\) \{[\s\S]*?\}/,
+          'if (!mapaRef.current) return;')],
+      //  Y EL PEOR DE LOS CINCO, porque deja el código «hablando» y la pantalla
+      //  igual de callada: el botón grita y quien lo escucha no hace nada. Es el
+      //  silencio de antes con otro disfraz, y sin este escape el medidor daría
+      //  por bueno un aviso que no llega a ninguna ventanita.
+      ['el aviso del botón verde se le pasa a un `() => {}`',
+        (s) => s.replace(/onNoSePudo=\{\(porque\) => setAviso\(NO_SE_DONDE_ESTAS\(esMensajeria, porque\)\)\}/,
+          'onNoSePudo={() => {}}')],
     ];
 
     // Y QUE LA LISTA NO SE VACÍE. Sin esto, borrar escapes pondría esta prueba
     // más verde cuanto menos vigilara — que es como se apagan los vigilantes.
-    assert.ok(ESCAPES.length >= 29,
-      'esta prueba solo vigila ' + ESCAPES.length + ' escapes, y el 21-sep-2026 vigilaba 29 '
-      + '(eran 24 el 15-sep-2026, y los 5 del GPS tardío entraron el 21). '
+    assert.ok(ESCAPES.length >= 34,
+      'esta prueba solo vigila ' + ESCAPES.length + ' escapes, y el 23-sep-2026 vigilaba 34 '
+      + '(eran 24 el 15-sep-2026, los 5 del GPS tardío entraron el 21, y los 5 de las '
+      + 'tres salidas mudas del botón verde el 23). '
       + 'Quitar escapes la pone verde por mirar menos, no por estar mejor.');
 
     const saltados = [];

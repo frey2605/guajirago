@@ -395,26 +395,79 @@ function elBotonVerdeMarca() {
   const pega = pareceSeguro(cuerpo);
   if (pega) return { falla: 'no lo corro porque ' + pega };
 
-  const aprieta = (contesta) => {
+  // El botón se aprieta con un aparato de mentira que se puede poner de CUATRO
+  // maneras, porque este botón tiene cuatro finales y tres de ellos eran mudos.
+  // Devuelve si prendió la marca Y si dijo algo — las dos cosas del mismo tiro,
+  // ejecutando, no leyendo.
+  const aprieta = ({ contesta, hayGeo = true, hayMapa = true }) => {
     const ref = { current: false };
-    const mapaFalso = { current: { setCenter: () => {}, setZoom: () => {} } };
-    const navigatorFalso = {
+    const dicho = [];
+    const mapaFalso = { current: hayMapa ? { setCenter: () => {}, setZoom: () => {} } : null };
+    const navigatorFalso = hayGeo ? {
       geolocation: {
         getCurrentPosition: (bien, mal) => (contesta
           ? bien({ coords: { latitude: 11.53, longitude: -72.92 } })
           : (mal ? mal({ code: 1 }) : undefined)),
       },
-    };
+    } : {};
     // eslint-disable-next-line no-new-func
-    new Function('navigator', 'loEligioRef', 'mapaRef', 'setUbicUsada', 'e', cuerpo)(
-      navigatorFalso, ref, mapaFalso, () => {}, { stopPropagation: () => {} });
-    return ref.current === true;
+    new Function('navigator', 'loEligioRef', 'mapaRef', 'setUbicUsada', 'onNoSePudo', 'e', cuerpo)(
+      navigatorFalso, ref, mapaFalso, () => {}, (porque) => dicho.push(porque),
+      { stopPropagation: () => {} });
+    // Hablar no es llamar a la función: un `onNoSePudo()` sin nada dentro, o con
+    // un texto vacío, deja al pasajero igual de atascado que el silencio. Así
+    // que se exige TEXTO, y se mira lo que llegó, no que llegara.
+    return { marca: ref.current === true, habla: dicho.some((t) => typeof t === 'string' && t.trim().length > 0) };
   };
   try {
-    return { marca: aprieta(true), marcaSinPermiso: aprieta(false) };
+    const bien = aprieta({ contesta: true });
+    const sinPermiso = aprieta({ contesta: false });
+    const sinAparato = aprieta({ contesta: false, hayGeo: false });
+    const sinMapa = aprieta({ contesta: false, hayMapa: false });
+    return {
+      marca: bien.marca,
+      marcaSinPermiso: sinPermiso.marca,
+      // 🔴 REGLA 9 · las TRES salidas que se iban calladas. Hasta el
+      // 23-sep-2026 las tres eran un `return` seco o un `() => {}`: el dueño
+      // apretó el botón en su casa, no pasó nada, y nadie le dijo por qué.
+      hablaSinPermiso: sinPermiso.habla,
+      hablaSinAparato: sinAparato.habla,
+      hablaSinMapa: sinMapa.habla,
+      // Y que el que lo pinta esté enchufado. Un botón que grita a un `onNoSePudo`
+      // que nadie pasó revienta; uno al que le pasan `() => {}` calla igual que
+      // antes. Se mira en el SITIO DE LLAMADA, que es donde se decide.
+      enchufado: elAvisoEstaEnchufado(),
+    };
   } catch (e) {
     return { falla: 'reventó al correrlo: ' + e.message };
   }
+}
+
+/**
+ * ¿El aviso del botón verde llega a una ventanita de verdad?
+ *
+ * No basta con que `MapaRecogida` hable: si quien lo dibuja no le pasa nada, el
+ * botón revienta; y si le pasa un `() => {}`, calla igual que antes y NADIE se
+ * entera — que es exactamente el fallo que este arreglo cierra, vuelto a poner
+ * con otro disfraz. Así que se mira el sitio de llamada y se exige que lo que
+ * pasa nombre el ÚNICO texto que existe para esto (`NO_SE_DONDE_ESTAS`), no uno
+ * nuevo: dos textos para el mismo aviso es el gemelo de la SEGUNDA LEY.
+ */
+function elAvisoEstaEnchufado() {
+  const i = codigo.indexOf('onNoSePudo={');
+  if (i < 0) return false;
+  // 🔴 SE MIRA SOLO LO QUE SE LE PASA A `onNoSePudo`, NO LO QUE VENGA DETRÁS.
+  //  La primera versión de esto cogía desde `onNoSePudo` hasta el final de la
+  //  etiqueta — y ahí dentro va también el cuerpo de `onCambioPunto`. O sea que
+  //  el día que alguien escribiera un `setAviso` ahí, un `onNoSePudo={() => {}}`
+  //  habría pasado por bueno: el silencio de vuelta, con la prueba en verde.
+  //  Se corta con el contador de llaves que ya existe en este archivo, no con
+  //  otro escrito a mano (SEGUNDA LEY).
+  const abre = codigo.indexOf('{', i);
+  const cierra = elQueCierra(codigo, abre);
+  if (abre < 0 || cierra < 0) return false;
+  const valor = codigo.slice(abre + 1, cierra);
+  return valor.includes('NO_SE_DONDE_ESTAS') && valor.includes('setAviso');
 }
 
 /**
@@ -1161,6 +1214,23 @@ async function elVeredictoDe() {
     ['y si el pasajero niega el permiso, NO lo marca   (ejecutado)',
       () => !!BOTON.falla || BOTON.marcaSinPermiso !== false,
       'apretar el botón no es saber dónde estás: hay que conseguir la ubicación'],
+    // 🔴 REGLA 9 · «NADA SE RECHAZA EN SILENCIO» — LAS TRES SALIDAS DEL BOTÓN.
+    // No marcarlo estaba bien; irse sin decirlo, no. Las tres se comprueban por
+    // separado porque son tres caminos distintos del archivo, y una nota vieja
+    // de la tabla de deuda nombraba SOLO el primero: arreglarlo por ella habría
+    // dejado dos mudos y a nadie quejándose.
+    ['si el aparato no contesta, el botón lo DICE   (ejecutado)',
+      () => !!BOTON.falla || BOTON.hablaSinPermiso !== true,
+      'el dueño lo apretó en su casa el 23-sep-2026 y la pantalla se quedó callada'],
+    ['si el teléfono no deja dar ubicación, lo DICE   (ejecutado)',
+      () => !!BOTON.falla || BOTON.hablaSinAparato !== true,
+      'era un `return` seco: ni marca, ni mapa, ni explicación'],
+    ['si el mapa no está listo, lo DICE   (ejecutado)',
+      () => !!BOTON.falla || BOTON.hablaSinMapa !== true,
+      'la tercera salida muda, la que ninguna nota nombraba'],
+    ['y ese aviso llega a una ventanita de verdad',
+      () => !!BOTON.falla || BOTON.enchufado !== true,
+      'hablarle a un `() => {}` es el mismo silencio con otro disfraz'],
     // 🔴 ESTE DETECTOR LO PIDIÓ LA SEGUNDA OPINIÓN, y es de contar, no de
     // correr: los dos oyentes se comprueban ejecutándolos, pero eso no impide
     // que alguien añada un TERCER sitio que prenda la marca. El que probó era

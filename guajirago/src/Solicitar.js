@@ -207,7 +207,7 @@ function AutocompleteInput({ value, onChange, placeholder, icon, onPlaceCoords }
 // NUEVO: mapa de recogida con pin fijo en el centro y dirección automática (geocodificación inversa, estilo InDriver).
 // Se agranda a pantalla completa mientras se mantiene presionado. Solo se cierra cuando se levantan TODOS los dedos
 // (si sueltas uno y sigues con otro, NO se cierra). Botón verde "usar mi ubicación" abajo a la derecha cuando está cerrado.
-function MapaRecogida({ ubicacionInicial, onCambioPunto }) {
+function MapaRecogida({ ubicacionInicial, onCambioPunto, onNoSePudo }) {
   const mapRef = useRef(null);
   const mapaRef = useRef(null);
   const geocoderRef = useRef(null);
@@ -345,9 +345,36 @@ function MapaRecogida({ ubicacionInicial, onCambioPunto }) {
     document.addEventListener('mouseup', alSoltarMouse);
   };
 
+  // REGLA 9 · «NADA SE RECHAZA EN SILENCIO» — Y ESTE BOTÓN TENÍA TRES SALIDAS
+  // MUDAS, no una.
+  //
+  // El pasajero apretaba «📍 Usar mi ubicación», no pasaba nada, y nadie le
+  // decía por qué. Las tres se iban con un `return` seco o un `() => {}`:
+  // el teléfono que no deja dar ubicación, el mapa que todavía no se ha
+  // dibujado, y —la que muerde de verdad— el aparato que no contesta.
+  //
+  // Medido en un teléfono de verdad el 23-sep-2026, en una casa: el GPS
+  // automático no llegó, el dueño apretó el botón, y la pantalla se quedó
+  // callada. Media hora de adivinar lo que un renglón habría dicho.
+  //
+  // NO se inventa un texto nuevo: sale de `NO_SE_DONDE_ESTAS`, el mismo que ya
+  // usa el pedido, y nombra las dos salidas que decidió el dueño —mover el
+  // marcador o escribir la dirección— (SEGUNDA LEY). Este componente no lo
+  // conoce: solo dice QUÉ pasó, y quien lo pinta es el que lo llama.
+  //
+  // `onNoSePudo` NO lleva respaldo a propósito. Un `|| (() => {})` volvería a
+  // poner el silencio de antes y nadie se enteraría; que reviente se ve. Que
+  // esté puesto lo vigila el amarre, no la suerte.
   const usarMiUbicacion = (e) => {
     if (e) e.stopPropagation();
-    if (!navigator.geolocation || !mapaRef.current) return;
+    if (!navigator.geolocation) {
+      onNoSePudo('Este teléfono no deja dar la ubicación.');
+      return;
+    }
+    if (!mapaRef.current) {
+      onNoSePudo('El mapa todavía no está listo.');
+      return;
+    }
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         // Se prende ANTES de mover el mapa: mover dispara el `idle`, y cuando
@@ -358,7 +385,7 @@ function MapaRecogida({ ubicacionInicial, onCambioPunto }) {
         mapaRef.current.setZoom(16);
         setUbicUsada(true);
       },
-      () => {},
+      () => onNoSePudo('Tu celular no dio la ubicación.'),
       { enableHighAccuracy: true, timeout: 10000 }
     );
   };
@@ -1698,6 +1725,10 @@ const PanelEmergencia = () => (
         <p style={{ color: '#1A1A1E', fontSize: '11px', letterSpacing: '2px', margin: '0 0 8px' }}>MUEVE EL MAPA PARA MARCAR TU RECOGIDA</p>
         <MapaRecogida
           ubicacionInicial={centroMapa}
+          // El mapa dice QUÉ pasó; la ventanita la pinta quien sabe pintarla, y
+          // el texto sale del único sitio donde vive (`NO_SE_DONDE_ESTAS`), el
+          // mismo que ve quien pide sin decir dónde está.
+          onNoSePudo={(porque) => setAviso(NO_SE_DONDE_ESTAS(esMensajeria, porque))}
           onCambioPunto={(punto, direccion, loEligio) => {
             // 🔴 EL RELLENO NO SE DA POR BUENO.
             //
