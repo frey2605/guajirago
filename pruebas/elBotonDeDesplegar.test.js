@@ -41,6 +41,9 @@ const { leer } = require('./cargar.cjs');
 const BOTON = '.github/workflows/desplegar.yml';
 const YML = leer(BOTON);
 
+const BOTON_REGLAS = '.github/workflows/desplegar-reglas.yml';
+const YML_REGLAS = leer(BOTON_REGLAS);
+
 /** Fuera los comentarios: de YAML y de shell. Son el señuelo, no el código. */
 function sinComentarios(yml) {
   return yml.split('\n').filter((l) => !l.trimStart().startsWith('#')).join('\n');
@@ -251,15 +254,20 @@ describe('EL BOTÓN DE DESPLEGAR · sus cuatro protecciones siguen donde sirven'
   // ══════════════════════════════════════════════════════════════════════════
   it('y no se puede ablandar: diez botones rotos, y se queja de los diez', () => {
     const { cabeza, pasos } = enTrozos(YML);
-    const idx = (t) => pasos.findIndex((p) => !p.trimStart().startsWith('#') && p.includes(t));
+    //  🔴 SE BUSCA EN EL PASO SIN SUS COMENTARIOS, Y ESTO COSTÓ UNA VUELTA. Los comentarios
+    //  que van ANTES de un `- name:` quedan pegados al paso ANTERIOR, así que buscar en el
+    //  texto crudo encuentra el paso de arriba y el sabotaje termina rompiendo otra cosa —
+    //  con lo cual el amarre firma en verde sin haber probado nada. Lo cazó el propio
+    //  contador de sabotajes mudos el 23-sep-2026: 2 de 6 no mordían.
+    const idx = (t) => pasos.findIndex((p) => sinComentarios(p).includes(t));
     const juntar = (ps) => cabeza + '\n' + ps.join('\n');
 
     // Mueve el paso que contiene `de` a justo después del que contiene `tras`.
     const mover = (de, tras) => {
       const ps = [...pasos];
-      const i = ps.findIndex((p) => p.includes(de));
+      const i = ps.findIndex((p) => sinComentarios(p).includes(de));
       const [trozo] = ps.splice(i, 1);
-      const j = ps.findIndex((p) => p.includes(tras));
+      const j = ps.findIndex((p) => sinComentarios(p).includes(tras));
       ps.splice(j + 1, 0, trozo);
       return juntar(ps);
     };
@@ -303,5 +311,166 @@ describe('EL BOTÓN DE DESPLEGAR · sus cuatro protecciones siguen donde sirven'
     assert.deepEqual(mudos, [],
       '🔴 EL AMARRE NO MUERDE en ' + mudos.length + ' de ' + SABOTAJES.length
       + ' sabotajes:\n  · ' + mudos.join('\n  · '));
+  });
+});
+
+/**
+ * ══════════════════════════════════════════════════════════════════════════════
+ *  EL OTRO BOTÓN: EL DE LAS REGLAS Y LOS ÍNDICES
+ *
+ *  Es el despliegue más peligroso del proyecto, y tiene DOS formas de hacer daño
+ *  que no existen en el de la app:
+ *
+ *    · `--only hosting` desde la RAÍZ publica un resto de JUNIO (el `build` de la
+ *      raíz) y tumba la app del cliente. Este botón corre justo ahí, así que esa
+ *      palabra no puede aparecer nunca en lo que ejecuta;
+ *    · el despliegue de índices SINCRONIZA: `--force` convierte «ofrece borrar»
+ *      en «borra», y un índice borrado no da error de despliegue — hace que la
+ *      consulta que lo usaba falle en la cara del usuario.
+ *
+ *  Las dos se vigilan mirando lo que se EJECUTA, con los comentarios fuera: el
+ *  propio archivo explica en prosa por qué no usa ninguna de las dos, así que un
+ *  buscador a pelo las encontraría ahí y se pondría rojo sin motivo — o, peor, se
+ *  ablandaría para dejar de hacerlo.
+ * ══════════════════════════════════════════════════════════════════════════════
+ */
+function losFallosDeLasReglas(yml) {
+  const q = [];
+  const pasos = losPasos(yml);
+  const limpio = sinComentarios(yml);
+
+  if (/--only\s+hosting|--only\s+\S*hosting/.test(limpio)) {
+    q.push('HOSTING: este botón corre en la RAÍZ y nombra `hosting`. El `firebase.json` de la '
+      + 'raíz apunta a un `build` de junio: publicarlo tumbaría la app del cliente');
+  }
+  if (/--force/.test(limpio)) {
+    q.push('FORCE: `--force` convierte «ofrece borrar un índice» en «lo borra», y un índice '
+      + 'borrado no da error: hace fallar la consulta que lo usaba');
+  }
+
+  const iVerdicto = elPasoQue(pasos, 'bajar-indices.cjs --verdicto');
+  const iReglas = elPasoQue(pasos, 'firestore:rules');
+  const iIndices = elPasoQue(pasos, '--only firestore:indexes');
+
+  if (iVerdicto < 0) {
+    q.push('VERDICTO: desapareció la comprobación de que el repo no se deja fuera un índice '
+      + 'que ya está puesto');
+  }
+  if (iReglas < 0) q.push('REGLAS: este botón ya no despliega las reglas');
+  if (iIndices < 0) q.push('INDICES: este botón ya no despliega los índices');
+
+  if (iVerdicto >= 0 && iIndices >= 0 && iVerdicto > iIndices) {
+    q.push('VERDICTO: la comprobación quedó DESPUÉS de desplegar los índices: avisa cuando el '
+      + 'borrado ya se hizo');
+  }
+  // La comparación tiene que vivir en el guion que sabe de índices, no copiada aquí.
+  if (iVerdicto >= 0 && !pasos[iVerdicto].includes('scripts/bajar-indices.cjs')) {
+    q.push('VERDICTO: la comparación se copió dentro del YAML en vez de pedírsela a '
+      + '`scripts/bajar-indices.cjs` (SEGUNDA LEY: el gemelo se queda viejo)');
+  }
+  if (!/firebase-tools@15/.test(limpio) || /firebase-tools@latest/.test(limpio)) {
+    q.push('VERSION: la herramienta no está fijada en 15');
+  }
+  return q;
+}
+
+describe('EL BOTÓN DE LAS REGLAS · el despliegue más peligroso, y sus dos frenos', () => {
+  it('hoy no tiene ninguna queja', () => {
+    const q = losFallosDeLasReglas(YML_REGLAS);
+    assert.deepEqual(q, [], '🔴 el botón de las reglas perdió una protección:\n  · ' + q.join('\n  · '));
+  });
+
+  it('NUNCA nombra `hosting`: corre en la raíz, donde el build es de junio', () => {
+    assert.ok(!/--only\s+\S*hosting/.test(sinComentarios(YML_REGLAS)),
+      '⛔ nombra hosting desde la raíz: publicaría el resto de junio');
+  });
+
+  it('NUNCA usa `--force`: eso borra índices de verdad', () => {
+    assert.ok(!/--force/.test(sinComentarios(YML_REGLAS)),
+      '⛔ `--force` convierte «ofrece borrar» en «borra»');
+  });
+
+  it('comprueba ANTES de desplegar que no se deja fuera ningún índice puesto', () => {
+    const pasos = losPasos(YML_REGLAS);
+    const iV = elPasoQue(pasos, 'bajar-indices.cjs --verdicto');
+    const iI = elPasoQue(pasos, '--only firestore:indexes');
+    assert.ok(iV >= 0, '⛔ desapareció el veredicto de los índices');
+    assert.ok(iV < iI, '⛔ el veredicto quedó después de desplegar: avisa cuando ya se borró');
+  });
+
+  it('y no se puede ablandar: seis botones de reglas rotos, y se queja de los seis', () => {
+    const { cabeza, pasos } = enTrozos(YML_REGLAS);
+    const juntar = (ps) => cabeza + '\n' + ps.join('\n');
+    //  Sin comentarios, por lo mismo que arriba: el comentario que explica un paso vive al
+    //  final del paso ANTERIOR, y buscar en crudo saboteaba el que no era.
+    const idx = (t) => pasos.findIndex((p) => sinComentarios(p).includes(t));
+    const quitar = (t) => juntar(pasos.filter((p, i) => i !== idx(t)));
+    const cambiar = (viejo, nuevo) => juntar(pasos).replace(viejo, nuevo);
+    const mover = (de, tras) => {
+      const ps = [...pasos];
+      const i = idx(de);
+      const [trozo] = ps.splice(i, 1);
+      const j = ps.findIndex((p) => sinComentarios(p).includes(tras));
+      ps.splice(j + 1, 0, trozo);
+      return juntar(ps);
+    };
+
+    const SABOTAJES = [
+      ['desplegando también hosting desde la raíz',
+        cambiar('--only firestore:indexes', '--only firestore:indexes,hosting'), 'HOSTING'],
+      ['forzando el despliegue de índices',
+        cambiar('--only firestore:indexes', '--only firestore:indexes --force'), 'FORCE'],
+      ['sin el veredicto de los índices', quitar('bajar-indices.cjs --verdicto'), 'VERDICTO'],
+      ['el veredicto, movido detrás del despliegue de índices',
+        mover('bajar-indices.cjs --verdicto', '--only firestore:indexes'), 'VERDICTO'],
+      ['sin desplegar las reglas', quitar('firestore:rules'), 'REGLAS'],
+      ['la herramienta suelta', cambiar(/firebase-tools@15/g, 'firebase-tools@latest'), 'VERSION'],
+    ];
+
+    const mudos = [];
+    for (const [nombre, roto, marca] of SABOTAJES) {
+      const q = losFallosDeLasReglas(roto);
+      if (!q.some((x) => x.startsWith(marca))) mudos.push(nombre + ' (esperaba ' + marca + ')');
+    }
+    assert.deepEqual(mudos, [],
+      '🔴 EL AMARRE DE LAS REGLAS NO MUERDE en ' + mudos.length + ' de ' + SABOTAJES.length
+      + ':\n  · ' + mudos.join('\n  · '));
+  });
+});
+
+/**
+ * Y la comparación de índices, que es la que decide si un despliegue borra algo.
+ * Se prueba con listas de mentira, sin salir a la red: la función es pura y vive
+ * en el guion que sabe de índices.
+ */
+describe('LA COMPARACIÓN DE ÍNDICES · distingue crear de BORRAR', () => {
+  const { loQueElRepoNoTrae } = require('../scripts/bajar-indices.cjs');
+  const A = { collectionGroup: 'viajes', fields: [{ fieldPath: 'conductorId' }] };
+  const B = { collectionGroup: 'pedidos', fields: [{ fieldPath: 'negocioId' }] };
+  const cuantos = (s, r) => {
+    const f = loQueElRepoNoTrae(s, r);
+    return f.indexes.length + f.fieldOverrides.length;
+  };
+
+  it('si el repo los trae todos, no falta nada', () => {
+    assert.equal(cuantos({ indexes: [A, B] }, { indexes: [A, B] }), 0);
+  });
+
+  it('🔴 si al repo le falta uno que el servidor tiene, lo canta', () => {
+    assert.equal(cuantos({ indexes: [A, B] }, { indexes: [A] }), 1);
+  });
+
+  it('pero un índice NUEVO en el repo no es un problema: es lo que se va a crear', () => {
+    assert.equal(cuantos({ indexes: [A] }, { indexes: [A, B] }), 0);
+  });
+
+  it('y las excepciones de campo cuentan igual', () => {
+    const E = { collectionGroup: 'viajes', fieldPath: 'tarifa' };
+    assert.equal(cuantos({ indexes: [], fieldOverrides: [E] }, { indexes: [], fieldOverrides: [] }), 1);
+    assert.equal(cuantos({ indexes: [], fieldOverrides: [E] }, { indexes: [], fieldOverrides: [E] }), 0);
+  });
+
+  it('un archivo vacío no engaña: faltan todos', () => {
+    assert.equal(cuantos({ indexes: [A, B] }, {}), 2);
   });
 });
