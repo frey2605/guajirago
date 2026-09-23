@@ -1068,3 +1068,51 @@ exactamente lo que no se hace. Ese es el motivo, no el que escribi.
 La leccion es la de siempre, y ya esta en CLAUDE.md como fila: un dato sin
 medicion detras se lee igual que uno medido. Escribi "los usa el panel y la
 app" porque sonaba razonable.
+
+
+=============================================================================
+23-sep-2026  ·  CODIGO MOVIDO DE SITIO, CON PERMISO DEL DUENO
+=============================================================================
+
+QUE SE MOVIO
+  6 renglones, de scripts/medir-origen-del-viaje.cjs a pruebas/cargar.cjs:
+  el criterio que juzga el respaldo del GPS (elPrimeroPideElBueno,
+  ningunRespaldoPideMas, todosAceptanGuardada, silencioTotal y la flecha
+  `alta`). En el medidor queda la delegacion, no la copia.
+
+POR QUE
+  Choque REAL entre las dos leyes, no una excusa.
+
+  · PRIMERA LEY, regla 3: mover un bloque sano cuenta como tocarlo. El
+    guardian lo detecto y paro el trabajo. Hizo exactamente su trabajo.
+  · SEGUNDA LEY: el criterio es UN proceso. El mismo fallo aparecio el mismo
+    dia en DOS pantallas —Solicitar.js (pasajero) y AppConductor.js
+    (conductor)—, asi que el criterio tenia que juzgar a las dos. Dejarlo en
+    el medidor del pasajero y escribir otro igual para el conductor son dos
+    calculadoras para el mismo proceso, y «el que se queda viejo es el que
+    nadie mira».
+
+  Se eligio romper la PRIMERA por la SEGUNDA porque el codigo movido tiene
+  HOY exactamente 20 minutos de vida —se escribio en el commit 9e6dc31, de
+  esta misma sesion— y todavia no lo usaba nadie mas. Mover codigo recien
+  escrito no es lo que la PRIMERA LEY protege; lo que protege es el codigo
+  viejo que funciona y que nadie esta mirando.
+
+QUIEN LO AUTORIZO
+  El dueno, por escrito, tras ver el veredicto del guardian con los 6
+  renglones nombrados uno por uno y las tres salidas sobre la mesa (A:
+  aprobar el movimiento · B: deshacerlo y duplicar · C: otra). Dijo A.
+
+COMO QUEDA VIGILADO
+  pruebas/amarres.test.js, «EL RESPALDO DEL GPS · el de repuesto no puede
+  pedir mas que el que fallo»: aplica el criterio de cargar.cjs a las DOS
+  pantallas y las sabotea con 4 escapes cada una. Si el criterio se
+  ablandara, las dos se enteran a la vez — que es justo lo que el movimiento
+  venia a conseguir.
+
+LO QUE ESTA ANOTACION NO ARREGLA, Y SIGUE PENDIENTE
+  Escribir en ESTE archivo es, para el guardian, tocar un archivo no
+  declarado — asi que su propio libro de excepciones lo vuelve a parar. Ya
+  esta en la tabla de deuda de CLAUDE.md desde el 15-sep-2026, con nombre y
+  archivo: es un arreglo de una linea en scripts/guardian.cjs, que no estaba
+  en la foto, y va aparte con sus pasos.

@@ -18,8 +18,8 @@
 const { describe, it } = require('node:test');
 const assert = require('node:assert');
 // El cargador vive en cargar.cjs: un solo sitio para todas las pruebas (SEGUNDA LEY).
-const { RAIZ, leer, cargarDeLaApp, soloCodigo, sinTextos, trozoDelTry, cuerpoDeLaFuncion }
-  = require('./cargar.cjs');
+const { RAIZ, leer, cargarDeLaApp, soloCodigo, sinTextos, trozoDelTry, cuerpoDeLaFuncion,
+  elRespaldoDelGps } = require('./cargar.cjs');
 
 describe('AMARRES · la app y el servidor miden la distancia IGUAL', () => {
   it('las dos calculadoras dan los mismos kilómetros en los mismos puntos', () => {
@@ -3386,5 +3386,104 @@ describe('EL VIAJE NO NACE EN LA PLAZA · sin GPS no se pide a ciegas', () => {
     assert.deepStrictEqual(nopudo, [],
       'el medidor no pudo correr estos caminos, así que lo que diga de ellos no vale:\n   · '
       + nopudo.join('\n   · '));
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+describe('EL RESPALDO DEL GPS · el de repuesto no puede pedir más que el que falló', () => {
+  //  Las DOS pantallas que piden ubicación con respaldo. La del pasajero para
+  //  saber dónde recogerlo; la del conductor para saber dónde está y poder
+  //  mandarle los viajes de su zona.
+  //
+  //  🔴 LAS DOS TENÍAN EL MISMO FALLO, y se encontraron el mismo día: el primer
+  //  intento pedía precisión BAJA —wifi y antenas, el camino fácil— y, cuando
+  //  ése fallaba, el respaldo pedía SATÉLITES, que es lo más difícil que hay.
+  //  Dentro de una casa el satélite es justo lo que no se ve. El dueño lo midió
+  //  con su teléfono, en su casa: 30 segundos y no llegó ninguno de los dos.
+  //
+  //  El criterio NO se escribe aquí: se importa de `cargar.cjs`, que es donde
+  //  vive una sola vez y donde lo usa también el medidor del pasajero. Si esta
+  //  prueba llevara su propia copia, el día que el criterio cambiara en un sitio
+  //  el otro seguiría firmando verde con la vara vieja (SEGUNDA LEY).
+  //
+  //  Y el ancla NO sobra: `Solicitar.js` tiene DOS peticiones de GPS —ésta y la
+  //  del botón «Usar mi ubicación», que lleva UN intento a propósito porque lo
+  //  aprieta una persona y ya se le dice si falla—. Sin ancla se coge «la
+  //  primera del archivo» y se juzga al botón con la vara de la pantalla: eso
+  //  pasó al escribir esto, y lo cazó la medición, no la lectura.
+  const PANTALLAS = [
+    ['la del PASAJERO', 'guajirago/src/Solicitar.js', 'if (!navigator.geolocation) return;'],
+    ['la del CONDUCTOR', 'guajirago/src/AppConductor.js', 'const guardarUbicacion'],
+  ];
+
+  it('las dos piden primero el punto bueno y se respaldan con el que siempre contesta', () => {
+    for (const [quien, archivo, ancla] of PANTALLAS) {
+      const r = elRespaldoDelGps(leer(archivo), ancla);
+      assert.ok(!r.falla, quien + ' (' + archivo + '): ' + r.falla);
+      assert.ok(r.elPrimeroPideElBueno,
+        quien + ' pide primero el punto APROXIMADO, así que quien está en la calle '
+        + 'recibe el malo antes que el bueno. El primer intento tiene que pedir precisión alta.');
+      assert.ok(r.ningunRespaldoPideMas,
+        quien + ' tiene un respaldo que pide MÁS que el intento que ya falló. Ése es el fallo '
+        + 'exacto del 23-sep-2026: falla el wifi y se piden satélites, que bajo techo no hay.');
+      assert.ok(r.todosAceptanGuardada,
+        quien + ' no acepta una posición que el aparato YA tiene (`maximumAge: 0`), así que '
+        + 'tira una buena de hace medio minuto y la pide otra vez desde cero.');
+      assert.ok(r.bajoTechoLlega,
+        quien + ': con el satélite sin aparecer y el wifi contestando —una casa— la ubicación '
+        + 'no llega. Es el caso que el dueño midió con su teléfono.');
+      //  Y que el silencio no crezca. La forma fácil de poner verde todo lo de
+      //  arriba es esperar más hasta que el aparato ceda, y eso empeora justo
+      //  lo que este arreglo vino a mejorar. El tope sale de lo que HABÍA.
+      assert.ok(r.silencioTotal <= 28000,
+        quien + ' hace esperar ' + (r.silencioTotal / 1000) + ' s sin decir nada, y antes del '
+        + 'arreglo eran 28. Alargar la espera no es arreglarlo: es esconderlo.');
+    }
+  });
+
+  //  Y LA REGLA SE PRUEBA A SÍ MISMA. Una regla que nadie sabotea es una regla
+  //  que nadie ha comprobado: se le dan pantallas de mentira —la de verdad con
+  //  el fallo metido dentro— y se exige que se queje de todas. Los parches son
+  //  sobre el archivo REAL, no copias escritas a mano, porque una copia a mano
+  //  se queda vieja en la siguiente edición y entonces esto vigila un fantasma.
+  it('y la regla se queja de todas las formas de romperlo', () => {
+    const ESCAPES = [
+      ['vuelve el orden de antes (fácil primero, satélite de respaldo)',
+        (t) => t.replace(/enableHighAccuracy: true, timeout: 10000, maximumAge: 60000/,
+          'enableHighAccuracy: false, timeout: 8000, maximumAge: 1')
+          .replace(/enableHighAccuracy: false, timeout: 10000, maximumAge: 300000/,
+            'enableHighAccuracy: true, timeout: 20000, maximumAge: 1')],
+      ['los dos intentos piden satélite, que bajo techo no hay',
+        (t) => t.replace(/enableHighAccuracy: false, timeout: 10000, maximumAge: 300000/,
+          'enableHighAccuracy: true, timeout: 10000, maximumAge: 300000')],
+      ['vuelve el `maximumAge: 0`: se tira una posición buena de hace un momento',
+        (t) => t.replace(/maximumAge: 60000/, 'maximumAge: 0')],
+      ['se alarga la espera hasta que el aparato ceda',
+        (t) => t.replace(/timeout: 10000, maximumAge: 300000/, 'timeout: 45000, maximumAge: 300000')],
+    ];
+
+    const saltados = [];
+    for (const [quien, archivo, ancla] of PANTALLAS) {
+      const real = leer(archivo);
+      for (const [nombre, romper] of ESCAPES) {
+        const rota = romper(real);
+        //  🔴 UN PARCHE QUE NO ENCUENTRA DÓNDE MORDER SE ESTARÍA APROBANDO SOLO.
+        //   La pantalla sale limpia, la regla dice «bien» con toda la razón, y
+        //   el verde no vale nada. Se apunta y se falla al final con su nombre.
+        if (rota === real) { saltados.push(quien + ' · ' + nombre); continue; }
+        const r = elRespaldoDelGps(rota, ancla);
+        const seQueja = !!r.falla || !r.elPrimeroPideElBueno || !r.ningunRespaldoPideMas
+          || !r.todosAceptanGuardada || !r.bajoTechoLlega || r.silencioTotal > 28000;
+        assert.ok(seQueja,
+          'con este escape metido en ' + quien + ' (' + archivo + ') —«' + nombre + '»— la regla '
+          + 'de `pruebas/cargar.cjs` sigue diciendo que todo está bien. O sea que ese escape se '
+          + 'puede poner en la app de verdad y ninguna prueba se entera. Arregla la REGLA, no '
+          + 'esta prueba.');
+      }
+    }
+    assert.deepStrictEqual(saltados, [],
+      'estos escapes ya no encuentran dónde morder, así que no probaron nada y su verde no '
+      + 'vale:\n   · ' + saltados.join('\n   · ')
+      + '\n   O el código se movió y hay que actualizar el parche, o el arreglo ya no está.');
   });
 });

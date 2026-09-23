@@ -63,7 +63,7 @@ const RAIZ = path.resolve(__dirname, '..');
 const PANTALLA = 'guajirago/src/Solicitar.js';
 const DOCUMENTO = 'guajirago/src/viajeNuevo.js';
 
-const { cargarDeLaApp, soloCodigo, sinTextos } = require('../pruebas/cargar.cjs');
+const { cargarDeLaApp, soloCodigo, sinTextos, elRespaldoDelGps } = require('../pruebas/cargar.cjs');
 
 // La plaza, la calculadora de distancia y la lista de finales salen de los
 // archivos de la app, no de una copia aquí (SEGUNDA LEY). Si mañana se mueve el
@@ -569,25 +569,20 @@ function elGpsDeLaPantalla(contesta) {
  * mismo o menos vale; uno que pida más, no — sea con la palabra que sea.
  */
 function elRespaldoEsMasFacil() {
-  const r = elGpsDeLaPantalla(false);
-  if (r.falla) return { falla: r.falla };
-  const i = r.intentos;
-  if (i.length < 2) return { falla: 'la pantalla solo intenta ' + i.length + ' vez el GPS' };
-  const alta = (o) => o.enableHighAccuracy === true;
-  return {
-    // El primero pide el punto BUENO: quien está en la calle recibe el de
-    // satélite, no el aproximado. Antes era al revés y nadie lo miraba.
-    elPrimeroPideElBueno: alta(i[0]),
-    // Y ninguno de los siguientes puede pedir MÁS que el que ya falló.
-    ningunRespaldoPideMas: i.slice(1).every((o) => !alta(o) || alta(i[0])),
-    // Una posición que el aparato ya tiene vale. Con `maximumAge: 0` —o sin
-    // decirlo, que es lo mismo— se tira una buena de hace medio minuto y se
-    // vuelve a empezar de cero.
-    todosAceptanGuardada: i.every((o) => Number(o.maximumAge) > 0),
-    // Y que el silencio no crezca. 28 segundos era lo que había; más sería
-    // empeorar lo que este arreglo vino a mejorar.
-    silencioTotal: i.reduce((a, o) => a + (Number(o.timeout) || 0), 0),
-  };
+  // 🔴 LA REGLA NO VIVE AQUÍ. Vive UNA sola vez en `pruebas/cargar.cjs`, y con
+  //  ella se juzga también la pantalla del CONDUCTOR, que tenía el mismo fallo.
+  //  Escribirla dos veces sería el gemelo que se queda viejo — y el que se
+  //  queda viejo es el que nadie mira. Esta función solo dice QUÉ pantalla y
+  //  DÓNDE empieza su petición; el criterio es de la casa común.
+  //
+  //  Se le pasa `codigo`, no el archivo: así las pantallas de mentira del
+  //  amarre siguen entrando por aquí.
+  //
+  //  El ancla no sobra: este archivo tiene DOS peticiones de GPS —ésta y la del
+  //  botón «Usar mi ubicación», que lleva UN intento a propósito—. Sin ancla se
+  //  cogía «la primera del archivo» y se juzgaba al botón con la vara de la
+  //  pantalla. Salió al medir, no al leer.
+  return elRespaldoDelGps(codigo, 'if (!navigator.geolocation) return;');
 }
 
 /**
