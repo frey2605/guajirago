@@ -300,7 +300,130 @@ function catchQueProtege(codigo, pos) {
   return codigo.slice(ini, k - 1);
 }
 
+
+/**
+ * 🔴 LA REGLA DEL RESPALDO DEL GPS — UNA SOLA VEZ, PARA TODAS LAS PANTALLAS.
+ *
+ * El 23-sep-2026 se encontró el mismo fallo en DOS sitios: la pantalla del
+ * pasajero (`Solicitar.js`) y la del conductor (`AppConductor.js`). En los dos,
+ * el primer intento pedía precisión BAJA —wifi y antenas, el camino fácil— y,
+ * cuando ése fallaba, el respaldo pedía precisión ALTA, o sea SATÉLITES, que es
+ * lo más difícil que hay. Dentro de una casa el satélite es justo lo que no se
+ * ve: cuando el camino fácil no servía, la app se iba por el imposible.
+ *
+ * Medido con el teléfono del dueño, dentro de su casa: no llegó ninguno de los
+ * dos intentos en 30 segundos.
+ *
+ * VIVE AQUÍ Y NO EN CADA MEDIDOR (SEGUNDA LEY): es UN proceso —«¿el respaldo
+ * pide menos que el que ya falló?»— y escribirlo dos veces es el gemelo que se
+ * queda viejo, y el que se queda viejo es el que nadie mira. Las dos pantallas
+ * se juzgan con ESTE código, así que no se pueden separar en silencio.
+ *
+ * NO LEE: EJECUTA. La cadena de `getCurrentPosition` se saca del archivo y se
+ * corre con un aparato de mentira, así que da igual cómo esté escrita, anidada
+ * o reordenada. Perseguir formas de escribir no acaba nunca; ejecutar, sí.
+ */
+function intentosDelGps(codigoFuente, contesta, desde) {
+  const seguro = sinTextos(codigoFuente);
+  const marca = 'navigator.geolocation.getCurrentPosition(';
+  // 🔴 HAY QUE DECIR DÓNDE MIRAR, y no es un capricho: un archivo puede tener
+  //  varias peticiones de GPS con trabajos distintos. `Solicitar.js` tiene DOS
+  //  —la de la pantalla, que sí lleva respaldo, y la del botón «Usar mi
+  //  ubicación», que lleva UN solo intento a propósito porque el pasajero lo
+  //  aprieta a mano y ya se le dice si falla—. Sin ancla, esta regla cogía «la
+  //  primera del archivo» y juzgaba al botón con la vara de la pantalla: dijo
+  //  «solo se intenta 1 vez» del archivo que acabábamos de arreglar bien.
+  //  «La primera del archivo» es exactamente el señuelo que este repo ya pagó
+  //  tres veces, y aquí se cazó solo porque la medición se corrió.
+  const ancla = desde == null ? 0 : seguro.indexOf(desde);
+  if (ancla < 0) return { falla: 'no encuentro el ancla «' + desde + '»' };
+  const i = seguro.indexOf(marca, ancla);
+  if (i < 0) return { falla: 'no encuentro ninguna petición de GPS' };
+  // La llamada entera, con sus anidadas dentro: contador de paréntesis sobre el
+  // texto SIN cadenas, para que un paréntesis dentro de un texto no descuadre.
+  let j = i + marca.length;
+  let hondo = 1;
+  while (j < seguro.length && hondo > 0) {
+    if (seguro[j] === '(') hondo += 1;
+    else if (seguro[j] === ')') hondo -= 1;
+    j += 1;
+  }
+  if (hondo !== 0) return { falla: 'no entiendo dónde acaba la petición de GPS' };
+  const cadena = codigoFuente.slice(i, j) + ';';
+
+  const intentos = [];
+  let llego = false;
+  const navigatorFalso = {
+    geolocation: {
+      getCurrentPosition: (bien, mal, opts) => {
+        intentos.push(opts || {});
+        // `bajoTecho` NO es «falla el primero». Es lo que de verdad pasa dentro
+        // de una casa: el SATÉLITE no aparece y el wifi sí, vaya en el puesto
+        // que vaya. Con un aparato que negara el TURNO, pedir satélite las dos
+        // veces pasaría por bueno — o sea el fallo entero, con todo en verde.
+        const acierta = contesta === true
+          || (contesta === 'bajoTecho' && (opts || {}).enableHighAccuracy !== true);
+        if (acierta) {
+          llego = true;
+          return bien({ coords: { latitude: 11.5312, longitude: -72.9241 }, timestamp: 0 });
+        }
+        return mal ? mal({ code: 3, message: 'timeout' }) : undefined;
+      },
+    },
+  };
+
+  // Los nombres que la cadena usa y que aquí no existen —`guardarUbicacion`,
+  // `setUbicacionPasajero`…— cambian de pantalla a pantalla. En vez de
+  // escribirlos a mano (una lista que se queda vieja en cuanto alguien renombre
+  // algo, y que mentiría en verde), se DESCUBREN: se corre, y si falta uno el
+  // propio error lo nombra. Con tope, para que un error distinto no dé vueltas.
+  const libres = [];
+  for (let vuelta = 0; vuelta <= 12; vuelta += 1) {
+    intentos.length = 0;
+    llego = false;
+    try {
+      // eslint-disable-next-line no-new-func
+      new Function('navigator', ...libres, cadena)(navigatorFalso, ...libres.map(() => () => {}));
+      return { intentos, llego };
+    } catch (e) {
+      const falta = /^(\w+) is not defined$/.exec(e.message || '');
+      if (!falta || libres.includes(falta[1])) {
+        return { falla: 'la petición de GPS reventó al correrla: ' + e.message };
+      }
+      libres.push(falta[1]);
+    }
+  }
+  return { falla: 'la petición de GPS usa más de 12 nombres de fuera; no la corro a ciegas' };
+}
+
+/**
+ * El veredicto sobre una pantalla, con la regla de arriba.
+ *
+ * Cuatro cosas, y las cuatro salen de CORRER la cadena:
+ *  · el primer intento pide el punto BUENO (satélite) — quien está en la calle
+ *    recibe el bueno, no el aproximado. Antes era al revés en las dos pantallas;
+ *  · ningún respaldo pide MÁS que el que ya falló;
+ *  · todos aceptan una posición que el aparato YA TIENE (`maximumAge > 0`);
+ *  · y, bajo techo, la ubicación LLEGA.
+ */
+function elRespaldoDelGps(codigoFuente, desde) {
+  const r = intentosDelGps(codigoFuente, false, desde);
+  if (r.falla) return { falla: r.falla };
+  const i = r.intentos;
+  if (i.length < 2) return { falla: 'solo se intenta ' + i.length + ' vez el GPS' };
+  const alta = (o) => o.enableHighAccuracy === true;
+  const techo = intentosDelGps(codigoFuente, 'bajoTecho', desde);
+  return {
+    elPrimeroPideElBueno: alta(i[0]),
+    ningunRespaldoPideMas: i.slice(1).every((o) => !alta(o) || alta(i[0])),
+    todosAceptanGuardada: i.every((o) => Number(o.maximumAge) > 0),
+    bajoTechoLlega: !techo.falla && techo.llego === true,
+    silencioTotal: i.reduce((a, o) => a + (Number(o.timeout) || 0), 0),
+  };
+}
+
 module.exports = {
   RAIZ, leer, cargarDeLaApp, soloCodigo, sinTextos, cuerpoDeLaFuncion, cuerpoDelCatch,
   trozoDelTry, dentroDeTry, tieneCatchPropio, catchPropioDe, catchQueProtege,
+  intentosDelGps, elRespaldoDelGps,
 };

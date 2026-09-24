@@ -207,7 +207,7 @@ function AutocompleteInput({ value, onChange, placeholder, icon, onPlaceCoords }
 // NUEVO: mapa de recogida con pin fijo en el centro y dirección automática (geocodificación inversa, estilo InDriver).
 // Se agranda a pantalla completa mientras se mantiene presionado. Solo se cierra cuando se levantan TODOS los dedos
 // (si sueltas uno y sigues con otro, NO se cierra). Botón verde "usar mi ubicación" abajo a la derecha cuando está cerrado.
-function MapaRecogida({ ubicacionInicial, onCambioPunto }) {
+function MapaRecogida({ ubicacionInicial, onCambioPunto, onNoSePudo }) {
   const mapRef = useRef(null);
   const mapaRef = useRef(null);
   const geocoderRef = useRef(null);
@@ -345,9 +345,36 @@ function MapaRecogida({ ubicacionInicial, onCambioPunto }) {
     document.addEventListener('mouseup', alSoltarMouse);
   };
 
+  // REGLA 9 · «NADA SE RECHAZA EN SILENCIO» — Y ESTE BOTÓN TENÍA TRES SALIDAS
+  // MUDAS, no una.
+  //
+  // El pasajero apretaba «📍 Usar mi ubicación», no pasaba nada, y nadie le
+  // decía por qué. Las tres se iban con un `return` seco o un `() => {}`:
+  // el teléfono que no deja dar ubicación, el mapa que todavía no se ha
+  // dibujado, y —la que muerde de verdad— el aparato que no contesta.
+  //
+  // Medido en un teléfono de verdad el 23-sep-2026, en una casa: el GPS
+  // automático no llegó, el dueño apretó el botón, y la pantalla se quedó
+  // callada. Media hora de adivinar lo que un renglón habría dicho.
+  //
+  // NO se inventa un texto nuevo: sale de `NO_SE_DONDE_ESTAS`, el mismo que ya
+  // usa el pedido, y nombra las dos salidas que decidió el dueño —mover el
+  // marcador o escribir la dirección— (SEGUNDA LEY). Este componente no lo
+  // conoce: solo dice QUÉ pasó, y quien lo pinta es el que lo llama.
+  //
+  // `onNoSePudo` NO lleva respaldo a propósito. Un `|| (() => {})` volvería a
+  // poner el silencio de antes y nadie se enteraría; que reviente se ve. Que
+  // esté puesto lo vigila el amarre, no la suerte.
   const usarMiUbicacion = (e) => {
     if (e) e.stopPropagation();
-    if (!navigator.geolocation || !mapaRef.current) return;
+    if (!navigator.geolocation) {
+      onNoSePudo('Este teléfono no deja dar la ubicación.');
+      return;
+    }
+    if (!mapaRef.current) {
+      onNoSePudo('El mapa todavía no está listo.');
+      return;
+    }
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         // Se prende ANTES de mover el mapa: mover dispara el `idle`, y cuando
@@ -358,7 +385,7 @@ function MapaRecogida({ ubicacionInicial, onCambioPunto }) {
         mapaRef.current.setZoom(16);
         setUbicUsada(true);
       },
-      () => {},
+      () => onNoSePudo('Tu celular no dio la ubicación.'),
       { enableHighAccuracy: true, timeout: 10000 }
     );
   };
@@ -622,19 +649,76 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
       setUbicacionPasajero({ lat: pos.coords.latitude, lng: pos.coords.longitude });
       setUbicacionEsDelGps(true);
     };
+    // 🔴 EL RESPALDO PEDÍA ALGO MÁS DIFÍCIL QUE EL PRIMER INTENTO (23-sep-2026).
+    //
+    // Estaba al revés: el intento 1 pedía precisión BAJA —wifi y antenas, el
+    // camino fácil— y, cuando ése fallaba, el respaldo pedía precisión ALTA,
+    // o sea SATÉLITES, que es lo más difícil que hay. Dentro de una casa los
+    // satélites son justo lo que no se ve, así que cuando el camino fácil no
+    // servía la app se iba por el imposible y se rendía a los 28 segundos.
+    //
+    // MEDIDO EN UN TELÉFONO DE VERDAD, no razonado: el 23-sep-2026 el dueño
+    // abrió la pantalla dentro de su casa, esperó 30 segundos y no llegó
+    // ninguno de los dos. El botón verde sí le funcionó — pero no por ser
+    // mejor: para entonces estos dos intentos ya llevaban 28 segundos
+    // despertando el GPS del aparato, y el botón se encontró el trabajo hecho.
+    //
+    // Ahora el orden es el que tiene sentido: primero el BUENO, y si no
+    // aparece, el que SIEMPRE contesta. Y de paso el que está al aire libre
+    // gana también, porque hasta hoy recibía el punto malo primero.
+    //
+    // `maximumAge` deja valer una posición que el aparato ya tiene. Antes los
+    // dos decían 0 —«no me sirve nada guardado»—, así que un teléfono que sacó
+    // su ubicación hace medio minuto la tiraba y la pedía otra vez desde cero.
+    // Un minuto para la buena, cinco para el respaldo: nadie se muda de barrio
+    // en ese rato, y quien lo haga tiene el marcador y la dirección a mano.
+    //
+    // 🔴 LO QUE ESTO CUESTA, y lo decidió el dueño sabiéndolo: una posición de
+    // wifi puede estar desviada 100 o 300 metros, y el conductor iría a esa
+    // zona. Se acepta porque lo que había antes cuando fallaban los dos era la
+    // PLAZA o nada, y 300 metros es mucho mejor que eso.
     navigator.geolocation.getCurrentPosition(
       delAparato,
       () => navigator.geolocation.getCurrentPosition(
         delAparato,
         () => setUbicacionPasajero(centroRiohacha),
-        { enableHighAccuracy: true, timeout: 20000 }
+        { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 }
       ),
-      { enableHighAccuracy: false, timeout: 8000, maximumAge: 0 }
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
     );
   }, []);
 
   // El mapa de recogida arranca centrado en el GPS del pasajero cuando este se obtiene
-  useEffect(() => { setCentroMapa(ubicacionPasajero); }, [ubicacionPasajero]);
+  //
+  // 🔴 PERO NO LE PISA EL PUNTO AL QUE YA DIJO DÓNDE ESTÁ.
+  //
+  // El GPS puede tardar hasta 28 segundos en contestar (un intento de 8 y, si
+  // falla, otro de 20). En ese rato al pasajero le da tiempo de sobra a decir
+  // dónde está: arrastrando el pin, o escogiendo su dirección de la lista.
+  // Cuando el GPS llegaba, este efecto recentraba el mapa IGUAL, sin preguntar
+  // si ya había un punto puesto. Recentrar lanza otro `idle`, y ese `idle`
+  // pasaba la guardia de `onCambioPunto` por las DOS puertas —por el arrastre
+  // porque `loEligio` sigue encendido, y por la dirección escrita porque para
+  // entonces `ubicacionEsDelGps` ya es `true`—, así que le PISABA el punto y
+  // el texto, sin avisar. Medido corriendo el camino entero: 2 de 2.
+  //
+  // Es el mismo daño que el del viaje que nacía en la plaza, entrando por otra
+  // puerta: el conductor va a un sitio que el pasajero no pidió, y el servidor
+  // avisa a los conductores de ALREDEDOR DE ESE PUNTO (`tokensConductoresCerca`
+  // en `functions/index.js`), no de donde está la persona.
+  //
+  // La marca que lo distingue ya existe y es `pinActivoRef`: encendida
+  // significa que hay una recogida puesta —la puso el pasajero, o la puso el
+  // propio GPS cuando llegó a tiempo—. No se inventa una segunda marca para lo
+  // mismo (SEGUNDA LEY).
+  //
+  // Y el caso del 95% NO cambia: quien abre la pantalla y no toca nada llega
+  // aquí con la marca APAGADA, así que el mapa se recentra en su GPS y la
+  // dirección se le sigue escribiendo sola.
+  useEffect(() => {
+    if (pinActivoRef.current) return;
+    setCentroMapa(ubicacionPasajero);
+  }, [ubicacionPasajero]);
 
   // Cuando el viaje ya tiene guardado el punto de recogida, el mapa del pasajero usa ESE punto (el mismo del conductor), no el GPS
   useEffect(() => {
@@ -1669,6 +1753,10 @@ const PanelEmergencia = () => (
         <p style={{ color: '#1A1A1E', fontSize: '11px', letterSpacing: '2px', margin: '0 0 8px' }}>MUEVE EL MAPA PARA MARCAR TU RECOGIDA</p>
         <MapaRecogida
           ubicacionInicial={centroMapa}
+          // El mapa dice QUÉ pasó; la ventanita la pinta quien sabe pintarla, y
+          // el texto sale del único sitio donde vive (`NO_SE_DONDE_ESTAS`), el
+          // mismo que ve quien pide sin decir dónde está.
+          onNoSePudo={(porque) => setAviso(NO_SE_DONDE_ESTAS(esMensajeria, porque))}
           onCambioPunto={(punto, direccion, loEligio) => {
             // 🔴 EL RELLENO NO SE DA POR BUENO.
             //

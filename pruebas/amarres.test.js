@@ -18,8 +18,8 @@
 const { describe, it } = require('node:test');
 const assert = require('node:assert');
 // El cargador vive en cargar.cjs: un solo sitio para todas las pruebas (SEGUNDA LEY).
-const { RAIZ, leer, cargarDeLaApp, soloCodigo, sinTextos, trozoDelTry, cuerpoDeLaFuncion }
-  = require('./cargar.cjs');
+const { RAIZ, leer, cargarDeLaApp, soloCodigo, sinTextos, trozoDelTry, cuerpoDeLaFuncion,
+  elRespaldoDelGps } = require('./cargar.cjs');
 
 describe('AMARRES · la app y el servidor miden la distancia IGUAL', () => {
   it('las dos calculadoras dan los mismos kilómetros en los mismos puntos', () => {
@@ -3212,14 +3212,23 @@ describe('EL VIAJE NO NACE EN LA PLAZA · sin GPS no se pide a ciegas', () => {
       //  marca se quedaba encendida — el siguiente `idle` daba el relleno por
       //  bueno y el viaje volvía a nacer en la plaza. Pasaba porque el lector
       //  del botón solo corría la mitad buena de la función.
+      //  🔴 ESTOS DOS PARCHES SE REESCRIBIERON EL 23-sep-2026, y el motivo vale
+      //  más que ellos: el arreglo de las salidas mudas cambió los renglones a
+      //  los que se agarraban —el `if` de dos condiciones se partió en dos, y el
+      //  `() => {}` pasó a decir algo—, así que dejaron de encontrar dónde
+      //  morder. No se pusieron en rojo por eso: se pusieron en rojo porque esta
+      //  prueba APUNTA los parches que no muerden y falla con sus nombres. Sin
+      //  esa guardia habrían quedado dos escapes de adorno, verdes por no haber
+      //  tocado nada, y nadie se habría enterado.
       ['el botón verde marca al apretarlo, antes de saber si hay GPS',
-        (s) => s.replace(/ {4}if \(!navigator\.geolocation \|\| !mapaRef\.current\) return;/,
-          '    if (!navigator.geolocation || !mapaRef.current) return;\n'
-          + '    loEligioRef.current = true;')],
+        (s) => s.replace(/const usarMiUbicacion = \(e\) => \{/,
+          'const usarMiUbicacion = (e) => { loEligioRef.current = true;')],
+      //  Ojo al detalle: este escape SIGUE HABLANDO. Si además lo dejara mudo,
+      //  caería por el silencio y no probaría lo suyo —que es marcar sin tener
+      //  la ubicación—. Un escape que cae por dos motivos no prueba ninguno.
       ['el botón verde marca aunque el pasajero NIEGUE el permiso',
-        (s) => s.replace(/\(\) => \{\},\s*\{ enableHighAccuracy: true, timeout: 10000 \}/,
-          '() => { loEligioRef.current = true; },\n'
-          + '      { enableHighAccuracy: true, timeout: 10000 }')],
+        (s) => s.replace(/\(\) => onNoSePudo\('Tu celular([^']*)'\),/,
+          "() => { loEligioRef.current = true; onNoSePudo('Tu celular$1'); },")],
       //  El señuelo, ahora DENTRO del marco: el arreglo anterior lo ancló al
       //  marco y el señuelo se mudó dentro. Por eso ahora se corre el bloque
       //  entero en vez de elegir un `if`.
@@ -3234,12 +3243,99 @@ describe('EL VIAJE NO NACE EN LA PLAZA · sin GPS no se pide a ciegas', () => {
         (s) => s.replace(/ {4}listenerRef\.current = mapaRef\.current\.addListener\('idle',/,
           "    arrastreRef.current.remove();\n"
           + "    listenerRef.current = mapaRef.current.addListener('idle',")],
+      // ── LOS CINCO DEL GPS QUE LLEGA TARDE (21-sep-2026) ────────────────
+      //  El GPS puede tardar 28 segundos en contestar, y en ese rato el
+      //  pasajero ya dijo dónde está. Cuando llegaba, el efecto del padre
+      //  recentraba el mapa IGUAL; recentrar lanza otro `idle` —Google lo lanza
+      //  SOLO—, y ese aviso volvía a entrar por la guardia y le PISABA el punto
+      //  y el texto. Es el mismo daño que el de la plaza por otra puerta.
+      //
+      //  Los tres primeros son la guardia nueva. El cuarto es el que importa de
+      //  verdad: CLAUDE.md tenía escrito desde el 15-sep-2026 que el medidor no
+      //  corría los `useEffect` del padre, y que «añadiendo UN efecto al lado
+      //  del que ya hay el fallo vuelve completo y el veredicto sale limpio».
+      //  Eso ya no cuela: ahora los corre TODOS, sean uno o sean cuatro.
+      ['el recentrado del mapa vuelve a pisar el punto del pasajero',
+        (s) => s.replace(/if \(pinActivoRef\.current\) return;\s+setCentroMapa\(ubicacionPasajero\);/,
+          'setCentroMapa(ubicacionPasajero);')],
+      ['la guardia del recentrado, que nunca se cumple',
+        (s) => s.replace(/if \(pinActivoRef\.current\) return;/, 'if (false) return;')],
+      //  Ésta no rompe la puerta: rompe al 95%. Con la guardia al revés, el
+      //  pasajero que no toca nada deja de recibir su dirección escrita sola.
+      //  Tiene que caer por NOROMPER, no por FALLOS.
+      ['la guardia del recentrado, al revés (deja tirado al 95%)',
+        (s) => s.replace(/if \(pinActivoRef\.current\) return;/,
+          'if (!pinActivoRef.current) return;')],
+      ['un SEGUNDO efecto que recentra, sin guardia, al lado del bueno',
+        (s) => s.replace(/\}, \[ubicacionPasajero\]\);/,
+          '}, [ubicacionPasajero]);\n'
+          + '  useEffect(() => { setCentroMapa(ubicacionPasajero); }, [ubicacionPasajero]);')],
+      //  Y el orden del campo de origen, que no es un detalle: `onChange` APAGA
+      //  el pin y `onPlaceCoords` lo ENCIENDE. Invertirlos deja el pin apagado,
+      //  y con él la guardia nueva no protege nada. Se mide corriendo el
+      //  `place_changed` de verdad, no llamando a las flechas en el orden que yo
+      //  crea. Tiene que caer SOLO por la puerta de la lista.
+      ['el campo de origen invierte el orden y deja el pin apagado',
+        (s) => s
+          .replace(/if \(place && place\.name\) onChangeRef\.current\(place\.name\);\s*/, '')
+          .replace(
+            /(onPlaceCoordsRef\.current\(\{ lat: place\.geometry\.location\.lat\(\), lng: place\.geometry\.location\.lng\(\) \}\);)/,
+            '$1 if (place && place.name) onChangeRef.current(place.name);')],
+      //  🔴 LAS TRES SALIDAS MUDAS DEL BOTÓN VERDE (23-sep-2026). Las tres se
+      //  sabotean POR SEPARADO, porque son tres caminos distintos: taparlas con
+      //  un solo escape dejaría dos sin probar, que es exactamente cómo la nota
+      //  vieja de la tabla de deuda nombraba SOLO una de las tres.
+      ['el botón verde vuelve a callarse cuando el aparato no contesta',
+        (s) => s.replace(/\(\) => onNoSePudo\('Tu celular[^']*'\),/, '() => {},')],
+      ['el botón verde habla, pero no dice nada (texto vacío)',
+        (s) => s.replace(/\(\) => onNoSePudo\('Tu celular[^']*'\),/, "() => onNoSePudo(''),")],
+      ['vuelve el `return` seco cuando el teléfono no deja dar ubicación',
+        (s) => s.replace(/if \(!navigator\.geolocation\) \{[\s\S]*?\}/,
+          'if (!navigator.geolocation) return;')],
+      ['vuelve el `return` seco cuando el mapa no está listo',
+        (s) => s.replace(/if \(!mapaRef\.current\) \{[\s\S]*?\}/,
+          'if (!mapaRef.current) return;')],
+      //  Y EL PEOR DE LOS CINCO, porque deja el código «hablando» y la pantalla
+      //  igual de callada: el botón grita y quien lo escucha no hace nada. Es el
+      //  silencio de antes con otro disfraz, y sin este escape el medidor daría
+      //  por bueno un aviso que no llega a ninguna ventanita.
+      ['el aviso del botón verde se le pasa a un `() => {}`',
+        (s) => s.replace(/onNoSePudo=\{\(porque\) => setAviso\(NO_SE_DONDE_ESTAS\(esMensajeria, porque\)\)\}/,
+          'onNoSePudo={() => {}}')],
+      //  🔴 EL ORDEN DE LOS DOS INTENTOS DEL GPS (23-sep-2026). El fallo que el
+      //  dueño midió con su teléfono dentro de su casa: el respaldo pedía algo
+      //  MÁS DIFÍCIL que el intento que ya había fallado.
+      ['vuelve el orden de antes: primero el aproximado, y de respaldo el satélite',
+        (s) => s.replace(/\{ enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 \}/,
+          '{ enableHighAccuracy: false, timeout: 8000, maximumAge: 0 }')
+          .replace(/\{ enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 \}/,
+            '{ enableHighAccuracy: true, timeout: 20000 }')],
+      //  Y el disfraz del mismo fallo: pedir satélite LAS DOS VECES. El respaldo
+      //  no pide «más» que el primero —pide lo mismo—, así que la fila del orden
+      //  lo deja pasar; el que lo caza es el pasajero bajo techo, ejecutado.
+      //  Sin el aparato que niega el SATÉLITE (y no el turno) esto pasaba.
+      ['los dos intentos piden satélite, que bajo techo no hay',
+        (s) => s.replace(/\{ enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 \}/,
+          '{ enableHighAccuracy: true, timeout: 10000, maximumAge: 300000 }')],
+      ['vuelve el `maximumAge: 0`: una posición buena de hace un momento se tira',
+        (s) => s.replace(/maximumAge: 60000/, 'maximumAge: 0')],
+      ['el respaldo desaparece y solo queda un intento',
+        (s) => s.replace(
+          /\(\) => navigator\.geolocation\.getCurrentPosition\([\s\S]*?maximumAge: 300000 \}\s*\)/,
+          '() => setUbicacionPasajero(centroRiohacha)')],
+      //  Y la forma fácil de poner verde todo lo de arriba: esperar más hasta que
+      //  el aparato acabe contestando. Eso empeora justo lo que se vino a
+      //  mejorar, así que tiene que caer por NOROMPER, no por FALLOS.
+      ['se alarga la espera hasta que el aparato ceda (el pasajero, callado)',
+        (s) => s.replace(/timeout: 10000, maximumAge: 300000/, 'timeout: 45000, maximumAge: 300000')],
     ];
 
     // Y QUE LA LISTA NO SE VACÍE. Sin esto, borrar escapes pondría esta prueba
     // más verde cuanto menos vigilara — que es como se apagan los vigilantes.
-    assert.ok(ESCAPES.length >= 24,
-      'esta prueba solo vigila ' + ESCAPES.length + ' escapes, y el 15-sep-2026 vigilaba 24. '
+    assert.ok(ESCAPES.length >= 39,
+      'esta prueba solo vigila ' + ESCAPES.length + ' escapes, y el 23-sep-2026 vigilaba 39 '
+      + '(eran 24 el 15-sep-2026, los 5 del GPS tardío entraron el 21, y el 23 entraron '
+      + 'los 5 de las tres salidas mudas del botón verde y los 5 del orden de los intentos). '
       + 'Quitar escapes la pone verde por mirar menos, no por estar mejor.');
 
     const saltados = [];
@@ -3273,20 +3369,121 @@ describe('EL VIAJE NO NACE EN LA PLAZA · sin GPS no se pide a ciegas', () => {
   it('y el medidor sigue mirando todos los eslabones que decía mirar', async () => {
     const { elVeredicto, ESCENARIOS } = require('../scripts/medir-origen-del-viaje.cjs');
     const v = await elVeredicto();
-    assert.ok(v.FALLOS.length >= 15,
+    assert.ok(v.FALLOS.length >= 17,
       'el medidor del origen del viaje solo mira ' + v.FALLOS.length + ' eslabones, y el '
-      + '15-sep-2026 miraba 15. Se le quitó vigilancia, y sus listas vacías dejaron de '
+      + '21-sep-2026 miraba 17 (eran 15 el 15-sep-2026; las 2 puertas del GPS tardío entraron '
+      + 'el 21). Se le quitó vigilancia, y sus listas vacías dejaron de '
       + 'querer decir «todo bien» para querer decir «no miré».');
-    assert.ok(v.NOROMPER.length >= 4,
+    assert.ok(v.NOROMPER.length >= 5,
       'el medidor solo comprueba ' + v.NOROMPER.length + ' caminos de los que ya funcionaban, '
-      + 'y el 15-sep-2026 comprobaba 4.');
-    assert.ok(ESCENARIOS.length >= 6,
-      'el medidor corre ' + ESCENARIOS.length + ' escenarios, y el 15-sep-2026 corría 6.');
+      + 'y el 21-sep-2026 comprobaba 5 (eran 4 el 15-sep-2026).');
+    assert.ok(ESCENARIOS.length >= 9,
+      'el medidor corre ' + ESCENARIOS.length + ' escenarios, y el 21-sep-2026 corría 9 '
+      + '(eran 6 el 15-sep-2026, y los 3 del GPS tardío entraron el 21).');
     // Y que de verdad los haya CORRIDO: un escenario que reventó no mide nada,
     // y su `falla` no aparece en las listas de fallos.
     const nopudo = v.salidas.filter(([, , r]) => r.falla).map(([n, , r]) => n + ': ' + r.falla);
     assert.deepStrictEqual(nopudo, [],
       'el medidor no pudo correr estos caminos, así que lo que diga de ellos no vale:\n   · '
       + nopudo.join('\n   · '));
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+describe('EL RESPALDO DEL GPS · el de repuesto no puede pedir más que el que falló', () => {
+  //  Las DOS pantallas que piden ubicación con respaldo. La del pasajero para
+  //  saber dónde recogerlo; la del conductor para saber dónde está y poder
+  //  mandarle los viajes de su zona.
+  //
+  //  🔴 LAS DOS TENÍAN EL MISMO FALLO, y se encontraron el mismo día: el primer
+  //  intento pedía precisión BAJA —wifi y antenas, el camino fácil— y, cuando
+  //  ése fallaba, el respaldo pedía SATÉLITES, que es lo más difícil que hay.
+  //  Dentro de una casa el satélite es justo lo que no se ve. El dueño lo midió
+  //  con su teléfono, en su casa: 30 segundos y no llegó ninguno de los dos.
+  //
+  //  El criterio NO se escribe aquí: se importa de `cargar.cjs`, que es donde
+  //  vive una sola vez y donde lo usa también el medidor del pasajero. Si esta
+  //  prueba llevara su propia copia, el día que el criterio cambiara en un sitio
+  //  el otro seguiría firmando verde con la vara vieja (SEGUNDA LEY).
+  //
+  //  Y el ancla NO sobra: `Solicitar.js` tiene DOS peticiones de GPS —ésta y la
+  //  del botón «Usar mi ubicación», que lleva UN intento a propósito porque lo
+  //  aprieta una persona y ya se le dice si falla—. Sin ancla se coge «la
+  //  primera del archivo» y se juzga al botón con la vara de la pantalla: eso
+  //  pasó al escribir esto, y lo cazó la medición, no la lectura.
+  const PANTALLAS = [
+    ['la del PASAJERO', 'guajirago/src/Solicitar.js', 'if (!navigator.geolocation) return;'],
+    ['la del CONDUCTOR', 'guajirago/src/AppConductor.js', 'const guardarUbicacion'],
+  ];
+
+  it('las dos piden primero el punto bueno y se respaldan con el que siempre contesta', () => {
+    for (const [quien, archivo, ancla] of PANTALLAS) {
+      const r = elRespaldoDelGps(leer(archivo), ancla);
+      assert.ok(!r.falla, quien + ' (' + archivo + '): ' + r.falla);
+      assert.ok(r.elPrimeroPideElBueno,
+        quien + ' pide primero el punto APROXIMADO, así que quien está en la calle '
+        + 'recibe el malo antes que el bueno. El primer intento tiene que pedir precisión alta.');
+      assert.ok(r.ningunRespaldoPideMas,
+        quien + ' tiene un respaldo que pide MÁS que el intento que ya falló. Ése es el fallo '
+        + 'exacto del 23-sep-2026: falla el wifi y se piden satélites, que bajo techo no hay.');
+      assert.ok(r.todosAceptanGuardada,
+        quien + ' no acepta una posición que el aparato YA tiene (`maximumAge: 0`), así que '
+        + 'tira una buena de hace medio minuto y la pide otra vez desde cero.');
+      assert.ok(r.bajoTechoLlega,
+        quien + ': con el satélite sin aparecer y el wifi contestando —una casa— la ubicación '
+        + 'no llega. Es el caso que el dueño midió con su teléfono.');
+      //  Y que el silencio no crezca. La forma fácil de poner verde todo lo de
+      //  arriba es esperar más hasta que el aparato ceda, y eso empeora justo
+      //  lo que este arreglo vino a mejorar. El tope sale de lo que HABÍA.
+      assert.ok(r.silencioTotal <= 28000,
+        quien + ' hace esperar ' + (r.silencioTotal / 1000) + ' s sin decir nada, y antes del '
+        + 'arreglo eran 28. Alargar la espera no es arreglarlo: es esconderlo.');
+    }
+  });
+
+  //  Y LA REGLA SE PRUEBA A SÍ MISMA. Una regla que nadie sabotea es una regla
+  //  que nadie ha comprobado: se le dan pantallas de mentira —la de verdad con
+  //  el fallo metido dentro— y se exige que se queje de todas. Los parches son
+  //  sobre el archivo REAL, no copias escritas a mano, porque una copia a mano
+  //  se queda vieja en la siguiente edición y entonces esto vigila un fantasma.
+  it('y la regla se queja de todas las formas de romperlo', () => {
+    const ESCAPES = [
+      ['vuelve el orden de antes (fácil primero, satélite de respaldo)',
+        (t) => t.replace(/enableHighAccuracy: true, timeout: 10000, maximumAge: 60000/,
+          'enableHighAccuracy: false, timeout: 8000, maximumAge: 1')
+          .replace(/enableHighAccuracy: false, timeout: 10000, maximumAge: 300000/,
+            'enableHighAccuracy: true, timeout: 20000, maximumAge: 1')],
+      ['los dos intentos piden satélite, que bajo techo no hay',
+        (t) => t.replace(/enableHighAccuracy: false, timeout: 10000, maximumAge: 300000/,
+          'enableHighAccuracy: true, timeout: 10000, maximumAge: 300000')],
+      ['vuelve el `maximumAge: 0`: se tira una posición buena de hace un momento',
+        (t) => t.replace(/maximumAge: 60000/, 'maximumAge: 0')],
+      ['se alarga la espera hasta que el aparato ceda',
+        (t) => t.replace(/timeout: 10000, maximumAge: 300000/, 'timeout: 45000, maximumAge: 300000')],
+    ];
+
+    const saltados = [];
+    for (const [quien, archivo, ancla] of PANTALLAS) {
+      const real = leer(archivo);
+      for (const [nombre, romper] of ESCAPES) {
+        const rota = romper(real);
+        //  🔴 UN PARCHE QUE NO ENCUENTRA DÓNDE MORDER SE ESTARÍA APROBANDO SOLO.
+        //   La pantalla sale limpia, la regla dice «bien» con toda la razón, y
+        //   el verde no vale nada. Se apunta y se falla al final con su nombre.
+        if (rota === real) { saltados.push(quien + ' · ' + nombre); continue; }
+        const r = elRespaldoDelGps(rota, ancla);
+        const seQueja = !!r.falla || !r.elPrimeroPideElBueno || !r.ningunRespaldoPideMas
+          || !r.todosAceptanGuardada || !r.bajoTechoLlega || r.silencioTotal > 28000;
+        assert.ok(seQueja,
+          'con este escape metido en ' + quien + ' (' + archivo + ') —«' + nombre + '»— la regla '
+          + 'de `pruebas/cargar.cjs` sigue diciendo que todo está bien. O sea que ese escape se '
+          + 'puede poner en la app de verdad y ninguna prueba se entera. Arregla la REGLA, no '
+          + 'esta prueba.');
+      }
+    }
+    assert.deepStrictEqual(saltados, [],
+      'estos escapes ya no encuentran dónde morder, así que no probaron nada y su verde no '
+      + 'vale:\n   · ' + saltados.join('\n   · ')
+      + '\n   O el código se movió y hay que actualizar el parche, o el arreglo ya no está.');
   });
 });

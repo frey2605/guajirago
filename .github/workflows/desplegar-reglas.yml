@@ -1,0 +1,211 @@
+# ══════════════════════════════════════════════════════════════════════════════════════════════
+#  EL BOTÓN DE LAS REGLAS Y LOS ÍNDICES — orden del dueño (23-sep-2026): «dale con el de las
+#  reglas».
+#
+#  QUÉ RESUELVE. El botón de la app (`desplegar.yml`) publica SOLO la app: corre
+#  `deploy --only hosting` desde dentro de `guajirago/`, cuyo `firebase.json` no tiene sección
+#  `firestore` ni `storage`. Las reglas y los índices viven en la RAÍZ y no los desplegaba nadie
+#  más que el PC del dueño. Y el paso 1 de las leyes avisa: **desplegar las apps antes que las
+#  reglas mata la app EN SILENCIO**.
+#  Por eso el botón de la app tiene una guardia que PARA si el cambio toca estos archivos. Ésta es
+#  la otra mitad del par: la que sí los publica.
+#
+#  🔴 CUÁNTO HACE FALTA, medido el 23-sep-2026: **11 de los últimos 30 commits de `main`** tocaron
+#  reglas o índices, y **22 de los 50** de todo el historial. Casi cuatro de cada diez. Sin este
+#  botón, la guardia del otro trancaría ese mismo cuatro de cada diez.
+#
+#  🔴 ESTE ES EL DESPLIEGUE MÁS PELIGROSO DEL PROYECTO, Y VA APARTE POR ESO.
+#  · Unas reglas mal puestas cierran la app a todo el mundo, o la abren a cualquiera.
+#  · Y el despliegue de índices **SINCRONIZA**: si el archivo del repo no trae un índice que el
+#    servidor SÍ tiene, ofrece BORRARLO — y un índice borrado **no da error de despliegue**: hace
+#    que la consulta que lo usaba falle en la cara del usuario. Está en las TRAMPAS del repo.
+#    Por eso aquí NUNCA se pasa `--force`, y antes de tocar nada se comprueba que el repo no se
+#    deje fuera nada de lo que ya hay puesto.
+#
+#  🔴 Y NUNCA, JAMÁS, `--only hosting` DESDE AQUÍ. Este botón corre en la RAÍZ, y el
+#  `firebase.json` de la raíz también dice `"public": "build"` — ese `build` es un resto de JUNIO.
+#  Un `--only hosting` desde aquí publicaría el muerto y tumbaría la app del cliente. Lo vigila el
+#  amarre `pruebas/elBotonDeDesplegar.test.js`.
+#
+#  DÓNDE SE APRIETA: github.com → guajirago → Actions → «Desplegar las REGLAS y los ÍNDICES».
+#  Y se dispara SOLO cuando entra a `main` un cambio de esos tres archivos.
+# ══════════════════════════════════════════════════════════════════════════════════════════════
+name: Desplegar las REGLAS y los ÍNDICES
+
+on:
+  #  Solo cuando cambia lo que este botón publica. Un cambio de la app no lo despierta: sería
+  #  redesplegar 2.235 renglones de reglas cada vez que se toca un color.
+  push:
+    branches: [main]
+    paths:
+      - 'firestore.rules'
+      - 'storage.rules'
+      - 'firestore.indexes.json'
+  workflow_dispatch:
+
+concurrency:
+  group: despliegue-reglas-guajirago
+  cancel-in-progress: false
+
+jobs:
+  reglas:
+    name: Comprobar, desplegar reglas e índices, y VERIFICAR
+    runs-on: ubuntu-latest
+    steps:
+      # ── ⏱️ ANTES DE GASTAR NADA ─────────────────────────────────────────────────────────────
+      - name: ⏱️ ¿Está la llave? (antes de gastar nada)
+        env:
+          LLAVE: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          if [ -z "$LLAVE" ]; then
+            echo "⛔ FALTA LA LLAVE DE FIREBASE (secreto: FIREBASE_SERVICE_ACCOUNT)"
+            echo "   Se pega en: https://github.com/frey2605/guajirago/settings/secrets/actions/new"
+            exit 1
+          fi
+          echo "✅ La llave está. Se sigue."
+
+      - name: Traer el código
+        uses: actions/checkout@v4
+
+      - name: Preparar Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # ── ⏱️ VIGÍA DE PERMISOS · REGLA 1407, ANTES DE TOCAR NADA ─────────────────────────────
+      #  Preguntarle a Google si la llave sirve tarda segundos. Aquí lo que se protege no es
+      #  tiempo: es llegar a medio desplegar. Si las reglas entran y los índices no, el proyecto
+      #  se queda en un estado que nadie pidió.
+      #
+      #  ⚠️ QUÉ COMPRUEBA Y QUÉ NO, dicho en vez de presumido. Se le pide a Firestore la lista de
+      #  índices: es una llamada de VERDAD con esta llave contra este proyecto. Caza que la llave
+      #  falte, esté rota, o no tenga acceso a Firestore. **NO caza que pueda ESCRIBIR reglas**:
+      #  eso solo lo dice el despliegue. Para escribir hacen falta roles que LEER no necesita, y
+      #  están nombrados abajo en el mensaje de error.
+      - name: ⏱️ ¿Esta llave puede hablar con Firestore? (segundos)
+        env:
+          LLAVE: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          printf '%s' "$LLAVE" > "$RUNNER_TEMP/llave.json"
+          export GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/llave.json"
+          set +e
+          SALIDA=$(npx --yes firebase-tools@15 firestore:indexes --project guajirago 2>&1)
+          CODIGO=$?
+          set -e
+          rm -f "$RUNNER_TEMP/llave.json"
+          if [ "$CODIGO" -eq 0 ]; then
+            echo "✅ La llave habla con Firestore. Se sigue."
+            exit 0
+          fi
+          echo "$SALIDA"
+          echo ""
+          echo "⛔ LA LLAVE NO PUEDE. Se para aquí, antes de dejar nada a medias."
+          echo ""
+          echo "   Los roles que ESTE botón necesita, en:"
+          echo "   https://console.cloud.google.com/iam-admin/iam?project=guajirago"
+          echo "     · Administrador de reglas de Firebase        (para las reglas)"
+          echo "     · Administrador de índices de Cloud Datastore (para los índices)"
+          echo "     · Lector de Cloud Datastore                  (para poder leerlos)"
+          echo ""
+          echo "   🔴 La cuenta publicar-desde-claude hoy solo tiene Administrador de Firebase"
+          echo "      Hosting y Lector de Cloud Datastore. Con eso publica la APP, no las reglas."
+          exit 1
+
+      # ── 🔴 LA GUARDIA DE LOS ÍNDICES · ANTES DE DESPLEGAR NADA ──────────────────────────────
+      #  El despliegue de índices SINCRONIZA. Si el repo no trae uno que el servidor sí tiene,
+      #  desplegar ofrecería borrarlo, y un índice borrado no da error: hace que la consulta que
+      #  lo usaba falle en la cara del usuario.
+      #  🔑 La comparación NO se escribe aquí: la hace `scripts/bajar-indices.cjs --verdicto`, que
+      #  es el archivo que sabe de índices (SEGUNDA LEY). Escribirla dentro de este YAML sería el
+      #  gemelo que se queda viejo. Él sale con error si el repo se deja algo fuera, y de paso
+      #  dice cuáles se van a CREAR — que son los que tardan en construirse.
+      - name: 🔴 ¿El repo se deja fuera algún índice que ya está puesto?
+        env:
+          LLAVE: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          printf '%s' "$LLAVE" > "$RUNNER_TEMP/llave.json"
+          export GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/llave.json"
+          set +e
+          node scripts/bajar-indices.cjs --verdicto
+          CODIGO=$?
+          set -e
+          rm -f "$RUNNER_TEMP/llave.json"
+          if [ "$CODIGO" -ne 0 ]; then
+            {
+              echo "## ⛔ Parado: el repo se deja fuera índices que ya están puestos"
+              echo ""
+              echo "Desplegar así ofrecería **borrarlos**, y un índice borrado no da error:"
+              echo "hace que la consulta que lo usaba falle en la cara del usuario."
+              echo ""
+              echo "Se arregla bajando primero lo que hay: \`node scripts/bajar-indices.cjs --escribir\`"
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+
+      # ── PASO 10 · APLICAR ───────────────────────────────────────────────────────────────────
+      #  Desde la RAÍZ, que es donde vive el `firebase.json` con las secciones `firestore` y
+      #  `storage`. Y con `--only` nombrando EXACTAMENTE lo que se publica: nunca `hosting`.
+      #  🔴 SIN `--force`, a propósito y para siempre. `--force` es lo que convierte «ofrece
+      #  borrar» en «borra». Si algún día el despliegue se queja de que va a borrar algo, la
+      #  respuesta NO es forzarlo: es bajar lo que hay y mirar por qué falta.
+      - name: Desplegar las REGLAS (firestore y almacén)
+        env:
+          LLAVE: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          printf '%s' "$LLAVE" > "$RUNNER_TEMP/llave.json"
+          export GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/llave.json"
+          npx --yes firebase-tools@15 deploy --only firestore:rules,storage:rules \
+            --project guajirago --non-interactive
+          rm -f "$RUNNER_TEMP/llave.json"
+
+      - name: Desplegar los ÍNDICES
+        env:
+          LLAVE: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          printf '%s' "$LLAVE" > "$RUNNER_TEMP/llave.json"
+          export GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/llave.json"
+          npx --yes firebase-tools@15 deploy --only firestore:indexes \
+            --project guajirago --non-interactive
+          rm -f "$RUNNER_TEMP/llave.json"
+
+      # ── PASO 11 · VERIFICAR CONTRA LA NUBE ─────────────────────────────────────────────────
+      #  «Que el despliegue diga listo NO es prueba de nada»: se le vuelve a preguntar al
+      #  servidor. Si desplegar hubiera borrado algo, este veredicto lo canta.
+      - name: Preguntarle al servidor qué quedó puesto
+        env:
+          LLAVE: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          printf '%s' "$LLAVE" > "$RUNNER_TEMP/llave.json"
+          export GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/llave.json"
+          set +e
+          node scripts/bajar-indices.cjs --verdicto
+          CODIGO=$?
+          node scripts/bajar-indices.cjs
+          set -e
+          rm -f "$RUNNER_TEMP/llave.json"
+          if [ "$CODIGO" -ne 0 ]; then
+            echo "⛔ DESPUÉS DE DESPLEGAR, al servidor le falta algo que antes tenía."
+            echo "   Eso es justo lo que esta tubería existe para que no pase. Mira arriba."
+            exit 1
+          fi
+          {
+            echo "## ✅ Reglas e índices desplegados"
+            echo ""
+            echo "| | |"
+            echo "|---|---|"
+            echo "| Proyecto | guajirago |"
+            echo "| Commit | \`${GITHUB_SHA:0:7}\` |"
+            echo ""
+            echo "Los índices se le volvieron a preguntar al servidor: no se perdió ninguno."
+            echo ""
+            echo "> 🔴 **Lo que esto NO dice:** que las REGLAS que quedaron puestas sean las del"
+            echo "> repo. `firebase` no tiene comando para LEER reglas (está en las trampas), y"
+            echo "> `scripts/bajar-reglas.cjs` necesita la sesión del PC, que aquí no existe. Se"
+            echo "> confía en lo que dijo el despliegue, que es exactamente lo que este proyecto"
+            echo "> no acostumbra a hacer. Se cierra cuando exista la casa común de los 31."
+            echo ""
+            echo "> ⚠️ **Si se creó un índice NUEVO**, tarda en construirse. Hasta que esté, la"
+            echo "> consulta que lo usa falla. **No publiques la app en esa ventana.**"
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo ""
+          echo "✅ Desplegado y comprobado (los índices)."

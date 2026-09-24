@@ -47,6 +47,43 @@ const C = {
 const ESCRIBIR = process.argv.includes('--escribir');
 
 /**
+ * 🔴 EL VEREDICTO (`--verdicto`, 23-sep-2026) — para el botón de desplegar reglas.
+ *
+ * Este guion AVISA cuando el repo y el servidor no dicen lo mismo, pero siempre
+ * sale en verde: es un informe para una persona. El botón de la nube necesita un
+ * SÍ o un NO, y necesita distinguir los dos casos, que no son iguales ni de lejos:
+ *
+ *   · el REPO trae uno que el servidor no → **bien**: es un índice nuevo por crear,
+ *     que es justo lo que se va a desplegar;
+ *   · el SERVIDOR tiene uno que el repo no → 🔴 **peligro**: desplegar así ofrece
+ *     BORRARLO, y un índice borrado no da error de despliegue — hace que la
+ *     consulta que lo usaba falle en la cara del usuario.
+ *
+ * La comparación vive AQUÍ y no en el botón (SEGUNDA LEY): el que sabe de índices
+ * es este archivo. Escribirla otra vez dentro del YAML sería el gemelo que se
+ * queda viejo, y el que se queda viejo es el que nadie mira.
+ */
+const VERDICTO = process.argv.includes('--verdicto');
+
+/** La huella de un índice: su contenido, no su sitio en la lista. */
+const huella = (x) => JSON.stringify(x);
+
+/**
+ * Lo que el SERVIDOR tiene y el REPO no nombra. Función pura, sin red y sin
+ * disco, para que se pueda probar con listas de mentira (lo hace el amarre).
+ */
+function loQueElRepoNoTrae(delServidor, delRepo) {
+  const faltan = { indexes: [], fieldOverrides: [] };
+  for (const cual of ['indexes', 'fieldOverrides']) {
+    const mios = new Set((delRepo[cual] || []).map(huella));
+    for (const x of delServidor[cual] || []) {
+      if (!mios.has(huella(x))) faltan[cual].push(x);
+    }
+  }
+  return faltan;
+}
+
+/**
  * 🔴 SE LE PIDE AL PROPIO `firebase`, NO SE CONVIERTE A MANO.
  *
  * La primera versión de este guion leía la API de Firestore y traducía la
@@ -84,7 +121,7 @@ const enPalabras = (i) => i.collectionGroup + ': '
     .map((f) => f.fieldPath + (f.arrayConfig ? '[]' : (f.order === 'DESCENDING' ? '↓' : '↑')))
     .join(' + ');
 
-(async () => {
+async function principal() {
   console.log('');
   console.log(C.neg + '  LOS ÍNDICES QUE ESTÁN PUESTOS EN EL SERVIDOR' + C.off);
   console.log(C.gris + '  proyecto ' + PROYECTO + C.off);
@@ -102,6 +139,55 @@ const enPalabras = (i) => i.collectionGroup + ': '
   console.log(C.gris + '  excepciones de campo: ' + fieldOverrides.length + C.off);
 
   const nuevo = JSON.stringify({ indexes, fieldOverrides }, null, 2) + '\n';
+
+  // 🔴 EL VEREDICTO, antes que nada: es lo único que puede PARAR un despliegue.
+  if (VERDICTO) {
+    const delRepo = fs.existsSync(DESTINO)
+      ? JSON.parse(fs.readFileSync(DESTINO, 'utf8'))
+      : { indexes: [], fieldOverrides: [] };
+    const faltan = loQueElRepoNoTrae({ indexes, fieldOverrides }, delRepo);
+    const cuantos = faltan.indexes.length + faltan.fieldOverrides.length;
+
+    // La dirección CONTRARIA no es un peligro, es una noticia: son los que se van a
+    // CREAR. Se dice porque un índice nuevo TARDA en construirse, y mientras tanto
+    // el servidor contesta «that index is currently building and cannot be used yet»
+    // a la consulta que lo necesita — o sea, pantalla en blanco si se publica la app
+    // en esa ventana. Eso ya pasó el 15-sep-2026 y está escrito en CLAUDE.md.
+    const nuevos = loQueElRepoNoTrae(delRepo, { indexes, fieldOverrides });
+    const cuantosNuevos = nuevos.indexes.length + nuevos.fieldOverrides.length;
+    if (cuantosNuevos) {
+      console.log(C.ama + '  ⚠ el repo trae ' + cuantosNuevos + ' que el servidor NO tiene: '
+        + 'se van a CREAR.' + C.off);
+      for (const i of nuevos.indexes) console.log(C.ama + '     + ' + enPalabras(i) + C.off);
+      console.log(C.gris + '    Un índice nuevo tarda en construirse, y hasta que esté la '
+        + 'consulta que lo usa' + C.off);
+      console.log(C.gris + '    falla. NO se publica la app en esa ventana.' + C.off);
+      console.log('');
+    }
+
+    if (!cuantos) {
+      console.log(C.ver + '  ✓ el repo NO se deja fuera nada de lo que hay puesto: '
+        + 'desplegar no borraría ningún índice.' + C.off);
+      console.log('');
+      return;
+    }
+    console.log(C.roj + C.neg + '  ⛔ EL SERVIDOR TIENE ' + cuantos
+      + ' COSA(S) QUE firestore.indexes.json NO TRAE.' + C.off);
+    for (const i of faltan.indexes) console.log(C.roj + '     · índice  ' + enPalabras(i) + C.off);
+    for (const f of faltan.fieldOverrides) {
+      console.log(C.roj + '     · excepción de campo  ' + (f.collectionGroup || '?')
+        + '.' + (f.fieldPath || '?') + C.off);
+    }
+    console.log('');
+    console.log(C.ama + '  Desplegar así OFRECERÍA BORRARLOS, y un índice borrado no da error de'
+      + C.off);
+    console.log(C.ama + '  despliegue: hace que la consulta que lo usaba falle en la cara del '
+      + 'usuario.' + C.off);
+    console.log(C.gris + '  Se arregla bajando primero lo que hay: '
+      + 'node scripts/bajar-indices.cjs --escribir' + C.off);
+    console.log('');
+    process.exit(1);
+  }
 
   console.log('');
   if (!ESCRIBIR) {
@@ -137,4 +223,13 @@ const enPalabras = (i) => i.collectionGroup + ': '
     console.log(C.gris + '    Ahora ya se puede AÑADIR el nuevo sin borrar los que hay.' + C.off);
   }
   console.log('');
-})().catch((e) => { console.error('FALLÓ: ' + e.message); process.exit(1); });
+}
+
+// 🔴 Solo corre si se le llama a él. Antes se ejecutaba con solo cargarlo, así que
+// el amarre no podía probar la comparación sin salir a pedirle los índices al
+// servidor de verdad — o sea, no podía probarla.
+if (require.main === module) {
+  principal().catch((e) => { console.error('FALLÓ: ' + e.message); process.exit(1); });
+}
+
+module.exports = { loQueElRepoNoTrae };

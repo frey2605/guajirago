@@ -912,9 +912,31 @@ const cargarSaldo = useCallback(async (uid) => {
       } catch (e) {}
     };
 
+    // 🔴 EL RESPALDO PEDÍA ALGO MÁS DIFÍCIL QUE EL INTENTO QUE YA HABÍA FALLADO
+    // (23-sep-2026). El mismo fallo que tenía la pantalla del pasajero, aquí.
+    //
+    // Estaba al revés: el intento 1 pedía precisión BAJA —wifi y antenas, el
+    // camino fácil— y, cuando ése fallaba, el respaldo pedía SATÉLITES, que es
+    // lo más difícil que hay. Un conductor arranca su turno donde se arranca un
+    // turno: dentro de su casa. Ahí el satélite es justo lo que no se ve, así
+    // que cuando el camino fácil no servía esta petición se iba por el
+    // imposible y se rendía a los 28 segundos sin haber escrito nada.
+    //
+    // 🔴 Y LO RARO ES QUE ESTE MISMO ARCHIVO YA LO SABÍA: cuatro renglones más
+    // abajo, el `watchPosition` lo tiene BIEN desde siempre —satélite primero,
+    // wifi de respaldo—. O sea que el archivo se contradecía consigo mismo, y
+    // nadie lo había mirado porque nada vigilaba esto.
+    //
+    // La regla NO se escribe aquí ni en un medidor nuevo: vive UNA sola vez en
+    // `pruebas/cargar.cjs` (`elRespaldoDelGps`) y juzga a las DOS pantallas con
+    // el mismo código, así que no se pueden separar en silencio (SEGUNDA LEY).
+    //
+    // `maximumAge` deja valer una posición que el aparato YA tiene. Antes decía
+    // 0 —«no me sirve nada guardado»—, y un conductor que acaba de usar el mapa
+    // tiraba una posición buena de hace medio minuto para pedirla otra vez.
     navigator.geolocation.getCurrentPosition(guardarUbicacion, () => {
-      navigator.geolocation.getCurrentPosition(guardarUbicacion, () => {}, { enableHighAccuracy: true, timeout: 20000 });
-    }, { enableHighAccuracy: false, timeout: 8000, maximumAge: 0 });
+      navigator.geolocation.getCurrentPosition(guardarUbicacion, () => {}, { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 });
+    }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 });
 
     let intervalo;
     try {

@@ -29,6 +29,24 @@ const REPOS = ['.', 'guajirago-admin', 'guajirago-aliados'];
 // Papeles del propio guardián: son del sistema, no del arreglo. Jamás cuentan como violación.
 const PROPIOS = new Set(['.guardian-foto.json', '.guardian-excepciones.log', '.guardian.json']);
 
+/**
+ * ¿Es este un papel del propio guardián (su foto, su libro de excepciones, su
+ * configuración)? Esos no cuentan como trabajo tocado: son del vigilante, no de
+ * lo vigilado.
+ *
+ * 🔴 EXISTE PORQUE EL CRITERIO ESTABA EN UN SOLO SITIO Y HACÍAN FALTA DOS
+ *  (24-sep-2026). `cambiados()` sí los saltaba; la comprobación de huellas, no.
+ *  Resultado: el guardián se saltaba su propio libro de excepciones y después se
+ *  quejaba de no haberlo visto —«CAMBIO INVISIBLE A GIT»— y PARABA EL TRABAJO.
+ *  Y la ley manda anotar en ese libro cada vez que hay que salirse de la lista,
+ *  así que cumplir la ley rompía al guardián. Medido ejecutándolo: escribir un
+ *  renglón en el libro y revisar → «✋ SE PARA EL TRABAJO».
+ *  Ahora el criterio vive aquí y lo usan los dos (SEGUNDA LEY).
+ */
+function esPapelDelGuardian(repo, rutaRepo) {
+  return repo === '.' && PROPIOS.has(rutaRepo);
+}
+
 const C = { rojo: '\x1b[31m', verde: '\x1b[32m', ama: '\x1b[33m', gris: '\x1b[90m', neg: '\x1b[1m', off: '\x1b[0m' };
 const say = (s) => process.stdout.write((s === undefined ? '' : s) + '\n');
 
@@ -61,30 +79,91 @@ function cambiados(repo) {
     let ruta = linea.slice(3).trim();
     if (ruta.startsWith('"') && ruta.endsWith('"')) ruta = ruta.slice(1, -1);
     if (ruta.includes(' -> ')) ruta = ruta.split(' -> ')[1]; // renombrados
-    if (repo === '.' && PROPIOS.has(ruta)) continue;         // los papeles del guardián no cuentan
+    if (esPapelDelGuardian(repo, ruta)) continue;            // los papeles del guardián no cuentan
     lista.push({ ruta: aRaiz(repo, ruta), marca });
   }
   return lista;
 }
 
 /** Renglones agregados y quitados por archivo, desde el diff del repo. */
-function renglones(repo) {
-  const diff = git(repo, ['diff', '--unified=0', '--no-color', '--no-ext-diff', 'HEAD']);
+// 🔴 LOS ARCHIVOS NUEVOS NO LOS VE `git diff HEAD`, Y AHÍ ESTABA LA PUERTA DE
+//  ATRÁS DEL DETECTOR DE CÓDIGO MOVIDO (medido el 24-sep-2026).
+//
+//  `git diff HEAD` compara contra el último commit, y un archivo que git todavía
+//  no sigue no aparece en esa comparación. Así que sus renglones nunca entraban
+//  en la lista de AÑADIDOS, y el detector no podía encontrar dónde reaparecieron
+//  los que se habían quitado de otro sitio.
+//
+//  Resultado, y está demostrado ejecutándolo: se movieron 747 renglones de un
+//  archivo a trece archivos nuevos y el guardián NO DIJO NADA — cuando el día
+//  antes había parado el trabajo por SEIS renglones movidos entre dos archivos
+//  ya seguidos. O sea: para esquivar el candado bastaba con mover el código a un
+//  archivo nuevo.
+//
+//  Se cierra leyendo los archivos que git ve como «sin seguir» y metiendo sus
+//  renglones como AÑADIDOS, que es lo que son.
+function archivosNuevos(repo) {
+  const out = git(repo, ['ls-files', '--others', '--exclude-standard']);
+  const nuevos = [];
+  for (const cruda of out.split('\n')) {
+    const ruta = cruda.trim();
+    if (!ruta) continue;
+    if (repo === '.' && PROPIOS.has(ruta)) continue; // los papeles del guardián no cuentan
+    const abs = path.join(RAIZ, repo === '.' ? '' : repo, ruta);
+    try {
+      const st = fs.statSync(abs);
+      if (!st.isFile()) continue;
+      // Un archivo enorme o binario no se lee: no es código movido, y leerlo
+      // costaría más que lo que protege. Se ANOTA, no se calla (REGLA 9).
+      if (st.size > 2 * 1024 * 1024) { SIN_MIRAR.push(ruta + ' (pesa demasiado)'); continue; }
+      const crudo = fs.readFileSync(abs);
+      if (crudo.includes(0)) { SIN_MIRAR.push(ruta + ' (es binario)'); continue; }
+      nuevos.push({ ruta, contenido: crudo.toString('utf8') });
+    } catch (e) {
+      SIN_MIRAR.push(ruta + ' (no se pudo leer: ' + e.message + ')');
+    }
+  }
+  return nuevos;
+}
+
+// Los archivos nuevos que el guardián NO pudo mirar. Si queda alguno, el
+// detector está ciego ahí y hay que decirlo en vez de firmar en verde.
+const SIN_MIRAR = [];
+
+/**
+ * Junta los renglones del diff con los de los archivos nuevos.
+ *
+ * Es PURA a propósito: recibe el texto del diff y los archivos nuevos ya
+ * leídos, así que la prueba puede darle casos de mentira sin tocar git. Un
+ * detector que nadie ha visto quejarse no es un detector.
+ */
+function juntarRenglones(diff, nuevos, aRuta) {
   const porArchivo = {};
+  const dame = (r) => {
+    if (!porArchivo[r]) porArchivo[r] = { mas: [], menos: [] };
+    return porArchivo[r];
+  };
   let actual = null;
   for (const linea of diff.split('\n')) {
     const m = /^\+\+\+ b\/(.*)$/.exec(linea);
-    if (m) {
-      actual = aRaiz(repo, m[1]);
-      if (!porArchivo[actual]) porArchivo[actual] = { mas: [], menos: [] };
-      continue;
-    }
+    if (m) { actual = aRuta(m[1]); dame(actual); continue; }
     if (!actual) continue;
     if (linea.startsWith('+++') || linea.startsWith('---')) continue;
-    if (linea.startsWith('+')) porArchivo[actual].mas.push(linea.slice(1));
-    else if (linea.startsWith('-')) porArchivo[actual].menos.push(linea.slice(1));
+    if (linea.startsWith('+')) dame(actual).mas.push(linea.slice(1));
+    else if (linea.startsWith('-')) dame(actual).menos.push(linea.slice(1));
+  }
+  // Un archivo nuevo es, entero, «renglones añadidos». Se le quita el último
+  // salto para no inventar un renglón vacío que no existe en el archivo.
+  for (const n of nuevos) {
+    const r = dame(aRuta(n.ruta));
+    for (const l of n.contenido.replace(/\n$/, '').split('\n')) r.mas.push(l);
   }
   return porArchivo;
+}
+
+function renglones(repo) {
+  const diff = git(repo, ['diff', '--unified=0', '--no-color', '--no-ext-diff', 'HEAD']);
+  return juntarRenglones(diff, archivosNuevos(repo), (r) => aRaiz(repo, r));
 }
 
 const sha = (t) => crypto.createHash('sha256').update(t).digest('hex').slice(0, 16);
@@ -127,6 +206,48 @@ function correrPruebas() {
   }
 }
 
+/**
+ * ¿Está este archivo declarado? Devuelve `true` si se declaró POR SU NOMBRE, la
+ * carpeta que lo cubre si entró por una carpeta, y `false` si no está.
+ *
+ * 🔑 Se distinguen los dos casos a propósito. Declarar una carpeta es una
+ * promesa más floja que declarar un archivo: dice «voy a tocar aquí dentro» sin
+ * decir qué. Eso vale cuando los nombres nacen del trabajo, pero SOLO si se ve.
+ * Una carpeta que no se enseña es una carpeta que esconde.
+ */
+function cubrePor(ruta, declarados) {
+  if (declarados.has(ruta)) return true;
+  for (const d of declarados) {
+    if (d.endsWith('/') && ruta.startsWith(d)) return d;
+  }
+  return false;
+}
+
+/**
+ * LA PREGUNTA BARATA: de lo que está sucio AHORA, ¿qué no cabe en la promesa?
+ *
+ * Es PURA a propósito —se le dan las tres listas ya hechas— por dos motivos:
+ * la prueba puede darle casos de mentira sin montar un repo, y el aviso de
+ * consola (`.claude/aviso-consola.cjs`) puede hacer la misma pregunta que hace
+ * `revisar`, con el MISMO criterio, sin pagar los 16 segundos de la revisión
+ * entera. Medido el 24-sep-2026: la revisión completa tarda 16,09 s y esta
+ * pregunta 18 milésimas. Un vigilante de 16 segundos por comando no se pone: se
+ * apaga.
+ *
+ * 🔴 GEMELO ANOTADO, NO UNIFICADO (SEGUNDA LEY): `revisar()` calcula este mismo
+ *  subconjunto EN LÍNEA, mezclado con lo que imprime. No se saca de ahí porque
+ *  mover código sano es justo lo que prohíbe la PRIMERA LEY, y `revisar()` hace
+ *  además cosas que esto no hace (renglones, huellas, código movido). Lo que sí
+ *  vive una sola vez es el CRITERIO —`cubrePor`—, que es la mitad que se
+ *  separa: ya pasó una vez con `esPapelDelGuardian`, y paró el trabajo.
+ *  Unificar el recorrido es trabajo aparte, con su permiso.
+ */
+function fueraDeLaFoto(sucios, declarados, suciosPrevios) {
+  const antes = new Set(suciosPrevios || []);
+  const lista = declarados instanceof Set ? declarados : new Set(declarados || []);
+  return (sucios || []).filter((r) => !antes.has(r) && !cubrePor(r, lista));
+}
+
 // ─────────────────────────────── FOTO ───────────────────────────────
 function foto(argv) {
   const descripcion = (argv[0] || '').trim();
@@ -138,7 +259,21 @@ function foto(argv) {
     process.exit(1);
   }
 
-  const archivos = [...new Set(sitios.map((s) => s.split(':')[0].replace(/\\/g, '/')))];
+  // 🔴 SE PUEDEN DECLARAR CARPETAS (24-sep-2026). Hasta hoy había que nombrar
+  //  cada archivo, y hay trabajos en los que los NOMBRES NACEN DEL TRABAJO: al
+  //  partir un documento en trece, los nombres salen de sus propios títulos y no
+  //  se pueden saber antes. Ese día la foto declaró `plan/` y el guardián paró
+  //  13 veces por archivos que estaban DENTRO de lo declarado.
+  //  Una carpeta se escribe con barra al final (`plan/`), y también se reconoce
+  //  sola si lo que se declaró ya existe y es una carpeta.
+  const archivos = [...new Set(sitios.map((s) => {
+    const r = s.split(':')[0].replace(/\\/g, '/');
+    if (r.endsWith('/')) return r;
+    try {
+      if (fs.statSync(path.join(RAIZ, r)).isDirectory()) return r + '/';
+    } catch (e) { /* no existe todavía: se trata como archivo, y el aviso de abajo lo dirá */ }
+    return r;
+  }))];
   const faltantes = archivos.filter((a) => !fs.existsSync(path.join(RAIZ, a)));
 
   const estado = {};
@@ -188,6 +323,10 @@ function revisar() {
   }
   const f = JSON.parse(fs.readFileSync(FOTO, 'utf8'));
   const declarados = new Set(f.archivos);
+  //  Los archivos que entraron por una CARPETA y no por su nombre. Se cuentan
+  //  aparte a propósito: una carpeta es una promesa más floja que un archivo, y
+  //  si no se enseña, esconde. Enseñarla es lo que la hace aceptable.
+  const porCarpeta = [];
   const paradas = [];
   const avisos = [];
 
@@ -217,8 +356,11 @@ function revisar() {
       for (const t of r.menos) todosMenos.push({ ruta: c.ruta, texto: t });
       const cuenta = '+' + r.mas.length + ' -' + r.menos.length;
       const marca = C.gris + cuenta + '  [' + c.marca + ']' + C.off;
-      if (declarados.has(c.ruta)) {
-        say('   ' + C.verde + '✓' + C.off + ' ' + c.ruta.padEnd(52) + ' ' + marca);
+      const carpeta = cubrePor(c.ruta, declarados);
+      if (carpeta) {
+        const nota = carpeta === true ? '' : C.gris + '  (por la carpeta ' + carpeta + ')' + C.off;
+        if (carpeta !== true) porCarpeta.push(c.ruta + ' ← ' + carpeta);
+        say('   ' + C.verde + '✓' + C.off + ' ' + c.ruta.padEnd(52) + ' ' + marca + nota);
       } else {
         say('   ' + C.rojo + '✗' + C.off + ' ' + c.ruta.padEnd(52) + ' ' + marca);
         paradas.push('ARCHIVO FUERA DE LA LISTA: ' + c.ruta);
@@ -231,8 +373,17 @@ function revisar() {
       const vistos = new Set(hoy.map((c) => c.ruta));
       for (const ruta of Object.keys(ahora)) {
         const antes = base.huellas[ruta];
-        if (antes && antes !== ahora[ruta] && !declarados.has(ruta) && !previos.has(ruta) && !vistos.has(ruta)) {
-          paradas.push('CAMBIO INVISIBLE A GIT: ' + ruta);
+        // El MISMO criterio que arriba: los papeles del guardián no cuentan. La
+        // huella se guarda con la ruta desde la RAÍZ, así que se vuelve a la
+        // ruta del repo para preguntarlo igual que `cambiados()`.
+        const delRepo = repo === '.' ? ruta : ruta.slice(repo.length + 1);
+        if (esPapelDelGuardian(repo, delRepo)) continue;
+        if (antes && antes !== ahora[ruta] && !cubrePor(ruta, declarados) && !previos.has(ruta) && !vistos.has(ruta)) {
+          // 🔴 LA ETIQUETA DECÍA «CAMBIO INVISIBLE A GIT», y era FALSA en el caso
+          //  que más salía: el libro de excepciones está seguido por git y se
+          //  había commiteado horas antes. Lo invisible no era para git: era que
+          //  el guardián no lo había mirado. Ahora dice lo que de verdad pasa.
+          paradas.push('CAMBIÓ SIN QUE GIT LO REPORTARA (¿marcado como no-seguido?): ' + ruta);
         }
       }
     }
@@ -274,6 +425,22 @@ function revisar() {
 
   // Veredicto
   say('');
+  // 🔴 Los archivos nuevos que no se pudieron leer dejan CIEGO al detector de
+  //  código movido justo ahí. Callarlo sería firmar en verde una zona que nadie
+  //  miró, que es peor que no tener detector (REGLA 9).
+  // Una carpeta declarada no puede esconder: se dice cuántos entraron por ella
+  // y cuáles. Quien lea el veredicto tiene que poder ver qué se prometió de
+  // verdad y qué se dio por bueno por estar en la misma carpeta.
+  if (porCarpeta.length) {
+    say('');
+    say(C.gris + '   entraron por una CARPETA declarada, no por su nombre:' + C.off);
+    for (const x of porCarpeta.slice(0, 20)) say(C.gris + '     · ' + x + C.off);
+    if (porCarpeta.length > 20) say(C.gris + '     … y ' + (porCarpeta.length - 20) + ' más' + C.off);
+    avisos.push(porCarpeta.length + ' archivo(s) entraron por una carpeta declarada, no por su '
+      + 'nombre: la promesa fue más floja de lo normal');
+  }
+  for (const x of SIN_MIRAR) avisos.push('archivo nuevo que NO se pudo mirar: ' + x
+    + ' — el detector de código movido está ciego ahí');
   for (const a of avisos) say('   ' + C.ama + '⚠ ' + a + C.off);
   if (paradas.length) {
     say('');
@@ -302,15 +469,30 @@ function estado() {
   for (const s of f.sitios) say('  · ' + s);
 }
 
-const modo = process.argv[2];
-const resto = process.argv.slice(3);
-if (modo === 'foto') foto(resto);
-else if (modo === 'revisar') revisar();
-else if (modo === 'estado') estado();
-else {
-  say('Guardián — graba la promesa antes de tocar y la revisa al final.');
-  say('  node scripts/guardian.cjs foto "qué se arregla" <archivo:funcion> [...]');
-  say('  node scripts/guardian.cjs revisar');
-  say('  node scripts/guardian.cjs estado');
-  process.exit(1);
+// 🔴 SIN ESTA GUARDA, `require()` EJECUTABA EL GUARDIÁN — y sin argumentos
+//  imprime la ayuda y hace `process.exit(1)`, o sea que MATA al que lo cargue.
+//  Por eso el guardián no tenía ni una prueba propia: no se podía cargar. Y un
+//  vigilante que nadie vigila es el único sitio donde un fallo vive tranquilo.
+if (require.main === module) {
+  const modo = process.argv[2];
+  const resto = process.argv.slice(3);
+  if (modo === 'foto') foto(resto);
+  else if (modo === 'revisar') revisar();
+  else if (modo === 'estado') estado();
+  else {
+    say('Guardián — graba la promesa antes de tocar y la revisa al final.');
+    say('  node scripts/guardian.cjs foto "qué se arregla" <archivo:funcion> [...]');
+    say('  node scripts/guardian.cjs revisar');
+    say('  node scripts/guardian.cjs estado');
+    process.exit(1);
+  }
 }
+
+module.exports = {
+  juntarRenglones, cubrePor, esPapelDelGuardian,
+  // Los usa el aviso de consola (`.claude/aviso-consola.cjs`). Se exportan en vez
+  // de volver a escribirlos allí: `cambiados` lee `git status --porcelain` y lo
+  // interpreta —renombrados, comillas, papeles del guardián—, y una segunda copia
+  // de esa interpretación es exactamente el gemelo que se queda viejo.
+  fueraDeLaFoto, cambiados, reposVivos, FOTO,
+};

@@ -1,0 +1,217 @@
+# ══════════════════════════════════════════════════════════════════════════════════════════════
+#  EL BOTÓN QUE SOLO MIDE
+#
+#  🔴 QUÉ PREGUNTA HOY (23-sep-2026, segunda pregunta): ¿el paso 5 del botón de desplegar —la
+#  SUITE ENTERA, con los tres repos juntos— corre de verdad en una máquina de GitHub?
+#
+#  Nadie lo ha probado NUNCA. El botón de desplegar corre `npm test` antes de publicar, y si eso
+#  se para allí, se para con el despliegue a medio camino. Y hay un motivo concreto para dudar:
+#  en el contenedor donde se trabaja, el emulador de FUNCIONES no arranca —«Unable to parse JSON
+#  … "request bl…"»—, así que `pruebas/funciones.test.js` lleva todo el día sin poder correr.
+#  Descubrir eso ANTES de fusionar cuesta diez minutos; descubrirlo después cuesta un despliegue
+#  a medias de la app que usan los clientes.
+#
+#  LA PRIMERA PREGUNTA YA SE CONTESTÓ, y su respuesta queda en CLAUDE.md: `storage.test.js` daba
+#  43/29/14 en el contenedor y 43/43/0 aquí (run 35873533595). Los 14 eran de la máquina, no del
+#  código. Esa medición no se pierde: la suite entera incluye ese archivo y su cuenta sale igual.
+#
+#  🔴 ESTO SIGUE SIN SER UN CANDADO: ES UNA CINTA MÉTRICA. Sale en VERDE aunque las pruebas
+#  fallen, y es a propósito: lo que se busca es el NÚMERO. Un rojo aquí no diría nada que el
+#  número no diga, y enseñaría a ignorar los rojos. El candado de verdad va en el botón de
+#  desplegar, donde sí tiene consecuencias.
+#
+#  🔑 SE CORRE `npm test`, NO UNA LISTA ESCRITA AQUÍ. La lista de archivos de prueba, las cuatro
+#  tandas y los emuladores que hacen falta viven UNA sola vez, en `pruebas/correr.cjs` (SEGUNDA
+#  LEY). Copiarlos aquí sería medir una suite que se parece a la de verdad y que se separa de
+#  ella en el primer cambio — o sea, una medición que miente en cuanto alguien añade una prueba.
+#
+#  🔑 Y LOS TRES REPOS SE TRAEN IGUAL QUE EN EL BOTÓN DE DESPLEGAR. Si se trajeran de otra forma,
+#  esto mediría OTRA cosa y la conclusión no valdría para el botón — que es todo el punto. Que no
+#  se separen lo vigila `pruebas/elBotonDeDesplegar.test.js`, no la buena intención.
+# ══════════════════════════════════════════════════════════════════════════════════════════════
+name: Medir · ¿la suite entera corre en una máquina limpia?
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  medir:
+    name: Correr npm test con los tres repos, en una máquina limpia
+    runs-on: ubuntu-latest
+    steps:
+      #  Antes de gastar nada: si falta el permiso de lectura, los otros dos repos no se pueden
+      #  traer y lo que se mida no será la suite entera. Se dice y se para, en vez de medir a
+      #  medias y presentarlo como si fuera el total.
+      # ── LOS TRES REPOS, Y EN ESTE ORDEN ──────────────────────────────────────────────────
+      #  El principal va PRIMERO: `checkout` limpia la carpeta donde entra, así que si fuera al
+      #  revés se llevaría por delante a los otros dos. Y ADEMÁS tiene que ir antes del vigía,
+      #  porque el vigía es un guion que vive en este repo.
+      - name: Traer el código
+        uses: actions/checkout@v4
+
+      # ── ⏱️ ¿EL PERMISO SIRVE? · REGLA 1407, ANTES DE GASTAR NADA ───────────────────────────
+      #  🔴 Antes aquí solo se miraba si el secreto ESTABA. El 23-sep-2026 pasó en verde y el run
+      #  murió cuarenta segundos después dentro de `checkout` con «Bad credentials»: el permiso
+      #  estaba caducado. Un mensaje que no dice qué hacer, en un paso que no es el que falla.
+      #  🔑 La comprobación NO se escribe aquí: vive una sola vez en `scripts/`, porque CUATRO
+      #  botones usan este mismo permiso y cuatro copias es una que se queda vieja (SEGUNDA LEY).
+      - name: ⏱️ ¿El permiso de los repos hermanos SIRVE?
+        env:
+          LEER_REPOS_HERMANOS: ${{ secrets.LEER_REPOS_HERMANOS }}
+        run: node scripts/vigia-repos-hermanos.cjs
+
+      #  Los dos hermanos, a la carpeta raíz, que es donde las pruebas los buscan. Medido:
+      #     grep -rcE "guajirago-admin|guajirago-aliados" pruebas/  →  9 archivos, 122 renglones
+      #  Son los amarres que leen los DOS lados de cada contrato entre apps — para eso existen.
+      #  `persist-credentials: false`: el permiso se usa para traerlos y no se queda escrito.
+      - name: Traer guajirago-admin (el otro lado de los contratos)
+        uses: actions/checkout@v4
+        with:
+          repository: frey2605/guajirago-admin
+          token: ${{ secrets.LEER_REPOS_HERMANOS }}
+          path: guajirago-admin
+          persist-credentials: false
+
+      - name: Traer guajirago-aliados (el otro lado de los contratos)
+        uses: actions/checkout@v4
+        with:
+          repository: frey2605/guajirago-aliados
+          token: ${{ secrets.LEER_REPOS_HERMANOS }}
+          path: guajirago-aliados
+          persist-credentials: false
+
+      - name: Preparar Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      #  El emulador corre sobre Java. Se FIJA la versión en vez de fiarse de lo que la imagen de
+      #  GitHub traiga ese día: una versión que cambia sola es la misma enfermedad que un
+      #  `firebase-tools@latest`.
+      - name: Preparar Java (lo necesita el emulador)
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Instalar las librerías de las pruebas
+        run: npm ci
+
+      #  La app tiene su propio paquete, aparte. Va con `npm ci` y no con `install`, igual que en
+      #  el botón de desplegar: `ci` instala EXACTAMENTE lo que dice el lock commiteado.
+      - name: Instalar las librerías de la app
+        run: npm ci --prefix guajirago
+
+      #  🔴 Y LAS DE LA NUBE, que son las que faltaban (24-sep-2026). El emulador de
+      #  funciones LEE `guajirago/functions/index.js` para registrar las 19 funciones, y sin
+      #  sus librerías ese `require` falla: el emulador arranca, no registra ninguna, y las
+      #  llamadas contestan 404. Medido en GitHub: 46 pruebas de `funciones.test.js` —las que
+      #  mueven DINERO— fallaban con «esperaba UNAUTHENTICATED, llegó null», que es la forma
+      #  de una respuesta que no es JSON porque no hay función que responda.
+      #  En una máquina donde se ha trabajado esta carpeta ya existe, y por eso no se notaba.
+      - name: Instalar las librerías de la NUBE (el emulador las necesita para leer las funciones)
+        run: npm ci --prefix guajirago/functions
+
+      - name: Decir con qué se está midiendo
+        run: |
+          echo "sistema : $(uname -sr)"
+          echo "node    : $(node -v)"
+          echo "java    : $(java -version 2>&1 | head -1)"
+          echo "firebase: $(npx --yes firebase-tools@15 --version)"
+          echo "repos   : $(ls -d guajirago guajirago-admin guajirago-aliados 2>&1 | tr '\n' ' ')"
+
+      - name: Correr la suite ENTERA y ENSEÑAR la cuenta
+        run: |
+          set +e
+          npm test 2>&1 | tee "$RUNNER_TEMP/salida.txt"
+          SALIDA=${PIPESTATUS[0]}
+          set -e
+
+          #  Las cuentas las escribe `node --test` al final de CADA tanda, en renglones que
+          #  empiezan por `# `. Se SUMAN las de todas las tandas: `npm test` encadena cuatro con
+          #  `&&`, así que si una se cae las de después ni corren — y eso también hay que verlo.
+          #  No se cuenta a mano: quien sabe cuántas pruebas corrieron es `node --test`.
+          suma() { grep -oP "^# $1 \K\d+" "$RUNNER_TEMP/salida.txt" | awk '{s+=$1} END {print s+0}'; }
+          TANDAS=$(grep -cP '^# tests \d+' "$RUNNER_TEMP/salida.txt" || true)
+          TOTAL=$(suma tests); PASAN=$(suma pass); FALLAN=$(suma fail)
+
+          if [ "$TANDAS" = "0" ]; then
+            echo "⛔ NO SE PUDO LEER NINGUNA CUENTA: las pruebas ni llegaron a correr."
+            echo "   Eso YA es una respuesta, y es la que se temía. Mira el registro de arriba:"
+            echo "   lo más probable es que un emulador no arrancara, no que una prueba fallara."
+            {
+              echo "## ⛔ La suite no llegó a correr en GitHub"
+              echo ""
+              echo "No hay ninguna cuenta que leer. **El paso 5 del botón de desplegar NO"
+              echo "funcionaría aquí**, y se pararía con el despliegue a medio camino."
+              echo ""
+              echo "Salida de \`npm test\`: \`$SALIDA\`. El motivo está en el registro."
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          # 🔴 Y SI FALLA ALGO, SE DICE CUÁL. Un número sin nombre obliga a escarbar el
+          #  registro entero: el 24-sep-2026 salió «1 fallan» y averiguar cuál costó traer
+          #  400.000 caracteres de registro y aun así no alcanzó, porque la cola no llegaba
+          #  hasta el fallo. Un medidor que dice «algo se rompió» sin decir qué es medio
+          #  medidor (REGLA 9).
+          if [ "$FALLAN" != "0" ]; then
+            echo ""
+            echo "───────────── LAS QUE FALLARON ─────────────"
+            grep -E "^ *not ok [0-9]+ - " "$RUNNER_TEMP/salida.txt" | sed 's/^ *//' | head -40 \
+              | tee "$RUNNER_TEMP/rotas.txt"
+            [ -s "$RUNNER_TEMP/rotas.txt" ] || echo "  (ninguna dio su nombre: mira el registro)"
+          fi
+
+          echo ""
+          echo "══════════════════════════════════════════════════════════════"
+          echo "  EN ESTA MÁQUINA LIMPIA:  $TOTAL pruebas · $PASAN pasan · $FALLAN fallan"
+          echo "  tandas que llegaron a correr: $TANDAS de 4"
+          echo "  salida de npm test: $SALIDA"
+          echo "══════════════════════════════════════════════════════════════"
+
+          #  El veredicto va TAMBIÉN al resumen, que es lo que se ve desde el celular sin abrir el
+          #  registro y buscar entre cientos de renglones.
+          {
+            echo "## La cuenta, con los tres repos juntos"
+            echo ""
+            echo "| | |"
+            echo "|---|---|"
+            echo "| Pruebas | $TOTAL |"
+            echo "| Pasan | $PASAN |"
+            echo "| Fallan | **$FALLAN** |"
+            echo "| Tandas que corrieron | $TANDAS de 4 |"
+            echo "| Salida de \`npm test\` | \`$SALIDA\` |"
+            echo ""
+            if [ "$FALLAN" = "0" ] && [ "$TANDAS" = "4" ] && [ "$SALIDA" = "0" ]; then
+              echo "### ✅ El paso 5 del botón de desplegar SÍ funciona aquí."
+              echo ""
+              echo "Las cuatro tandas corrieron y no falló ninguna prueba. Se puede fusionar a"
+              echo "\`main\` sin que el despliegue se pare en las pruebas."
+            elif [ "$TANDAS" != "4" ]; then
+              echo "### 🔴 Faltaron tandas: solo corrieron $TANDAS de 4."
+              echo ""
+              echo "Una tanda se cayó y las de después ni arrancaron. **El botón de desplegar se"
+              echo "pararía aquí**, con el despliegue a medio camino. Hay que arreglarlo ANTES de"
+              echo "fusionar. La tanda 4 es \`storage.test.js\`; la 2, \`funciones.test.js\`, que es"
+              echo "la que el contenedor de trabajo no puede correr."
+            else
+              echo "### 🔴 Fallan $FALLAN pruebas aquí también."
+              echo ""
+              echo "No es la máquina: corrieron las cuatro tandas. **El botón de desplegar se"
+              echo "pararía en el paso 5.** Hay que arreglarlas antes de fusionar."
+            fi
+            # El nombre de lo que falló va TAMBIÉN al resumen. Es lo que se lee desde el
+            # celular, y sin el nombre no se puede hacer nada con el número.
+            if [ -s "$RUNNER_TEMP/rotas.txt" ]; then
+              echo ""
+              echo "**Las que fallaron:**"
+              echo ""
+              echo '```'
+              cat "$RUNNER_TEMP/rotas.txt"
+              echo '```'
+            fi
+            echo ""
+            echo "_Esto es una medición, no un candado: sale en verde igual. El número es el producto._"
+          } >> "$GITHUB_STEP_SUMMARY"
