@@ -8,7 +8,7 @@ Ninguna de estas la puedo decidir yo. Cada una cambia el plan.
 
 | # | Pregunta | Estado |
 |---|---|---|
-| 1 | ¿Aliados comparte proyecto Firebase con la superapp? | **abierta — es la que bloquea la Fase 0** |
+| 1 | ¿Aliados comparte proyecto Firebase con la superapp? | ✅ **contestada 24-sep-2026: NO, se separa.** Y medido: el **transporte NO se separa** — el pasajero y el conductor escriben el mismo documento en vivo. Ver [`02-DECISIONES.md`](02-DECISIONES.md) |
 | 2 | ¿Cómo cobra aliados? | abierta |
 | 3 | ¿Qué es «rentar»? | abierta |
 | 4 | ¿Efectivo o pasarela? | abierta — **y ahora pesa más**: sin internet no hay tarjeta |
@@ -18,6 +18,7 @@ Ninguna de estas la puedo decidir yo. Cada una cambia el plan.
 | 8 | ¿Cuántos aparatos por negocio? | **abierta — y ahora es urgente**: con un solo aparato, 4b sobra |
 | 9 | ¿Impresora de tirilla o cajón de dinero? | abierta — decide nativa o escritorio |
 | 10 | ¿Aliados y la superapp comparten cuenta de usuario? | abierta |
+| 11 | ¿La app del **conductor** se publica aparte de la del pasajero? | Hoy se compilan juntas: el pasajero se descarga el código del conductor, y tocar una pantalla del conductor republica la app del cliente. Es empaquetado, no base de datos |
 
 ---
 

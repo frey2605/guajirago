@@ -47,9 +47,9 @@ nadie vuelve a abrir.
 
 | | |
 |---|---|
-| **Lo que bloquea** | la **pregunta 1**: ¿aliados comparte proyecto Firebase con la superapp, o tendrá el suyo? De eso depende la Fase 0, que es por donde se empieza |
+| **Decidido** | **aliados se SEPARA** en su propio proyecto; **el transporte NO** (el pasajero y el conductor escriben el mismo documento en vivo). Ver [`02-DECISIONES.md`](02-DECISIONES.md) |
 | **Lo urgente detrás** | la **pregunta 8**: ¿cuántos aparatos por negocio? Con uno solo, la fase 4b entera sobra |
-| **Contestadas** | la 6 (qué es «Calaira» → el otro proyecto) y la 7 (sin internet **todos los días** → la red interna es requisito) |
+| **Contestadas** | la 1 (aliados se separa), la 6 (qué es «Calaira») y la 7 (sin internet **todos los días**) |
 | **Lo que bloquea primero de todo** | el **permiso de lectura** de los repos hermanos: GitHub contesta `Bad credentials`. Sin él no se puede medir si la suite corre en la nube, y no se debería fusionar a `main` a ciegas. Ver [`D-PENDIENTES.md`](D-PENDIENTES.md) |
 | **Lo siguiente que se hará** | arreglar ese permiso, cerrar la puerta de atrás del guardián (N1–N3), y contestar la pregunta 1 |
 
