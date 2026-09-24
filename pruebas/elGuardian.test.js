@@ -17,7 +17,7 @@
 // ══════════════════════════════════════════════════════════════════════════════
 const { describe, it } = require('node:test');
 const assert = require('node:assert');
-const { juntarRenglones, cubrePor } = require('../scripts/guardian.cjs');
+const { juntarRenglones, cubrePor, esPapelDelGuardian } = require('../scripts/guardian.cjs');
 
 //  `juntarRenglones` es pura: recibe el texto del diff y los archivos nuevos ya
 //  leídos. Por eso aquí se le pueden dar casos de mentira sin tocar git.
@@ -142,5 +142,46 @@ describe('EL GUARDIÁN · una carpeta declarada cubre lo de dentro, y se nota', 
     assert.strictEqual(cubrePor('b/c.js', soloArchivos), true);
     assert.strictEqual(cubrePor('b/otro.js', soloArchivos), false,
       '⛔ declarar `b/c.js` no puede abrir la carpeta `b/` entera');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  LOS PAPELES DEL PROPIO GUARDIÁN
+//
+//  🔴 Por qué existe, medido el 24-sep-2026 ejecutándolo: la ley manda anotar en
+//  `.guardian-excepciones.log` cada vez que hay que salirse de la lista
+//  declarada... y escribir ahí PARABA AL GUARDIÁN. O sea: cumplir la ley lo
+//  rompía.
+//
+//  La causa no era misteriosa: el criterio «esto es un papel mío» vivía en UN
+//  sitio y hacían falta DOS. La lista de archivos cambiados sí lo saltaba; la
+//  comprobación de huellas, no. Así que el guardián se saltaba su propio libro y
+//  después se quejaba de no haberlo visto — y encima lo llamaba «CAMBIO
+//  INVISIBLE A GIT», cuando git lo seguía y lo había commiteado horas antes.
+//  Lo invisible no era para git: era que el guardián no lo había mirado.
+describe('EL GUARDIÁN · sus propios papeles no le paran el trabajo', () => {
+  it('el libro de excepciones es papel suyo', () => {
+    assert.strictEqual(esPapelDelGuardian('.', '.guardian-excepciones.log'), true,
+      '⛔ escribir en el libro de excepciones vuelve a parar al guardián, y la ley manda ' +
+      'escribir ahí. Cumplir la ley no puede romper al vigilante.');
+  });
+
+  it('su foto y su configuración también', () => {
+    assert.strictEqual(esPapelDelGuardian('.', '.guardian-foto.json'), true);
+    assert.strictEqual(esPapelDelGuardian('.', '.guardian.json'), true);
+  });
+
+  it('cualquier otro archivo NO lo es', () => {
+    assert.strictEqual(esPapelDelGuardian('.', 'guajirago/src/Solicitar.js'), false);
+    assert.strictEqual(esPapelDelGuardian('.', 'CLAUDE.md'), false,
+      '⛔ si CLAUDE.md contara como papel del guardián, tocarlo dejaría de vigilarse');
+  });
+
+  //  🔴 Y EL ESCAPE QUE HABRÍA SIDO FÁCIL: dar por papel del guardián un archivo
+  //   con el mismo nombre dentro de OTRO repo. Los repos hermanos tienen su
+  //   propia carpeta, y un `.guardian.json` suyo no es papel de este guardián.
+  it('un archivo con el mismo nombre en OTRO repo no se cuela', () => {
+    assert.strictEqual(esPapelDelGuardian('guajirago-admin', '.guardian.json'), false,
+      '⛔ un archivo de otro repo pasaría por papel de este guardián y dejaría de vigilarse');
   });
 });

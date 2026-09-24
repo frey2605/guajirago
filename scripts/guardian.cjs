@@ -29,6 +29,24 @@ const REPOS = ['.', 'guajirago-admin', 'guajirago-aliados'];
 // Papeles del propio guardián: son del sistema, no del arreglo. Jamás cuentan como violación.
 const PROPIOS = new Set(['.guardian-foto.json', '.guardian-excepciones.log', '.guardian.json']);
 
+/**
+ * ¿Es este un papel del propio guardián (su foto, su libro de excepciones, su
+ * configuración)? Esos no cuentan como trabajo tocado: son del vigilante, no de
+ * lo vigilado.
+ *
+ * 🔴 EXISTE PORQUE EL CRITERIO ESTABA EN UN SOLO SITIO Y HACÍAN FALTA DOS
+ *  (24-sep-2026). `cambiados()` sí los saltaba; la comprobación de huellas, no.
+ *  Resultado: el guardián se saltaba su propio libro de excepciones y después se
+ *  quejaba de no haberlo visto —«CAMBIO INVISIBLE A GIT»— y PARABA EL TRABAJO.
+ *  Y la ley manda anotar en ese libro cada vez que hay que salirse de la lista,
+ *  así que cumplir la ley rompía al guardián. Medido ejecutándolo: escribir un
+ *  renglón en el libro y revisar → «✋ SE PARA EL TRABAJO».
+ *  Ahora el criterio vive aquí y lo usan los dos (SEGUNDA LEY).
+ */
+function esPapelDelGuardian(repo, rutaRepo) {
+  return repo === '.' && PROPIOS.has(rutaRepo);
+}
+
 const C = { rojo: '\x1b[31m', verde: '\x1b[32m', ama: '\x1b[33m', gris: '\x1b[90m', neg: '\x1b[1m', off: '\x1b[0m' };
 const say = (s) => process.stdout.write((s === undefined ? '' : s) + '\n');
 
@@ -61,7 +79,7 @@ function cambiados(repo) {
     let ruta = linea.slice(3).trim();
     if (ruta.startsWith('"') && ruta.endsWith('"')) ruta = ruta.slice(1, -1);
     if (ruta.includes(' -> ')) ruta = ruta.split(' -> ')[1]; // renombrados
-    if (repo === '.' && PROPIOS.has(ruta)) continue;         // los papeles del guardián no cuentan
+    if (esPapelDelGuardian(repo, ruta)) continue;            // los papeles del guardián no cuentan
     lista.push({ ruta: aRaiz(repo, ruta), marca });
   }
   return lista;
@@ -330,8 +348,17 @@ function revisar() {
       const vistos = new Set(hoy.map((c) => c.ruta));
       for (const ruta of Object.keys(ahora)) {
         const antes = base.huellas[ruta];
+        // El MISMO criterio que arriba: los papeles del guardián no cuentan. La
+        // huella se guarda con la ruta desde la RAÍZ, así que se vuelve a la
+        // ruta del repo para preguntarlo igual que `cambiados()`.
+        const delRepo = repo === '.' ? ruta : ruta.slice(repo.length + 1);
+        if (esPapelDelGuardian(repo, delRepo)) continue;
         if (antes && antes !== ahora[ruta] && !cubrePor(ruta, declarados) && !previos.has(ruta) && !vistos.has(ruta)) {
-          paradas.push('CAMBIO INVISIBLE A GIT: ' + ruta);
+          // 🔴 LA ETIQUETA DECÍA «CAMBIO INVISIBLE A GIT», y era FALSA en el caso
+          //  que más salía: el libro de excepciones está seguido por git y se
+          //  había commiteado horas antes. Lo invisible no era para git: era que
+          //  el guardián no lo había mirado. Ahora dice lo que de verdad pasa.
+          paradas.push('CAMBIÓ SIN QUE GIT LO REPORTARA (¿marcado como no-seguido?): ' + ruta);
         }
       }
     }
@@ -436,4 +463,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { juntarRenglones, cubrePor };
+module.exports = { juntarRenglones, cubrePor, esPapelDelGuardian };
