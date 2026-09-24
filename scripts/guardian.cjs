@@ -223,6 +223,31 @@ function cubrePor(ruta, declarados) {
   return false;
 }
 
+/**
+ * LA PREGUNTA BARATA: de lo que está sucio AHORA, ¿qué no cabe en la promesa?
+ *
+ * Es PURA a propósito —se le dan las tres listas ya hechas— por dos motivos:
+ * la prueba puede darle casos de mentira sin montar un repo, y el aviso de
+ * consola (`.claude/aviso-consola.cjs`) puede hacer la misma pregunta que hace
+ * `revisar`, con el MISMO criterio, sin pagar los 16 segundos de la revisión
+ * entera. Medido el 24-sep-2026: la revisión completa tarda 16,09 s y esta
+ * pregunta 18 milésimas. Un vigilante de 16 segundos por comando no se pone: se
+ * apaga.
+ *
+ * 🔴 GEMELO ANOTADO, NO UNIFICADO (SEGUNDA LEY): `revisar()` calcula este mismo
+ *  subconjunto EN LÍNEA, mezclado con lo que imprime. No se saca de ahí porque
+ *  mover código sano es justo lo que prohíbe la PRIMERA LEY, y `revisar()` hace
+ *  además cosas que esto no hace (renglones, huellas, código movido). Lo que sí
+ *  vive una sola vez es el CRITERIO —`cubrePor`—, que es la mitad que se
+ *  separa: ya pasó una vez con `esPapelDelGuardian`, y paró el trabajo.
+ *  Unificar el recorrido es trabajo aparte, con su permiso.
+ */
+function fueraDeLaFoto(sucios, declarados, suciosPrevios) {
+  const antes = new Set(suciosPrevios || []);
+  const lista = declarados instanceof Set ? declarados : new Set(declarados || []);
+  return (sucios || []).filter((r) => !antes.has(r) && !cubrePor(r, lista));
+}
+
 // ─────────────────────────────── FOTO ───────────────────────────────
 function foto(argv) {
   const descripcion = (argv[0] || '').trim();
@@ -463,4 +488,11 @@ if (require.main === module) {
   }
 }
 
-module.exports = { juntarRenglones, cubrePor, esPapelDelGuardian };
+module.exports = {
+  juntarRenglones, cubrePor, esPapelDelGuardian,
+  // Los usa el aviso de consola (`.claude/aviso-consola.cjs`). Se exportan en vez
+  // de volver a escribirlos allí: `cambiados` lee `git status --porcelain` y lo
+  // interpreta —renombrados, comillas, papeles del guardián—, y una segunda copia
+  // de esa interpretación es exactamente el gemelo que se queda viejo.
+  fueraDeLaFoto, cambiados, reposVivos, FOTO,
+};

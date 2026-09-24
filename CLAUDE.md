@@ -33,9 +33,23 @@ Esta manda sobre todas las demás. Antes de cada cambio:
    La lista se compara contra la que quedó grabada en la FOTO, no contra la que se diga al
    final. Sin declaración previa el guardián no deja seguir.
 6. **Si de verdad hay que tocar algo fuera de la lista, se pide permiso primero.**
-7. **Tres candados más:**
-   · **El cambio se niega EN EL MOMENTO.** `.claude/candado.cjs` corre antes de cada
-     escritura: si el archivo no está declarado, la escritura no se hace.
+7. **Cuatro candados más:**
+   · **El cambio se niega EN EL MOMENTO — pero SOLO por una de las dos puertas.**
+     `.claude/candado.cjs` corre antes de cada escritura hecha con las herramientas de
+     archivo (Write, Edit, NotebookEdit): si el archivo no está declarado, la escritura no
+     se hace. 🔴 **Lo escrito desde la CONSOLA no lo puede negar** —un `sed -i`, un
+     `cat > archivo`, un `>>`— porque esos no pasan por ahí. Lo dice la cabecera del propio
+     candado desde el primer día; lo que estaba mal era **este renglón**, que prometía
+     «antes de CADA escritura» y hacía creer en una vigilancia que no existía. Mordió el
+     24-sep-2026: se leyeron estas leyes, se creyó lo que decían, y se trabajó por consola
+     sin vigilancia toda una sesión. **El mismo candado descrito en dos papeles que no
+     decían lo mismo** — SEGUNDA LEY, y el que se quedó viejo es el que todo el mundo lee.
+   · **Por la otra puerta hay un TESTIGO, no un candado.** `.claude/aviso-consola.cjs`
+     corre DESPUÉS de cada comando y pregunta *qué cambió* —no si el comando llevaba `sed`,
+     porque perseguir formas de escribir no acaba nunca—. Si algo se movió fuera de la
+     promesa, lo nombra. **Avisa después: no impide.** Cuesta lo que arrancar node (la
+     pregunta en sí, **18 milésimas**; la revisión entera, **16,09 s** — medido el
+     24-sep-2026), y por eso se puede tener puesto siempre.
    · **Libro de excepciones.** Cada escape queda anotado en `.guardian-excepciones.log`.
    · **Segunda opinión antes de cada commit.** Un revisor independiente contesta una sola
      pregunta: *¿esto hacía falta para lo que se pidió?*
