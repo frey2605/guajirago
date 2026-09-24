@@ -39,6 +39,7 @@ nadie vuelve a abrir.
 | **A** | [`A-CONTROL-ELITE.md`](A-CONTROL-ELITE.md) | Qué se copia del otro proyecto, careado número a número |
 | **B** | [`B-SIN-SENAL.md`](B-SIN-SENAL.md) | Aliados sin señal, y todo desde el celular |
 | **C** | [`C-RED-INTERNA.md`](C-RED-INTERNA.md) | La red interna del negocio: **es requisito**, no opción |
+| **D** | [`D-PENDIENTES.md`](D-PENDIENTES.md) | Lo que falta por hacer: el inventario, medido, y a qué fase va cada cosa |
 
 ---
 
@@ -49,7 +50,8 @@ nadie vuelve a abrir.
 | **Lo que bloquea** | la **pregunta 1**: ¿aliados comparte proyecto Firebase con la superapp, o tendrá el suyo? De eso depende la Fase 0, que es por donde se empieza |
 | **Lo urgente detrás** | la **pregunta 8**: ¿cuántos aparatos por negocio? Con uno solo, la fase 4b entera sobra |
 | **Contestadas** | la 6 (qué es «Calaira» → el otro proyecto) y la 7 (sin internet **todos los días** → la red interna es requisito) |
-| **Lo siguiente que se hará** | buscar los puntos por hacer que ya están medidos y anotados en el repo, y añadirlos al plan |
+| **Lo que bloquea primero de todo** | el **permiso de lectura** de los repos hermanos: GitHub contesta `Bad credentials`. Sin él no se puede medir si la suite corre en la nube, y no se debería fusionar a `main` a ciegas. Ver [`D-PENDIENTES.md`](D-PENDIENTES.md) |
+| **Lo siguiente que se hará** | arreglar ese permiso, cerrar la puerta de atrás del guardián (N1–N3), y contestar la pregunta 1 |
 
 ---
 
