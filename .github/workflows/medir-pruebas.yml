@@ -43,31 +43,23 @@ jobs:
       #  Antes de gastar nada: si falta el permiso de lectura, los otros dos repos no se pueden
       #  traer y lo que se mida no será la suite entera. Se dice y se para, en vez de medir a
       #  medias y presentarlo como si fuera el total.
-      - name: ¿Está el permiso para traer los otros dos repos?
-        env:
-          LEER: ${{ secrets.LEER_REPOS_HERMANOS }}
-        run: |
-          if [ -z "$LEER" ]; then
-            echo "⛔ FALTA EL SECRETO 'LEER_REPOS_HERMANOS'."
-            echo "   Sin él no se pueden traer guajirago-admin y guajirago-aliados, y sin los tres"
-            echo "   repos juntos NUEVE archivos de pruebas no corren. Medir sin ellos daría un"
-            echo "   número que NO es el de la suite entera, y ese es justo el engaño que este"
-            echo "   botón existe para evitar."
-            echo "   Se crea en: https://github.com/settings/personal-access-tokens/new"
-            {
-              echo "## ⛔ No se pudo medir: falta el permiso de lectura"
-              echo "Sin \`LEER_REPOS_HERMANOS\` no se traen los repos hermanos, y sin ellos esto"
-              echo "no sería la suite entera. No se da un número a medias."
-            } >> "$GITHUB_STEP_SUMMARY"
-            exit 0
-          fi
-          echo "✅ El permiso está. Se sigue."
-
-      # ── LOS TRES REPOS, Y EN ESTE ORDEN ────────────────────────────────────────────────────
+      # ── LOS TRES REPOS, Y EN ESTE ORDEN ──────────────────────────────────────────────────
       #  El principal va PRIMERO: `checkout` limpia la carpeta donde entra, así que si fuera al
-      #  revés se llevaría por delante a los otros dos.
+      #  revés se llevaría por delante a los otros dos. Y ADEMÁS tiene que ir antes del vigía,
+      #  porque el vigía es un guion que vive en este repo.
       - name: Traer el código
         uses: actions/checkout@v4
+
+      # ── ⏱️ ¿EL PERMISO SIRVE? · REGLA 1407, ANTES DE GASTAR NADA ───────────────────────────
+      #  🔴 Antes aquí solo se miraba si el secreto ESTABA. El 23-sep-2026 pasó en verde y el run
+      #  murió cuarenta segundos después dentro de `checkout` con «Bad credentials»: el permiso
+      #  estaba caducado. Un mensaje que no dice qué hacer, en un paso que no es el que falla.
+      #  🔑 La comprobación NO se escribe aquí: vive una sola vez en `scripts/`, porque CUATRO
+      #  botones usan este mismo permiso y cuatro copias es una que se queda vieja (SEGUNDA LEY).
+      - name: ⏱️ ¿El permiso de los repos hermanos SIRVE?
+        env:
+          LEER_REPOS_HERMANOS: ${{ secrets.LEER_REPOS_HERMANOS }}
+        run: node scripts/vigia-repos-hermanos.cjs
 
       #  Los dos hermanos, a la carpeta raíz, que es donde las pruebas los buscan. Medido:
       #     grep -rcE "guajirago-admin|guajirago-aliados" pruebas/  →  9 archivos, 122 renglones

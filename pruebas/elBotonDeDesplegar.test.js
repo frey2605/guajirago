@@ -908,3 +908,91 @@ describe('EL BOTÓN QUE MIDE · mide lo mismo que el que despliega, o no vale', 
       + 'probaron nada:\n   · ' + saltados.join('\n   · '));
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  EL VIGÍA DEL PERMISO DE LOS REPOS HERMANOS
+//
+//  🔴 Por qué existe, medido el 23-sep-2026: los botones comprobaban que el
+//  secreto ESTUVIERA puesto, no que SIRVIERA. El botón que mide pasó en verde y
+//  murió cuarenta segundos después dentro de `checkout` con «Bad credentials»:
+//  el permiso estaba caducado. Un mensaje que no dice qué hacer, en un paso que
+//  no es el que falla de verdad.
+//
+//  La decisión está separada de la llamada a propósito: `veredicto()` es pura y
+//  recibe lo que contestó GitHub, así que aquí se le pueden dar respuestas de
+//  mentira —sin red y sin permiso— y exigir que se queje cuando toca. Un vigía
+//  que nadie ha visto quejarse no es un vigía.
+describe('EL VIGÍA DEL PERMISO · distingue caducado de sin red, y lo dice', () => {
+  const { veredicto } = require('../scripts/vigia-repos-hermanos.cjs');
+  const ok = (r) => ({ repo: r, estado: 200, error: null });
+
+  it('con todo bien, deja pasar y no dice nada', () => {
+    const v = veredicto(true, [ok('a'), ok('b')]);
+    assert.strictEqual(v.para, false);
+    assert.strictEqual(v.titulo, null, 'no debería tener nada que decir cuando todo está bien');
+  });
+
+  it('🔴 con el permiso CADUCADO (401), PARA — es el fallo del 23-sep-2026', () => {
+    const v = veredicto(true, [{ repo: 'a', estado: 401 }, { repo: 'b', estado: 401 }]);
+    assert.ok(v.para, 'un permiso caducado tiene que parar el botón AQUÍ, no dentro de `checkout`');
+  });
+
+  it('y con un repo bueno y otro malo también para', () => {
+    assert.ok(veredicto(true, [ok('a'), { repo: 'b', estado: 401 }]).para,
+      'si falta UNO de los dos repos, nueve archivos de pruebas no corren igual');
+  });
+
+  it('sin el secreto puesto, para', () => {
+    assert.ok(veredicto(false, []).para);
+  });
+
+  it('con 403 y con 404 también para, y dice lo que significa cada uno', () => {
+    for (const e of [403, 404]) {
+      const v = veredicto(true, [{ repo: 'a', estado: e }, { repo: 'b', estado: e }]);
+      assert.ok(v.para, 'un ' + e + ' no es un «sí»');
+      assert.ok(v.detalle.join('\n').length > 50, 'tiene que explicar qué significa el ' + e);
+    }
+  });
+
+  //  🔑 Y LA OTRA MITAD, que es la que evita la falsa alarma: si no se pudo ni
+  //   PREGUNTAR, eso es un tropiezo de red, no un permiso malo. Un vigía que
+  //   grita sin fuego se deja de mirar, y éste protege al que más falta hace.
+  it('si NO se pudo preguntar (sin red), avisa pero NO para', () => {
+    const v = veredicto(true, [
+      { repo: 'a', estado: null, error: 'ENOTFOUND' },
+      { repo: 'b', estado: null, error: 'ENOTFOUND' },
+    ]);
+    assert.strictEqual(v.para, false, 'un fallo de red no puede parar el botón: eso es falsa alarma');
+    assert.ok(v.titulo, 'pero tiene que DECIRLO, no callarse (REGLA 9)');
+  });
+
+  //  Y que el mensaje sirva para algo. Un «no sirve» sin decir cómo se arregla
+  //  deja igual de atascado que el «Bad credentials» que vino a sustituir.
+  it('cuando para, el mensaje dice DÓNDE se renueva el permiso', () => {
+    const texto = veredicto(true, [{ repo: 'a', estado: 401 }]).detalle.join('\n');
+    assert.ok(texto.includes('personal-access-tokens'),
+      '⛔ el aviso no dice dónde se renueva. Entonces es el mismo callejón sin salida que el ' +
+      '«Bad credentials» de GitHub, solo que con mejor letra.');
+    assert.ok(texto.includes('LEER_REPOS_HERMANOS'),
+      '⛔ el aviso no dice en qué secreto se pega');
+  });
+
+  //  Y QUE ESTÉ ENCHUFADO EN LOS BOTONES, en el sitio correcto. Un vigía
+  //  perfecto que nadie llama no protege nada, y llamado DESPUÉS de traer los
+  //  repos llega tarde: para entonces el `checkout` ya murió.
+  const CONVIGIA = [['el botón que mide', YML_MEDIR], ['el botón de desplegar', YML]];
+  it('los dos botones lo llaman, y ANTES de traer los repos hermanos', () => {
+    for (const [quien, yml] of CONVIGIA) {
+      const pasos = losPasos(yml);
+      const iVigia = elPasoQue(pasos, 'vigia-repos-hermanos.cjs');
+      const iCodigo = elPasoQue(pasos, 'actions/checkout@v4');
+      const iHermano = elPasoQue(pasos, 'frey2605/guajirago-admin');
+      assert.ok(iVigia >= 0, '⛔ ' + quien + ' ya no llama al vigía del permiso. Vuelve a morir ' +
+        'dentro de `checkout` con «Bad credentials», que no dice qué hacer.');
+      assert.ok(iVigia > iCodigo, '⛔ en ' + quien + ' el vigía va ANTES de traer el código, y el ' +
+        'vigía es un guion de este repo: no existiría todavía.');
+      assert.ok(iVigia < iHermano, '⛔ en ' + quien + ' el vigía va DESPUÉS de traer los repos ' +
+        'hermanos, así que llega tarde: para entonces el checkout ya falló.');
+    }
+  });
+});
