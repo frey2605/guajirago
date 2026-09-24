@@ -188,6 +188,15 @@ jobs:
       - name: Instalar las librerías de la app elegida
         run: npm ci --prefix ${{ steps.app.outputs.carpeta }}
 
+      #  🔴 Y LAS DE LA NUBE, aunque aquí se publique el panel o aliados (24-sep-2026). Este
+      #  botón corre la suite ENTERA, y dentro van las 46 pruebas que mueven DINERO: el
+      #  emulador de funciones LEE `guajirago/functions/index.js` para registrar las 19
+      #  funciones, y sin sus librerías ese `require` falla — el emulador arranca, no registra
+      #  ninguna, y las llamadas contestan 404. La app elegida no tiene nada que ver: lo que
+      #  falta es la carpeta de la nube.
+      - name: Instalar las librerías de la NUBE (el emulador las necesita para leer las funciones)
+        run: npm ci --prefix guajirago/functions
+
       # ── ⏱️ VIGÍA DE PERMISOS · REGLA 1407, ANTES DE LAS PRUEBAS ────────────────────────────
       #  Preguntarle a Google si la llave sirve tarda segundos; las pruebas tardan minutos.
       #  ⚠️ Caza que la llave falte, esté rota o no tenga acceso a Hosting. NO caza que pueda

@@ -1029,3 +1029,46 @@ describe('EL VIGÍA DEL PERMISO · distingue caducado de sin red, y lo dice', ()
     }
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  QUIEN CORRA `npm test` TIENE QUE INSTALAR LAS LIBRERÍAS DE LA NUBE
+//
+//  🔴 Medido en GitHub el 24-sep-2026: el emulador de funciones LEE
+//  `guajirago/functions/index.js` para registrar las 19 funciones. Sin las
+//  librerías de esa carpeta, ese `require` falla — el emulador arranca, no
+//  registra ninguna función, y las llamadas contestan 404. Resultado: 46
+//  pruebas de `funciones.test.js`, LAS QUE MUEVEN DINERO, fallando con
+//  «esperaba UNAUTHENTICATED, llegó null» — que es la forma de una respuesta
+//  que no es JSON porque no hay función que responda.
+//
+//  🔑 En una máquina donde ya se ha trabajado esa carpeta existe, así que el
+//  fallo SOLO aparece en limpio. Es el mismo tipo de trampa que el de las
+//  citas: verde por haber corrido donde alguien había trabajado.
+//
+//  La lista no se escribe: se LEE. Todo botón que corra `npm test` necesita
+//  esto, hoy y el día que nazca el sexto.
+describe('EL EMULADOR NECESITA LAS LIBRERÍAS DE LA NUBE · quien corra npm test las instala', () => {
+  const LOS_QUE_PRUEBAN = fs.readdirSync(path.join(RAIZ, '.github/workflows'))
+    .filter((f) => f.endsWith('.yml'))
+    .map((f) => ['.github/workflows/' + f, leer('.github/workflows/' + f)])
+    .filter(([, yml]) => sinComentarios(yml).includes('npm test'));
+
+  it('todos los que corren `npm test` instalan las librerías de la nube, ANTES', () => {
+    assert.ok(LOS_QUE_PRUEBAN.length >= 3,
+      'solo ' + LOS_QUE_PRUEBAN.length + ' botones corren `npm test`, y el 24-sep-2026 eran 3 o '
+      + 'más. Si bajó, esta prueba vigila menos de lo que creía.');
+    for (const [quien, yml] of LOS_QUE_PRUEBAN) {
+      const pasos = losPasos(yml);
+      const iNube = elPasoQue(pasos, 'npm ci --prefix guajirago/functions');
+      const iPruebas = elPasoQue(pasos, 'npm test');
+      assert.ok(iNube >= 0,
+        '⛔ ' + quien + ' corre `npm test` pero NO instala las librerías de la nube. El emulador '
+        + 'de funciones no podrá leer `guajirago/functions/index.js`, no registrará ninguna de '
+        + 'las 19 funciones, y las 46 pruebas que mueven dinero fallarán con 404. En una '
+        + 'máquina donde ya se trabajó esto no se nota: solo en limpio.');
+      assert.ok(iNube < iPruebas,
+        '⛔ en ' + quien + ' las librerías de la nube se instalan DESPUÉS de las pruebas: para '
+        + 'entonces el emulador ya arrancó sin funciones');
+    }
+  });
+});

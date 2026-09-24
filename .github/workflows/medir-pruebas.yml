@@ -103,6 +103,16 @@ jobs:
       - name: Instalar las librerías de la app
         run: npm ci --prefix guajirago
 
+      #  🔴 Y LAS DE LA NUBE, que son las que faltaban (24-sep-2026). El emulador de
+      #  funciones LEE `guajirago/functions/index.js` para registrar las 19 funciones, y sin
+      #  sus librerías ese `require` falla: el emulador arranca, no registra ninguna, y las
+      #  llamadas contestan 404. Medido en GitHub: 46 pruebas de `funciones.test.js` —las que
+      #  mueven DINERO— fallaban con «esperaba UNAUTHENTICATED, llegó null», que es la forma
+      #  de una respuesta que no es JSON porque no hay función que responda.
+      #  En una máquina donde se ha trabajado esta carpeta ya existe, y por eso no se notaba.
+      - name: Instalar las librerías de la NUBE (el emulador las necesita para leer las funciones)
+        run: npm ci --prefix guajirago/functions
+
       - name: Decir con qué se está midiendo
         run: |
           echo "sistema : $(uname -sr)"
