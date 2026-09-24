@@ -36,7 +36,12 @@
  */
 const { describe, it } = require('node:test');
 const assert = require('node:assert');
-const { leer } = require('./cargar.cjs');
+const fs = require('node:fs');
+const path = require('node:path');
+// `RAIZ` sale de la casa común, no de un `..` escrito a mano: si este archivo
+// cambia de carpeta, un `..` apuntaría a otro sitio y esta prueba miraría
+// una carpeta de botones vacía — verde por no haber mirado nada.
+const { leer, RAIZ } = require('./cargar.cjs');
 
 const BOTON = '.github/workflows/desplegar.yml';
 const YML = leer(BOTON);
@@ -980,9 +985,23 @@ describe('EL VIGÍA DEL PERMISO · distingue caducado de sin red, y lo dice', ()
   //  Y QUE ESTÉ ENCHUFADO EN LOS BOTONES, en el sitio correcto. Un vigía
   //  perfecto que nadie llama no protege nada, y llamado DESPUÉS de traer los
   //  repos llega tarde: para entonces el `checkout` ya murió.
-  const CONVIGIA = [['el botón que mide', YML_MEDIR], ['el botón de desplegar', YML]];
-  it('los dos botones lo llaman, y ANTES de traer los repos hermanos', () => {
-    for (const [quien, yml] of CONVIGIA) {
+  //
+  //  🔑 LA LISTA NO SE ESCRIBE A MANO: se LEE de la carpeta de botones. Una
+  //   lista de cuatro nombres aquí se queda vieja el día que nazca el quinto —y
+  //   ese quinto entraría sin vigía, en verde—. Así que la regla es: **todo
+  //   botón que use el permiso tiene que llamar al vigía**, y quién los usa lo
+  //   dicen ellos, no yo. Es la misma lección que este repo ya pagó tres veces:
+  //   preguntar DÓNDE aparece, no repetir una lista.
+  const LOS_QUE_USAN_EL_PERMISO = fs.readdirSync(path.join(RAIZ, '.github/workflows'))
+    .filter((f) => f.endsWith('.yml'))
+    .map((f) => ['.github/workflows/' + f, leer('.github/workflows/' + f)])
+    .filter(([, yml]) => yml.includes('LEER_REPOS_HERMANOS'));
+
+  it('TODO botón que usa el permiso llama al vigía, y ANTES de traer los repos hermanos', () => {
+    assert.ok(LOS_QUE_USAN_EL_PERMISO.length >= 4,
+      'solo ' + LOS_QUE_USAN_EL_PERMISO.length + ' botones usan el permiso, y el 24-sep-2026 eran '
+      + '4. Si bajó, esta prueba vigila menos de lo que creía.');
+    for (const [quien, yml] of LOS_QUE_USAN_EL_PERMISO) {
       const pasos = losPasos(yml);
       const iVigia = elPasoQue(pasos, 'vigia-repos-hermanos.cjs');
       const iCodigo = elPasoQue(pasos, 'actions/checkout@v4');

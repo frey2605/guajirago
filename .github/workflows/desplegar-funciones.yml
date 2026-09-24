@@ -71,6 +71,19 @@ jobs:
       - name: Traer el código
         uses: actions/checkout@v4
 
+      # ── ⏱️ ¿EL PERMISO DE LOS HERMANOS SIRVE? · REGLA 1407 ─────────────────────────────────
+      #  🔴 El paso de los secretos, arriba, comprueba que ESTÉN. No que SIRVAN. El 23-sep-2026
+      #  el botón que mide pasó esa comprobación en verde y murió cuarenta segundos después
+      #  dentro de `checkout` con «Bad credentials»: el permiso estaba caducado.
+      #  Va AQUÍ y no antes porque el vigía es un guion de este repo: hace falta haberlo traído.
+      #  Y antes de los hermanos, porque después llega tarde — el checkout ya habría fallado.
+      #  🔑 La comprobación no se escribe en el YAML: vive una sola vez en `scripts/`, y la usan
+      #  los CUATRO botones que necesitan este permiso (SEGUNDA LEY).
+      - name: ⏱️ ¿El permiso de los repos hermanos SIRVE?
+        env:
+          LEER_REPOS_HERMANOS: ${{ secrets.LEER_REPOS_HERMANOS }}
+        run: node scripts/vigia-repos-hermanos.cjs
+
       - name: Traer guajirago-admin (el otro lado de los contratos)
         uses: actions/checkout@v4
         with:
