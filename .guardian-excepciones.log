@@ -1224,3 +1224,59 @@ LO QUE SI SE COMPROBO
     emulador de funciones muere al registrar el disparador («Unable to parse
     JSON ... "request bl"»), que es la trampa ya escrita en CLAUDE.md. El
     veredicto de las 46 lo da el boton que mide, en GitHub.
+
+───────────────────────────────────────────────────────────────────────────────
+24-sep-2026 · CORRECCION DE LO QUE YO MISMO ESCRIBI ARRIBA, EL MISMO DIA
+───────────────────────────────────────────────────────────────────────────────
+
+LO QUE ESCRIBI, unas horas antes, en la anotacion de esta misma fecha:
+
+  «🔴 HALLAZGO, ANOTADO Y NO ARREGLADO: EL CANDADO TIENE UNA PUERTA DE ATRAS.
+   `.claude/candado.cjs` promete negar la escritura EN EL MOMENTO si el archivo
+   no esta declarado. No la nego.»
+
+ESO ESTA MAL, Y DE DOS MANERAS.
+
+1. NO ERA UN HALLAZGO. Estaba escrito en la cabecera del propio candado desde
+   que se hizo, con todas las letras:
+
+     « * NO cubre: escrituras hechas desde Bash (sed, heredocs, >). Para esas
+       * manda la primera ley y la revision del guardian al final.»
+
+   Lo apunte como si lo hubiera descubierto yo. No lo descubri: lo leia el
+   archivo desde el primer dia. Apuntarme un descubrimiento que ya estaba
+   escrito es exactamente lo que este libro existe para no dejar pasar.
+
+2. EL CANDADO NO PROMETIO ESO. Yo escribi «promete negar la escritura EN EL
+   MOMENTO». El candado nunca prometio cubrir la consola — dice lo contrario.
+   Quien promete de mas es `CLAUDE.md`, en su renglon 37:
+
+     «El cambio se niega EN EL MOMENTO. `.claude/candado.cjs` corre antes de
+      cada escritura: si el archivo no esta declarado, la escritura no se hace.»
+
+   Le puse al candado un incumplimiento que era de la ley que lo describe.
+
+LO QUE SI ES UN FALLO DE VERDAD, y es OTRO:
+  El mismo candado esta descrito en DOS papeles que dicen cosas DISTINTAS.
+  `CLAUDE.md` dice «antes de cada escritura»; el candado dice «no cubre Bash».
+  Es la SEGUNDA LEY rota en su forma peor: el papel que se quedo viejo es
+  EL QUE TODO EL MUNDO LEE, y el que dice la verdad esta enterrado en un
+  comentario que nadie abre.
+  Y mordio: yo lei CLAUDE.md, me confie en un guardia que no estaba ahi, y
+  trabaje por consola toda la sesion creyendome vigilado.
+
+MEDIDO, no supuesto:
+  · `.claude/settings.json` engancha el candado a Write|Edit|NotebookEdit.
+    Enganches sobre Bash: CERO (`grep -c Bash` → 0).
+  · El guardian completo tarda 16 s — demasiado para correrlo tras cada
+    comando. La pregunta barata («¿hay algo sucio fuera de la lista?») tarda
+    7 milesimas.
+
+QUE QUEDA PENDIENTE: la fila en CLAUDE.md, con su propia foto y su permiso.
+  Y el arreglo NO es perseguir comandos (`sed`, `>`, `tee`, `python`, `awk`…):
+  esa es la enfermedad que este proyecto ya pago tres veces —«perseguir formas
+  de escribir no acaba nunca»—. Es preguntar QUE cambio, no COMO se escribio.
+
+EL COMMIT 80213d8 TAMBIEN LO LLEVA MAL en su mensaje («un hallazgo aparte: el
+  candado no niega las escrituras hechas desde la consola»). Ya esta empujado y
+  NO se reescribe: la correccion es esta, y se nombra en el commit siguiente.
