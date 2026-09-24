@@ -188,6 +188,23 @@ function correrPruebas() {
   }
 }
 
+/**
+ * ¿Está este archivo declarado? Devuelve `true` si se declaró POR SU NOMBRE, la
+ * carpeta que lo cubre si entró por una carpeta, y `false` si no está.
+ *
+ * 🔑 Se distinguen los dos casos a propósito. Declarar una carpeta es una
+ * promesa más floja que declarar un archivo: dice «voy a tocar aquí dentro» sin
+ * decir qué. Eso vale cuando los nombres nacen del trabajo, pero SOLO si se ve.
+ * Una carpeta que no se enseña es una carpeta que esconde.
+ */
+function cubrePor(ruta, declarados) {
+  if (declarados.has(ruta)) return true;
+  for (const d of declarados) {
+    if (d.endsWith('/') && ruta.startsWith(d)) return d;
+  }
+  return false;
+}
+
 // ─────────────────────────────── FOTO ───────────────────────────────
 function foto(argv) {
   const descripcion = (argv[0] || '').trim();
@@ -199,7 +216,21 @@ function foto(argv) {
     process.exit(1);
   }
 
-  const archivos = [...new Set(sitios.map((s) => s.split(':')[0].replace(/\\/g, '/')))];
+  // 🔴 SE PUEDEN DECLARAR CARPETAS (24-sep-2026). Hasta hoy había que nombrar
+  //  cada archivo, y hay trabajos en los que los NOMBRES NACEN DEL TRABAJO: al
+  //  partir un documento en trece, los nombres salen de sus propios títulos y no
+  //  se pueden saber antes. Ese día la foto declaró `plan/` y el guardián paró
+  //  13 veces por archivos que estaban DENTRO de lo declarado.
+  //  Una carpeta se escribe con barra al final (`plan/`), y también se reconoce
+  //  sola si lo que se declaró ya existe y es una carpeta.
+  const archivos = [...new Set(sitios.map((s) => {
+    const r = s.split(':')[0].replace(/\\/g, '/');
+    if (r.endsWith('/')) return r;
+    try {
+      if (fs.statSync(path.join(RAIZ, r)).isDirectory()) return r + '/';
+    } catch (e) { /* no existe todavía: se trata como archivo, y el aviso de abajo lo dirá */ }
+    return r;
+  }))];
   const faltantes = archivos.filter((a) => !fs.existsSync(path.join(RAIZ, a)));
 
   const estado = {};
@@ -249,6 +280,10 @@ function revisar() {
   }
   const f = JSON.parse(fs.readFileSync(FOTO, 'utf8'));
   const declarados = new Set(f.archivos);
+  //  Los archivos que entraron por una CARPETA y no por su nombre. Se cuentan
+  //  aparte a propósito: una carpeta es una promesa más floja que un archivo, y
+  //  si no se enseña, esconde. Enseñarla es lo que la hace aceptable.
+  const porCarpeta = [];
   const paradas = [];
   const avisos = [];
 
@@ -278,8 +313,11 @@ function revisar() {
       for (const t of r.menos) todosMenos.push({ ruta: c.ruta, texto: t });
       const cuenta = '+' + r.mas.length + ' -' + r.menos.length;
       const marca = C.gris + cuenta + '  [' + c.marca + ']' + C.off;
-      if (declarados.has(c.ruta)) {
-        say('   ' + C.verde + '✓' + C.off + ' ' + c.ruta.padEnd(52) + ' ' + marca);
+      const carpeta = cubrePor(c.ruta, declarados);
+      if (carpeta) {
+        const nota = carpeta === true ? '' : C.gris + '  (por la carpeta ' + carpeta + ')' + C.off;
+        if (carpeta !== true) porCarpeta.push(c.ruta + ' ← ' + carpeta);
+        say('   ' + C.verde + '✓' + C.off + ' ' + c.ruta.padEnd(52) + ' ' + marca + nota);
       } else {
         say('   ' + C.rojo + '✗' + C.off + ' ' + c.ruta.padEnd(52) + ' ' + marca);
         paradas.push('ARCHIVO FUERA DE LA LISTA: ' + c.ruta);
@@ -292,7 +330,7 @@ function revisar() {
       const vistos = new Set(hoy.map((c) => c.ruta));
       for (const ruta of Object.keys(ahora)) {
         const antes = base.huellas[ruta];
-        if (antes && antes !== ahora[ruta] && !declarados.has(ruta) && !previos.has(ruta) && !vistos.has(ruta)) {
+        if (antes && antes !== ahora[ruta] && !cubrePor(ruta, declarados) && !previos.has(ruta) && !vistos.has(ruta)) {
           paradas.push('CAMBIO INVISIBLE A GIT: ' + ruta);
         }
       }
@@ -338,6 +376,17 @@ function revisar() {
   // 🔴 Los archivos nuevos que no se pudieron leer dejan CIEGO al detector de
   //  código movido justo ahí. Callarlo sería firmar en verde una zona que nadie
   //  miró, que es peor que no tener detector (REGLA 9).
+  // Una carpeta declarada no puede esconder: se dice cuántos entraron por ella
+  // y cuáles. Quien lea el veredicto tiene que poder ver qué se prometió de
+  // verdad y qué se dio por bueno por estar en la misma carpeta.
+  if (porCarpeta.length) {
+    say('');
+    say(C.gris + '   entraron por una CARPETA declarada, no por su nombre:' + C.off);
+    for (const x of porCarpeta.slice(0, 20)) say(C.gris + '     · ' + x + C.off);
+    if (porCarpeta.length > 20) say(C.gris + '     … y ' + (porCarpeta.length - 20) + ' más' + C.off);
+    avisos.push(porCarpeta.length + ' archivo(s) entraron por una carpeta declarada, no por su '
+      + 'nombre: la promesa fue más floja de lo normal');
+  }
   for (const x of SIN_MIRAR) avisos.push('archivo nuevo que NO se pudo mirar: ' + x
     + ' — el detector de código movido está ciego ahí');
   for (const a of avisos) say('   ' + C.ama + '⚠ ' + a + C.off);
@@ -387,4 +436,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { juntarRenglones };
+module.exports = { juntarRenglones, cubrePor };

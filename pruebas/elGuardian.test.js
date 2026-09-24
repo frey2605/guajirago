@@ -17,7 +17,7 @@
 // ══════════════════════════════════════════════════════════════════════════════
 const { describe, it } = require('node:test');
 const assert = require('node:assert');
-const { juntarRenglones } = require('../scripts/guardian.cjs');
+const { juntarRenglones, cubrePor } = require('../scripts/guardian.cjs');
 
 //  `juntarRenglones` es pura: recibe el texto del diff y los archivos nuevos ya
 //  leídos. Por eso aquí se le pueden dar casos de mentira sin tocar git.
@@ -91,5 +91,56 @@ describe('EL GUARDIÁN · el código movido a un archivo NUEVO ya no se escapa',
     const r = juntarRenglones(diff, [{ ruta: 'x.js', contenido: 'del archivo\n' }], igual);
     assert.deepStrictEqual(r['x.js'].mas, ['del diff', 'del archivo'],
       'si uno pisara al otro, el guardián vería la mitad de lo que hay');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  DECLARAR UNA CARPETA
+//
+//  🔴 Por qué existe, medido el 24-sep-2026: al partir un documento en trece
+//  archivos, los NOMBRES NACÍAN DEL TRABAJO —salían de los títulos del propio
+//  documento— así que no se podían declarar antes. La foto declaró la carpeta y
+//  el guardián paró TRECE veces por archivos que estaban dentro de lo declarado.
+//
+//  🔑 Pero una carpeta es una promesa MÁS FLOJA que un archivo: dice «voy a
+//  tocar aquí dentro» sin decir qué. Por eso `cubrePor` no contesta sí o no:
+//  contesta `true` si se declaró por su nombre y LA CARPETA si entró por ella,
+//  para que el veredicto lo pueda enseñar. Una carpeta que no se enseña esconde.
+describe('EL GUARDIÁN · una carpeta declarada cubre lo de dentro, y se nota', () => {
+  const D = new Set(['plan/', 'scripts/vigia.cjs']);
+
+  it('un archivo declarado por su NOMBRE devuelve true', () => {
+    assert.strictEqual(cubrePor('scripts/vigia.cjs', D), true);
+  });
+
+  it('uno de dentro de la carpeta devuelve LA CARPETA, no true', () => {
+    assert.strictEqual(cubrePor('plan/00-INDICE.md', D), 'plan/',
+      '⛔ si devolviera `true` el veredicto no podría distinguirlo de un archivo declarado por su ' +
+      'nombre, y una promesa floja pasaría por una firme');
+  });
+
+  it('cubre también lo que está en una carpeta más adentro', () => {
+    assert.strictEqual(cubrePor('plan/anexos/x.md', D), 'plan/');
+  });
+
+  it('lo que no está declarado sigue fuera', () => {
+    assert.strictEqual(cubrePor('otro/cosa.js', D), false);
+  });
+
+  //  🔴 EL ESCAPE QUE HABRÍA SIDO FÁCIL: comparar por texto sin la barra. Con
+  //   `plan` en vez de `plan/`, la carpeta `planeta/` entraría por la puerta de
+  //   `plan` y el guardián daría por declarado un archivo de otro sitio.
+  it('una carpeta con nombre parecido NO se cuela', () => {
+    assert.strictEqual(cubrePor('planeta/x.md', D), false,
+      '⛔ `planeta/` se coló por `plan/`. Un archivo de otra carpeta pasaría por declarado.');
+    assert.strictEqual(cubrePor('planes.md', D), false);
+  });
+
+  it('sin ninguna carpeta declarada, se porta exactamente como antes', () => {
+    const soloArchivos = new Set(['a.js', 'b/c.js']);
+    assert.strictEqual(cubrePor('a.js', soloArchivos), true);
+    assert.strictEqual(cubrePor('b/c.js', soloArchivos), true);
+    assert.strictEqual(cubrePor('b/otro.js', soloArchivos), false,
+      '⛔ declarar `b/c.js` no puede abrir la carpeta `b/` entera');
   });
 });
