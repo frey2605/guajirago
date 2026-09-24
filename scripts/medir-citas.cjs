@@ -99,6 +99,27 @@ const HUECOS = /^(archivo|fichero|nombre|algo|xxx|ejemplo)\./i;
  *
  * Cada una lleva su motivo. Si una deja de estar aquí, el guion la señala.
  */
+/**
+ * ── ARCHIVOS QUE NACEN AL TRABAJAR ──────────────────────────────────────────
+ *
+ * 🔴 ENCONTRADO EL 24-sep-2026, la PRIMERA vez que la suite corrió en una máquina
+ *  limpia. Este guion daba 0 citas rotas en el PC y **4 en GitHub**: las cuatro a
+ *  `.guardian-foto.json`, que no está en el repo porque lo CREA el propio guardián
+ *  al sacar una foto. En una máquina donde se trabaja existe; en un clon recién
+ *  bajado, no.
+ *
+ *  O sea que esta prueba llevaba meses en verde **solo porque nunca había corrido
+ *  donde nadie había trabajado**. Eso no es una prueba: es una casualidad.
+ *
+ * 🔑 Y LA EXCUSA NO SE CREE SOLA: cada nombre de aquí tiene que estar de verdad en
+ *  `.gitignore`. Si alguien mete aquí un archivo que el repo SÍ debería traer, el
+ *  guion lo canta — porque si no, esta lista sería la puerta para perdonar
+ *  cualquier cita rota escribiendo su nombre.
+ */
+const NACEN_AL_TRABAJAR = [
+  ['guardian-foto.json', 'la foto del guardián: la crea `guardian.cjs foto` y git la ignora'],
+];
+
 const HISTORIA = [
   ['guajirago/src/configApp.js', 'SolicitarMensajeria.js',
     'Estos seis números estaban escritos a mano',
@@ -235,9 +256,23 @@ function medir() {
   }
   // Se perdona por RENGLÓN: archivo + un trozo que tiene que estar en la línea.
   const perdonadas = HISTORIA.map(([d, quien, trozo]) => ({ d, quien, trozo }));
+
+  // La excusa de «nace al trabajar» tiene que estar respaldada por `.gitignore`.
+  // Sin esto, la lista sería un permiso para perdonar cualquier cita escribiendo
+  // su nombre — y una excusa floja es una puerta (lo dice el propio guion arriba).
+  const loQueGitIgnora = (() => {
+    try { return fs.readFileSync(path.join(RAIZ, '.gitignore'), 'utf8'); } catch (e) { return ''; }
+  })();
+  const excusasSinRespaldo = NACEN_AL_TRABAJAR
+    .filter(([n]) => !loQueGitIgnora.includes(n))
+    .map(([n, porque]) => n + ' — dice «' + porque + '» pero .gitignore no lo nombra');
+  const naceAlTrabajar = (nombre) => NACEN_AL_TRABAJAR
+    .some(([n]) => n.toLowerCase() === nombre.toLowerCase()
+      && loQueGitIgnora.includes(n));
   const usadas = new Set();
 
-  const fuera = { total: 0, conRenglon: 0, sinArchivo: [], sinRenglon: [], historiaViva: [] };
+  const fuera = { total: 0, conRenglon: 0, sinArchivo: [], sinRenglon: [], historiaViva: [],
+    excusasSinRespaldo };
   for (const rel of archivos) {
     const esteGuion = rel === ELGUION;
     const texto = fs.readFileSync(path.join(RAIZ, rel), 'utf8');
@@ -302,7 +337,9 @@ function medir() {
               usadas.add(fila.d + '|' + fila.quien + '|' + fila.trozo);
               fuera.historiaViva.push(fila.d + '|' + fila.quien + '|' + fila.trozo);
             }
-          } else fuera.sinArchivo.push({ rel, renglon: i + 1, cita: m[0] });
+          } else if (!naceAlTrabajar(nombre)) {
+            fuera.sinArchivo.push({ rel, renglon: i + 1, cita: m[0] });
+          }
           continue;
         }
         if (num !== null) {
@@ -347,6 +384,19 @@ const pinta = (titulo, lista, extra) => {
 // despliega, y se vuelve a bajar. Por eso va aparte, para que no parezca
 // trabajo pendiente de escritorio cuando lo que falta es un despliegue.
 const esLaFoto = (x) => x.rel.endsWith('.LIVE');
+// 🔴 UNA EXCUSA SIN RESPALDO ES UNA PUERTA. Si alguien mete en
+// `NACEN_AL_TRABAJAR` un archivo que el repo SÍ debería traer, esa lista pasaría a
+// perdonar cualquier cita rota con solo escribir su nombre. Se canta ANTES que
+// nada, porque mientras esté ahí lo demás no se puede creer.
+if (r.excusasSinRespaldo && r.excusasSinRespaldo.length) {
+  console.log('');
+  console.log('    ' + C.roj + '🔴 ' + r.excusasSinRespaldo.length
+    + ' excusa(s) de «nace al trabajar» que .gitignore NO respalda:' + C.off);
+  for (const x of r.excusasSinRespaldo) console.log('        ' + x);
+  console.log(C.gris + '      Mientras estén ahí, esta lista perdona sin motivo.' + C.off);
+  process.exitCode = 1;
+}
+
 pinta('citas a un ARCHIVO que no existe', r.sinArchivo.filter((x) => !esLaFoto(x)),
   (x) => (x.eraHistoria ? '   (está en HISTORIA, pero con renglón: no vale)' : ''));
 const enLaFoto = r.sinArchivo.filter(esLaFoto);
@@ -389,4 +439,9 @@ if (enLaFoto.length > 0) {
     + 'desplegar las reglas)' + C.off);
 }
 console.log('');
-process.exit(enElRepo === 0 ? 0 : 1);
+// 🔴 Y UNA EXCUSA SIN RESPALDO CUENTA COMO PROBLEMA. Sin esto, el guion enseñaba
+// la queja en rojo y salía con 0 — o sea que se quejaba y firmaba bien a la vez, y
+// quien mirara solo la salida no se enteraba. `process.exitCode` lo pisaba este
+// `process.exit` de aquí abajo, que solo miraba las citas.
+const excusasMalas = (r.excusasSinRespaldo || []).length;
+process.exit(enElRepo === 0 && excusasMalas === 0 ? 0 : 1);
