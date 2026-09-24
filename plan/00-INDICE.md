@@ -40,6 +40,8 @@ nadie vuelve a abrir.
 | **B** | [`B-SIN-SENAL.md`](B-SIN-SENAL.md) | Aliados sin señal, y todo desde el celular |
 | **C** | [`C-RED-INTERNA.md`](C-RED-INTERNA.md) | La red interna del negocio: **es requisito**, no opción |
 | **D** | [`D-PENDIENTES.md`](D-PENDIENTES.md) | Lo que falta por hacer: el inventario, medido, y a qué fase va cada cosa |
+| **E** | [`E-APP-TRANSPORTE.md`](E-APP-TRANSPORTE.md) | Qué hay que separar de la app de transporte (pasajero y conductor) |
+| **F** | [`F-APP-ALIADOS.md`](F-APP-ALIADOS.md) | Qué hay que hacer en la app de aliados, en orden |
 
 ---
 
