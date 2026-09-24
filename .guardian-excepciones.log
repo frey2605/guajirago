@@ -1116,3 +1116,55 @@ LO QUE ESTA ANOTACION NO ARREGLA, Y SIGUE PENDIENTE
   esta en la tabla de deuda de CLAUDE.md desde el 15-sep-2026, con nombre y
   archivo: es un arreglo de una linea en scripts/guardian.cjs, que no estaba
   en la foto, y va aparte con sus pasos.
+
+
+=============================================================================
+24-sep-2026  ·  EL PLAN SE PARTE EN LA CARPETA plan/  (lo pidio el dueño)
+=============================================================================
+
+QUE SE HIZO
+  PLAN-GENERAL.md (763 renglones) se partio en 13 archivos dentro de plan/, y
+  el archivo original quedo como una puerta de 10 renglones que apunta al
+  indice. No se copio a mano: lo partio un guion que saca los cortes del PROPIO
+  archivo y despues CAREA el contenido antes y despues, renglon por renglon.
+  Resultado: 0 perdidos.
+
+POR QUE
+  Lo pidio el dueño con estas palabras: «el plan esta gigante... podemos
+  dejarlo grabado en una carpeta dentro del proyecto para no perder nada e ir
+  actualizando poco a poco». Un plan de 763 renglones en un archivo es un plan
+  que nadie vuelve a abrir, y este tiene que durar meses.
+
+POR QUE PARO EL GUARDIAN, Y POR QUE SE SIGUIO
+  13 motivos, y los 13 son EL MISMO: «ARCHIVO FUERA DE LA LISTA» para archivos
+  que estan DENTRO de plan/, que SI se declaro en la foto. El guardian no
+  entiende carpetas: quiere archivo por archivo. Y los nombres de esos archivos
+  no se pueden saber antes de partir, porque salen de los titulos del propio
+  documento.
+  No se volvio a sacar la foto. Sacarla despues del trabajo es justo lo que la
+  ley prohibe («la lista se compara contra la que quedo grabada en la FOTO, no
+  contra la que se diga al final»). Se deja la foto como estaba y se anota aqui.
+
+🔴 HALLAZGO 1, ANOTADO Y NO ARREGLADO: la foto no puede declarar una CARPETA.
+  Hoy hay que nombrar cada archivo, y hay trabajos —como este— en los que los
+  nombres nacen del propio trabajo. Es un arreglo en scripts/guardian.cjs, que
+  no estaba en la foto. Va aparte.
+
+🔴 HALLAZGO 2, Y ES MAS GRAVE: NO SALIO NI UN «CODIGO MOVIDO».
+  Se movieron 747 renglones de un archivo a otro y el detector que el 23-sep
+  paro el trabajo por 6 renglones movidos NO DIJO NADA. El motivo: los archivos
+  nuevos no estan seguidos por git todavia, asi que el guardian los ve como
+  «+0 -0» y no encuentra donde reaparecieron los renglones.
+  O sea: PARA ESQUIVAR EL DETECTOR DE CODIGO MOVIDO BASTA CON MOVER EL CODIGO A
+  UN ARCHIVO NUEVO. Eso no es un detalle: es la puerta de atras del candado que
+  mas ha mordido en este proyecto.
+  No se arregla aqui (otro archivo, otra foto), pero queda escrito con el
+  ejemplo exacto que lo demuestra: este mismo commit.
+
+LO QUE SI SE COMPROBO
+  · 0 renglones perdidos, careando el contenido antes y despues.
+  · amarres 90/90, incluida «LAS NOTAS NO MIENTEN»: los enlaces entre los 13
+    archivos apuntan a archivos que existen.
+  · Se cerro un gemelo que nacio al partir: la lista de preguntas quedaba en
+    DOS sitios (la vieja de 6 y la nueva de 10). Ahora vive solo en
+    plan/08-PREGUNTAS.md y el anexo C la nombra en vez de copiarla.
