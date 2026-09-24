@@ -875,6 +875,16 @@ describe('EL BOTÓN QUE MIDE · mide lo mismo que el que despliega, o no vale', 
     ['mira también la salida de `npm test`, no solo el conteo',
       (t) => !t.includes('[ "$SALIDA" = "0" ]'),
       'una tanda puede morir después de escribir su cuenta; solo la salida lo dice'],
+    //  🔴 Y DICE CUÁLES FALLARON, no solo cuántas. El 24-sep-2026 el botón dijo
+    //   «1 fallan» y averiguar cuál costó traer 400.000 caracteres de registro —
+    //   y ni así, porque la cola no llegaba hasta el fallo. Un medidor que dice
+    //   «algo se rompió» sin decir qué es medio medidor (REGLA 9).
+    ['dice el NOMBRE de las pruebas que fallaron',
+      (t) => !t.includes('not ok [0-9]+ - '),
+      'un número sin nombre obliga a escarbar el registro entero, y a veces ni eso alcanza'],
+    ['y ese nombre va también al RESUMEN, que es lo que se lee desde el celular',
+      (t) => !t.includes('cat "$RUNNER_TEMP/rotas.txt"'),
+      'el registro no se lee desde un teléfono; el resumen sí'],
   ];
 
   it('sigue siendo una CINTA MÉTRICA que no puede fingir un número', () => {
@@ -895,6 +905,10 @@ describe('EL BOTÓN QUE MIDE · mide lo mismo que el que despliega, o no vale', 
         (t) => t.replace(/\[ "\$TANDAS" = "4" \]/g, 'true')],
       ['ya no mira la salida de npm test',
         (t) => t.replace(/\[ "\$SALIDA" = "0" \]/g, 'true')],
+      ['deja de decir el nombre de las que fallaron',
+        (t) => t.replace(/not ok \[0-9\]\+ - /g, 'XXX')],
+      ['el nombre ya no llega al resumen',
+        (t) => t.replace(/cat "\$RUNNER_TEMP\/rotas\.txt"/g, 'true')],
     ];
     const saltados = [];
     for (const [nombre, romper] of ESCAPES) {

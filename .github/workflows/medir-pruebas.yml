@@ -141,6 +141,19 @@ jobs:
             exit 0
           fi
 
+          # 🔴 Y SI FALLA ALGO, SE DICE CUÁL. Un número sin nombre obliga a escarbar el
+          #  registro entero: el 24-sep-2026 salió «1 fallan» y averiguar cuál costó traer
+          #  400.000 caracteres de registro y aun así no alcanzó, porque la cola no llegaba
+          #  hasta el fallo. Un medidor que dice «algo se rompió» sin decir qué es medio
+          #  medidor (REGLA 9).
+          if [ "$FALLAN" != "0" ]; then
+            echo ""
+            echo "───────────── LAS QUE FALLARON ─────────────"
+            grep -E "^ *not ok [0-9]+ - " "$RUNNER_TEMP/salida.txt" | sed 's/^ *//' | head -40 \
+              | tee "$RUNNER_TEMP/rotas.txt"
+            [ -s "$RUNNER_TEMP/rotas.txt" ] || echo "  (ninguna dio su nombre: mira el registro)"
+          fi
+
           echo ""
           echo "══════════════════════════════════════════════════════════════"
           echo "  EN ESTA MÁQUINA LIMPIA:  $TOTAL pruebas · $PASAN pasan · $FALLAN fallan"
@@ -178,6 +191,16 @@ jobs:
               echo ""
               echo "No es la máquina: corrieron las cuatro tandas. **El botón de desplegar se"
               echo "pararía en el paso 5.** Hay que arreglarlas antes de fusionar."
+            fi
+            # El nombre de lo que falló va TAMBIÉN al resumen. Es lo que se lee desde el
+            # celular, y sin el nombre no se puede hacer nada con el número.
+            if [ -s "$RUNNER_TEMP/rotas.txt" ]; then
+              echo ""
+              echo "**Las que fallaron:**"
+              echo ""
+              echo '```'
+              cat "$RUNNER_TEMP/rotas.txt"
+              echo '```'
             fi
             echo ""
             echo "_Esto es una medición, no un candado: sale en verde igual. El número es el producto._"
