@@ -94,7 +94,10 @@ el gemelo que se queda viejo. Aquí queda el índice, y lo que es de GuajiraGo y
   error barato es publicar pruebas por error, nunca producción. Y se compila por ambiente:
   `npm run build:produccion` o `npm run build:pruebas` (`npm run build` a secas sigue siendo producción;
   un `react-scripts build` a pelo produce una app que se para al arrancar). Lo mide
-  `node scripts/medir-ambientes.cjs`. El panel y aliados siguen como antes: van aparte.
+  `node scripts/medir-ambientes.cjs`. **El panel va igual desde ese mismo día** (fase 0 en `guajirago-admin`,
+  commit `0664217` de ese repo): desde dentro de `guajirago-admin/`, `npm run build:produccion` y
+  `firebase deploy --only hosting:admin --project produccion`; sin `--project` publica en
+  `guajirago-pruebas-admin.web.app`. Aliados sigue como antes: va aparte.
   🔴 **Desde el 24-sep-2026 se publica desde el PC, y GitHub es solo para GUARDAR** (decisión del
   dueño). Los cuatro botones que se disparaban solos al subir código —`desplegar`,
   `desplegar-reglas`, `desplegar-funciones` y `medir-pruebas`— están **APAGADOS en GitHub**, no
