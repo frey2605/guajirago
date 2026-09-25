@@ -25,8 +25,8 @@
 | `catch` mudos en las tres apps | **149** | `grep -rhoE "catch *\([a-z]*\) *\{ *\}\|catch *\([a-z]*\) *\{ *console"` |
 | Medidores que existen (cada uno vigila algo) | 22 | `ls scripts/medir-*.cjs \| wc -l` |
 | `TODO` / `FIXME` de verdad en el código | **1** | `grep -rhoE "//\s*(TODO\|FIXME\|HACK\|XXX)"` |
-| Commits que le faltan a `main` | ~~25~~ → **0** el 25-sep | `git log origin/main..HEAD --oneline \| wc -l` |
-| Botones de despliegue escritos / **en `main`** | ~~5 / 0~~ → **5 / 5** el 25-sep | `ls .github/workflows/*.yml`, `git ls-tree origin/main -- .github/` |
+| Commits que le faltan a `main` | ~~25~~ → **0** el 24-sep (noche); ojo: la rama `claude/hola-6wz1a3` del servidor trae **3 commits sin fusionar** | `git log origin/main..HEAD --oneline \| wc -l` |
+| Botones de despliegue escritos / **en `main`** | ~~5 / 0~~ → **5 / 5** el 24-sep (noche) | `ls .github/workflows/*.yml`, `git ls-tree origin/main -- .github/` |
 
 ### 🟢 Lo primero que dice este conteo, y es bueno
 
@@ -47,18 +47,19 @@ renglón habría dicho.
 
 Esto no es deuda: es trabajo empezado que está a medias y no sirve de nada hasta terminarlo.
 
-> 🔄 **Vuelto a medir el 25-sep-2026** con `node scripts/medir-pendientes.cjs` (solo lee). De los
-> cinco, **cuatro ya estaban cerrados desde el 24**: la lista mandaba a trabajar en lo hecho.
+> 🔄 **Vuelto a medir la noche del 24-sep-2026** con `node scripts/medir-pendientes.cjs` (no toca
+> datos; solo hace `git fetch`). De los cinco, **cuatro se habían cerrado esa misma tarde** y la
+> lista seguía mandando a trabajar en ellos.
 
 | # | Qué | Estado medido | Quién lo desbloquea |
 |---|---|---|---|
 | ~~**P1**~~ | El permiso de lectura de los repos hermanos | ✅ **CERRADO** — la corrida que baja los tres repos sale bien desde el 24-sep (17:44 UTC) | — |
 | ~~**P2**~~ | Los 5 botones de despliegue | ✅ **CERRADO** — los 5 en `main`, y `desplegar.yml` ya publicó la app el 24-sep. **Pero ya no se usan para publicar**: ver abajo | — |
-| **P3** | Los permisos (roles) de la llave de servicio | faltan 2 para reglas e índices, 5 para la nube. **No medido el 25-sep**: se ve en la consola de Google, no desde aquí | **el dueño**, en la consola de Google |
+| **P3** | Los permisos (roles) de la llave de servicio | faltan 2 para reglas e índices, 5 para la nube. **No medido el 24-sep**: se ve en la consola de Google, no desde aquí | **el dueño**, en la consola de Google |
 | ~~**P4**~~ | Los arreglos de las librerías de panel y aliados | ✅ **CERRADO** — los dos repos hermanos en `main`, nada sin empujar y ninguna rama sin fusionar | — |
-| ~~**P5**~~ | ¿Corre la suite entera en GitHub? | ✅ **CONTESTADO: sí** — las últimas 14 corridas salieron bien | — |
+| ~~**P5**~~ | ¿Corre la suite entera en GitHub? | ✅ **CONTESTADO: sí** — desde las 17:44 UTC del 24-sep, 12 corridas de la tanda salieron bien y 1 se canceló a mano | — |
 
-### 🖥️ Desde el 25-sep-2026 se publica desde el PC
+### 🖥️ Desde el 24-sep-2026 se publica desde el PC
 
 Decisión del dueño: «Todo lo vamos a publicar desde aquí porque no tenemos minutos en GitHub», y
 «que siga guardando en GitHub». GitHub queda **solo para guardar** (paso 9); publicar se hace con
@@ -69,7 +70,7 @@ Decisión del dueño: «Todo lo vamos a publicar desde aquí porque no tenemos m
 todavía **publica desde allá** sin pasar por el paso 10. Decidido apagarlos en GitHub
 (`gh workflow disable`), sin tocar los archivos. **Pendiente**, como su propio arreglo.
 
-🔴 **Y lo que eso destapa:** la tanda entera tiene que pasar **en el PC**, y el 25-sep no pasa —ver
+🔴 **Y lo que eso destapa:** la tanda entera tiene que pasar **en el PC**, y el 24-sep no pasa —ver
 D.4—.
 
 ---
@@ -108,8 +109,8 @@ se apunta aquí para que no se pierda.
 | **N5** | La prueba de citas **no ve los archivos de otros repos con extensión de código** | los amarres | Cazó un nombre `.md` de otro repo pero **no** tres `.jsx`. Un hueco del propio vigilante |
 | **N6** | El emulador de **funciones** no arranca en el contenedor de trabajo | la caja, no el repo | `pruebas/funciones.test.js` lleva días sin poder correr aquí. **No está medido por qué** |
 | **N7** | El canal de prueba necesitó autorizar **dos** listas de dominios | fuera del repo | Maps y Auth, cada una por su lado. Ya resuelto para este canal; **el siguiente canal lo pedirá otra vez** |
-| — | 🔴 **La tanda entera NO pasa en el PC** (25-sep) | `pruebas/elBotonDeDesplegar.test.js`, los tres «y no se puede ablandar» | 979 de 982. Los tres que fallan vigilan los botones: **5 de sus 30 sabotajes no se ponen rojos** en el PC (2 de 15, 2 de 7 y 1 de 8), y en GitHub sí. Y como la tanda 1 falla, **funciones, chat y almacén ni se corren**. Ahora que se publica desde el PC, el PC es el único juez. **No medido por qué** |
-| — | 🔴 **Nadie vigila las citas de la carpeta `plan/`** (25-sep) | `scripts/medir-citas.cjs`, su lista de carpetas | Saboteado: se metió aquí una cita a un guion que no existe y **nada se puso rojo**. El medidor no entra en `plan/`; y metiéndolo tal cual da 54 falsas alarmas, porque lee `01-DONDE-ESTAMOS.md` como `DONDE-ESTAMOS.md` (exige que el nombre empiece por letra) |
+| — | 🔴 **La tanda entera NO pasa en el PC** (24-sep) | `pruebas/elBotonDeDesplegar.test.js`, los tres «y no se puede ablandar» | 979 de 982. Los tres que fallan vigilan los botones: **5 de sus 30 sabotajes no se ponen rojos** en el PC (2 de 15, 2 de 7 y 1 de 8), y en GitHub sí. Y como la tanda 1 falla, **funciones, chat y almacén ni se corren**. Ahora que se publica desde el PC, el PC es el único juez. **No medido por qué** |
+| — | 🔴 **Nadie vigila las citas de la carpeta `plan/`** (24-sep) | `scripts/medir-citas.cjs`, su lista de carpetas | Saboteado: se metió aquí una cita a un guion que no existe y **nada se puso rojo**. El medidor no entra en `plan/`; y metiéndolo tal cual da 53 falsas alarmas, porque lee `01-DONDE-ESTAMOS.md` como `DONDE-ESTAMOS.md` (exige que el nombre empiece por letra) |
 
 > N1, N2 y N3 se hicieron el 24-sep, cada uno con sus pasos.
 
@@ -132,7 +133,7 @@ se apunta aquí para que no se pierda.
 
 1. ~~**Arreglar P1**~~ ✅ ya servía el 24-sep.
 2. ~~**N1 + N2 + N3**~~ ✅ hechos el 24-sep.
-2-bis. (25-sep) **Apagar en GitHub los botones que se disparan solos**, y **que la tanda entera
+2-bis. (24-sep) **Apagar en GitHub los botones que se disparan solos**, y **que la tanda entera
    pase en el PC** — cada uno como su propio arreglo.
 3. **Contestar la pregunta 1** (¿aliados comparte proyecto Firebase?), que es lo que bloquea la
    Fase 0 y por tanto todo lo demás.

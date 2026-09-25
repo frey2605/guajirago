@@ -1,14 +1,14 @@
 /**
  * LO QUE BLOQUEA — ¿sigue abierto lo que plan/D-PENDIENTES.md dice que bloquea?
  *
- *   node scripts/medir-pendientes.cjs     <- SOLO LEE. No escribe nada.
+ *   node scripts/medir-pendientes.cjs     <- No toca datos. Solo escribe lo que escribe un `git fetch`.
  *
  * Guion del PASO 1, y el mismo que corre el PASO 12.
  *
  * ── POR QUÉ EXISTE ──────────────────────────────────────────────────────────
- * El 25-sep-2026 el anexo D decía que bloqueaban cinco cosas (P1–P5) y que el
+ * La noche del 24-sep-2026 el anexo D decía que bloqueaban cinco cosas (P1–P5) y que el
  * guardián tenía la puerta de atrás abierta (N1–N3). Medido ese día: cuatro de
- * los cinco bloqueos y los tres del guardián ya estaban cerrados desde el 24.
+ * los cinco bloqueos y los tres del guardián se habían cerrado esa misma tarde.
  * La lista escrita para que nada se perdiera mandaba a trabajar en lo hecho.
  *
  * ── LO QUE CUENTA ───────────────────────────────────────────────────────────
