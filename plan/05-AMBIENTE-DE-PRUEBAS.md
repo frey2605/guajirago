@@ -37,8 +37,8 @@ Sin esto, **nada de lo demás se puede hacer sin riesgo**. Por eso va primero.
 ### 🟢 Lo que ya está puesto (25-sep-2026)
 
 - **Nivel 2 empezado.** `guajirago-pruebas` existe (lo creó el dueño; se llama `-pruebas` y no `-dev`, como
-  en Talaria). Tiene app web registrada y dos sitios: `guajirago-pruebas.web.app` (transporte) y
-  `guajirago-pruebas-admin.web.app` (panel). **No tiene todavía** base de
+  en Talaria). Tiene app web registrada y tres sitios: `guajirago-pruebas.web.app` (transporte),
+  `guajirago-pruebas-admin.web.app` (panel) y `guajirago-pruebas-aliados.web.app` (aliados). **No tiene todavía** base de
   Firestore (la API está apagada: se enciende en la consola), ni plan Blaze (funciones y almacén), ni llave
   de notificaciones.
 - **La app de transporte cumple las reglas 1, 3 y 4** (`b1c8a63`): proyecto aparte, el ambiente lo fija cómo
@@ -50,6 +50,9 @@ Sin esto, **nada de lo demás se puede hacer sin riesgo**. Por eso va primero.
   por ambiente con las mismas llaves —en producción el panel comparte la app web de Firebase con transporte
   y solo cambia el sitio, medido ese día—, cartel naranja, y `.firebaserc` con el target `admin` mapeado en
   los dos proyectos (`guajirago-admin` / `guajirago-pruebas-admin`). Publicado en pruebas desde copia limpia.
-- **Aliados no ha empezado**: sigue con las llaves de producción escritas a mano (y `firebaseSecundario.js`
-  con otras). Va aparte, con su arreglo. Lo cuenta `node scripts/medir-ambientes.cjs`: transporte 6 de 6,
-  panel 6 de 6, aliados 1 de 6.
+- **Aliados cumple lo mismo** (`30cd8d1` de `guajirago-aliados`, 25-sep-2026): la misma pieza atada, las mismas
+  llaves, cartel, y el target `aliados` en los dos proyectos (`guajirago-aliados` / `guajirago-pruebas-aliados`).
+  Y lo suyo: la segunda conexión con la que crea cuentas de empleados (`firebaseSecundario.js`) saca las
+  llaves de la misma calculadora, no de una copia; y la llave Web Push con la que los negocios reciben
+  los avisos de pedidos sale del ambiente (en pruebas está vacía y el `.env` lo dice). Publicado en pruebas
+  desde copia limpia. Lo cuenta `node scripts/medir-ambientes.cjs`: 6 de 6 en las tres.

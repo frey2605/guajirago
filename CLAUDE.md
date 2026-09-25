@@ -97,7 +97,10 @@ el gemelo que se queda viejo. Aquí queda el índice, y lo que es de GuajiraGo y
   `node scripts/medir-ambientes.cjs`. **El panel va igual desde ese mismo día** (fase 0 en `guajirago-admin`,
   commit `0664217` de ese repo): desde dentro de `guajirago-admin/`, `npm run build:produccion` y
   `firebase deploy --only hosting:admin --project produccion`; sin `--project` publica en
-  `guajirago-pruebas-admin.web.app`. Aliados sigue como antes: va aparte.
+  `guajirago-pruebas-admin.web.app`. **Y aliados igual** (fase 0 en `guajirago-aliados`, commit `30cd8d1`
+  de ese repo): `firebase deploy --only hosting:aliados --project produccion`; sin `--project` va a
+  `guajirago-pruebas-aliados.web.app`. Las TRES apps van por ambiente, y las tres comparten la app web
+  de Firebase (mismas llaves, distinto sitio de hosting).
   🔴 **Desde el 24-sep-2026 se publica desde el PC, y GitHub es solo para GUARDAR** (decisión del
   dueño). Los cuatro botones que se disparaban solos al subir código —`desplegar`,
   `desplegar-reglas`, `desplegar-funciones` y `medir-pruebas`— están **APAGADOS en GitHub**, no
