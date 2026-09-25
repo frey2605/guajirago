@@ -136,8 +136,8 @@ se apunta aquí para que no se pierda.
 2. ~~**N1 + N2 + N3**~~ ✅ hechos el 24-sep.
 2-bis. (24-sep) ~~**Apagar en GitHub los botones que se disparan solos**~~ ✅ hecho el 24-sep, y
    **que la tanda entera pase en el PC** — cada uno como su propio arreglo.
-3. **Contestar la pregunta 1** (¿aliados comparte proyecto Firebase?), que es lo que bloquea la
-   Fase 0 y por tanto todo lo demás.
+3. ~~**Contestar la pregunta 1**~~ ✅ contestada por el dueño el 24-sep: aliados **se separa** en
+   su propio proyecto, y el transporte no. Ver `08-PREGUNTAS.md` y `02-DECISIONES.md`.
 4. **Volcar N1–N7 a la tabla de `CLAUDE.md`** cuando cada uno se arregle o se decida — este
    archivo es el borrador, no el destino. Si un pendiente se queda aquí para siempre, este anexo
    se convierte en el gemelo de la tabla de deuda — que es justo lo que la nota de arriba dice
