@@ -65,10 +65,11 @@ Decisión del dueño: «Todo lo vamos a publicar desde aquí porque no tenemos m
 «que siga guardando en GitHub». GitHub queda **solo para guardar** (paso 9); publicar se hace con
 `firebase` desde el PC (paso 10), desde la carpeta de cada app.
 
-🔴 **Lo que eso obliga a hacer:** cuatro de los cinco botones **se disparan solos al subir código**
-—`desplegar.yml` publica la app con cualquier cosa que entre a `main`—, así que guardar en GitHub
-todavía **publica desde allá** sin pasar por el paso 10. Decidido apagarlos en GitHub
-(`gh workflow disable`), sin tocar los archivos. **Pendiente**, como su propio arreglo.
+🔴 **Lo que eso obligó a hacer:** cuatro de los cinco botones **se disparaban solos al subir código**
+—`desplegar.yml` publicaba la app con cualquier cosa que entrara a `main`—, así que guardar en GitHub
+**publicaba desde allá** sin pasar por el paso 10. ✅ **Apagados en GitHub el 24-sep-2026**
+(`gh workflow disable`), sin tocar los archivos; el del panel y aliados sigue encendido porque solo
+se aprieta a mano. Lo dice `CLAUDE.md` en el paso 10.
 
 🔴 **Y lo que eso destapa:** la tanda entera tiene que pasar **en el PC**, y el 24-sep no pasa —ver
 D.4—.
@@ -133,8 +134,8 @@ se apunta aquí para que no se pierda.
 
 1. ~~**Arreglar P1**~~ ✅ ya servía el 24-sep.
 2. ~~**N1 + N2 + N3**~~ ✅ hechos el 24-sep.
-2-bis. (24-sep) **Apagar en GitHub los botones que se disparan solos**, y **que la tanda entera
-   pase en el PC** — cada uno como su propio arreglo.
+2-bis. (24-sep) ~~**Apagar en GitHub los botones que se disparan solos**~~ ✅ hecho el 24-sep, y
+   **que la tanda entera pase en el PC** — cada uno como su propio arreglo.
 3. **Contestar la pregunta 1** (¿aliados comparte proyecto Firebase?), que es lo que bloquea la
    Fase 0 y por tanto todo lo demás.
 4. **Volcar N1–N7 a la tabla de `CLAUDE.md`** cuando cada uno se arregle o se decida — este

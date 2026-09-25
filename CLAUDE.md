@@ -88,6 +88,12 @@ el gemelo que se queda viejo. Aquí queda el índice, y lo que es de GuajiraGo y
   los cambios de los otros dos.
 - **Paso 10 · APLICAR** — desde **dentro de la carpeta de cada app**. Desde la raíz,
   `firebase deploy --only hosting` publica un resto de junio y tumba la app del cliente.
+  🔴 **Desde el 24-sep-2026 se publica desde el PC, y GitHub es solo para GUARDAR** (decisión del
+  dueño). Los cuatro botones que se disparaban solos al subir código —`desplegar`,
+  `desplegar-reglas`, `desplegar-funciones` y `medir-pruebas`— están **APAGADOS en GitHub**, no
+  borrados: subir a `main` ya no publica nada ni corre la tanda allá, **y apretarlos a mano
+  tampoco sirve**. El único juez de la tanda entera es el PC. Se encienden con
+  `gh workflow enable <archivo>.yml`; lo cuenta `node scripts/medir-pendientes.cjs`.
 
 ---
 

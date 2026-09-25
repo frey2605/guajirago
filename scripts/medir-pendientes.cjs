@@ -14,7 +14,9 @@
  * ── LO QUE CUENTA ───────────────────────────────────────────────────────────
  *   · main en esta máquina contra main en el SERVIDOR (ls-remote, no origin/main)
  *   · commits que le faltan a main, y ramas del servidor sin fusionar
- *   · botones de despliegue escritos y los que están EN main
+ *   · botones de despliegue escritos, los que están EN main, y si GitHub los
+ *     tiene encendidos (desde el 24-sep-2026 cuatro van APAGADOS: se publica
+ *     desde el PC)
  *   · las últimas corridas de GitHub Actions (necesita `gh` con sesión)
  *   · si los arreglos N1, N2 y N3 del guardián están en main
  *   · los dos repos hermanos: rama, commits sin empujar, ramas sin fusionar
@@ -43,6 +45,7 @@ fila('commits que le faltan a main (origin/main..HEAD)', sh('git rev-list --coun
 fila('ramas del servidor sin fusionar en main', sh('git branch -r --no-merged origin/main').replace(/\s+/g, ' '));
 fila('botones escritos (.github/workflows)', sh('git ls-files .github/workflows').split('\n').filter(Boolean).length);
 fila('botones EN origin/main', sh('git ls-tree -r --name-only origin/main -- .github/workflows').split('\n').filter(Boolean).length);
+fila('botones ENCENDIDOS en GitHub', '\n' + sh('gh workflow list --all --json path,state -q ".[] | \\"   \\(.state) \\(.path)\\""'));
 fila('corridas de Actions (últimas 5)', '\n' + sh('gh run list -L 5 --json conclusion,name,createdAt -q ".[] | \\"   \\(.createdAt) \\(.conclusion) \\(.name)\\""'));
 for (const n of ['N1', 'N2', 'N3'])
   fila(n + ' en origin/main', sh(`git log origin/main --format="%h %cs %s" -E --grep="^${n}:"`) || 'NO');
