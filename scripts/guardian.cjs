@@ -21,13 +21,15 @@ const RAIZ = path.resolve(__dirname, '..');
 const FOTO = path.join(RAIZ, '.guardian-foto.json');
 const EXCEPCIONES = path.join(RAIZ, '.guardian-excepciones.log');
 const CONFIG = path.join(RAIZ, '.guardian.json');
+// Las ÚLTIMAS PALABRAS de la tanda cuando no pasa (25-sep-2026): papel del guardián, fuera de git.
+const ULTIMA_TANDA = path.join(RAIZ, '.guardian-ultima-tanda.log');
 
 // La raíz ya cubre guajirago/ (sus archivos están rastreados por la raíz).
 // NO se usa guajirago/.git: es un repo anidado viejo en la rama v2.1 (ver TRAMPAS en CLAUDE.md).
 const REPOS = ['.', 'guajirago-admin', 'guajirago-aliados'];
 
 // Papeles del propio guardián: son del sistema, no del arreglo. Jamás cuentan como violación.
-const PROPIOS = new Set(['.guardian-foto.json', '.guardian-excepciones.log', '.guardian.json']);
+const PROPIOS = new Set(['.guardian-foto.json', '.guardian-excepciones.log', '.guardian.json', '.guardian-ultima-tanda.log']);
 
 /**
  * ¿Es este un papel del propio guardián (su foto, su libro de excepciones, su
@@ -212,20 +214,58 @@ function leerConfig() {
 function correrPruebas(cfg = leerConfig()) {
   if (!cfg.pruebas) return { hay: false, ok: null };
   const minutos = cfg.pruebasMinutos || 20;
+  // 🔴 LAS ÚLTIMAS PALABRAS (25-sep-2026). Ese día la tanda murió a medias CUATRO
+  //  veces dentro del guardián, y de ninguna quedó registro: la salida se capturaba
+  //  por la tubería y, al fallar o no terminar, se tiraba junto con el error. Ahora,
+  //  si la tanda no pasa —o pasa pero algo retuvo su salida—, lo que imprimió queda
+  //  en `.guardian-ultima-tanda.log` (papel del guardián, fuera de git) y sus últimos
+  //  renglones salen en el veredicto. Si pasa limpia, el registro viejo se borra:
+  //  las últimas palabras de OTRA tanda engañan más que no tener ninguna.
+  const registro = cfg.registro || ULTIMA_TANDA;
   try {
     execFileSync(cfg.pruebas, {
       cwd: RAIZ, encoding: 'utf8', shell: true,
       maxBuffer: 32 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'],
       timeout: minutos * 60 * 1000,
     });
+    try { fs.unlinkSync(registro); } catch (e) { /* no había registro viejo */ }
     return { hay: true, ok: true };
   } catch (e) {
+    guardarUltimasPalabras(registro, cfg.pruebas, e);
     if (e.code === 'ETIMEDOUT') {
       if (typeof e.status === 'number') return { hay: true, ok: e.status === 0, retenida: minutos };
       return { hay: true, ok: null, colgada: minutos };
     }
     return { hay: true, ok: false };
   }
+}
+
+/** El registro: qué se corrió, cómo acabó, y TODO lo que imprimió (la salida y los errores). */
+function guardarUltimasPalabras(registro, comando, e) {
+  const como = e.code === 'ETIMEDOUT'
+    ? (typeof e.status === 'number'
+      ? 'terminó con salida ' + e.status + ', pero algo retuvo su salida hasta agotar el tiempo'
+      : 'NO TERMINÓ: se agotó el tiempo')
+    : 'salida ' + e.status + (e.signal ? ' · señal ' + e.signal : '');
+  fs.writeFileSync(registro, '== tanda del ' + new Date().toISOString() + ' · ' + comando + ' · ' + como + '\n'
+    + (e.stdout || '') + '\n--- errores (stderr) ---\n' + (e.stderr || ''));
+}
+
+/**
+ * Los últimos renglones del registro, para el veredicto. Sin registro, ninguno:
+ * no se inventa. Se saltan los vacíos, que en una tanda colgada son muchos.
+ */
+function ultimasPalabras(registro = ULTIMA_TANDA, cuantos = 12) {
+  if (!fs.existsSync(registro)) return [];
+  return fs.readFileSync(registro, 'utf8').split(/\r?\n/).map((l) => l.trimEnd()).filter(Boolean).slice(-cuantos);
+}
+
+/** Las enseña en pantalla, con el nombre del registro para leerlo entero. */
+function mostrarUltimasPalabras(sangria) {
+  const ultimas = ultimasPalabras();
+  if (!ultimas.length) return;
+  say(C.gris + sangria + 'últimas palabras de la tanda (' + path.basename(ULTIMA_TANDA) + '):' + C.off);
+  for (const l of ultimas) say(C.gris + sangria + '  ' + l.slice(0, 160) + C.off);
 }
 
 /**
@@ -377,7 +417,10 @@ function foto(argv) {
       ? 'NO TERMINARON en ' + pruebas.colgada + ' min: no se sabe si pasaban'
       : pruebas.ok ? 'pasaban' : 'YA FALLABAN antes de tocar')
       + (pruebas.retenida ? ' — pero algo retuvo su salida ' + pruebas.retenida + ' min' : '') + C.off);
-    if (!pruebas.ok || pruebas.retenida) for (const l of emuladoresVivos()) say(C.gris + '     ' + l + C.off);
+    if (!pruebas.ok || pruebas.retenida) {
+      for (const l of emuladoresVivos()) say(C.gris + '     ' + l + C.off);
+      mostrarUltimasPalabras('     ');
+    }
   }
 }
 
@@ -512,6 +555,7 @@ function revisar() {
       say('   ' + C.gris + '  emuladores que siguen escuchando después de la tanda:' + C.off);
       for (const l of vivos) say('   ' + C.gris + '    ' + l + C.off);
     }
+    mostrarUltimasPalabras('     ');
   }
 
   // Veredicto
@@ -589,6 +633,8 @@ module.exports = {
   // Lo usa su prueba (`pruebas/elGuardian.test.js`), para comprobar con un proceso
   // de verdad que un huérfano ya no lo cuelga.
   correrPruebas, queDicenLasPruebas,
+  // Las últimas palabras de la tanda (25-sep-2026): su prueba comprueba que quedan y que se leen.
+  ultimasPalabras, ULTIMA_TANDA,
   // Lo usa el amarre de los puertos (`pruebas/amarres.test.js`), para comprobar que sin
   // firebase-tools el guardián mira al menos los puertos declarados y lo dice.
   emuladoresVivos,

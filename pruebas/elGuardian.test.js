@@ -17,7 +17,7 @@
 // ══════════════════════════════════════════════════════════════════════════════
 const { describe, it } = require('node:test');
 const assert = require('node:assert');
-const { juntarRenglones, cubrePor, esPapelDelGuardian, correrPruebas, queDicenLasPruebas }
+const { juntarRenglones, cubrePor, esPapelDelGuardian, correrPruebas, queDicenLasPruebas, ultimasPalabras }
   = require('../scripts/guardian.cjs');
 
 //  `juntarRenglones` es pura: recibe el texto del diff y los archivos nuevos ya
@@ -170,6 +170,9 @@ describe('EL GUARDIÁN · sus propios papeles no le paran el trabajo', () => {
   it('su foto y su configuración también', () => {
     assert.strictEqual(esPapelDelGuardian('.', '.guardian-foto.json'), true);
     assert.strictEqual(esPapelDelGuardian('.', '.guardian.json'), true);
+    assert.strictEqual(esPapelDelGuardian('.', '.guardian-ultima-tanda.log'), true,
+      '⛔ el registro de las últimas palabras de la tanda es papel suyo: si contara como cambio, ' +
+      'cada tanda fallida pararía el trabajo por un archivo que escribió el propio guardián');
   });
 
   it('cualquier otro archivo NO lo es', () => {
@@ -216,6 +219,8 @@ describe('EL GUARDIÁN · un emulador huérfano ya no lo cuelga', () => {
   const SE_CUELGA = escribir('se-cuelga.cjs', 'setTimeout(()=>{}, 40000);');
   const QUE_FALLA = escribir('que-falla.cjs', 'process.exit(1);');
   const QUE_PASA = escribir('que-pasa.cjs', 'process.exit(0);');
+  // Cada tanda de mentira deja sus últimas palabras aquí, no en el registro de verdad.
+  const REGISTRO = path.join(carpeta, 'ultimas-palabras.log');
   const SEIS_SEGUNDOS = 0.1;
   const aTiempo = (fn) => {
     const t0 = Date.now();
@@ -227,7 +232,7 @@ describe('EL GUARDIÁN · un emulador huérfano ya no lo cuelga', () => {
   };
 
   it('🔴 EL QUE MUERDE · el caso del 24-sep: la tanda terminó en verde y un huérfano retiene la salida', () => {
-    const r = aTiempo(() => correrPruebas({ pruebas: BIEN_CON_HUERFANO, pruebasMinutos: SEIS_SEGUNDOS }));
+    const r = aTiempo(() => correrPruebas({ pruebas: BIEN_CON_HUERFANO, pruebasMinutos: SEIS_SEGUNDOS, registro: REGISTRO }));
     assert.strictEqual(r.ok, true,
       '⛔ la tanda TERMINÓ en verde: su resultado se conoce y no se puede tirar a la basura');
     assert.strictEqual(r.retenida, SEIS_SEGUNDOS, '⛔ no avisó de que algo retuvo la salida');
@@ -235,13 +240,13 @@ describe('EL GUARDIÁN · un emulador huérfano ya no lo cuelga', () => {
   });
 
   it('🔴 EL QUE MUERDE · si terminó en rojo con un huérfano, sigue siendo rojo', () => {
-    const r = aTiempo(() => correrPruebas({ pruebas: MAL_CON_HUERFANO, pruebasMinutos: SEIS_SEGUNDOS }));
+    const r = aTiempo(() => correrPruebas({ pruebas: MAL_CON_HUERFANO, pruebasMinutos: SEIS_SEGUNDOS, registro: REGISTRO }));
     assert.strictEqual(r.ok, false, '⛔ un rojo con huérfano se estaría firmando como verde');
     assert.strictEqual(r.retenida, SEIS_SEGUNDOS);
   });
 
   it('🔴 EL QUE MUERDE · si de verdad no terminó, dice que NO TERMINARON y no firma ni verde ni rojo', () => {
-    const r = aTiempo(() => correrPruebas({ pruebas: SE_CUELGA, pruebasMinutos: SEIS_SEGUNDOS }));
+    const r = aTiempo(() => correrPruebas({ pruebas: SE_CUELGA, pruebasMinutos: SEIS_SEGUNDOS, registro: REGISTRO }));
     assert.strictEqual(r.colgada, SEIS_SEGUNDOS, '⛔ no dijo que las pruebas NO TERMINARON');
     assert.strictEqual(r.ok, null,
       '⛔ unas pruebas que no terminaron no son ni verdes ni rojas: `ok` tiene que ser null. '
@@ -249,11 +254,11 @@ describe('EL GUARDIÁN · un emulador huérfano ya no lo cuelga', () => {
   });
 
   it('y una tanda que FALLA sin huérfanos sigue siendo roja, sin avisos de más', () => {
-    assert.deepStrictEqual(correrPruebas({ pruebas: QUE_FALLA, pruebasMinutos: SEIS_SEGUNDOS }), { hay: true, ok: false });
+    assert.deepStrictEqual(correrPruebas({ pruebas: QUE_FALLA, pruebasMinutos: SEIS_SEGUNDOS, registro: REGISTRO }), { hay: true, ok: false });
   });
 
   it('y una que PASA sigue siendo verde', () => {
-    assert.deepStrictEqual(correrPruebas({ pruebas: QUE_PASA, pruebasMinutos: SEIS_SEGUNDOS }), { hay: true, ok: true });
+    assert.deepStrictEqual(correrPruebas({ pruebas: QUE_PASA, pruebasMinutos: SEIS_SEGUNDOS, registro: REGISTRO }), { hay: true, ok: true });
   });
 
   //  🔴 Y EL ORDEN DEL VEREDICTO. Una tanda que no terminó trae `ok: null`, y
@@ -272,6 +277,61 @@ describe('EL GUARDIÁN · un emulador huérfano ya no lo cuelga', () => {
       '⛔ si la foto no terminó, un rojo de ahora no se puede dar por «ya fallaba»');
   });
 
+  //  🔴 LAS ÚLTIMAS PALABRAS (25-sep-2026). Cuatro colgadas en un día, y de ninguna
+  //   quedó qué imprimió la tanda antes de morir: el guardián capturaba la salida y
+  //   la tiraba con el error. Ahora queda en un registro, y el veredicto la enseña.
+  const QUE_FALLA_HABLANDO = escribir('que-falla-hablando.cjs',
+    "process.stdout.write('ultimo aviso por la salida\\n'); process.stderr.write('y este por los errores\\n'); process.exit(1);");
+  const SE_CUELGA_HABLANDO = escribir('se-cuelga-hablando.cjs',
+    "console.log('me quedo aqui esperando'); setTimeout(()=>{}, 40000);");
+
+  it('🔴 EL QUE MUERDE · si la tanda falla, lo que imprimió queda en el registro: la salida y los errores', () => {
+    correrPruebas({ pruebas: QUE_FALLA_HABLANDO, pruebasMinutos: SEIS_SEGUNDOS, registro: REGISTRO });
+    assert.ok(fs.existsSync(REGISTRO), '⛔ la tanda falló y no quedó registro: otra vez sin últimas palabras');
+    const t = fs.readFileSync(REGISTRO, 'utf8');
+    assert.match(t, /ultimo aviso por la salida/, '⛔ la salida normal no está en el registro');
+    assert.match(t, /y este por los errores/, '⛔ los errores (stderr) no están en el registro');
+    assert.match(t, /salida 1/, '⛔ el registro no dice cómo acabó la tanda');
+    assert.ok(ultimasPalabras(REGISTRO).includes('y este por los errores'),
+      '⛔ el veredicto no podría enseñar las últimas palabras');
+  });
+
+  it('🔴 EL QUE MUERDE · si la tanda NO TERMINA, queda lo que alcanzó a decir', () => {
+    const r = aTiempo(() => correrPruebas({ pruebas: SE_CUELGA_HABLANDO, pruebasMinutos: SEIS_SEGUNDOS, registro: REGISTRO }));
+    assert.strictEqual(r.colgada, SEIS_SEGUNDOS);
+    const t = fs.existsSync(REGISTRO) ? fs.readFileSync(REGISTRO, 'utf8') : '';
+    assert.match(t, /me quedo aqui esperando/, '⛔ la tanda se colgó y no quedó lo que alcanzó a imprimir');
+    assert.match(t, /NO TERMIN/, '⛔ el registro no dice que no terminó');
+  });
+
+  it('y si la tanda PASA, el registro viejo se borra: las últimas palabras de otra tanda engañan', () => {
+    fs.writeFileSync(REGISTRO, 'de una tanda vieja');
+    correrPruebas({ pruebas: QUE_PASA, pruebasMinutos: SEIS_SEGUNDOS, registro: REGISTRO });
+    assert.ok(!fs.existsSync(REGISTRO), '⛔ quedó el registro de otra tanda después de una en verde');
+  });
+
+  it('sin registro, las últimas palabras son ninguna: no se inventan', () => {
+    assert.deepStrictEqual(ultimasPalabras(path.join(carpeta, 'no-existe.log')), []);
+  });
+
+  it('y son solo los últimos renglones, sin los vacíos', () => {
+    fs.writeFileSync(REGISTRO, ['a', '', 'b', '  ', 'c'].join('\n'));
+    assert.deepStrictEqual(ultimasPalabras(REGISTRO, 2), ['b', 'c']);
+  });
+
+  //  Y que el VEREDICTO las enseñe: `revisar` y `foto` tienen que llamar a mostrarlas. Es un
+  //  detector de FORMA —correr `revisar` entero pide un repo con foto y git—, y se dice así.
+  //  Sin esto, quitar la llamada dejaba las 29 pruebas en verde con el registro escrito y nadie leyéndolo.
+  it('el veredicto de revisar y el de la foto enseñan las últimas palabras', () => {
+    const { leer, cuerpoDeLaFuncion } = require('./cargar.cjs');
+    const codigo = leer('scripts/guardian.cjs');
+    for (const nombre of ['revisar', 'foto']) {
+      const desde = codigo.indexOf('function ' + nombre + '(');
+      assert.ok(desde > 0, 'no encontré function ' + nombre);
+      assert.match(cuerpoDeLaFuncion(codigo, desde).texto, /mostrarUltimasPalabras\(/,
+        '⛔ ' + nombre + ' ya no enseña las últimas palabras de la tanda: el registro se escribe y nadie lo lee');
+    }
+  });
   it('sin comando no inventa: dice que no hay pruebas', () => {
     assert.deepStrictEqual(correrPruebas({}), { hay: false, ok: null });
   });
