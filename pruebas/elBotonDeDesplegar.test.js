@@ -43,17 +43,25 @@ const path = require('node:path');
 // una carpeta de botones vacía — verde por no haber mirado nada.
 const { leer, RAIZ } = require('./cargar.cjs');
 
+//  🔴 LOS BOTONES SE LEEN COMO LOS VE GITHUB: con `\n`, no con `\r\n`. En el PC
+//  (Windows, `core.autocrlf=true`) git los deja con `\r\n`, y los sabotajes que
+//  buscan un renglón entero —`'        working-directory: guajirago\n'`— no
+//  encontraban dónde romper: 5 de 30 «no mordían» y la tanda 1 se paraba ahí,
+//  sin dejar correr funciones, chat y almacén. En GitHub (Linux) pasaban.
+//  Medido el 24-sep-2026, el día que se decidió publicar desde el PC.
+const leerYml = (ruta) => leer(ruta).replace(/\r\n/g, '\n');
+
 const BOTON = '.github/workflows/desplegar.yml';
-const YML = leer(BOTON);
+const YML = leerYml(BOTON);
 
 const BOTON_REGLAS = '.github/workflows/desplegar-reglas.yml';
-const YML_REGLAS = leer(BOTON_REGLAS);
+const YML_REGLAS = leerYml(BOTON_REGLAS);
 
 const BOTON_PANEL = '.github/workflows/desplegar-panel-y-aliados.yml';
-const YML_PANEL = leer(BOTON_PANEL);
+const YML_PANEL = leerYml(BOTON_PANEL);
 
 const BOTON_NUBE = '.github/workflows/desplegar-funciones.yml';
-const YML_NUBE = leer(BOTON_NUBE);
+const YML_NUBE = leerYml(BOTON_NUBE);
 
 /** Fuera los comentarios: de YAML y de shell. Son el señuelo, no el código. */
 function sinComentarios(yml) {
@@ -818,7 +826,7 @@ describe('EL BOTÓN DE LA NUBE · 19 funciones, y ninguna se puede quedar por el
 //  mismo, comparándolos entre sí. Que no se separen no lo cuida la buena
 //  intención, lo cuida esta prueba.
 const BOTON_MEDIR = '.github/workflows/medir-pruebas.yml';
-const YML_MEDIR = leer(BOTON_MEDIR);
+const YML_MEDIR = leerYml(BOTON_MEDIR);
 
 describe('EL BOTÓN QUE MIDE · mide lo mismo que el que despliega, o no vale', () => {
   it('trae los MISMOS tres repos, y a las mismas carpetas', () => {
