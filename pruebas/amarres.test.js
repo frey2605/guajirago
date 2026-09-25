@@ -3784,3 +3784,43 @@ describe('LOS PUERTOS DEL EMULADOR · propios donde hace falta, y escritos en un
     assert.match(r.incompleta, /solo se miraron los 3 puertos declarados/, 'el websocket cuenta entre los declarados');
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  LA TANDA · toda prueba entra sola
+//
+//  El 25-sep-2026, al añadir pruebas/elAmbiente.test.js, hubo que acordarse de escribirla
+//  a mano en la orden de pruebas/correr.cjs, y nada avisaba si se olvidaba: una prueba que
+//  no está en la orden no corre en ningún sitio y queda verde para siempre. Ese día había
+//  31 de 31. Aquí se cuentan, y la lista sale del MISMO lector que ya lee la orden
+//  (`laTanda`, en scripts/medir-puertos-emulador.cjs): un segundo lector sería el gemelo.
+// ═══════════════════════════════════════════════════════════════════════════
+describe('LA TANDA · toda prueba de pruebas/ corre en la orden de correr.cjs', () => {
+  const M = require('../scripts/medir-puertos-emulador.cjs');
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const enDisco = () => fs.readdirSync(__dirname).filter((f) => f.endsWith('.test.js')).map((f) => 'pruebas/' + f).sort();
+  const real = leer('pruebas/correr.cjs');
+
+  it('cada pruebas/*.test.js está en la orden, y la orden no nombra ninguna que no exista', () => {
+    const orden = M.laTanda(real).archivos;
+    const faltan = enDisco().filter((a) => !orden.includes(a));
+    assert.deepStrictEqual(faltan, [], '⛔ estas pruebas existen y NO corren en la tanda: ' + faltan.join(', ')
+      + '. Añádelas a la orden de pruebas/correr.cjs');
+    const fantasmas = orden.filter((a) => !fs.existsSync(path.join(__dirname, '..', a)));
+    assert.deepStrictEqual(fantasmas, [], '⛔ la orden nombra pruebas que no existen: ' + fantasmas.join(', '));
+    assert.ok(orden.length >= 31, 'el 25-sep-2026 eran 31: si bajan, alguien quitó pruebas de la orden');
+  });
+
+  it('la lista sale de la ORDEN, no de un comentario ni de todo el archivo', () => {
+    // El señuelo nombra una prueba REAL (tarifas), sacada de la orden y puesta solo en un
+    // comentario: un nombre inventado pondría rojo, con razón, al medidor de citas.
+    const sinUna = real.replace('pruebas/tarifas.test.js ', '');
+    assert.ok(!M.laTanda(sinUna).archivos.includes('pruebas/tarifas.test.js'),
+      '⛔ quitar una prueba de la orden no se notó: el lector no está leyendo la orden');
+    const enComentario = '// pruebas/tarifas.test.js iría aquí\n' + sinUna;
+    assert.ok(!M.laTanda(enComentario).archivos.includes('pruebas/tarifas.test.js'),
+      '⛔ un nombre en un comentario se tomó por parte de la orden');
+    assert.throws(() => M.laTanda(real.replace('\'"node --test', '\'"node --test pruebas/x.test.js"\' + \'"node --test')), /UNA sola/,
+      '⛔ con dos órdenes no se elige: se para');
+  });
+});

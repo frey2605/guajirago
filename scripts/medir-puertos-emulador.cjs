@@ -73,7 +73,13 @@ function laTanda(texto) {
   const mayor = unaSola('firebase-tools@', /['"]firebase-tools@(\d+)['"]/, "versión 'firebase-tools@N'");
   const only = unaSola('--only', /['"]--only['"],\s*['"]([^'"]+)['"]\s*,/,
     "lista '--only', '…', (completa, no armada por partes)");
-  return { mayor: Number(mayor), emuladores: only.split(',').map((s) => s.trim()).filter(Boolean) };
+  // 🔑 Y LOS ARCHIVOS DE LA ORDEN (25-sep-2026): una prueba que no está escrita aquí no corre en
+  //  ningún sitio y queda verde para siempre. Salen de la orden misma —el texto que arranca con
+  //  '"node --test— y no de todo el archivo: un nombre en un comentario no es parte de la tanda.
+  const orden = unaSola('\'"node --test', /'"node --test ([^']+)"'/,
+    'orden \'"node --test …"\' (la tanda entera, en un solo texto)');
+  const archivos = [...new Set(orden.match(/pruebas\/[A-Za-z0-9_-]+\.test\.js/g) || [])];
+  return { mayor: Number(mayor), emuladores: only.split(',').map((s) => s.trim()).filter(Boolean), archivos };
 }
 
 /** Los que abre firebase-tools por su cuenta, además de los del `--only`. Esto SÍ va escrito: no
