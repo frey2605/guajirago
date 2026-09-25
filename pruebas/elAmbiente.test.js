@@ -112,11 +112,11 @@ describe('EL AMBIENTE (fase 0) · la app de transporte deduce si es PRUEBAS o PR
     assert.match(c, /ambiente\.nombre/, '⛔ el cartel no dice el nombre del ambiente');
   });
 
-  it('el medidor dice que la app de transporte tiene las 6 piezas, y las otras dos apps todavía no', () => {
+  it('el medidor dice que transporte y el panel tienen las 6 piezas, y aliados todavía no', () => {
     const [t, admin, aliados] = M.medirTodas();
     assert.strictEqual(t.puestas, 6, '⛔ transporte: ' + t.porque.join(' · '));
-    assert.ok(admin.puestas < 6 && aliados.puestas < 6,
-      'el panel y aliados van aparte, cada uno con su arreglo: si ya están, esta prueba se actualiza con ellos');
+    assert.strictEqual(admin.puestas, 6, '⛔ panel: ' + admin.porque.join(' · '));
+    assert.ok(aliados.puestas < 6, 'aliados va aparte, con su arreglo: si ya está, esta prueba se actualiza con él');
   });
 
   //  🔴 Y EL MEDIDOR NO SE PUEDE ABLANDAR: se le da un árbol de mentira con las seis
@@ -171,5 +171,79 @@ describe('EL AMBIENTE (fase 0) · la app de transporte deduce si es PRUEBAS o PR
         assert.ok(m.porque.length > 0, 'y tiene que decir por qué');
       });
     }
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  EL PANEL (guajirago-admin) · la misma fase 0, con la MISMA pieza
+//
+//  El panel es otro repo, así que no puede importar guajirago/src/ambiente.js:
+//  lleva una COPIA. Una copia en otro repo es el gemelo que se queda viejo
+//  (SEGUNDA LEY), y por eso aquí se ata byte a byte: si se separan, rojo. Lo que
+//  la copia HACE ya está probado arriba ejecutando la de transporte; aquí va lo que
+//  es del panel: sus .env, su firebase.js, su cartel, sus scripts y su .firebaserc,
+//  que además lleva TARGETS, porque el panel publica en un sitio aparte y un target
+//  mal mapeado publica el panel ENCIMA de la app de transporte.
+// ═══════════════════════════════════════════════════════════════════════════
+describe('EL AMBIENTE (fase 0) · el panel (guajirago-admin) deduce igual, con la misma pieza', () => {
+  const P = 'guajirago-admin/';
+
+  it('ambiente.js y CartelAmbiente.js del panel son byte a byte los de transporte: la copia está atada', () => {
+    for (const f of ['src/ambiente.js', 'src/CartelAmbiente.js']) {
+      assert.strictEqual(leer(P + f), leer('guajirago/' + f),
+        '⛔ ' + P + f + ' se separó de guajirago/' + f + ': la copia se cambia en los dos sitios o se saca a una casa común');
+    }
+  });
+
+  it('los dos .env del panel están completos y en pareja: se pasan por la guardia de su propia copia', () => {
+    const A = cargarDeLaApp(P + 'src/ambiente.js');
+    for (const modo of ['pruebas', 'produccion']) {
+      const e = M.leerEnv(leer(P + '.env.' + modo));
+      const cfg = A.configFirebaseDe(e);
+      assert.strictEqual(e.REACT_APP_AMBIENTE, modo, P + '.env.' + modo + ' no dice su ambiente');
+      assert.strictEqual(A.verificarPareja(modo, cfg.projectId), true);
+    }
+    assert.strictEqual(M.leerEnv(leer(P + '.env.produccion')).REACT_APP_FIREBASE_PROJECT_ID, 'guajirago',
+      '⛔ producción del panel tiene que seguir siendo el proyecto guajirago');
+    assert.strictEqual(M.leerEnv(leer(P + '.env.pruebas')).REACT_APP_FIREBASE_PROJECT_ID, 'guajirago-pruebas');
+  });
+
+  it('el panel usa la MISMA app web de Firebase que transporte, en los dos ambientes (así está en producción, medido el 25-sep-2026)', () => {
+    for (const modo of ['pruebas', 'produccion']) {
+      const a = M.leerEnv(leer(P + '.env.' + modo));
+      const t = M.leerEnv(leer('guajirago/.env.' + modo));
+      for (const k of M.LLAVES) assert.strictEqual(a[k], t[k], '⛔ ' + k + ' del panel (' + modo + ') no es la de transporte: el panel no tiene app web propia');
+    }
+  });
+
+  it('firebase.js del panel ya no lleva llaves escritas: las pide al ambiente y comprueba la pareja', () => {
+    const t = soloCodigo(leer(P + 'src/firebase.js'));
+    assert.ok(!/projectId:\s*["']/.test(t) && !/apiKey:\s*["']AIza/.test(t), '⛔ quedan llaves escritas a mano en firebase.js del panel');
+    for (const f of ['ambienteDe(', 'configFirebaseDe(', 'verificarPareja(']) assert.ok(t.includes(f), '⛔ firebase.js del panel no llama a ' + f);
+    assert.match(t, /export const ambiente\b/, '⛔ firebase.js del panel no exporta el ambiente, y el cartel lo necesita');
+  });
+
+  it('la copia de pruebas del panel se ve: index.js pinta el cartel', () => {
+    assert.match(soloCodigo(leer(P + 'src/index.js')), /<CartelAmbiente\s*\/>/, '⛔ index.js del panel no pinta el cartel');
+  });
+
+  it('el panel se compila por ambiente, y su .firebaserc manda el target admin a un sitio distinto en cada proyecto', () => {
+    const pkg = JSON.parse(leer(P + 'package.json'));
+    const s = pkg.scripts;
+    assert.match(s['build:pruebas'], /env-cmd -f \.env\.pruebas react-scripts build/);
+    assert.match(s['build:produccion'], /env-cmd -f \.env\.produccion react-scripts build/);
+    assert.match(s.build, /build:produccion/, '⛔ `npm run build` a secas tiene que seguir siendo producción');
+    assert.match(s.start, /\.env\.pruebas/, '⛔ el servidor de desarrollo del panel tiene que correr contra PRUEBAS, nunca contra producción');
+    assert.ok((pkg.devDependencies || {})['env-cmd'], '⛔ env-cmd no está declarado en el panel');
+    const rc = JSON.parse(leer(P + '.firebaserc'));
+    assert.strictEqual(rc.projects.default, 'guajirago-pruebas', '⛔ un `firebase deploy` sin --project tiene que caer en pruebas, nunca en producción');
+    assert.strictEqual(rc.projects.pruebas, 'guajirago-pruebas');
+    assert.strictEqual(rc.projects.produccion, 'guajirago');
+    assert.deepStrictEqual(rc.targets.guajirago.hosting.admin, ['guajirago-admin'], '⛔ en producción el target admin es el sitio guajirago-admin');
+    assert.deepStrictEqual(rc.targets['guajirago-pruebas'].hosting.admin, ['guajirago-pruebas-admin'],
+      '⛔ en pruebas el target admin tiene que ir a guajirago-pruebas-admin: en el sitio guajirago-pruebas vive la app de transporte');
+    const fjt = leer(P + 'firebase.json');
+    const fj = JSON.parse(fjt.charCodeAt(0) === 0xFEFF ? fjt.slice(1) : fjt); // el archivo empieza con BOM (trampa del 23-sep)
+    assert.strictEqual(fj.hosting.target, 'admin', '⛔ firebase.json del panel ya no publica por el target admin');
   });
 });
