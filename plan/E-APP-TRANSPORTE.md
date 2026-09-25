@@ -70,9 +70,10 @@ nadie mire.
 
 | Riesgo | Cómo se controla |
 |---|---|
-| **Que nazcan gemelos** al mover los 18 | el guardián ya detecta código movido — **salvo si va a un archivo nuevo** (ver [`D-PENDIENTES.md`](D-PENDIENTES.md), N1). **Ese hueco hay que cerrarlo ANTES de empezar E1** |
+| **Que nazcan gemelos** al mover los 18 | el guardián detecta código movido, **también cuando va a un archivo nuevo**: ese hueco (N1 en [`D-PENDIENTES.md`](D-PENDIENTES.md)) se cerró el 24-sep-2026, commit `19e671b`, con su prueba en `pruebas/elGuardian.test.js` |
 | **Que se rompa lo que funciona** | mover no es reescribir. Ni un renglón cambia de contenido en E1 |
 | **Que las pruebas dejen de encontrar los archivos** | 23 archivos de `pruebas/` leen rutas de la app. Se miden **antes** de mover |
 
-🔴 **E1 no puede empezar hasta que el detector de código movido esté arreglado.** Mover 18 archivos
-con el candado abierto es exactamente el escenario que ese candado existe para vigilar.
+✅ ~~**E1 no puede empezar hasta que el detector de código movido esté arreglado.**~~ Arreglado el
+24-sep-2026 (`19e671b`). Mover 18 archivos con el candado abierto era exactamente el escenario que
+ese candado existe para vigilar; ya no está abierto.
