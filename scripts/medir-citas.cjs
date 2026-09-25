@@ -50,6 +50,12 @@ const CARPETAS = [
   'guajirago/src', 'guajirago/functions', 'guajirago/public',
   'guajirago-admin/src', 'guajirago-aliados/src',
   'pruebas', 'scripts', 'docs', '.claude',
+  // `plan/` nació el 24-sep-2026 y aquí no entró: sus 16 archivos citaban sin
+  // que nadie lo comprobara. Lo destapó un sabotaje que ESCAPÓ esa misma noche.
+  // Para que no vuelva a pasar con la carpeta DE NOTAS que nazca mañana, este
+  // guion dice al final cuántas notas `.md` del repo se quedan sin mirar. Una
+  // carpeta solo de código no la ve (hoy `guajirago-publicidad/`): anotado.
+  'plan',
 ];
 // Y las RAÍCES, solo un nivel: ahí viven los README y las reglas.
 const RAICES = ['.', 'guajirago', 'guajirago-admin', 'guajirago-aliados'];
@@ -190,7 +196,10 @@ function losArchivos() {
 // Y el `(?![\w-])` del final NO SOBRA: sin él, `rel.rulesetName` se leía como
 // una cita a un archivo de reglas, y el guion acusaba a dos guiones sin culpa.
 // La extensión tiene que ACABAR ahí, no ser el principio de otra palabra.
-const CITA = /([A-Za-z][\w.-]*\.(?:rules|json|cjs|md|js))(?![\w-])(?::(\d+))?/gi;
+// Y el nombre PUEDE EMPEZAR POR NÚMERO: los de `plan/` empiezan por `01-`, `02-`…,
+// y exigiendo letra se leían sin ese prefijo, como un archivo que no existe —
+// 53 falsas alarmas (24-sep-2026).
+const CITA = /([A-Za-z0-9][\w.-]*\.(?:rules|json|cjs|md|js))(?![\w-])(?::(\d+))?/gi;
 
 // Los archivos de configuración que se nombran a cada rato y no son citas.
 // OJO: por nombre ENTERO. El filtro de antes empezaba por `firebase.` y se
@@ -228,7 +237,11 @@ function laParteComentada(linea, esMarkdown) {
  * scripts/…`). Lo demás se comprueba como cualquier cita.
  */
 const CARPETAS_NUESTRAS = new Set(['guajirago', 'guajirago-admin', 'guajirago-aliados',
-  'admin', 'aliados', 'src', 'pruebas', 'scripts', 'functions', 'docs', 'public', '.claude']);
+  'admin', 'aliados', 'src', 'pruebas', 'scripts', 'functions', 'docs', 'public', '.claude',
+  // Sin `plan` aquí, una cita escrita `plan/…md` se daba por «de fuera» y NUNCA se
+  // comprobaba — aunque `plan/` ya estuviera en CARPETAS. Lo cazó la segunda
+  // opinión el 24-sep-2026 metiendo `plan/99-…md` en un clon: ni una alarma.
+  'plan']);
 
 function deFuera(comentario, desde) {
   // ¿Hay una dirección de internet abierta antes de esta cita, sin espacios?
@@ -250,7 +263,7 @@ function medir() {
     const base = path.basename(a);
     (porNombre[base] = porNombre[base] || []).push(a);
     // Y también sin el punto de delante: una cita escribe «.guardian-foto.json»
-    // y la expresión, que empieza por letra, se queda con «guardian-foto.json».
+    // y la expresión, que empieza por letra o número, se queda con «guardian-foto.json».
     // Sin esto, un archivo oculto que SÍ existe salía como desaparecido.
     if (base.startsWith('.')) (porNombre[base.slice(1)] = porNombre[base.slice(1)] || []).push(a);
   }
@@ -425,6 +438,21 @@ if (sobran.length > 0) {
   for (const [d, quien, trozo] of sobran) console.log(C.gris + '        ' + d + '  →  ' + quien + '  «' + trozo.slice(0, 38) + '…»' + C.off);
 }
 
+// 🔴 ¿QUEDA ALGUNA NOTA DEL REPO SIN MIRAR? Un cero de arriba puede querer decir
+// «no hay citas rotas» o «no estaba mirando ahí», y se ven igual. `plan/` estuvo
+// fuera de la lista desde que nació, y lo único que lo destapó fue un sabotaje.
+// Así que la lista de carpetas se CARA contra lo que git tiene: toda nota `.md`
+// que git sigue en este repo tiene que estar entre los archivos que se miran.
+const { execFileSync } = require('child_process');
+const mirados = new Set(losArchivos());
+// `:(icase)`: una nota con la extensión en MAYÚSCULAS también es una nota.
+const ciegas = execFileSync('git', ['ls-files', '-z', '--', ':(icase)*.md'], { cwd: RAIZ, encoding: 'utf8' })
+  .split('\0').filter(Boolean).filter((f) => !mirados.has(f));
+console.log('');
+console.log('    ' + (ciegas.length ? C.roj + '🔴 ' : C.ver + '✓ ') + 'notas .md del repo que este '
+  + 'guion NO mira: ' + ciegas.length + C.off);
+for (const f of ciegas) console.log(C.gris + '        ' + f + C.off);
+
 console.log('');
 // EL VEREDICTO CUENTA LO QUE SE PUEDE ARREGLAR ESCRIBIENDO. Las de
 // `firestore.rules.LIVE` se van solas al desplegar, así que meterlas aquí
@@ -444,4 +472,5 @@ console.log('');
 // quien mirara solo la salida no se enteraba. `process.exitCode` lo pisaba este
 // `process.exit` de aquí abajo, que solo miraba las citas.
 const excusasMalas = (r.excusasSinRespaldo || []).length;
-process.exit(enElRepo === 0 && excusasMalas === 0 ? 0 : 1);
+// Y una nota sin mirar también: un vigilante con una carpeta fuera firma en falso.
+process.exit(enElRepo === 0 && excusasMalas === 0 && ciegas.length === 0 ? 0 : 1);

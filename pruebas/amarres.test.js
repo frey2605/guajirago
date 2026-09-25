@@ -3029,6 +3029,25 @@ describe('LAS NOTAS NO MIENTEN · ninguna cita apunta a algo que no existe', () 
       + 'mirar alguna carpeta y se apagó en silencio — que es como fallan los vigilantes.');
   });
 
+  //  🔴 EL SUELO DE ARRIBA NO VE UNA CARPETA QUE FALTA SI ES PEQUEÑA. `plan/`
+  //  (16 archivos) estuvo fuera desde que nació, con 1.174 citas contadas —muy
+  //  por encima del suelo—, y lo destapó un sabotaje que escapó el 24-sep-2026.
+  //  Así que aquí no se cuenta: se pregunta por NOMBRE qué nota `.md` que git
+  //  sigue se queda fuera. La lista de carpetas se carea contra git, no contra
+  //  la memoria de quien la escribió.
+  it('EL QUE MUERDE · ninguna nota .md del repo se queda sin mirar', () => {
+    const { salida } = correr();
+    const limpia = salida.replace(/\x1b\[[0-9;]*m/g, '');
+    const cuantas = /notas \.md del repo que este guion NO mira: (\d+)/.exec(limpia);
+    assert.ok(cuantas, 'el guion `scripts/medir-citas.cjs` ya no dice cuántas notas se quedan '
+      + 'sin mirar. Sin ese número, una carpeta fuera de la lista no se ve.');
+    const fuera = limpia.split('NO mira:')[1].split('\n').slice(1)
+      .filter((l) => /^ {8}\S/.test(l)).map((l) => l.trim());
+    assert.strictEqual(Number(cuantas[1]), 0,
+      'hay ' + cuantas[1] + ' notas .md que el medidor de citas NO mira:\n   '
+      + fuera.join('\n   ') + '\n   Mete su carpeta en CARPETAS de `scripts/medir-citas.cjs`.');
+  });
+
   it('y en la lista HISTORIA no sobra ninguna fila', () => {
     // Si se limpia una nota y su fila se queda aquí, la lista empieza a mentir
     // por el otro lado: perdonaría una cita rota futura con el mismo nombre.
