@@ -52,8 +52,8 @@ nadie vuelve a abrir.
 | **Decidido** | **aliados se SEPARA** en su propio proyecto; **el transporte NO** (el pasajero y el conductor escriben el mismo documento en vivo). Ver [`02-DECISIONES.md`](02-DECISIONES.md) |
 | **Lo urgente detrás** | la **pregunta 8**: ¿cuántos aparatos por negocio? Con uno solo, la fase 4b entera sobra |
 | **Contestadas** | la 1 (aliados se separa), la 6 (qué es «Calaira») y la 7 (sin internet **todos los días**) |
-| **Lo que bloquea primero de todo** | el **permiso de lectura** de los repos hermanos: GitHub contesta `Bad credentials`. Sin él no se puede medir si la suite corre en la nube, y no se debería fusionar a `main` a ciegas. Ver [`D-PENDIENTES.md`](D-PENDIENTES.md) |
-| **Lo siguiente que se hará** | arreglar ese permiso, cerrar la puerta de atrás del guardián (N1–N3), y contestar la pregunta 1 |
+| **Lo que bloquea primero de todo** | ~~el permiso de lectura de los repos hermanos~~ ✅ servía desde la tarde del 24-sep. De lo que bloqueaba solo queda **P3**, los permisos de la llave de servicio, que son del dueño. Ver D.2 en [`D-PENDIENTES.md`](D-PENDIENTES.md) |
+| **Lo siguiente que se hará** | lo dice D.6 en [`D-PENDIENTES.md`](D-PENDIENTES.md), y solo ahí: copiarlo aquí es el gemelo que se quedó viejo (el guardián N1–N3 y la pregunta 1 ya estaban hechos cuando este renglón los pedía) |
 
 ---
 
