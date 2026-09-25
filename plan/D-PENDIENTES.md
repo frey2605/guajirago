@@ -25,7 +25,7 @@
 | `catch` mudos en las tres apps | **149** | `grep -rhoE "catch *\([a-z]*\) *\{ *\}\|catch *\([a-z]*\) *\{ *console"` |
 | Medidores que existen (cada uno vigila algo) | 22 | `ls scripts/medir-*.cjs \| wc -l` |
 | `TODO` / `FIXME` de verdad en el código | **1** | `grep -rhoE "//\s*(TODO\|FIXME\|HACK\|XXX)"` |
-| Commits que le faltan a `main` | ~~25~~ → **0** el 24-sep (noche); ojo: la rama `claude/hola-6wz1a3` del servidor trae **3 commits sin fusionar** | `git log origin/main..HEAD --oneline \| wc -l` |
+| Commits que le faltan a `main` | ~~25~~ → **0** el 24-sep (noche); la rama `claude/hola-6wz1a3` traía 3 commits sin fusionar: el 25-sep su corrección de las leyes entró a `main` (`ca76832`), el programa de mudanza a Drive no (va contra lo decidido), y la rama se borró — queda en la etiqueta `respaldo/claude-hola-6wz1a3` | `git log origin/main..HEAD --oneline \| wc -l` |
 | Botones de despliegue escritos / **en `main`** | ~~5 / 0~~ → **5 / 5** el 24-sep (noche) | `ls .github/workflows/*.yml`, `git ls-tree origin/main -- .github/` |
 
 ### 🟢 Lo primero que dice este conteo, y es bueno
