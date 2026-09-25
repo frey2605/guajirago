@@ -25,8 +25,8 @@
 | `catch` mudos en las tres apps | **149** | `grep -rhoE "catch *\([a-z]*\) *\{ *\}\|catch *\([a-z]*\) *\{ *console"` |
 | Medidores que existen (cada uno vigila algo) | 22 | `ls scripts/medir-*.cjs \| wc -l` |
 | `TODO` / `FIXME` de verdad en el código | **1** | `grep -rhoE "//\s*(TODO\|FIXME\|HACK\|XXX)"` |
-| Commits que le faltan a `main` | **25** | `git log origin/main..HEAD --oneline \| wc -l` |
-| Botones de despliegue escritos / **en `main`** | **5 / 0** | `ls .github/workflows/*.yml`, `git ls-tree origin/main -- .github/` |
+| Commits que le faltan a `main` | ~~25~~ → **0** el 25-sep | `git log origin/main..HEAD --oneline \| wc -l` |
+| Botones de despliegue escritos / **en `main`** | ~~5 / 0~~ → **5 / 5** el 25-sep | `ls .github/workflows/*.yml`, `git ls-tree origin/main -- .github/` |
 
 ### 🟢 Lo primero que dice este conteo, y es bueno
 
@@ -47,16 +47,30 @@ renglón habría dicho.
 
 Esto no es deuda: es trabajo empezado que está a medias y no sirve de nada hasta terminarlo.
 
+> 🔄 **Vuelto a medir el 25-sep-2026** con `node scripts/medir-pendientes.cjs` (solo lee). De los
+> cinco, **cuatro ya estaban cerrados desde el 24**: la lista mandaba a trabajar en lo hecho.
+
 | # | Qué | Estado medido | Quién lo desbloquea |
 |---|---|---|---|
-| **P1** | El permiso de lectura de los repos hermanos | **caducado o revocado** — GitHub contesta `Bad credentials` | **el dueño**, renovándolo |
-| **P2** | Los 5 botones de despliegue | escritos y probados, **0 en `main`**, **ninguno ha desplegado nunca** | fusionar los 25 commits |
-| **P3** | Los permisos (roles) de la llave de servicio | faltan 2 para reglas e índices, 5 para la nube | **el dueño**, en la consola de Google |
-| **P4** | Los arreglos de las librerías de panel y aliados | hechos, **en una rama sin fusionar** en cada repo hermano | fusionarlos |
-| **P5** | ¿Corre la suite entera en GitHub? | **sin respuesta**: la medición no llegó a intentarlo por culpa de P1 | se contesta sola al arreglar P1 |
+| ~~**P1**~~ | El permiso de lectura de los repos hermanos | ✅ **CERRADO** — la corrida que baja los tres repos sale bien desde el 24-sep (17:44 UTC) | — |
+| ~~**P2**~~ | Los 5 botones de despliegue | ✅ **CERRADO** — los 5 en `main`, y `desplegar.yml` ya publicó la app el 24-sep. **Pero ya no se usan para publicar**: ver abajo | — |
+| **P3** | Los permisos (roles) de la llave de servicio | faltan 2 para reglas e índices, 5 para la nube. **No medido el 25-sep**: se ve en la consola de Google, no desde aquí | **el dueño**, en la consola de Google |
+| ~~**P4**~~ | Los arreglos de las librerías de panel y aliados | ✅ **CERRADO** — los dos repos hermanos en `main`, nada sin empujar y ninguna rama sin fusionar | — |
+| ~~**P5**~~ | ¿Corre la suite entera en GitHub? | ✅ **CONTESTADO: sí** — las últimas 14 corridas salieron bien | — |
 
-> **P1 es el primero de todos.** Mientras no sirva, P5 no se puede contestar y P2 no se debería
-> fusionar a ciegas.
+### 🖥️ Desde el 25-sep-2026 se publica desde el PC
+
+Decisión del dueño: «Todo lo vamos a publicar desde aquí porque no tenemos minutos en GitHub», y
+«que siga guardando en GitHub». GitHub queda **solo para guardar** (paso 9); publicar se hace con
+`firebase` desde el PC (paso 10), desde la carpeta de cada app.
+
+🔴 **Lo que eso obliga a hacer:** cuatro de los cinco botones **se disparan solos al subir código**
+—`desplegar.yml` publica la app con cualquier cosa que entre a `main`—, así que guardar en GitHub
+todavía **publica desde allá** sin pasar por el paso 10. Decidido apagarlos en GitHub
+(`gh workflow disable`), sin tocar los archivos. **Pendiente**, como su propio arreglo.
+
+🔴 **Y lo que eso destapa:** la tanda entera tiene que pasar **en el PC**, y el 25-sep no pasa —ver
+D.4—.
 
 ---
 
@@ -87,17 +101,17 @@ se apunta aquí para que no se pierda.
 
 | # | Qué | Dónde | Por qué importa |
 |---|---|---|---|
-| **N1** | 🔴 **El detector de «código movido» tiene puerta de atrás** | el guardián | Basta con mover el código a un **archivo nuevo** y no dice nada. Demostrado: 747 renglones movidos sin una queja, cuando el 23-sep paró el trabajo por seis |
-| **N2** | La foto del guardián **no puede declarar una carpeta** | el guardián | Hay trabajos en los que los nombres de los archivos **nacen del trabajo**, y entonces no se pueden declarar antes |
-| **N3** | El libro de excepciones **para al guardián** | el guardián | Escribir en él es tocar un archivo no declarado. Ya estaba anotado; hoy se midió además que lo llama «cambio invisible a git» cuando **sí** está en git |
+| ~~**N1**~~ | ✅ **CERRADO** (commit `19e671b`, 24-sep) — el detector de «código movido» tenía puerta de atrás | el guardián | Bastaba con mover el código a un **archivo nuevo** y no decía nada. Demostrado: 747 renglones movidos sin una queja, cuando el 23-sep paró el trabajo por seis |
+| ~~**N2**~~ | ✅ **CERRADO** (commit `bf175b1`, 24-sep) — la foto del guardián no podía declarar una carpeta | el guardián | Hay trabajos en los que los nombres de los archivos **nacen del trabajo**, y entonces no se pueden declarar antes |
+| ~~**N3**~~ | ✅ **CERRADO** (commit `20da141`, 24-sep) — el libro de excepciones paraba al guardián | el guardián | Escribir en él era tocar un archivo no declarado, y lo llamaba «cambio invisible a git» cuando **sí** está en git |
 | **N4** | El respaldo del conductor **sigue mudo** | app del conductor | Si los dos intentos de GPS fallan, no se le dice nada. Hermano de los 149 |
 | **N5** | La prueba de citas **no ve los archivos de otros repos con extensión de código** | los amarres | Cazó un nombre `.md` de otro repo pero **no** tres `.jsx`. Un hueco del propio vigilante |
 | **N6** | El emulador de **funciones** no arranca en el contenedor de trabajo | la caja, no el repo | `pruebas/funciones.test.js` lleva días sin poder correr aquí. **No está medido por qué** |
 | **N7** | El canal de prueba necesitó autorizar **dos** listas de dominios | fuera del repo | Maps y Auth, cada una por su lado. Ya resuelto para este canal; **el siguiente canal lo pedirá otra vez** |
+| — | 🔴 **La tanda entera NO pasa en el PC** (25-sep) | `pruebas/elBotonDeDesplegar.test.js`, los tres «y no se puede ablandar» | 979 de 982. Los tres que fallan vigilan los botones: **5 de sus 30 sabotajes no se ponen rojos** en el PC (2 de 15, 2 de 7 y 1 de 8), y en GitHub sí. Y como la tanda 1 falla, **funciones, chat y almacén ni se corren**. Ahora que se publica desde el PC, el PC es el único juez. **No medido por qué** |
+| — | 🔴 **Nadie vigila las citas de la carpeta `plan/`** (25-sep) | `scripts/medir-citas.cjs`, su lista de carpetas | Saboteado: se metió aquí una cita a un guion que no existe y **nada se puso rojo**. El medidor no entra en `plan/`; y metiéndolo tal cual da 54 falsas alarmas, porque lee `01-DONDE-ESTAMOS.md` como `DONDE-ESTAMOS.md` (exige que el nombre empiece por letra) |
 
-> **N1, N2 y N3 son el mismo arreglo**, en el mismo archivo, y son de una o dos líneas cada uno.
-> Van juntos, con sus pasos. **Y van pronto**: N1 deja abierto el candado que más ha protegido a
-> este proyecto.
+> N1, N2 y N3 se hicieron el 24-sep, cada uno con sus pasos.
 
 ---
 
@@ -116,9 +130,10 @@ se apunta aquí para que no se pierda.
 
 ## D.6 · Lo que se propone hacer con esto
 
-1. **Arreglar P1** (el permiso). Es de minutos y desbloquea cuatro cosas.
-2. **N1 + N2 + N3 juntos**, con sus pasos. Es poco trabajo y devuelve el candado que hoy tiene una
-   puerta abierta.
+1. ~~**Arreglar P1**~~ ✅ ya servía el 24-sep.
+2. ~~**N1 + N2 + N3**~~ ✅ hechos el 24-sep.
+2-bis. (25-sep) **Apagar en GitHub los botones que se disparan solos**, y **que la tanda entera
+   pase en el PC** — cada uno como su propio arreglo.
 3. **Contestar la pregunta 1** (¿aliados comparte proyecto Firebase?), que es lo que bloquea la
    Fase 0 y por tanto todo lo demás.
 4. **Volcar N1–N7 a la tabla de `CLAUDE.md`** cuando cada uno se arregle o se decida — este
