@@ -1016,7 +1016,7 @@ describe('EL VIGÍA DEL PERMISO · distingue caducado de sin red, y lo dice', ()
   //   preguntar DÓNDE aparece, no repetir una lista.
   const LOS_QUE_USAN_EL_PERMISO = fs.readdirSync(path.join(RAIZ, '.github/workflows'))
     .filter((f) => f.endsWith('.yml'))
-    .map((f) => ['.github/workflows/' + f, leer('.github/workflows/' + f)])
+    .map((f) => ['.github/workflows/' + f, leerYml('.github/workflows/' + f)])
     .filter(([, yml]) => yml.includes('LEER_REPOS_HERMANOS'));
 
   it('TODO botón que usa el permiso llama al vigía, y ANTES de traer los repos hermanos', () => {
@@ -1058,7 +1058,7 @@ describe('EL VIGÍA DEL PERMISO · distingue caducado de sin red, y lo dice', ()
 describe('EL EMULADOR NECESITA LAS LIBRERÍAS DE LA NUBE · quien corra npm test las instala', () => {
   const LOS_QUE_PRUEBAN = fs.readdirSync(path.join(RAIZ, '.github/workflows'))
     .filter((f) => f.endsWith('.yml'))
-    .map((f) => ['.github/workflows/' + f, leer('.github/workflows/' + f)])
+    .map((f) => ['.github/workflows/' + f, leerYml('.github/workflows/' + f)])
     .filter(([, yml]) => sinComentarios(yml).includes('npm test'));
 
   it('todos los que corren `npm test` instalan las librerías de la nube, ANTES', () => {
