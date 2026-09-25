@@ -3654,4 +3654,133 @@ describe('LOS PUERTOS DEL EMULADOR · propios donde hace falta, y escritos en un
     assert.deepStrictEqual(M.laTanda(real.replace(O, "'--x', 'http://a', " + O)).emuladores, M.laTanda(real).emuladores,
       'un http:// en el mismo renglón no es un comentario');
   });
+
+  // Sin firebase-tools en la máquina, el vigilante de colgados no se queda ciego (25-sep-2026): antes
+  // no miraba ningún puerto, ni los tres que firebase.json sí declara, y decía «No se pudo preguntar a
+  // Windows», que era falso. Se corre DE VERDAD, en otro proceso, con npm mirando carpetas vacías.
+  const sinFirebaseTools = () => {
+    const fs = require('node:fs'), os = require('node:os'), path = require('node:path');
+    const vacia = fs.mkdtempSync(path.join(os.tmpdir(), 'sin-ft-'));
+    return { vacia, env: { ...process.env, NPM_CONFIG_PREFIX: vacia, npm_config_prefix: vacia, npm_config_cache: vacia } };
+  };
+  const declarados = () => {
+    const em = deVerdad().emulators;
+    const d = Object.values(em).filter((v) => v && v.port).map((v) => String(v.port));
+    if (em.firestore && em.firestore.websocketPort) d.push(String(em.firestore.websocketPort));
+    return d;
+  };
+  const soloWindows = process.platform !== 'win32' && 'pregunta a Windows (PowerShell)';
+
+  // 🔑 Que DE VERDAD le pregunte a Windows, no solo que lo escriba: tiene que ver ocupado un puerto
+  // declarado. Si ya hay uno ocupado (dentro de `npm test` el emulador de la tanda los tiene), vale ése;
+  // si no, se abre uno aquí mismo. La primera versión de estas pruebas miraba solo el renglón «puertos
+  // que se miran», y la segunda opinión vació la pregunta a Windows con las dos pruebas en verde.
+  const conUnPuertoOcupado = async (hacer) => {
+    const net = require('node:net');
+    const escucha = (p) => new Promise((ok) => {
+      const s = net.connect({ host: '127.0.0.1', port: p }, () => { s.destroy(); ok(true); });
+      s.on('error', () => ok(false));
+    });
+    const puertos = declarados().map(Number);
+    const ocupados = async () => { const o = []; for (const p of puertos) if (await escucha(p)) o.push(p); return o; };
+    const ya = await ocupados();
+    if (ya.length) return hacer({ puerto: ya[0], ocupados: ya, dueno: null });
+    const servidor = net.createServer();
+    await new Promise((ok, mal) => { servidor.once('error', mal); servidor.listen(puertos[0], '127.0.0.1', ok); });
+    try { return await hacer({ puerto: puertos[0], ocupados: await ocupados(), dueno: process.pid }); }
+    finally { await new Promise((ok) => servidor.close(ok)); }
+  };
+  // Lo que Windows tiene que haber contestado: EXACTAMENTE los declarados ocupados (ronda 2 de segunda
+  // opinión: un medidor que se inventaba una fila por puerto pasaba), y si el puerto lo abrió esta prueba,
+  // con ella como dueña.
+  const contestoWindows = (renglones, o, quien) => {
+    const vistos = [...new Set(renglones.map((l) => (l.match(/(?:^|\s)(\d+) \(/) || [])[1]).filter(Boolean).map(Number))].sort();
+    assert.deepStrictEqual(vistos, [...o.ocupados].sort(),
+      quien + ' no nombró EXACTAMENTE los puertos declarados que están ocupados: no se lo preguntó a Windows\n' + renglones.join('\n'));
+    if (o.dueno) {
+      assert.ok(renglones.some((l) => suRenglon(o.puerto).test(l) && new RegExp('proceso ' + o.dueno + '(\\s|$)').test(l)),
+        quien + ' no dijo que el ' + o.puerto + ' lo tiene esta prueba (proceso ' + o.dueno + '):\n' + renglones.join('\n'));
+    }
+  };
+  const correrSin = (args) => new Promise((ok) => {
+    const { vacia, env } = sinFirebaseTools();
+    require('node:child_process').execFile('node', args, { cwd: RAIZ, env, encoding: 'utf8', timeout: 3 * 60 * 1000 },
+      (e, stdout, stderr) => { require('node:fs').rmSync(vacia, { recursive: true, force: true }); ok({ status: e ? e.code : 0, salida: stdout + stderr, stdout }); });
+  });
+  const suRenglon = (p) => new RegExp('(^|\\s)' + p + ' \\(');
+
+  it('sin firebase-tools, el medidor de colgados mira los puertos declarados y dice que no miró el resto',
+    { skip: soloWindows }, () => conUnPuertoOcupado(async (o) => {
+      const ocupado = o.puerto;
+      const r = await correrSin(['scripts/medir-emulador-colgado.cjs']);
+      assert.strictEqual(r.status, 0, 'el medidor reventó sin firebase-tools:\n' + r.salida);
+      assert.ok(!/No se pudo preguntar a Windows/.test(r.salida), 'culpa a Windows de lo que es falta de firebase-tools');
+      const miro = (r.salida.match(/puertos que se miran: (.*)/) || [])[1] || '';
+      for (const p of declarados()) assert.ok(new RegExp('(^|\\D)' + p + '(\\D|$)').test(miro), 'no miró el ' + p + ':\n' + r.salida);
+      assert.match(r.salida, /⚠ solo se miraron los \d+ puertos declarados/, 'no dijo que solo miró una parte:\n' + r.salida);
+      const filas = r.salida.split(/\r?\n/).filter((l) => /^(🔴 HUÉRFANO |·  )\d/.test(l));
+      assert.ok(filas.some((l) => suRenglon(ocupado).test(l)),
+        'el ' + ocupado + ' está ocupado y el medidor no lo vio: no le preguntó a Windows por él\n' + r.salida);
+      contestoWindows(filas, o, 'el medidor');
+    }));
+
+  it('sin firebase-tools, el guardián también lo dice, y no un «nadie» a secas', { skip: soloWindows },
+    () => conUnPuertoOcupado(async (o) => {
+      const ocupado = o.puerto;
+      const r = await correrSin(['-e', "console.log(JSON.stringify(require('./scripts/guardian.cjs').emuladoresVivos()))"]);
+      const lineas = JSON.parse((r.stdout.trim().split(/\r?\n/).pop()) || '[]');
+      assert.match(lineas[0] || '', /^⚠ solo se miraron los \d+ puertos declarados/,
+        'el guardián no avisó que solo miró una parte: ' + JSON.stringify(lineas) + '\n' + r.salida);
+      assert.ok(!lineas.some((l) => /no se pudo mirar quién ocupa/.test(l)), 'el guardián se quedó ciego: ' + JSON.stringify(lineas));
+      assert.ok(lineas.slice(1).some((l) => suRenglon(ocupado).test(l)),
+        'el ' + ocupado + ' está ocupado y el guardián no lo nombró: ' + JSON.stringify(lineas));
+      contestoWindows(lineas.slice(1), o, 'el guardián');
+    }));
+
+  // Los dos caminos que un puerto ocupado no deja ver: el «nadie» y un error que NO es la falta de
+  // firebase-tools. Se prueban por dentro, dándole a cada pieza una vecina de mentira en la caché de
+  // require (los dos la piden al llamar, no al cargar). Los sabotajes 6 y 11 escapaban sin esto.
+  const conVecinaDeMentira = (archivo, exportsDeMentira, hacer) => {
+    const ruta = require.resolve(archivo);
+    const antes = require.cache[ruta];
+    require.cache[ruta] = { id: ruta, filename: ruta, loaded: true, exports: exportsDeMentira };
+    try { return hacer(); } finally { if (antes) require.cache[ruta] = antes; else delete require.cache[ruta]; }
+  };
+
+  it('el guardián, habiendo mirado solo una parte y sin nadie escuchando, no dice «nadie» a secas', () => {
+    const { emuladoresVivos } = require('../scripts/guardian.cjs');
+    const lineas = conVecinaDeMentira('../scripts/medir-emulador-colgado.cjs',
+      { quienOcupa: () => Object.assign([], { incompleta: 'solo se miraron los 3' }), describir: String },
+      () => emuladoresVivos());
+    assert.deepStrictEqual(lineas, ['⚠ solo se miraron los 3', '✓ ninguno de esos escuchando (los demás no se miraron)']);
+    const completo = conVecinaDeMentira('../scripts/medir-emulador-colgado.cjs',
+      { quienOcupa: () => [], describir: String }, () => emuladoresVivos());
+    assert.deepStrictEqual(completo, ['✓ ninguno escuchando: no hay emulador vivo'], 'mirando todo, la salida de siempre');
+  });
+
+  it('la red de los declarados se abre SOLO si falta firebase-tools; otro error sigue reventando', () => {
+    const { losPuertos } = require('../scripts/medir-emulador-colgado.cjs');
+    const vecina = (mensaje) => ({ losDeFabrica: () => { throw new Error(mensaje); }, losDeGuajiraGo: () => [] });
+    const sinFt = conVecinaDeMentira('../scripts/medir-puertos-emulador.cjs',
+      vecina('no encontré la firebase-tools 15 que corre la tanda'), () => losPuertos());
+    assert.deepStrictEqual(sinFt.map(([p]) => String(p)), declarados(), 'sin firebase-tools tiene que mirar los declarados');
+    assert.ok(sinFt.incompleta, 'y decir que es una parte');
+    assert.throws(() => conVecinaDeMentira('../scripts/medir-puertos-emulador.cjs',
+      vecina('en pruebas/correr.cjs tiene que haber UNA sola versión'), () => losPuertos()), /UNA sola/,
+    'un error que no es la falta de firebase-tools se tapó con la red de los declarados');
+  });
+
+  // El sabotaje «quitar el websocketPort de los declarados» ESCAPABA (25-sep-2026, tarde): firebase.json hoy no
+  // lo declara, así que ese renglón no lo corría nadie y quitarlo dejaba los 10 casos en verde. Se le da una
+  // firebase.json de mentira que sí lo declara; y `ui`, que no tiene puerto, no cuenta como uno.
+  it('si firebase.json declarara el puerto websocket de firestore, sin firebase-tools también se miraría', () => {
+    const { losPuertos } = require('../scripts/medir-emulador-colgado.cjs');
+    const sinFt = { losDeFabrica: () => { throw new Error('no encontré la firebase-tools 15 que corre la tanda'); }, losDeGuajiraGo: () => [] };
+    const deMentira = { emulators: { firestore: { port: 11, websocketPort: 22 }, storage: { port: 33 }, ui: { enabled: false } } };
+    const r = conVecinaDeMentira('../firebase.json', deMentira, () =>
+      conVecinaDeMentira('../scripts/medir-puertos-emulador.cjs', sinFt, () => losPuertos()));
+    assert.deepStrictEqual(r.map(([p, n]) => p + ' ' + n).sort(), ['11 firestore', '22 firestore (websocket)', '33 storage'],
+      'con websocketPort declarado tiene que mirarlo, y una entrada sin puerto (ui) no es un puerto');
+    assert.match(r.incompleta, /solo se miraron los 3 puertos declarados/, 'el websocket cuenta entre los declarados');
+  });
 });

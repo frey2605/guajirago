@@ -38,13 +38,30 @@ const RAIZ = path.join(__dirname, '..');
 /**
  * Los puertos: los mismos que cuenta `scripts/medir-puertos-emulador.cjs`, que los lee de
  * `firebase.json` y de la firebase-tools de la tanda. Antes iban copiados aquí con su
- * número de fábrica: el gemelo que se queda viejo (SEGUNDA LEY). Si no encuentra
- * firebase-tools, revienta y el guardián lo dice (`emuladoresVivos`): nunca un «nadie»
- * sin mirar.
+ * número de fábrica: el gemelo que se queda viejo (SEGUNDA LEY).
+ * 🔑 Si no encuentra firebase-tools, NO se queda ciego: mira al menos los que declara
+ * `firebase.json` y lo DICE en `incompleta` (una propiedad de la lista). Hasta el 25-sep
+ * reventaba y no se miraba ninguno, ni los tres que sí se conocían.
  */
 function losPuertos() {
   const { losDeFabrica, losDeGuajiraGo } = require('./medir-puertos-emulador.cjs');
-  return losDeGuajiraGo(losDeFabrica()).map((f) => [f.puerto, f.nombre]);
+  try {
+    return losDeGuajiraGo(losDeFabrica()).map((f) => [f.puerto, f.nombre]);
+  } catch (e) {
+    // Solo cuando FALTA firebase-tools. Cualquier otro error (un pruebas/correr.cjs que no se lee,
+    // una firebase-tools que cambió) sigue reventando: la red no puede esconder otro fallo.
+    if (!/no encontré la firebase-tools/.test(e.message)) throw e;
+    const em = require(path.join(RAIZ, 'firebase.json')).emulators || {};
+    const declarados = Object.entries(em)
+      .filter(([, v]) => v && v.port)
+      .map(([nombre, v]) => [Number(v.port), nombre]);
+    if (em.firestore && em.firestore.websocketPort) {
+      declarados.push([Number(em.firestore.websocketPort), 'firestore (websocket)']);
+    }
+    declarados.incompleta = 'solo se miraron los ' + declarados.length + ' puertos declarados en firebase.json; '
+      + 'los que firebase-tools abre por su cuenta NO se pudieron mirar, porque: ' + String(e.message).split('\n')[0];
+    return declarados;
+  }
 }
 
 /**
@@ -69,10 +86,13 @@ Get-NetTCPConnection -State Listen -ErrorAction SilentlyContinue | Where-Object 
   const salida = execFileSync('powershell.exe', ['-NoProfile', '-Command', ps],
     { encoding: 'utf8', timeout: 60 * 1000 });
   const nombre = Object.fromEntries(puertos);
-  return [...new Set(salida.split(/\r?\n/).filter(Boolean))].map((f) => {
+  const filas = [...new Set(salida.split(/\r?\n/).filter(Boolean))].map((f) => {
     const [puerto, pid, desde, padre, proyecto] = f.split('|');
     return { puerto: Number(puerto), nombre: nombre[puerto], pid, desde, padre, proyecto };
   });
+  // Si solo se miró una parte, viaja con la respuesta: un «nadie» a medias no es un «nadie».
+  if (puertos.incompleta) filas.incompleta = puertos.incompleta;
+  return filas;
 }
 
 /** Un renglón legible por puerto, para este guion y para el guardián. */
@@ -90,7 +110,7 @@ if (require.main === module) {
   try {
     filas = quienOcupa();
   } catch (e) {
-    console.log('No se pudo preguntar a Windows: ' + String(e.message).split('\n')[0]);
+    console.log('No se pudo mirar quién ocupa los puertos: ' + String(e.message).split('\n')[0]);
     process.exit(1);
   }
   if (filas === null) {
@@ -99,8 +119,10 @@ if (require.main === module) {
   }
   console.log('== medido ' + new Date().toISOString());
   console.log('puertos que se miran: ' + losPuertos().map(([n, q]) => n + ' (' + q + ')').join(', '));
+  if (filas.incompleta) console.log('⚠ ' + filas.incompleta);
   if (!filas.length) {
-    console.log('✓ ninguno está abierto: no hay emulador vivo.');
+    console.log(filas.incompleta ? '✓ ninguno de ESOS está abierto (los demás no se miraron).'
+      : '✓ ninguno está abierto: no hay emulador vivo.');
     process.exit(0);
   }
   for (const o of filas) console.log(describir(o));

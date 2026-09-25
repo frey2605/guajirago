@@ -256,9 +256,14 @@ function emuladoresVivos() {
     const { quienOcupa, describir } = require('./medir-emulador-colgado.cjs');
     const filas = quienOcupa();
     if (filas === null) return ['(esta máquina no es Windows: no se pudo mirar quién ocupa los puertos)'];
+    // Si solo se miró una parte de los puertos, se dice antes que nada (25-sep-2026).
+    const aviso = filas.incompleta ? ['⚠ ' + filas.incompleta] : [];
     // Se miró y no hay nadie: se DICE, para que no se confunda con «no se preguntó».
-    if (!filas.length) return ['✓ ninguno escuchando: no hay emulador vivo'];
-    return filas.map(describir);
+    if (!filas.length) {
+      return [...aviso, filas.incompleta ? '✓ ninguno de esos escuchando (los demás no se miraron)'
+        : '✓ ninguno escuchando: no hay emulador vivo'];
+    }
+    return [...aviso, ...filas.map(describir)];
   } catch (e) {
     return ['(no se pudo mirar quién ocupa los puertos: ' + String(e.message).split('\n')[0] + ')'];
   }
@@ -584,4 +589,7 @@ module.exports = {
   // Lo usa su prueba (`pruebas/elGuardian.test.js`), para comprobar con un proceso
   // de verdad que un huérfano ya no lo cuelga.
   correrPruebas, queDicenLasPruebas,
+  // Lo usa el amarre de los puertos (`pruebas/amarres.test.js`), para comprobar que sin
+  // firebase-tools el guardián mira al menos los puertos declarados y lo dice.
+  emuladoresVivos,
 };
