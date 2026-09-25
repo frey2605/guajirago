@@ -52,10 +52,12 @@ const CARPETAS = [
   'pruebas', 'scripts', 'docs', '.claude',
   // `plan/` nació el 24-sep-2026 y aquí no entró: sus 16 archivos citaban sin
   // que nadie lo comprobara. Lo destapó un sabotaje que ESCAPÓ esa misma noche.
-  // Para que no vuelva a pasar con la carpeta DE NOTAS que nazca mañana, este
-  // guion dice al final cuántas notas `.md` del repo se quedan sin mirar. Una
-  // carpeta solo de código no la ve (hoy `guajirago-publicidad/`): anotado.
+  // Para que no vuelva a pasar con la carpeta que nazca mañana, este guion dice
+  // al final cuántos archivos citables del repo se quedan sin mirar.
   'plan',
+  // El generador del kit de publicidad: el único archivo citable que se quedaba
+  // fuera (medido el 25-sep-2026). El dueño: «arréglalos todos».
+  'guajirago-publicidad',
 ];
 // Y las RAÍCES, solo un nivel: ahí viven los README y las reglas.
 const RAICES = ['.', 'guajirago', 'guajirago-admin', 'guajirago-aliados'];
@@ -241,7 +243,7 @@ const CARPETAS_NUESTRAS = new Set(['guajirago', 'guajirago-admin', 'guajirago-al
   // Sin `plan` aquí, una cita escrita `plan/…md` se daba por «de fuera» y NUNCA se
   // comprobaba — aunque `plan/` ya estuviera en CARPETAS. Lo cazó la segunda
   // opinión el 24-sep-2026 metiendo `plan/99-…md` en un clon: ni una alarma.
-  'plan']);
+  'plan', 'guajirago-publicidad']);
 
 function deFuera(comentario, desde) {
   // ¿Hay una dirección de internet abierta antes de esta cita, sin espacios?
@@ -438,18 +440,20 @@ if (sobran.length > 0) {
   for (const [d, quien, trozo] of sobran) console.log(C.gris + '        ' + d + '  →  ' + quien + '  «' + trozo.slice(0, 38) + '…»' + C.off);
 }
 
-// 🔴 ¿QUEDA ALGUNA NOTA DEL REPO SIN MIRAR? Un cero de arriba puede querer decir
+// 🔴 ¿QUEDA ALGÚN ARCHIVO DEL REPO SIN MIRAR? Un cero de arriba puede querer decir
 // «no hay citas rotas» o «no estaba mirando ahí», y se ven igual. `plan/` estuvo
 // fuera de la lista desde que nació, y lo único que lo destapó fue un sabotaje.
-// Así que la lista de carpetas se CARA contra lo que git tiene: toda nota `.md`
-// que git sigue en este repo tiene que estar entre los archivos que se miran.
+// Así que la lista de carpetas se CARA contra lo que git tiene: todo archivo que
+// git sigue en este repo y que este guion sabe leer (MIRABLES: notas y código, sin
+// distinguir mayúsculas) tiene que estar entre los que se miran. Hasta el 25-sep
+// solo se contaban las notas `.md`, y una carpeta solo de código no se veía.
 const { execFileSync } = require('child_process');
 const mirados = new Set(losArchivos());
-// `:(icase)`: una nota con la extensión en MAYÚSCULAS también es una nota.
-const ciegas = execFileSync('git', ['ls-files', '-z', '--', ':(icase)*.md'], { cwd: RAIZ, encoding: 'utf8' })
-  .split('\0').filter(Boolean).filter((f) => !mirados.has(f));
+const ciegas = execFileSync('git', ['ls-files', '-z'], { cwd: RAIZ, encoding: 'utf8' })
+  .split('\0').filter(Boolean)
+  .filter((f) => MIRABLES.test(path.basename(f)) && !mirados.has(f));
 console.log('');
-console.log('    ' + (ciegas.length ? C.roj + '🔴 ' : C.ver + '✓ ') + 'notas .md del repo que este '
+console.log('    ' + (ciegas.length ? C.roj + '🔴 ' : C.ver + '✓ ') + 'archivos citables del repo que este '
   + 'guion NO mira: ' + ciegas.length + C.off);
 for (const f of ciegas) console.log(C.gris + '        ' + f + C.off);
 
@@ -472,5 +476,5 @@ console.log('');
 // quien mirara solo la salida no se enteraba. `process.exitCode` lo pisaba este
 // `process.exit` de aquí abajo, que solo miraba las citas.
 const excusasMalas = (r.excusasSinRespaldo || []).length;
-// Y una nota sin mirar también: un vigilante con una carpeta fuera firma en falso.
+// Y un archivo citable sin mirar también: un vigilante con una carpeta fuera firma en falso.
 process.exit(enElRepo === 0 && excusasMalas === 0 && ciegas.length === 0 ? 0 : 1);
