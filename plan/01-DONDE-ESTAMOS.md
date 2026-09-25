@@ -8,8 +8,8 @@ No supuesto. Cada fila se puede volver a contar.
 
 | Qué | Cuánto | Con qué se contó |
 |---|---|---|
-| Proyectos Firebase | **1** (`guajirago`) | `cat .firebaserc guajirago*/.firebaserc` |
-| Ambientes | **1**, y es **producción** | `grep -rhoE "projectId: *['\"][^'\"]+" */src` → un solo valor |
+| Proyectos Firebase | **2** desde el 25-sep-2026: `guajirago` (producción) y `guajirago-pruebas` (pruebas; creado ese día, todavía sin base de datos ni plan Blaze) | `npx firebase-tools@15 projects:list` |
+| Ambientes | **2 en la app de transporte** desde `b1c8a63` (compila por ambiente); el panel y aliados siguen con **1**, producción, con las llaves a mano | `node scripts/medir-ambientes.cjs` → transporte 6 de 6, panel 1 de 6, aliados 1 de 6 |
 | App Check | **no existe** | `grep -rl "appCheck\|AppCheck" */src */functions` → 0 fuera de `node_modules` |
 | Escrituras del celular directo a la base | **150** | `grep -rhoE "\b(addDoc\|setDoc\|updateDoc\|deleteDoc)\(" */src \| wc -l` |
 | Llamadas a funciones del servidor | **8** | `grep -rhoE "httpsCallable\(" */src \| wc -l` |

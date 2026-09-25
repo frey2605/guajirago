@@ -88,6 +88,13 @@ el gemelo que se queda viejo. Aquí queda el índice, y lo que es de GuajiraGo y
   los cambios de los otros dos.
 - **Paso 10 · APLICAR** — desde **dentro de la carpeta de cada app**. Desde la raíz,
   `firebase deploy --only hosting` publica un resto de junio y tumba la app del cliente.
+  🔴 **Y desde el 25-sep-2026 (fase 0, `b1c8a63`), producción se publica con `--project produccion`**
+  (o `guajirago`): el `.firebaserc` de `guajirago/` tiene por defecto **PRUEBAS** (`guajirago-pruebas`),
+  así que un `firebase deploy` sin `--project` publica en `guajirago-pruebas.web.app`. Es a propósito: el
+  error barato es publicar pruebas por error, nunca producción. Y se compila por ambiente:
+  `npm run build:produccion` o `npm run build:pruebas` (`npm run build` a secas sigue siendo producción;
+  un `react-scripts build` a pelo produce una app que se para al arrancar). Lo mide
+  `node scripts/medir-ambientes.cjs`. El panel y aliados siguen como antes: van aparte.
   🔴 **Desde el 24-sep-2026 se publica desde el PC, y GitHub es solo para GUARDAR** (decisión del
   dueño). Los cuatro botones que se disparaban solos al subir código —`desplegar`,
   `desplegar-reglas`, `desplegar-funciones` y `medir-pruebas`— están **APAGADOS en GitHub**, no

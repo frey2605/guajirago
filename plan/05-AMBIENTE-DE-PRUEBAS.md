@@ -33,3 +33,17 @@ Sin esto, **nada de lo demás se puede hacer sin riesgo**. Por eso va primero.
 - **La llave de Maps y los dominios de Auth** hay que autorizarlos también para dev. Eso ya mordió
   una vez con el canal de prueba (23-sep-2026).
 - Cada despliegue pasa a ser **dos**: primero dev, luego producción.
+
+### 🟢 Lo que ya está puesto (25-sep-2026)
+
+- **Nivel 2 empezado.** `guajirago-pruebas` existe (lo creó el dueño; se llama `-pruebas` y no `-dev`, como
+  en Talaria). Tiene app web registrada y sitio `guajirago-pruebas.web.app`. **No tiene todavía** base de
+  Firestore (la API está apagada: se enciende en la consola), ni plan Blaze (funciones y almacén), ni llave
+  de notificaciones.
+- **La app de transporte cumple las reglas 1, 3 y 4** (`b1c8a63`): proyecto aparte, el ambiente lo fija cómo
+  se compila (`npm run build:pruebas` / `build:produccion`, nunca a mano), y la copia de pruebas lleva cartel
+  naranja. La regla 5 se cumple a medias y está escrita: en `guajirago/.env.pruebas` la llave de
+  notificaciones está vacía y lo dice. La regla 2 (sembrar datos falsos con un guion) **no está hecha**.
+- **El panel y aliados no han empezado**: siguen con las llaves de producción escritas a mano. Van aparte,
+  cada uno con su arreglo. Lo cuenta `node scripts/medir-ambientes.cjs`: transporte 6 de 6, panel 1 de 6,
+  aliados 1 de 6.

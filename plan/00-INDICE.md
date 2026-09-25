@@ -50,6 +50,7 @@ nadie vuelve a abrir.
 | | |
 |---|---|
 | **Decidido** | **aliados se SEPARA** en su propio proyecto; **el transporte NO** (el pasajero y el conductor escriben el mismo documento en vivo). Ver [`02-DECISIONES.md`](02-DECISIONES.md) |
+| **Fase 0, empezada (25-sep-2026)** | `guajirago-pruebas` existe y la app de transporte compila por ambiente (`b1c8a63`): `npm run build:pruebas` / `build:produccion`, cartel PRUEBAS, `.firebaserc` con PRUEBAS por defecto. Faltan: la base de datos y el plan Blaze de pruebas (consola, del dueño), reglas, índices y funciones a pruebas, el guion de siembra, y las otras dos apps. Lo cuenta `node scripts/medir-ambientes.cjs` |
 | **Lo urgente detrás** | la **pregunta 8**: ¿cuántos aparatos por negocio? Con uno solo, la fase 4b entera sobra |
 | **Contestadas** | la 1 (aliados se separa), la 6 (qué es «Calaira») y la 7 (sin internet **todos los días**) |
 | **Lo que bloquea primero de todo** | ~~el permiso de lectura de los repos hermanos~~ ✅ servía desde la tarde del 24-sep. De lo que bloqueaba solo queda **P3**, los permisos de la llave de servicio, que son del dueño. Ver D.2 en [`D-PENDIENTES.md`](D-PENDIENTES.md) |
