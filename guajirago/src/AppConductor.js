@@ -901,7 +901,7 @@ const cargarSaldo = useCallback(async (uid) => {
         try {
           const { getMessaging, getToken } = await import('firebase/messaging');
           const messaging = getMessaging();
-          tokenFCM = await getToken(messaging, { vapidKey: 'BLcxcBCOZVLKO-qblckhRh0vcuAZjrXmMLZIQNxI0T6x9Viw0XxbpKoZJmNhvTb173FLjuaBIiRum8fSsZGljY0' });
+          tokenFCM = await getToken(messaging, { vapidKey: process.env.REACT_APP_FIREBASE_VAPID_KEY });
         } catch(e) {}
         await setDoc(doc(db, 'conductores', user.uid), {
           nombre: nombre || 'Conductor', telefono: telefono || '',

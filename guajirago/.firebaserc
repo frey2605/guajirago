@@ -1,5 +1,7 @@
 {
   "projects": {
-    "default": "guajirago"
+    "default": "guajirago-pruebas",
+    "pruebas": "guajirago-pruebas",
+    "produccion": "guajirago"
   }
 }

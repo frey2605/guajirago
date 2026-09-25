@@ -15,8 +15,10 @@
     "web-vitals": "^2.1.4"
   },
   "scripts": {
-    "start": "react-scripts start",
-    "build": "react-scripts build",
+    "start": "env-cmd -f .env.pruebas react-scripts start",
+    "build": "npm run build:produccion",
+    "build:pruebas": "env-cmd -f .env.pruebas react-scripts build",
+    "build:produccion": "env-cmd -f .env.produccion react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject"
   },
@@ -37,5 +39,8 @@
       "last 1 firefox version",
       "last 1 safari version"
     ]
+  },
+  "devDependencies": {
+    "env-cmd": "^11.0.0"
   }
 }
