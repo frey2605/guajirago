@@ -3507,3 +3507,151 @@ describe('EL RESPALDO DEL GPS · el de repuesto no puede pedir más que el que f
       + '\n   O el código se movió y hay que actualizar el parche, o el arreglo ya no está.');
   });
 });
+
+describe('LOS PUERTOS DEL EMULADOR · propios donde hace falta, y escritos en un solo sitio', () => {
+  // El 25-sep-2026 la tanda se colgó dos veces, y el emulador de aquí abría los puertos de
+  // fábrica, los mismos de cualquier proyecto Firebase de la máquina. Medido ese día con
+  // `node scripts/medir-puertos-emulador.cjs`: firestore, functions y storage son FIJOS (si
+  // están ocupados, fallan), así que esos tres se declaran propios en firebase.json; los
+  // demás buscan otro solos, y declararlos los volvería fijos. Las pruebas piden el número a
+  // `elEmulador` de pruebas/cargar.cjs. El recorrido vive en el guion; aquí se IMPORTA.
+  // 🔑 Este bloque no lleva ningún número de puerto escrito: los saca de firebase-tools, porque
+  // su propio vigilante recorre este archivo.
+  const M = require('../scripts/medir-puertos-emulador.cjs');
+  const { elEmulador } = require('./cargar.cjs');
+  // Se pide DENTRO de cada prueba: si firebase-tools no está, cae la prueba con su nombre y su
+  // motivo, no el bloque entero con un rojo mudo (lo demostró la segunda opinión del 25-sep).
+  const fabrica = () => M.losDeFabrica();
+  const deVerdad = () => JSON.parse(leer('firebase.json').replace(/^﻿/, ''));
+
+  it('los de fábrica salen de la firebase-tools que corre la tanda, no de cualquiera', () => {
+    // Se le PREGUNTA a npx qué versión correría con la orden de la tanda. La primera versión de
+    // este caso comparaba la versión mayor con un 15 escrito a mano, y el guion ya filtraba por ese
+    // 15: no podía fallar nunca (ronda 2 de segunda opinión). Va con `--yes` y no `--no-install`:
+    // sin global, `--no-install` se niega aunque la copia esté en el caché (medido el 25-sep). Dentro
+    // de `npm test` no baja nada: la tanda ya la bajó al arrancar con la misma orden.
+    const f = fabrica();
+    const salida = require('node:child_process').execSync('npx --yes firebase-tools@' + f.mayor + ' --version',
+      { cwd: RAIZ, encoding: 'utf8', timeout: 3 * 60 * 1000 }).trim().split(/\r?\n/).pop();
+    assert.strictEqual(f.version, salida,
+      'la tanda corre firebase-tools ' + salida + ' y los de fábrica se leyeron de la ' + f.version + ' (' + f.origen + ')');
+  });
+
+  it('los puertos FIJOS de la tanda son propios; los que buscan otro solos, sin declarar', () => {
+    const f = fabrica();
+    const filas = M.losDeGuajiraGo(f);
+    const chocan = filas.filter((x) => x.chocable).map((x) => x.nombre + ' ' + x.puerto);
+    assert.deepStrictEqual(chocan, [],
+      'estos puertos son fijos Y de fábrica: si otro proyecto los tiene, el emulador de aquí falla al arrancar');
+    const fijosSinDeclarar = filas.filter((x) => x.fijo && !x.declarado).map((x) => x.nombre);
+    assert.deepStrictEqual(fijosSinDeclarar, [],
+      'estos son fijos y no están en firebase.json: arrancan en el de fábrica y chocan');
+    const sobran = filas.filter((x) => x.declarado && f.buscaOtro[x.nombre]).map((x) => x.nombre);
+    assert.deepStrictEqual(sobran, [],
+      'sin declarar, estos buscaban otro puerto solos si el suyo estaba ocupado; declarados se vuelven '
+      + 'FIJOS y fallan. No los declares: ' + sobran.join(', '));
+    const fijos = filas.filter((x) => x.fijo).map((x) => x.puerto);
+    assert.deepStrictEqual(fijos.filter((p, i) => fijos.indexOf(p) !== i), [], 'dos emuladores fijos en el mismo puerto');
+  });
+
+  it('ningún archivo de los tres repos lleva suelto un número de puerto de la tanda', () => {
+    const m = M.losEscritosAMano(fabrica());
+    assert.deepStrictEqual(m.sitios.map((s) => s.archivo + ':' + s.renglon + '  ' + s.texto + '  ← ' + s.motivo), [],
+      'un número de puerto escrito a mano habla con el emulador de OTRO, o se queda viejo el día que '
+      + 'firebase.json cambie. Pídeselo a `elEmulador` de pruebas/cargar.cjs');
+    assert.deepStrictEqual(m.sinUso.map((x) => x.archivo + ' — ' + x.motivo), [],
+      'estas excepciones de scripts/medir-puertos-emulador.cjs ya no calzan con ningún renglón: bórralas');
+  });
+
+  it('elEmulador dice lo que dice firebase.json, y se queja si falta uno', () => {
+    const e = deVerdad().emulators;
+    assert.deepStrictEqual(elEmulador(),
+      { firestore: e.firestore.port, functions: e.functions.port, storage: e.storage.port });
+    // Con un firebase.json de mentira: si devolviera números fijos, aquí se vería.
+    const mentira = { emulators: { firestore: { port: 1 }, functions: { port: 2 }, storage: { port: 3 } } };
+    assert.deepStrictEqual(elEmulador(mentira), { firestore: 1, functions: 2, storage: 3 });
+    for (const falta of ['firestore', 'functions', 'storage']) {
+      const sin = JSON.parse(JSON.stringify(mentira));
+      delete sin.emulators[falta];
+      assert.throws(() => elEmulador(sin), new RegExp(falta),
+        'sin el puerto de ' + falta + ' en firebase.json, elEmulador tenía que quejarse');
+    }
+  });
+
+  it('el guardián de los colgados mira EXACTAMENTE los puertos que abre la tanda', () => {
+    const { losPuertos } = require('../scripts/medir-emulador-colgado.cjs');
+    const mira = losPuertos().map(([p]) => p).sort((a, b) => a - b);
+    const abre = M.losDeGuajiraGo(fabrica()).map((x) => x.puerto).sort((a, b) => a - b);
+    assert.deepStrictEqual(mira, abre,
+      'el guardián vigila unos puertos y el emulador abre otros: le sobra una copia a mano o le falta uno');
+  });
+
+  it('y el medidor no se puede ablandar: busca el NÚMERO, lo escriban como lo escriban', () => {
+    const f = fabrica();
+    const numeros = Object.keys(M.losNumerosProhibidos(f));
+    const H = '127.0.0.' + '1';
+    // Las formas que la segunda opinión coló el 25-sep delante del vigilante anterior, y más.
+    const formas = (n) => ['port: ' + n, "'http://" + H + ":' + " + n, '`http://' + H + ':${' + n + '}/`',
+      '{ firestore: ' + n + ', functions: 1 }', "connectFirestoreEmulator(db, '" + H + "', " + n + ')',
+      'FIRESTORE_EMULATOR_HOST=localhost:' + n, "port: Number('" + n + "')", '"port": ' + n, 'port =\n  ' + n];
+    for (const n of numeros) {
+      for (const t of formas(n)) {
+        assert.strictEqual(M.numerosEnTexto(t, numeros).filter((h) => h.numero === Number(n)).length, 1,
+          'el medidor no vio el ' + n + ' en: ' + t);
+      }
+      // Y no lo confunde con un número más largo ni con un nombre que lo contenga.
+      for (const t of ['1' + n, n + '0', 'v' + n, '0.' + n]) {
+        assert.strictEqual(M.numerosEnTexto(t, numeros).filter((h) => h.numero === Number(n)).length, 0,
+          'el medidor vio un ' + n + ' donde no lo hay: ' + t);
+      }
+    }
+    // Recorre subcarpetas y los tres repos, incluido él mismo; y firebase.json se salta a propósito.
+    const archivos = new Set(M.losArchivos());
+    for (const debe of ['guajirago/functions/index.js', 'scripts/medir-puertos-emulador.cjs', '.claude/candado.cjs',
+      'pruebas/amarres.test.js', '.github/workflows/desplegar.yml']) {
+      assert.ok(archivos.has(debe), 'el medidor no recorre ' + debe);
+    }
+    assert.ok([...archivos].some((a) => a.startsWith('guajirago-admin/src/')), 'el medidor no recorre el panel');
+    assert.ok([...archivos].some((a) => a.startsWith('guajirago-aliados/src/')), 'el medidor no recorre aliados');
+    assert.ok(!archivos.has('firebase.json'), 'firebase.json es el único sitio donde viven los propios');
+    // Un firebase.json de mentira: un fijo en el de fábrica, uno de los que se mueven declarado, uno fijo quitado.
+    const malo = deVerdad();
+    malo.emulators.firestore.port = f.puertos.firestore;
+    malo.emulators.hub = { port: 1 };
+    delete malo.emulators.storage;
+    const filas = M.losDeGuajiraGo(f, malo);
+    const fila = (n) => filas.find((x) => x.nombre === n);
+    assert.ok(fila('firestore').chocable, 'no vio que firestore volvió al de fábrica');
+    assert.ok(fila('hub').declarado && fila('hub').fijo, 'no vio que declarar el hub lo vuelve fijo');
+    assert.ok(fila('storage').fijo && !fila('storage').declarado && fila('storage').chocable,
+      'no vio que storage dejó de estar declarado y arranca en el de fábrica');
+    // Un emulador más en el `--only` de la tanda: su puerto es fijo y de fábrica, y se tiene que ver.
+    const conAuth = { ...f, arrancan: M.losQueArrancan(['firestore', 'functions', 'storage', 'auth']) };
+    const auth = M.losDeGuajiraGo(conAuth).find((x) => x.nombre === 'auth');
+    assert.ok(auth && auth.chocable, 'no vio que un emulador nuevo en el --only arranca en un puerto fijo de fábrica');
+    assert.ok(Object.keys(M.losNumerosProhibidos(conAuth)).includes(String(f.puertos.auth)),
+      'con auth en la tanda, su número de fábrica tiene que estar prohibido');
+    // La tanda se lee de pruebas/correr.cjs, y un señuelo no la engaña (ronda 3 de segunda opinión).
+    const real = leer('pruebas/correr.cjs');
+    const V = "'firebase-tools@" + f.mayor + "',";
+    const O = "'--only', '" + laTandaDeVerdad().emuladores.join(',') + "',";
+    function laTandaDeVerdad() { return M.laTanda(real); }
+    assert.throws(() => M.laTanda('// antes: ' + O + '\n' + real), /UNA sola/, 'un --only viejo en un comentario engañó la lectura');
+    assert.throws(() => M.laTanda('// antes: ' + V + '\n' + real), /UNA sola/, 'una versión vieja en un comentario engañó la lectura');
+    assert.throws(() => M.laTanda(real.replace(O, O.slice(0, -2) + "' + ',auth',")), /UNA sola/,
+      'un --only armado por partes se leyó a medias');
+    // Ronda 4: la orden real con comillas DOBLES y un señuelo con simples en un comentario.
+    const Odobles = O.replace(/'/g, '"');
+    const conAuthDobles = real.replace(O, Odobles.slice(0, -2) + ',auth",');
+    assert.throws(() => M.laTanda('/*\n  ' + O + '\n*/\n' + conAuthDobles), /UNA sola/,
+      'un señuelo en un comentario de bloque tapó la orden real escrita con comillas dobles');
+    // La ÚNICA aparición, comentada: tiene que pararse aunque no haya dos (vigila el chequeo de comentario).
+    assert.throws(() => M.laTanda(real.replace(O, '// ' + O)), /UNA sola/, 'un --only comentado se tomó por la orden');
+    assert.throws(() => M.laTanda(real.replace(O, '/* ' + O + ' */')), /UNA sola/, 'un --only en /* */ se tomó por la orden');
+    // Y sin falsas alarmas: comillas dobles, y un `//` que es de una dirección, no un comentario.
+    assert.deepStrictEqual(M.laTanda(real.replace(O, Odobles)).emuladores, M.laTanda(real).emuladores,
+      'la orden real con comillas dobles se tiene que leer igual');
+    assert.deepStrictEqual(M.laTanda(real.replace(O, "'--x', 'http://a', " + O)).emuladores, M.laTanda(real).emuladores,
+      'un http:// en el mismo renglón no es un comentario');
+  });
+});

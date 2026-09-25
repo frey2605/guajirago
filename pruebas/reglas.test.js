@@ -29,6 +29,7 @@ const como = (uid) => entorno.authenticatedContext(uid).firestore();
 const sinCuenta = () => entorno.unauthenticatedContext().firestore();
 
 before(async () => {
+  const { elEmulador } = require('./cargar.cjs');
   RUT = await import('@firebase/rules-unit-testing');
   FS = await import('firebase/firestore');
   entorno = await RUT.initializeTestEnvironment({
@@ -36,7 +37,7 @@ before(async () => {
     firestore: {
       rules: fs.readFileSync(path.join(RAIZ, 'firestore.rules'), 'utf8'),
       host: '127.0.0.1',
-      port: 8085,
+      port: elEmulador().firestore,
     },
   });
 });

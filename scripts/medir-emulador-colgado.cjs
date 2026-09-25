@@ -17,13 +17,16 @@
  * 25-sep no lo reprodujo.
  *
  * ── LO QUE CUENTA ───────────────────────────────────────────────────────────
- *   · cada puerto del emulador: los de `firebase.json` y los que el emulador
- *     abre por su cuenta (hub, logging, eventarc, tasks, websocket)
+ *   · cada puerto que abre el emulador de la tanda: los tres declarados en
+ *     `firebase.json` y los que firebase-tools abre solo (hub, registro, eventarc,
+ *     tareas, websocket), con el número que saca `scripts/medir-puertos-emulador.cjs`
  *   · quién lo escucha, de qué proyecto es (`demo-…`) y si su padre sigue vivo
  *
- * 🔑 Los puertos se comparten entre proyectos de esta máquina: Talaria usa el
- * mismo 9199 y el mismo hub 4400. Un puerto ocupado por OTRO proyecto no es un
- * huérfano de aquí: es un choque, y se dice distinto.
+ * 🔑 Desde el 25-sep-2026 firestore, functions y storage tienen puertos PROPIOS,
+ * declarados en `firebase.json`: antes eran los de fábrica, los mismos de cualquier
+ * proyecto Firebase de la máquina. Los demás siguen siendo los de fábrica A PROPÓSITO:
+ * si están ocupados, firebase-tools busca otro solo. Por eso un proyecto ajeno en uno
+ * de ellos no es un huérfano de aquí: es un choque, y se dice distinto.
  *
  * Solo sirve en Windows (pregunta con PowerShell). En otra máquina lo dice y sale.
  */
@@ -32,15 +35,16 @@ const path = require('path');
 
 const RAIZ = path.join(__dirname, '..');
 
-/** Los puertos: los que declara `firebase.json` y los que el emulador abre solo. */
+/**
+ * Los puertos: los mismos que cuenta `scripts/medir-puertos-emulador.cjs`, que los lee de
+ * `firebase.json` y de la firebase-tools de la tanda. Antes iban copiados aquí con su
+ * número de fábrica: el gemelo que se queda viejo (SEGUNDA LEY). Si no encuentra
+ * firebase-tools, revienta y el guardián lo dice (`emuladoresVivos`): nunca un «nadie»
+ * sin mirar.
+ */
 function losPuertos() {
-  const em = require(path.join(RAIZ, 'firebase.json')).emulators || {};
-  const declarados = Object.entries(em)
-    .filter(([, v]) => v && v.port)
-    .map(([nombre, v]) => [Number(v.port), nombre]);
-  const propios = [[4400, 'hub'], [4500, 'logging'], [9150, 'websocket de firestore'],
-    [9299, 'eventarc'], [9499, 'tasks']];
-  return [...declarados, ...propios];
+  const { losDeFabrica, losDeGuajiraGo } = require('./medir-puertos-emulador.cjs');
+  return losDeGuajiraGo(losDeFabrica()).map((f) => [f.puerto, f.nombre]);
 }
 
 /**

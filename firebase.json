@@ -24,9 +24,9 @@
     "source": "guajirago/functions"
   },
   "emulators": {
-    "firestore": { "port": 8085 },
-    "functions": { "port": 5001 },
-    "storage": { "port": 9199 },
+    "firestore": { "port": 18085 },
+    "functions": { "port": 15001 },
+    "storage": { "port": 19199 },
     "ui": { "enabled": false }
   }
 }

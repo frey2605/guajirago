@@ -422,8 +422,41 @@ function elRespaldoDelGps(codigoFuente, desde) {
   };
 }
 
+/**
+ * LOS PUERTOS DEL EMULADOR — salen de `firebase.json` y de ningún otro sitio.
+ *
+ * Hasta el 25-sep-2026 cuatro pruebas llevaban el número escrito a mano, en ocho
+ * sitios, y eran los puertos DE FÁBRICA que usa cualquier proyecto Firebase de la
+ * máquina: si otro los tenía ocupados, el emulador de aquí fallaba al arrancar.
+ * Ahora `firebase.json` declara puertos propios y las pruebas se los piden aquí.
+ * Si falta uno, se queja con su nombre: una prueba que adivina el puerto es una
+ * prueba que habla con el emulador de OTRO.
+ *
+ * `config` es para el amarre, que le da archivos de mentira; sin él, lee el de verdad.
+ */
+function elEmulador(config) {
+  let c = config;
+  if (!c) {
+    let t = fs.readFileSync(path.join(RAIZ, 'firebase.json'), 'utf8');
+    if (t.charCodeAt(0) === 0xFEFF) t = t.slice(1);
+    c = JSON.parse(t);
+  }
+  const em = c.emulators || {};
+  const puerto = (nombre, valor) => {
+    assert.ok(Number.isInteger(valor) && valor > 0,
+      'firebase.json no declara el puerto del emulador «' + nombre + '». Las pruebas no '
+      + 'adivinan: sin puerto declarado arrancaría en el de fábrica, el mismo de los otros proyectos.');
+    return valor;
+  };
+  return {
+    firestore: puerto('firestore', em.firestore && em.firestore.port),
+    functions: puerto('functions', em.functions && em.functions.port),
+    storage: puerto('storage', em.storage && em.storage.port),
+  };
+}
+
 module.exports = {
   RAIZ, leer, cargarDeLaApp, soloCodigo, sinTextos, cuerpoDeLaFuncion, cuerpoDelCatch,
   trozoDelTry, dentroDeTry, tieneCatchPropio, catchPropioDe, catchQueProtege,
-  intentosDelGps, elRespaldoDelGps,
+  intentosDelGps, elRespaldoDelGps, elEmulador,
 };

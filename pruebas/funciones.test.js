@@ -16,8 +16,11 @@ const { test, describe, before, beforeEach } = require('node:test');
 const assert = require('node:assert');
 
 const PROYECTO = 'demo-guajirago';
-const BD = 'http://127.0.0.1:8085/v1/projects/' + PROYECTO + '/databases/(default)/documents';
-const FN = 'http://127.0.0.1:5001/' + PROYECTO + '/us-central1/confirmarConductor';
+// Los puertos salen de firebase.json por `pruebas/cargar.cjs` (elEmulador): no se escriben aquí.
+const PUERTOS = require('./cargar.cjs').elEmulador();
+const BD = 'http://127.0.0.1:' + PUERTOS.firestore + '/v1/projects/' + PROYECTO + '/databases/(default)/documents';
+const FUNCIONES = 'http://127.0.0.1:' + PUERTOS.functions + '/' + PROYECTO + '/us-central1/';
+const FN = FUNCIONES + 'confirmarConductor';
 
 const COMISION_TAXI = 800;
 const SALDO_INICIAL = 10000;
@@ -65,7 +68,7 @@ function carnet(uid) {
 async function llamarA(nombre, uid, datos) {
   const cabeceras = { 'Content-Type': 'application/json' };
   if (uid) cabeceras.Authorization = 'Bearer ' + carnet(uid);
-  const r = await fetch('http://127.0.0.1:5001/' + PROYECTO + '/us-central1/' + nombre,
+  const r = await fetch(FUNCIONES + nombre,
     { method: 'POST', headers: cabeceras, body: JSON.stringify({ data: datos }) });
   let cuerpo = null;
   try { cuerpo = await r.json(); } catch (e) { cuerpo = null; }
@@ -228,7 +231,7 @@ describe('REGLA 2 · confirmarConductor pregunta quien llama', () => {
   });
 
   test('subirTarifa ya no existe en el servidor', async () => {
-    const r = await fetch('http://127.0.0.1:5001/' + PROYECTO + '/us-central1/subirTarifa', {
+    const r = await fetch(FUNCIONES + 'subirTarifa', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ data: { viajeId: 'v1', nuevaTarifa: 1 } }),
     });

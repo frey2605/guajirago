@@ -44,6 +44,7 @@ const como = (uid) => entorno.authenticatedContext(uid).storage();
 const sinCuenta = () => entorno.unauthenticatedContext().storage();
 
 before(async () => {
+  const { elEmulador } = require('./cargar.cjs');
   RUT = await import('@firebase/rules-unit-testing');
   ST = await import('firebase/storage');
   FS = await import('firebase/firestore');
@@ -52,12 +53,12 @@ before(async () => {
     storage: {
       rules: fs.readFileSync(path.join(RAIZ, 'storage.rules'), 'utf8'),
       host: '127.0.0.1',
-      port: 9199,
+      port: elEmulador().storage,
     },
     firestore: {
       rules: fs.readFileSync(path.join(RAIZ, 'firestore.rules'), 'utf8'),
       host: '127.0.0.1',
-      port: 8085,
+      port: elEmulador().firestore,
     },
   });
 });
