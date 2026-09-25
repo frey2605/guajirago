@@ -191,18 +191,76 @@ function leerConfig() {
   }
 }
 
-/** Corre las pruebas si hay comando configurado. Sin comando NO inventa: lo dice. */
-function correrPruebas() {
-  const cfg = leerConfig();
+/**
+ * Corre las pruebas si hay comando configurado. Sin comando NO inventa: lo dice.
+ *
+ * 🔴 CON TIEMPO MÁXIMO. El 24-sep-2026 la tanda TERMINÓ, pero el Java del
+ * emulador se quedó huérfano reteniendo la salida, y `execFileSync` la esperó PARA
+ * SIEMPRE: el guardián se colgó sin decir nada. Medido el 25-sep en Windows, al
+ * agotarse el tiempo hay DOS casos, y no son lo mismo:
+ *   · la tanda terminó y algo retiene la salida → `ETIMEDOUT` CON `status` (0 o 1).
+ *     El resultado SE CONOCE: se usa, y `retenida` avisa aparte. Tirarlo sería
+ *     decir «no terminaron» justo en el caso del 24-sep, que sí terminó.
+ *   · la tanda no terminó → `ETIMEDOUT` sin `status`. `ok` es `null` —no se sabe
+ *     si pasan— y `colgada` dice a los cuántos minutos.
+ * ⚠ El tiempo agotado mata el `cmd.exe`, NO lo que corre debajo (npm, firebase,
+ * el Java): eso puede seguir vivo con los puertos tomados. Por eso, cuando las
+ * pruebas no pasan o no terminan, se enseña quién sigue escuchando.
+ * La tanda entera tarda unos 5 minutos; por defecto se esperan 20
+ * (`pruebasMinutos` en `.guardian.json` lo cambia).
+ */
+function correrPruebas(cfg = leerConfig()) {
   if (!cfg.pruebas) return { hay: false, ok: null };
+  const minutos = cfg.pruebasMinutos || 20;
   try {
     execFileSync(cfg.pruebas, {
       cwd: RAIZ, encoding: 'utf8', shell: true,
       maxBuffer: 32 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'],
+      timeout: minutos * 60 * 1000,
     });
     return { hay: true, ok: true };
   } catch (e) {
+    if (e.code === 'ETIMEDOUT') {
+      if (typeof e.status === 'number') return { hay: true, ok: e.status === 0, retenida: minutos };
+      return { hay: true, ok: null, colgada: minutos };
+    }
     return { hay: true, ok: false };
+  }
+}
+
+/**
+ * Qué dicen las pruebas de ahora comparadas con las de la foto. Pura, para que su
+ * prueba la llame sin correr nada: 'sin' | 'colgada' | 'rompiste' | 'verde' |
+ * 'rojaSinBase' | 'yaRojas'.
+ * 🔴 EL ORDEN ES LA DECISIÓN: 'colgada' va ANTES que 'rompiste'. Una tanda que no
+ * terminó trae `ok: null`, y `!null` es verdadero: preguntando primero «¿pasaba y
+ * ahora no?», un cuelgue se firmaría como «rompiste algo» sin saber si algo se rompió.
+ */
+function queDicenLasPruebas(base, pr) {
+  if (!pr.hay) return 'sin';
+  if (pr.colgada) return 'colgada';
+  if (base.ok && !pr.ok) return 'rompiste';
+  if (pr.ok) return 'verde';
+  if (base.colgada) return 'rojaSinBase';
+  return 'yaRojas';
+}
+
+/**
+ * Quién sigue escuchando en los puertos del emulador, en renglones legibles. Se
+ * pregunta cuando las pruebas no pasan o no terminan: un emulador vivo DESPUÉS de
+ * la tanda es uno colgado o de otro proyecto, y eso explica un rojo que no es del
+ * código. Si no se puede preguntar, se dice (REGLA 9): nunca un «nadie» sin mirar.
+ */
+function emuladoresVivos() {
+  try {
+    const { quienOcupa, describir } = require('./medir-emulador-colgado.cjs');
+    const filas = quienOcupa();
+    if (filas === null) return ['(esta máquina no es Windows: no se pudo mirar quién ocupa los puertos)'];
+    // Se miró y no hay nadie: se DICE, para que no se confunda con «no se preguntó».
+    if (!filas.length) return ['✓ ninguno escuchando: no hay emulador vivo'];
+    return filas.map(describir);
+  } catch (e) {
+    return ['(no se pudo mirar quién ocupa los puertos: ' + String(e.message).split('\n')[0] + ')'];
   }
 }
 
@@ -291,7 +349,7 @@ function foto(argv) {
     descripcion, sitios, archivos,
     fecha: new Date().toISOString(),
     estado,
-    pruebasBase: { hay: pruebas.hay, ok: pruebas.ok },
+    pruebasBase: { hay: pruebas.hay, ok: pruebas.ok, colgada: pruebas.colgada || null },
   };
   fs.writeFileSync(FOTO, JSON.stringify(datos, null, 2));
 
@@ -310,7 +368,11 @@ function foto(argv) {
   if (!pruebas.hay) {
     say(C.ama + '   ⚠ sin pruebas configuradas: el paso 5 no se puede cumplir (ver .guardian.json)' + C.off);
   } else {
-    say(C.gris + '   pruebas base: ' + (pruebas.ok ? 'pasaban' : 'YA FALLABAN antes de tocar') + C.off);
+    say(C.gris + '   pruebas base: ' + (pruebas.colgada
+      ? 'NO TERMINARON en ' + pruebas.colgada + ' min: no se sabe si pasaban'
+      : pruebas.ok ? 'pasaban' : 'YA FALLABAN antes de tocar')
+      + (pruebas.retenida ? ' — pero algo retuvo su salida ' + pruebas.retenida + ' min' : '') + C.off);
+    if (!pruebas.ok || pruebas.retenida) for (const l of emuladoresVivos()) say(C.gris + '     ' + l + C.off);
   }
 }
 
@@ -410,17 +472,41 @@ function revisar() {
   // Pruebas: una que pasaba y ahora falla es "moviste código que ya funcionaba"
   say('');
   const pr = correrPruebas();
-  if (!pr.hay) {
+  const dicen = queDicenLasPruebas(f.pruebasBase, pr);
+  if (dicen === 'sin') {
     say('   ' + C.ama + '⚠ SIN PRUEBAS' + C.off + ' — el paso 5 no se está cumpliendo.');
     say('   ' + C.gris + '  Configura {"pruebas":"<comando>"} en .guardian.json.' + C.off);
     avisos.push('no hay pruebas que ejecuten lo tocado');
-  } else if (f.pruebasBase.ok && !pr.ok) {
+  } else if (dicen === 'colgada') {
+    say('   ' + C.rojo + C.neg + '⏱ LAS PRUEBAS NO TERMINARON en ' + pr.colgada + ' min' + C.off
+      + ' — no se sabe si pasan, y lo que corría puede seguir vivo (mira abajo quién escucha)');
+    paradas.push('LAS PRUEBAS NO TERMINARON en ' + pr.colgada + ' min: no se puede firmar nada');
+  } else if (dicen === 'rompiste') {
     say('   ' + C.rojo + C.neg + '✗ UNA PRUEBA QUE PASABA AHORA FALLA' + C.off);
     paradas.push('ROMPISTE ALGO QUE YA FUNCIONABA (prueba en verde → en rojo)');
-  } else if (pr.ok) {
+  } else if (dicen === 'verde') {
     say('   ' + C.verde + '✓ pruebas en verde' + C.off);
+  } else if (dicen === 'rojaSinBase') {
+    say('   ' + C.rojo + C.neg + '✗ pruebas en rojo' + C.off + ', y antes de tocar NO TERMINARON:'
+      + ' no se sabe si esto ya fallaba');
+    paradas.push('PRUEBAS EN ROJO sin una base con la que compararlas (la de la foto no terminó)');
   } else {
     say('   ' + C.ama + '⚠ pruebas en rojo, pero ya lo estaban antes de tocar' + C.off);
+  }
+  // La tanda terminó, pero algo retuvo su salida hasta agotar el tiempo: es el
+  // 24-sep. El veredicto de arriba es el de verdad; esto se avisa aparte.
+  if (pr.retenida) {
+    avisos.push('la tanda terminó, pero algo retuvo su salida ' + pr.retenida + ' min (un emulador '
+      + 'huérfano, como el 24-sep): mira arriba quién escucha');
+  }
+  // Un emulador vivo DESPUÉS de la tanda explica un rojo que no es del código:
+  // el 24-sep un puerto ocupado firmó «rompiste algo» sin haber roto nada.
+  if (pr.hay && (!pr.ok || pr.retenida)) {
+    const vivos = emuladoresVivos();
+    if (vivos.length) {
+      say('   ' + C.gris + '  emuladores que siguen escuchando después de la tanda:' + C.off);
+      for (const l of vivos) say('   ' + C.gris + '    ' + l + C.off);
+    }
   }
 
   // Veredicto
@@ -495,4 +581,7 @@ module.exports = {
   // interpreta —renombrados, comillas, papeles del guardián—, y una segunda copia
   // de esa interpretación es exactamente el gemelo que se queda viejo.
   fueraDeLaFoto, cambiados, reposVivos, FOTO,
+  // Lo usa su prueba (`pruebas/elGuardian.test.js`), para comprobar con un proceso
+  // de verdad que un huérfano ya no lo cuelga.
+  correrPruebas, queDicenLasPruebas,
 };

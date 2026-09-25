@@ -17,7 +17,8 @@
 // ══════════════════════════════════════════════════════════════════════════════
 const { describe, it } = require('node:test');
 const assert = require('node:assert');
-const { juntarRenglones, cubrePor, esPapelDelGuardian } = require('../scripts/guardian.cjs');
+const { juntarRenglones, cubrePor, esPapelDelGuardian, correrPruebas, queDicenLasPruebas }
+  = require('../scripts/guardian.cjs');
 
 //  `juntarRenglones` es pura: recibe el texto del diff y los archivos nuevos ya
 //  leídos. Por eso aquí se le pueden dar casos de mentira sin tocar git.
@@ -183,5 +184,95 @@ describe('EL GUARDIÁN · sus propios papeles no le paran el trabajo', () => {
   it('un archivo con el mismo nombre en OTRO repo no se cuela', () => {
     assert.strictEqual(esPapelDelGuardian('guajirago-admin', '.guardian.json'), false,
       '⛔ un archivo de otro repo pasaría por papel de este guardián y dejaría de vigilarse');
+  });
+});
+
+// ── EL GUARDIÁN NO SE CUELGA POR UN HUÉRFANO ─────────────────────────────────
+//  El 24-sep-2026 a las 23:55 la tanda TERMINÓ, pero el Java del emulador se quedó
+//  vivo con su padre muerto, reteniendo la salida, y `correrPruebas` la esperó
+//  PARA SIEMPRE. Aquí se hace lo mismo con procesos DE VERDAD —un nieto que hereda
+//  la salida y sobrevive a su padre—, no con un simulacro. Tres casos, medidos el
+//  25-sep en Windows, y los tres se distinguen:
+//    · terminó bien  + huérfano → el resultado SE CONOCE (verde) y se avisa aparte
+//    · terminó mal   + huérfano → el resultado SE CONOCE (rojo)  y se avisa aparte
+//    · no terminó               → no se sabe: `ok` null, «colgada»
+describe('EL GUARDIÁN · un emulador huérfano ya no lo cuelga', () => {
+  const { after } = require('node:test');
+  const os = require('node:os');
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const carpeta = fs.mkdtempSync(path.join(os.tmpdir(), 'guardian-huerfano-'));
+  after(() => fs.rmSync(carpeta, { recursive: true, force: true }));
+  const escribir = (nombre, codigo) => {
+    const f = path.join(carpeta, nombre);
+    fs.writeFileSync(f, codigo);
+    return 'node "' + f + '"';
+  };
+  // El nieto vive 40 s con la salida de su padre. Como el Java.
+  const NIETO = "require('child_process').spawn(process.execPath, ['-e', 'setTimeout(()=>{}, 40000)'],"
+    + " { stdio: 'inherit', detached: true }).unref();";
+  const BIEN_CON_HUERFANO = escribir('bien-con-huerfano.cjs', NIETO + 'process.exit(0);');
+  const MAL_CON_HUERFANO = escribir('mal-con-huerfano.cjs', NIETO + 'process.exit(1);');
+  const SE_CUELGA = escribir('se-cuelga.cjs', 'setTimeout(()=>{}, 40000);');
+  const QUE_FALLA = escribir('que-falla.cjs', 'process.exit(1);');
+  const QUE_PASA = escribir('que-pasa.cjs', 'process.exit(0);');
+  const SEIS_SEGUNDOS = 0.1;
+  const aTiempo = (fn) => {
+    const t0 = Date.now();
+    const r = fn();
+    const s = (Date.now() - t0) / 1000;
+    assert.ok(s < 30, '⛔ el guardián tardó ' + Math.round(s) + ' s: esperó al huérfano en vez de '
+      + 'cortar a los 6 s. Es el cuelgue del 24-sep-2026.');
+    return r;
+  };
+
+  it('🔴 EL QUE MUERDE · el caso del 24-sep: la tanda terminó en verde y un huérfano retiene la salida', () => {
+    const r = aTiempo(() => correrPruebas({ pruebas: BIEN_CON_HUERFANO, pruebasMinutos: SEIS_SEGUNDOS }));
+    assert.strictEqual(r.ok, true,
+      '⛔ la tanda TERMINÓ en verde: su resultado se conoce y no se puede tirar a la basura');
+    assert.strictEqual(r.retenida, SEIS_SEGUNDOS, '⛔ no avisó de que algo retuvo la salida');
+    assert.ok(!r.colgada, '⛔ una tanda que terminó no puede decir «no terminaron»');
+  });
+
+  it('🔴 EL QUE MUERDE · si terminó en rojo con un huérfano, sigue siendo rojo', () => {
+    const r = aTiempo(() => correrPruebas({ pruebas: MAL_CON_HUERFANO, pruebasMinutos: SEIS_SEGUNDOS }));
+    assert.strictEqual(r.ok, false, '⛔ un rojo con huérfano se estaría firmando como verde');
+    assert.strictEqual(r.retenida, SEIS_SEGUNDOS);
+  });
+
+  it('🔴 EL QUE MUERDE · si de verdad no terminó, dice que NO TERMINARON y no firma ni verde ni rojo', () => {
+    const r = aTiempo(() => correrPruebas({ pruebas: SE_CUELGA, pruebasMinutos: SEIS_SEGUNDOS }));
+    assert.strictEqual(r.colgada, SEIS_SEGUNDOS, '⛔ no dijo que las pruebas NO TERMINARON');
+    assert.strictEqual(r.ok, null,
+      '⛔ unas pruebas que no terminaron no son ni verdes ni rojas: `ok` tiene que ser null. '
+      + 'Con `false` el guardián firmaría «rompiste algo» sin saberlo.');
+  });
+
+  it('y una tanda que FALLA sin huérfanos sigue siendo roja, sin avisos de más', () => {
+    assert.deepStrictEqual(correrPruebas({ pruebas: QUE_FALLA, pruebasMinutos: SEIS_SEGUNDOS }), { hay: true, ok: false });
+  });
+
+  it('y una que PASA sigue siendo verde', () => {
+    assert.deepStrictEqual(correrPruebas({ pruebas: QUE_PASA, pruebasMinutos: SEIS_SEGUNDOS }), { hay: true, ok: true });
+  });
+
+  //  🔴 Y EL ORDEN DEL VEREDICTO. Una tanda que no terminó trae `ok: null`, y
+  //   `!null` es verdadero: si «¿pasaba y ahora no?» se pregunta antes que «¿no
+  //   terminó?», el cuelgue se firmaría como «rompiste algo» sin saber si algo se rompió.
+  it('🔴 EL QUE MUERDE · una tanda que no terminó NO se firma como «rompiste algo»', () => {
+    assert.strictEqual(queDicenLasPruebas({ ok: true }, { hay: true, ok: null, colgada: 20 }), 'colgada');
+  });
+
+  it('y los demás veredictos siguen como estaban', () => {
+    assert.strictEqual(queDicenLasPruebas({ ok: true }, { hay: false, ok: null }), 'sin');
+    assert.strictEqual(queDicenLasPruebas({ ok: true }, { hay: true, ok: false }), 'rompiste');
+    assert.strictEqual(queDicenLasPruebas({ ok: true }, { hay: true, ok: true }), 'verde');
+    assert.strictEqual(queDicenLasPruebas({ ok: false }, { hay: true, ok: false }), 'yaRojas');
+    assert.strictEqual(queDicenLasPruebas({ ok: null, colgada: 20 }, { hay: true, ok: false }), 'rojaSinBase',
+      '⛔ si la foto no terminó, un rojo de ahora no se puede dar por «ya fallaba»');
+  });
+
+  it('sin comando no inventa: dice que no hay pruebas', () => {
+    assert.deepStrictEqual(correrPruebas({}), { hay: false, ok: null });
   });
 });
