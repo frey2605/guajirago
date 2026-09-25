@@ -23,7 +23,7 @@ const { execFileSync } = require('node:child_process');
 
 const {
   dondePuedeEstarDrive, motivosParaNoMudar, loQueNoViaja, carear,
-  seVuelveAFabricar, NOMBRE_DESTINO, SE_VUELVEN_A_FABRICAR, HERMANOS,
+  seVuelveAFabricar, clonarEnSuRama, NOMBRE_DESTINO, SE_VUELVEN_A_FABRICAR, HERMANOS,
 } = require('../scripts/mudar-a-drive.cjs');
 
 // ─── un repo de mentira, de verdad: git init, commit y empujado a otro de al lado ───
@@ -257,7 +257,67 @@ describe('EL CAREO · byte a byte, y se queja', () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  5 · EL NOMBRE QUE PIDIÓ EL DUEÑO
+//  5 · EL CLON SE PONE EN LA RAMA DEL ORIGEN
+//
+//  🔴 ESTA PRUEBA NACE DE UN FALLO QUE SE ESCAPÓ A TODO LO DE ARRIBA. En el primer
+//  simulacro de verdad (25-sep-2026), `git clone` a secas trajo LA RAMA POR
+//  DEFECTO: la carpeta nueva quedó en `main`, sin dos archivos y con dos versiones
+//  viejas, y sin un solo error. Lo cazó el careo byte a byte, no una prueba — y por
+//  eso existe ésta: un arreglo que nadie ha visto funcionar vuelve solo.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('EL CLON · queda en la MISMA rama que el origen, no en la por defecto', () => {
+  /** Un servidor con `main` Y una segunda rama que es donde está el trabajo. */
+  function conDosRamas() {
+    const servidor = nuevaCarpeta();
+    g(servidor, 'init', '--bare', '-b', 'main');
+    const d = nuevaCarpeta();
+    g(d, 'init', '-b', 'main');
+    g(d, 'config', 'user.email', 'prueba@guajirago');
+    g(d, 'config', 'user.name', 'Prueba');
+    fs.writeFileSync(path.join(d, 'viejo.txt'), 'lo de main\n');
+    g(d, 'add', '-A'); g(d, 'commit', '-m', 'main');
+    g(d, 'remote', 'add', 'origin', servidor);
+    g(d, 'push', '-u', 'origin', 'main');
+    g(d, 'checkout', '-b', 'claude/trabajo-de-hoy');
+    fs.writeFileSync(path.join(d, 'nuevo.txt'), 'lo de hoy\n');
+    g(d, 'add', '-A'); g(d, 'commit', '-m', 'el trabajo de hoy');
+    g(d, 'push', '-u', 'origin', 'claude/trabajo-de-hoy');
+    return { dir: d, servidor };
+  }
+  const callado = () => {};
+
+  it('🔴 queda en la rama del trabajo, y el archivo nuevo ESTÁ', () => {
+    const { dir, servidor } = conDosRamas();
+    const destino = nuevaCarpeta(); fs.rmSync(destino, { recursive: true });
+    assert.strictEqual(clonarEnSuRama(servidor, destino, 'x', 'claude/trabajo-de-hoy', callado), true);
+    assert.strictEqual(g(destino, 'rev-parse', '--abbrev-ref', 'HEAD').trim(), 'claude/trabajo-de-hoy');
+    assert.ok(fs.existsSync(path.join(destino, 'nuevo.txt')),
+      'quedó en la rama por defecto: falta el archivo del trabajo de hoy');
+    // Y el careo tiene que estar de acuerdo: es el que dio la alarma la primera vez.
+    const c = carear(dir, destino);
+    assert.deepStrictEqual(c.faltan, []);
+    assert.deepStrictEqual(c.distintos, []);
+  });
+
+  it('si la rama NO está en el servidor, no se calla ni miente', () => {
+    // Pasa de verdad: una rama fusionada y borrada. La carpeta queda en otra, y eso
+    // hay que decirlo — el careo de después lo confirma.
+    const { servidor } = conDosRamas();
+    const destino = nuevaCarpeta(); fs.rmSync(destino, { recursive: true });
+    const dicho = [];
+    assert.strictEqual(clonarEnSuRama(servidor, destino, 'x', 'rama/que-no-existe', (s) => dicho.push(s)), true);
+    assert.match(dicho.join('\n'), /no se pudo poner/);
+    assert.strictEqual(g(destino, 'rev-parse', '--abbrev-ref', 'HEAD').trim(), 'main');
+  });
+
+  it('si el clon falla, devuelve false en vez de seguir como si nada', () => {
+    const destino = nuevaCarpeta(); fs.rmSync(destino, { recursive: true });
+    assert.strictEqual(clonarEnSuRama('/no/existe/este/repo', destino, 'x', 'main', () => {}), false);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  6 · EL NOMBRE QUE PIDIÓ EL DUEÑO
 // ─────────────────────────────────────────────────────────────────────────────
 describe('LA CARPETA SE LLAMA COMO PIDIÓ EL DUEÑO', () => {
   it('«Guajira Go Proyecto», tal cual', () => {

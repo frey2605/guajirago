@@ -226,6 +226,45 @@ function carear(origen, destino) {
   return { total: seguidos.length, iguales, distintos, faltan };
 }
 
+// ─────────────────────────────── CLONAR EN SU RAMA ───────────────────────────────
+/**
+ * Clona un repo y SE PONE EN LA MISMA RAMA que tenía el origen.
+ *
+ * 🔴 ESTO SALIÓ DEL SIMULACRO (25-sep-2026), y era grave: `git clone` a secas trae
+ *  **la rama por defecto del repo**, no la rama en la que se está trabajando. En la
+ *  primera corrida la carpeta nueva quedó en `main`: **le faltaban dos archivos y
+ *  tenía dos versiones viejas**, y no hubo un solo error — el clon había salido
+ *  «bien». Lo cazó el careo byte a byte del final, que es justo para lo que está.
+ *  Leyendo el código nadie lo habría visto.
+ *
+ * 🔑 Vive aquí fuera, y no dentro de `mudar()`, para que la prueba lo pueda
+ *  ENCENDER contra un repo de mentira. Un arreglo que nadie ha visto funcionar
+ *  vuelve solo, y éste ya se escapó una vez.
+ *
+ * Si la rama no está en el servidor —fusionada y borrada, por ejemplo— NO se calla
+ * ni lo da por bueno: dice en qué rama quedó, y el careo del final lo confirma.
+ */
+function clonarEnSuRama(url, dir, quien, rama, hablar = say) {
+  hablar('   clonando ' + quien + (rama ? ' (rama ' + rama + ')' : '') + '…');
+  try {
+    execFileSync('git', ['clone', url, dir], { stdio: ['ignore', 'ignore', 'pipe'], encoding: 'utf8' });
+  } catch (e) {
+    hablar('   ' + C.rojo + '✗ ' + quien + ': ' + String(e.stderr || e.message).trim() + C.off);
+    return false;
+  }
+  if (!rama || rama === 'HEAD') return true;
+  const ahora = git(dir, ['rev-parse', '--abbrev-ref', 'HEAD']).trim();
+  if (ahora === rama) return true;
+  try {
+    execFileSync('git', ['-C', dir, 'checkout', rama], { stdio: ['ignore', 'ignore', 'pipe'], encoding: 'utf8' });
+    hablar('     ' + C.gris + 'puesto en ' + rama + C.off);
+  } catch (e) {
+    hablar('     ' + C.ama + '⚠ no se pudo poner en «' + rama + '»: quedó en «' + ahora +
+      '». Si tu trabajo estaba en esa rama, el careo de abajo lo va a decir.' + C.off);
+  }
+  return true;
+}
+
 // ─────────────────────────────────── INFORME ───────────────────────────────────
 function mirar() {
   say(C.neg + '🔍 ANTES DE MUDAR — qué hay y qué se perdería' + C.off);
@@ -322,23 +361,18 @@ function mudar(carpetaDrive) {
   }
 
   fs.mkdirSync(proyecto, { recursive: true });
-  const clonar = (url, dir, quien) => {
-    say('   clonando ' + quien + '…');
-    try {
-      execFileSync('git', ['clone', url, dir], { stdio: ['ignore', 'ignore', 'pipe'], encoding: 'utf8' });
-      return true;
-    } catch (e) { say('   ' + C.rojo + '✗ ' + quien + ': ' + String(e.stderr || e.message).trim() + C.off); return false; }
-  };
 
   const raizUrl = git(RAIZ, ['remote', 'get-url', 'origin']).trim();
+  const raizRama = git(RAIZ, ['rev-parse', '--abbrev-ref', 'HEAD']).trim();
   fs.rmdirSync(proyecto); // git clone quiere la carpeta vacía o inexistente
-  if (!clonar(raizUrl, proyecto, 'la raíz')) return 1;
+  if (!clonarEnSuRama(raizUrl, proyecto, 'la raíz', raizRama)) return 1;
 
   for (const h of HERMANOS) {
     const d = path.join(RAIZ, h);
     if (!fs.existsSync(path.join(d, '.git'))) continue;
     const u = git(d, ['remote', 'get-url', 'origin']).trim();
-    if (!clonar(u, path.join(proyecto, h), h)) return 1;
+    const r = git(d, ['rev-parse', '--abbrev-ref', 'HEAD']).trim();
+    if (!clonarEnSuRama(u, path.join(proyecto, h), h, r)) return 1;
   }
 
   // Los papeles que no viajan, copiados uno por uno y nombrados.
@@ -406,5 +440,5 @@ if (require.main === module) {
 
 module.exports = {
   dondePuedeEstarDrive, motivosParaNoMudar, loQueNoViaja, carear,
-  seVuelveAFabricar, NOMBRE_DESTINO, SE_VUELVEN_A_FABRICAR, HERMANOS,
+  seVuelveAFabricar, clonarEnSuRama, NOMBRE_DESTINO, SE_VUELVEN_A_FABRICAR, HERMANOS,
 };
