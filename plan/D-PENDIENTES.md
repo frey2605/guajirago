@@ -71,8 +71,8 @@ Decisión del dueño: «Todo lo vamos a publicar desde aquí porque no tenemos m
 (`gh workflow disable`), sin tocar los archivos; el del panel y aliados sigue encendido porque solo
 se aprieta a mano. Lo dice `CLAUDE.md` en el paso 10.
 
-🔴 **Y lo que eso destapa:** la tanda entera tiene que pasar **en el PC**, y el 24-sep no pasa —ver
-D.4—.
+✅ **Y lo que eso destapaba:** la tanda entera tenía que pasar **en el PC**, y el 24-sep no pasaba.
+Arreglado esa misma noche (`9b156e5`): ver D.4.
 
 ---
 
@@ -110,7 +110,7 @@ se apunta aquí para que no se pierda.
 | **N5** | La prueba de citas **no ve los archivos de otros repos con extensión de código** | los amarres | Cazó un nombre `.md` de otro repo pero **no** tres `.jsx`. Un hueco del propio vigilante |
 | **N6** | El emulador de **funciones** no arranca en el contenedor de trabajo | la caja, no el repo | `pruebas/funciones.test.js` lleva días sin poder correr aquí. **No está medido por qué** |
 | **N7** | El canal de prueba necesitó autorizar **dos** listas de dominios | fuera del repo | Maps y Auth, cada una por su lado. Ya resuelto para este canal; **el siguiente canal lo pedirá otra vez** |
-| — | 🔴 **La tanda entera NO pasa en el PC** (24-sep) | `pruebas/elBotonDeDesplegar.test.js`, los tres «y no se puede ablandar» | 979 de 982. Los tres que fallan vigilan los botones: **5 de sus 30 sabotajes no se ponen rojos** en el PC (2 de 15, 2 de 7 y 1 de 8), y en GitHub sí. Y como la tanda 1 falla, **funciones, chat y almacén ni se corren**. Ahora que se publica desde el PC, el PC es el único juez. **No medido por qué** |
+| — | ✅ **CERRADO** (commit `9b156e5`, 24-sep) — la tanda entera no pasaba en el PC | `pruebas/elBotonDeDesplegar.test.js`, los tres «y no se puede ablandar» | 979 de 982. Los tres que fallan vigilan los botones: **5 de sus 30 sabotajes no se ponen rojos** en el PC (2 de 15, 2 de 7 y 1 de 8), y en GitHub sí. Y como la tanda 1 falla, **funciones, chat y almacén ni se corren**. La causa: `core.autocrlf=true` deja los `.yml` del PC con finales de Windows, y los sabotajes buscan renglones con finales de Linux. Ahora la prueba los lee como GitHub: **1.099 pruebas, 0 fallan**, y funciones, chat y almacén se corren en el PC |
 | — | 🔴 **Nadie vigila las citas de la carpeta `plan/`** (24-sep) | `scripts/medir-citas.cjs`, su lista de carpetas | Saboteado: se metió aquí una cita a un guion que no existe y **nada se puso rojo**. El medidor no entra en `plan/`; y metiéndolo tal cual da 53 falsas alarmas, porque lee `01-DONDE-ESTAMOS.md` como `DONDE-ESTAMOS.md` (exige que el nombre empiece por letra) |
 
 > N1, N2 y N3 se hicieron el 24-sep, cada uno con sus pasos.
@@ -135,7 +135,7 @@ se apunta aquí para que no se pierda.
 1. ~~**Arreglar P1**~~ ✅ ya servía el 24-sep.
 2. ~~**N1 + N2 + N3**~~ ✅ hechos el 24-sep.
 2-bis. (24-sep) ~~**Apagar en GitHub los botones que se disparan solos**~~ ✅ hecho el 24-sep, y
-   **que la tanda entera pase en el PC** — cada uno como su propio arreglo.
+   ~~**que la tanda entera pase en el PC**~~ ✅ hecho el 24-sep (`9b156e5`).
 3. ~~**Contestar la pregunta 1**~~ ✅ contestada por el dueño el 24-sep: aliados **se separa** en
    su propio proyecto, y el transporte no. Ver `08-PREGUNTAS.md` y `02-DECISIONES.md`.
 4. **Volcar N1–N7 a la tabla de `CLAUDE.md`** cuando cada uno se arregle o se decida — este
