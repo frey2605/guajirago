@@ -218,6 +218,37 @@ cada contrato entre repos y se pone roja si se separan.
 
 ---
 
+## 🔘 LA LEY DEL BOTÓN — todo lo que guarda pasa por el candado
+
+> **Palabras del dueño** (en Talaria, 25-sep-2026; traída a GuajiraGo el 26-sep-2026: «revísalo y tráelo para
+> dejarlo como regla en todo el proyecto»): «cada botón debe tener bloqueo de doble toque, mostrar la acción
+> GUARDANDO, ENVIANDO, AJUSTANDO, y al final el resultado con la verdad».
+
+Vale en las TRES apps. Todo lo que al tocarlo **guarda, envía o cambia algo** —un botón, un interruptor, la tecla
+Enter de un chat, el «Confirmar» de una ventanita— usa `const { ocupado, correr, texto, aviso, cerrarAviso } = useAccion()`
+(`src/useAccion.js` → `src/candado.js`). **Nunca** un `setGuardando(true)` hecho a mano.
+
+1. **Una sola vez aunque se toque dos:** `correr(() => guardar(...), 'guardar', 'Quedó guardado.')`. El candado se cierra en
+   el mismo instante del primer toque; el segundo devuelve `null` y no hace nada.
+2. **Dice su palabra mientras trabaja:** `{texto('guardar', 'Guardando…', 'Guardar')}` — el nombre de la acción es el mismo
+   en `correr` y en `texto`, o la palabra no sale nunca. Y el botón con `disabled={!!ocupado}`.
+3. **La verdad al final la da el candado**, no cada pantalla: `aviso` trae `{ ok, texto }` y la pantalla lo pinta en una
+   ventanita, **dentro** del diálogo abierto. Los errores de Firebase salen en cristiano (tabla `ERRORES`).
+4. **Nunca trabado:** si en 20 s no hay respuesta, el candado se abre y dice **«No se pudo confirmar. Revisa si quedó hecho
+   antes de volver a intentar»** — no «falló», porque no se sabe, y con plata de por medio decir «falló» cuando sí entró
+   invita a hacerlo dos veces. Si la respuesta llega tarde, el aviso se corrige solo.
+5. **«Cancelar» no se toca mientras trabaja** (`disabled={!!ocupado}`).
+
+**La vigila** `pruebas/leyBoton.test.js` con `scripts/medir-ley-boton.cjs`, que mira **cada** manejador de las tres apps
+(no la pantalla entera, que era el hueco de Talaria) y caza el «guardando» a mano por lo que hace, no por cómo se llama.
+Lo que había antes de la ley está contado archivo por archivo en `PENDIENTES` de ese guion y **solo puede bajar**: una
+pantalla nueva que guarde sin candado pone la tanda en rojo, y una arreglada que nadie tache también.
+`node scripts/medir-ley-boton.cjs --detalle` dice cuáles y en qué renglón.
+🔴 **Lo que el candado NO resuelve:** si el tope vence y la escritura entra después, un segundo toque puede duplicar. Para
+lo que CREA algo (un viaje, un pedido, una recarga) la defensa de verdad es que el servidor reconozca el reintento.
+
+---
+
 ## Cómo se trabaja (leyes de siempre)
 
 1. **Un arreglo a la vez.** Un arreglo = un commit = una verificación.
