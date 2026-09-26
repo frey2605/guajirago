@@ -8,13 +8,16 @@ import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 // El filtro anti-datos vive en filtroChat.js: un solo sitio para todos los
 // chats de la app (SEGUNDA LEY), amarrado por prueba a la copia del panel.
 import { contieneInfoSensible } from './filtroChat';
+// LA LEY DEL BOTÓN (26-sep-2026): recargar, el comprobante y el chat pasan por el candado — una sola vez aunque se
+// toque dos, su palabra mientras trabaja, la verdad al final en una ventanita, y nunca trabado sin señal.
+import { useAccion } from './useAccion';
+import AvisoModal from './AvisoModal';
 
 function Creditos({ onVolver }) {
   const [saldo, setSaldo] = useState(null);
   const [codigo, setCodigo] = useState('');
-  const [mensaje, setMensaje] = useState('');
   const [error, setError] = useState('');
-  const [cargando, setCargando] = useState(false);
+  const { ocupado, correr, texto, aviso, cerrarAviso } = useAccion();
   const [mensajesRecarga, setMensajesRecarga] = useState([]);
   const [textoChatRecarga, setTextoChatRecarga] = useState('');
   const [errorChatRecarga, setErrorChatRecarga] = useState('');
@@ -36,8 +39,6 @@ function Creditos({ onVolver }) {
     }
   }, [mensajesRecarga]);
 
-  const [subiendoComprobante, setSubiendoComprobante] = useState(false);
-
   const enviarMensajeRecarga = async () => {
     setErrorChatRecarga('');
     if (!textoChatRecarga.trim()) return;
@@ -47,7 +48,7 @@ function Creditos({ onVolver }) {
     }
     const user = auth.currentUser;
     if (!user) return;
-    try {
+    await correr(async () => {
       const nuevoMensaje = { texto: textoChatRecarga.trim(), autor: 'conductor', fecha: new Date().toISOString() };
       // ── UNA RESPUESTA NO PUEDE BORRAR UN MENSAJE (6-sep-2026) ──────────────
       // Esto leía la lista entera, le pegaba el mensaje nuevo y SUBÍA LA LISTA
@@ -66,21 +67,17 @@ function Creditos({ onVolver }) {
       // nube: CERO idénticos y CERO sin fecha.
       await updateDoc(doc(db, 'usuarios', user.uid), { mensajesRecarga: arrayUnion(nuevoMensaje) });
       setTextoChatRecarga('');
-    } catch (e) {
-      // REGLA 9: nada se rechaza en silencio. Antes: `catch (e) {}` — si el
-      // mensaje no salía, el conductor lo veía irse de la caja de texto y creía
-      // que había llegado. Se avisa igual que su función hermana de abajo.
-      setErrorChatRecarga('No se pudo enviar el mensaje. Intenta de nuevo');
-    }
+      // REGLA 9: nada se rechaza en silencio. Antes: `catch (e) {}` — si el mensaje no salía, el conductor lo veía irse
+      // de la caja de texto y creía que había llegado. Ahora el fallo lo dice el candado, en la ventanita.
+    }, 'mensaje', 'Mensaje enviado.');
   };
 
   const enviarComprobante = async (archivo) => {
     if (!archivo) return;
     const user = auth.currentUser;
     if (!user) return;
-    setSubiendoComprobante(true);
     setErrorChatRecarga('');
-    try {
+    await correr(async () => {
       const refArchivo = ref(storage, `recargas/${user.uid}/comprobante_${Date.now()}.jpg`);
       await uploadBytes(refArchivo, archivo);
       const url = await getDownloadURL(refArchivo);
@@ -90,10 +87,7 @@ function Creditos({ onVolver }) {
       // mismo momento, su respuesta subía la lista de ANTES de la foto y la foto
       // desaparecía — justo la prueba de que el conductor pagó.
       await updateDoc(doc(db, 'usuarios', user.uid), { mensajesRecarga: arrayUnion(nuevoMensaje) });
-    } catch (e) {
-      setErrorChatRecarga('No se pudo subir el comprobante. Intenta de nuevo');
-    }
-    setSubiendoComprobante(false);
+    }, 'comprobante', 'Comprobante enviado. Te contestamos por este chat.');
   };
 
   // Cargar el saldo actual del conductor
@@ -118,12 +112,12 @@ function Creditos({ onVolver }) {
   const recargar = async () => {
     const cod = codigo.trim().toUpperCase();
     if (!cod) { setError('Escribe un código de recarga'); return; }
-    setCargando(true); setError(''); setMensaje('');
+    setError('');
 
     const user = auth.currentUser;
-    if (!user) { setError('Error de sesión. Vuelve a iniciar sesión'); setCargando(false); return; }
+    if (!user) { setError('Error de sesión. Vuelve a iniciar sesión'); return; }
 
-    try {
+    await correr(async () => {
       // REGLA 7 — el canje ya NO se hace aquí. Hasta el 24-ago-2026 este
       // teléfono comprobaba el código y SE SUMABA EL SALDO él mismo; las reglas
       // dejaban escribir 'creditos' a cualquiera, así que ni siquiera hacía
@@ -137,16 +131,11 @@ function Creditos({ onVolver }) {
       const snap = await getDoc(doc(db, 'usuarios', user.uid));
       setSaldo(snap.exists() ? (snap.data().creditos || 0) : 0);
       setCodigo('');
-      setMensaje(`¡Recargaste $${valorRecargado.toLocaleString()} en créditos! 🎉`);
-    } catch (e) {
-      // El motivo lo explica ahora el servidor ("Ese código ya fue usado", etc.)
-      // y esos mensajes SIEMPRE llevan espacios. Cuando falla la red, la
-      // librería de Firebase pone de mensaje el código pelado ('internal',
-      // 'deadline-exceeded'): eso no se le enseña a nadie.
-      const delServidor = e && e.message && e.message.includes(' ');
-      setError(delServidor ? e.message : 'Error al recargar. Revisa tu conexión e intenta de nuevo');
-    }
-    setCargando(false);
+      return valorRecargado;
+      // El motivo del fallo lo explica el servidor ("Ese código ya fue usado", etc.) y el candado lo respeta tal cual;
+      // cuando falla la red y Firebase pone el código pelado ('internal', 'deadline-exceeded'), lo traduce
+      // (enCristiano, en candado.js: el criterio que vivía aquí se mudó allí, para todas las pantallas).
+    }, 'recargar', (valor) => `¡Recargaste $${valor.toLocaleString()} en créditos! 🎉`);
   };
 
   return (
@@ -177,15 +166,18 @@ function Creditos({ onVolver }) {
           </div>
           <button
             onClick={recargar}
-            disabled={cargando}
-            style={{ flexShrink: 0, padding: '0 18px', background: cargando ? '#ECECEF' : 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)', border: 'none', borderRadius: '12px', color: cargando ? '#6B7280' : '#FFFFFF', fontSize: '14px', fontWeight: '900', cursor: cargando ? 'default' : 'pointer' }}
+            disabled={!!ocupado}
+            style={{ flexShrink: 0, padding: '0 18px', background: ocupado ? '#ECECEF' : 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)', border: 'none', borderRadius: '12px', color: ocupado ? '#6B7280' : '#FFFFFF', fontSize: '14px', fontWeight: '900', cursor: ocupado ? 'default' : 'pointer' }}
           >
-            {cargando ? '...' : 'Recargar'}
+            {texto('recargar', 'Recargando…', 'Recargar')}
           </button>
         </div>
 
         {error && <p style={{ color: '#FF4444', fontSize: '12px', textAlign: 'center', marginBottom: '8px' }}>{error}</p>}
-        {mensaje && <p style={{ color: '#2ECC71', fontSize: '13px', textAlign: 'center', marginBottom: '12px', fontWeight: 'bold' }}>{mensaje}</p>}
+        {/* La verdad del final, en ventanita. El mensaje del chat que SÍ salió no la abre: se ve en la conversación. */}
+        {aviso && !(aviso.ok && aviso.cual === 'mensaje') && (
+          <AvisoModal aviso={{ titulo: aviso.ok ? '¡Listo!' : 'No se pudo', texto: aviso.texto, icono: aviso.ok ? '✅' : '⚠️' }} onCerrar={cerrarAviso} />
+        )}
 
         {/* Información */}
         <div style={{ background: '#FFFFFF', borderRadius: '16px', padding: '16px', border: '1px solid #FF7A2F' }}>
@@ -248,9 +240,9 @@ function Creditos({ onVolver }) {
           </div>
           {errorChatRecarga && <p style={{ color: '#FF4444', fontSize: '12px', margin: '0 0 8px' }}>{errorChatRecarga}</p>}
           <div style={{ display: 'flex', gap: '8px' }}>
-            <label style={{ width: '46px', height: '46px', flexShrink: 0, background: '#FFFFFF', border: '1px solid #ECECEF', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: subiendoComprobante ? 'default' : 'pointer', fontSize: '20px' }}>
-              {subiendoComprobante ? '⏳' : '📎'}
-              <input type="file" accept="image/*" disabled={subiendoComprobante} onChange={e => { if (e.target.files[0]) enviarComprobante(e.target.files[0]); e.target.value = ''; }} style={{ display: 'none' }} />
+            <label style={{ width: '46px', height: '46px', flexShrink: 0, background: '#FFFFFF', border: '1px solid #ECECEF', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: ocupado ? 'default' : 'pointer', fontSize: '20px' }}>
+              {texto('comprobante', '⏳', '📎')}
+              <input type="file" accept="image/*" disabled={!!ocupado} onChange={e => { if (e.target.files[0]) enviarComprobante(e.target.files[0]); e.target.value = ''; }} style={{ display: 'none' }} />
             </label>
             <input
               value={textoChatRecarga}
@@ -259,7 +251,7 @@ function Creditos({ onVolver }) {
               placeholder="Escribe tu mensaje..."
               style={{ flex: 1, background: '#FFFFFF', border: '1px solid #ECECEF', borderRadius: '12px', padding: '12px 14px', color: '#1A1A1E', fontSize: '15px', outline: 'none' }}
             />
-            <button onClick={enviarMensajeRecarga} disabled={!textoChatRecarga.trim()} style={{ padding: '12px 18px', background: textoChatRecarga.trim() ? 'linear-gradient(135deg, #FF7A2F, #D6357E)' : '#ECECEF', border: 'none', borderRadius: '12px', color: textoChatRecarga.trim() ? '#FFFFFF' : '#6B7280', fontSize: '20px', cursor: textoChatRecarga.trim() ? 'pointer' : 'default' }}>➤</button>
+            <button onClick={enviarMensajeRecarga} disabled={!textoChatRecarga.trim() || !!ocupado} style={{ padding: '12px 18px', background: textoChatRecarga.trim() ? 'linear-gradient(135deg, #FF7A2F, #D6357E)' : '#ECECEF', border: 'none', borderRadius: '12px', color: textoChatRecarga.trim() ? '#FFFFFF' : '#6B7280', fontSize: '20px', cursor: textoChatRecarga.trim() ? 'pointer' : 'default' }}>{texto('mensaje', '…', '➤')}</button>
           </div>
         </div>
       </div>

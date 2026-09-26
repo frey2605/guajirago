@@ -267,11 +267,22 @@ describe('EL CHAT DE RECARGA · los CINCO escritores, ninguno menos', () => {
       const codigo = soloCodigo(leer('guajirago/src/Creditos.js'));
       const i = codigo.indexOf('const ' + nombre + ' = async');
       assert.ok(i >= 0, 'ya no existe «' + nombre + '» en Creditos.js');
+      // DESDE LA LEY DEL BOTÓN (26-sep-2026) el fallo lo avisa el CANDADO, no un catch de la función: la escritura va
+      // dentro de `correr(...)`, que nunca se traga un error, y la pantalla pinta su aviso en una ventanita. Se acepta
+      // esa forma SOLO si las dos mitades están: la escritura dentro del candado, y la ventanita que enseña los fallos
+      // (la única excepción permitida es no abrirla cuando el mensaje SÍ salió).
       const cuerpo = cuerpoDelCatch(codigo, i);
-      assert.ok(cuerpo, '«' + nombre + '» habla con la base y NO tiene catch.');
-      assert.match(cuerpo, /setErrorChatRecarga\(/,
-        'el catch de «' + nombre + '» no avisa de nada. El conductor ve irse su mensaje '
-        + 'de la caja de texto y cree que llegó, y no llegó.');
+      if (cuerpo) {
+        assert.match(cuerpo, /setErrorChatRecarga\(/,
+          'el catch de «' + nombre + '» no avisa de nada. El conductor ve irse su mensaje '
+          + 'de la caja de texto y cree que llegó, y no llegó.');
+      } else {
+        const suyo = soloCodigo(cuerpoDe('guajirago/src/Creditos.js', nombre));
+        assert.match(suyo, /await correr\(async \(\) => \{[\s\S]*mensajesRecarga:\s*arrayUnion\([\s\S]*\}, '\w+', /,
+          '«' + nombre + '» habla con la base sin catch y sin el candado: si falla, nadie se entera.');
+        assert.match(codigo, /\{aviso && !\(aviso\.ok && aviso\.cual === 'mensaje'\) && \(\s*<AvisoModal aviso=\{\{[^}]*texto: aviso\.texto/,
+          'la pantalla no pinta el aviso del candado, o lo esconde también cuando FALLA: el fallo sería mudo.');
+      }
     });
   }
 });

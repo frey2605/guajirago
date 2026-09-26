@@ -49,7 +49,7 @@ function AvisoModal({ aviso, onCerrar }) {
   return (
     <div onClick={onCerrar} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', zIndex: 10000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
       <div onClick={(e) => e.stopPropagation()} style={{ background: '#FFFFFF', borderRadius: '20px', padding: '24px', width: '100%', maxWidth: '360px', textAlign: 'center' }}>
-        <div style={{ fontSize: '44px', marginBottom: '8px' }}>⚠️</div>
+        <div style={{ fontSize: '44px', marginBottom: '8px' }}>{aviso.icono || '⚠️'}</div>
         <p style={{ color: '#1A1A1E', fontSize: '17px', fontWeight: '900', margin: '0 0 8px' }}>{aviso.titulo}</p>
         <p style={{ color: '#666', fontSize: '14px', margin: '0 0 18px' }}>{aviso.texto}</p>
         <button onClick={onCerrar} style={{ width: '100%', padding: '13px', background: '#1C8EF9', border: 'none', borderRadius: '12px', color: '#FFF', fontSize: '15px', fontWeight: '900', cursor: 'pointer' }}>Entendido</button>

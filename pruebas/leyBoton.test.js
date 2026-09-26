@@ -76,6 +76,21 @@ describe('LA LEY DEL BOTÓN · el candado, ejecutado', () => {
     assert.strictEqual(C.enCristiano(undefined), C.MENSAJE_FALLA);
   });
 
+  it('la frase de NUESTRAS funciones se respeta tal cual («Ese código ya fue usado»), y el código pelado se traduce', () => {
+    assert.strictEqual(C.enCristiano({ code: 'functions/already-exists', message: 'Ese código ya fue usado' }), 'Ese código ya fue usado',
+      '⛔ se le quitó al conductor el motivo exacto que escribió el servidor');
+    assert.strictEqual(C.enCristiano({ code: 'functions/permission-denied', message: 'Ese código es de otro conductor' }), 'Ese código es de otro conductor');
+    assert.strictEqual(C.enCristiano({ code: 'functions/deadline-exceeded', message: 'deadline-exceeded' }), C.NO_CONFIRMADO);
+    assert.strictEqual(C.enCristiano({ code: 'firestore/permission-denied', message: 'Missing or insufficient permissions.' }), C.ERRORES['permission-denied'],
+      '⛔ el inglés de la base (también lleva espacios) llegó a la pantalla: solo se respetan las frases de NUESTRAS funciones');
+  });
+
+  it('el «se hizo» puede decir lo que devolvió la acción («¡Recargaste $20.000!»)', async () => {
+    const { c, avisos } = candado();
+    await c.correr(async () => 20000, 'recargar', (v) => '¡Recargaste $' + v + '!');
+    assert.strictEqual(avisos[0].texto, '¡Recargaste $20000!');
+  });
+
   it('una respuesta { ok: false } del servidor es una falla, no un éxito', async () => {
     const { c, avisos } = candado();
     assert.deepStrictEqual(await c.correr(async () => ({ ok: false, error: 'Saldo insuficiente.' }), 'recargar', 'Recargado.'),
@@ -142,6 +157,12 @@ describe('LA LEY DEL BOTÓN · una sola pieza en las tres apps', () => {
       }
     });
   }
+
+  it('la ventanita pinta el ícono que le manden (✅ al salir bien) y, si no le mandan ninguno, el ⚠️ de siempre', () => {
+    for (const f of ['guajirago/src/AvisoModal.js', 'guajirago-admin/src/AvisoModal.js']) {
+      assert.match(leer(f), /\{aviso\.icono \|\| '⚠️'\}/, '⛔ ' + f + ': las pantallas que no mandan ícono se quedarían sin él');
+    }
+  });
 
   it('el gancho usa el candado y la palabra sale SOLO en el botón cuya acción corre', () => {
     const t = leer('guajirago/src/useAccion.js');

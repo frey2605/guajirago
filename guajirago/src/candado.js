@@ -33,9 +33,13 @@ export const ERRORES = {
   'invalid-argument': 'Algún dato no es válido. Revisa lo que escribiste.',
 };
 
-// El motivo que ve la gente. Un mensaje propio de la app (sin código de Firebase) se respeta tal cual.
+// El motivo que ve la gente. Un mensaje propio de la app (sin código de Firebase) se respeta tal cual. Y también el de
+// NUESTRAS funciones: el servidor contesta «Ese código ya fue usado» o «Ese código es de otro conductor», frases escritas
+// para el conductor, y cambiarlas por «Eso ya estaba hecho» le quitaría el motivo. Una frase lleva espacios; cuando falla
+// la red, Firebase pone de mensaje el código pelado («internal», «unavailable»), y ese sí se traduce.
 export function enCristiano(e) {
   const codigo = String((e && e.code) || '').split('/').pop();
+  if (e && /^functions\//.test(e.code) && typeof e.message === 'string' && /\s/.test(e.message.trim())) return e.message;
   if (ERRORES[codigo]) return ERRORES[codigo];
   if (e && !e.code && typeof e.message === 'string' && e.message) return e.message;
   return MENSAJE_FALLA;
@@ -49,16 +53,18 @@ export function crearCandado({ alCambiar = () => {}, alAviso = () => {}, tope = 
   return {
     get ocupado() { return cerrado; },
     // correr(fn, cual, exito): fn es lo que guarda; cual, el nombre de la acción (el mismo que usa texto());
-    // exito, lo que se dice si sale bien. Devuelve { ok: true, valor } | { ok: false, error, sinConfirmar? },
-    // o null si fue un segundo toque mientras el primero trabajaba.
+    // exito, lo que se dice si sale bien: un texto, o una función que recibe lo que fn devolvió («¡Recargaste $20.000!»).
+    // Devuelve { ok: true, valor } | { ok: false, error, sinConfirmar? }, o null si fue un segundo toque mientras el
+    // primero trabajaba.
     async correr(fn, cual, exito) {
       if (typeof cual !== 'string' || !cual) throw new Error('La ley del botón: correr(fn, cual, exito) necesita el nombre de la acción.');
-      if (typeof exito !== 'string' || !exito) throw new Error('La ley del botón: correr(fn, cual, exito) necesita el texto de «se hizo».');
+      if (typeof exito !== 'function' && (typeof exito !== 'string' || !exito)) throw new Error('La ley del botón: correr(fn, cual, exito) necesita el texto de «se hizo».');
       if (cerrado) return null;
       cerrado = true;
       const mia = ++vuelta;
       alCambiar(cual);
-      const decir = (r) => { if (mia === vuelta) alAviso(r.ok ? { ok: true, texto: exito, cual } : { ok: false, texto: r.error, cual }); };
+      const dicho = (v) => (typeof exito === 'function' ? String(exito(v)) : exito);
+      const decir = (r) => { if (mia === vuelta) alAviso(r.ok ? { ok: true, texto: dicho(r.valor), cual } : { ok: false, texto: r.error, cual }); };
       const trabajo = Promise.resolve().then(fn).then(
         (v) => (v && v.ok === false ? { ok: false, error: v.error || MENSAJE_FALLA } : { ok: true, valor: v }),
         (e) => ({ ok: false, error: enCristiano(e) }),
