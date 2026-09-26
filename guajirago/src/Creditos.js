@@ -69,7 +69,7 @@ function Creditos({ onVolver }) {
       setTextoChatRecarga('');
       // REGLA 9: nada se rechaza en silencio. Antes: `catch (e) {}` — si el mensaje no salía, el conductor lo veía irse
       // de la caja de texto y creía que había llegado. Ahora el fallo lo dice el candado, en la ventanita.
-    }, 'mensaje', 'Mensaje enviado.');
+    }, 'mensaje', 'Mensaje enviado.', 'enviar el mensaje');
   };
 
   const enviarComprobante = async (archivo) => {
@@ -87,7 +87,7 @@ function Creditos({ onVolver }) {
       // mismo momento, su respuesta subía la lista de ANTES de la foto y la foto
       // desaparecía — justo la prueba de que el conductor pagó.
       await updateDoc(doc(db, 'usuarios', user.uid), { mensajesRecarga: arrayUnion(nuevoMensaje) });
-    }, 'comprobante', 'Comprobante enviado. Te contestamos por este chat.');
+    }, 'comprobante', 'Comprobante enviado. Te contestamos por este chat.', 'subir el comprobante');
   };
 
   // Cargar el saldo actual del conductor
@@ -135,7 +135,7 @@ function Creditos({ onVolver }) {
       // El motivo del fallo lo explica el servidor ("Ese código ya fue usado", etc.) y el candado lo respeta tal cual;
       // cuando falla la red y Firebase pone el código pelado ('internal', 'deadline-exceeded'), lo traduce
       // (enCristiano, en candado.js: el criterio que vivía aquí se mudó allí, para todas las pantallas).
-    }, 'recargar', (valor) => `¡Recargaste $${valor.toLocaleString()} en créditos! 🎉`);
+    }, 'recargar', (valor) => `¡Recargaste $${valor.toLocaleString()} en créditos! 🎉`, 'canjear el código');
   };
 
   return (
@@ -176,7 +176,7 @@ function Creditos({ onVolver }) {
         {error && <p style={{ color: '#FF4444', fontSize: '12px', textAlign: 'center', marginBottom: '8px' }}>{error}</p>}
         {/* La verdad del final, en ventanita. El mensaje del chat que SÍ salió no la abre: se ve en la conversación. */}
         {aviso && !(aviso.ok && aviso.cual === 'mensaje') && (
-          <AvisoModal aviso={{ titulo: aviso.ok ? '¡Listo!' : 'No se pudo', texto: aviso.texto, icono: aviso.ok ? '✅' : '⚠️' }} onCerrar={cerrarAviso} />
+          <AvisoModal aviso={aviso} onCerrar={cerrarAviso} />
         )}
 
         {/* Información */}

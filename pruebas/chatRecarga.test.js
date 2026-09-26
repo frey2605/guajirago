@@ -280,7 +280,7 @@ describe('EL CHAT DE RECARGA · los CINCO escritores, ninguno menos', () => {
         const suyo = soloCodigo(cuerpoDe('guajirago/src/Creditos.js', nombre));
         assert.match(suyo, /await correr\(async \(\) => \{[\s\S]*mensajesRecarga:\s*arrayUnion\([\s\S]*\}, '\w+', /,
           '«' + nombre + '» habla con la base sin catch y sin el candado: si falla, nadie se entera.');
-        assert.match(codigo, /\{aviso && !\(aviso\.ok && aviso\.cual === 'mensaje'\) && \(\s*<AvisoModal aviso=\{\{[^}]*texto: aviso\.texto/,
+        assert.match(codigo, /\{aviso && !\(aviso\.ok && aviso\.cual === 'mensaje'\) && \(\s*<AvisoModal aviso=\{aviso\}/,
           'la pantalla no pinta el aviso del candado, o lo esconde también cuando FALLA: el fallo sería mudo.');
       }
     });

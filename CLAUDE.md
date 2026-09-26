@@ -233,7 +233,10 @@ Enter de un chat, el «Confirmar» de una ventanita— usa `const { ocupado, cor
 2. **Dice su palabra mientras trabaja:** `{texto('guardar', 'Guardando…', 'Guardar')}` — el nombre de la acción es el mismo
    en `correr` y en `texto`, o la palabra no sale nunca. Y el botón con `disabled={!!ocupado}`.
 3. **La verdad al final la da el candado**, no cada pantalla: `aviso` trae `{ ok, texto }` y la pantalla lo pinta en una
-   ventanita, **dentro** del diálogo abierto. Los errores de Firebase salen en cristiano (tabla `ERRORES`).
+   ventanita, **dentro** del diálogo abierto (`<AvisoModal aviso={aviso} onCerrar={cerrarAviso} />`). El motivo de un
+   fallo NO lo calcula el candado: lo da `motivoDeRechazo` de `avisoRechazo.js`, la única pieza que lo sabe decir (el
+   26-sep-2026 el candado nació con su propia tabla de errores y se le quitó ese mismo día: SEGUNDA LEY). El cuarto
+   argumento de `correr` dice qué se intentaba, para el título: `correr(fn, 'cancelar', 'Cancelado.', 'cancelar el viaje')`.
 4. **Nunca trabado:** si en 20 s no hay respuesta, el candado se abre y dice **«No se pudo confirmar. Revisa si quedó hecho
    antes de volver a intentar»** — no «falló», porque no se sabe, y con plata de por medio decir «falló» cuando sí entró
    invita a hacerlo dos veces. Si la respuesta llega tarde, el aviso se corrige solo.

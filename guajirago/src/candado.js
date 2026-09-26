@@ -19,44 +19,25 @@ export const TOPE_MS = 20000;
 export const MENSAJE_FALLA = 'No se pudo completar. Revisa la señal y vuelve a intentar.';
 export const NO_CONFIRMADO = 'No se pudo confirmar. Revisa si quedó hecho antes de volver a intentar.';
 
-// Los errores de Firebase llegan como «firestore/permission-denied» o «functions/unavailable»: se dicen en cristiano.
-export const ERRORES = {
-  'permission-denied': 'No tienes permiso para hacer esto.',
-  unauthenticated: 'Tu sesión se cerró. Vuelve a entrar.',
-  unavailable: 'No hay señal con el servidor. Vuelve a intentar.',
-  'deadline-exceeded': NO_CONFIRMADO,
-  'not-found': 'Eso ya no existe. Refresca la pantalla.',
-  'already-exists': 'Eso ya estaba hecho.',
-  'failed-precondition': 'No se puede hacer en este momento: algo cambió. Refresca la pantalla.',
-  aborted: 'Otra persona lo cambió al mismo tiempo. Vuelve a intentar.',
-  'resource-exhausted': 'Demasiados intentos seguidos. Espera un momento.',
-  'invalid-argument': 'Algún dato no es válido. Revisa lo que escribiste.',
-};
+// EL MOTIVO DEL FALLO NO SE CALCULA AQUÍ (SEGUNDA LEY). Lo calcula `motivoDeRechazo` de avisoRechazo.js, la única pieza
+// que convierte un fallo en un aviso para la gente, con copia atada en las tres apps. El 26-sep-2026 este archivo trajo
+// su propia tabla de errores y ya decía cosas distintas que aquélla: se quitó el mismo día. El gancho useAccion se la
+// pasa como `traducir(e, accion)` → { clave, titulo, texto }.
+const TRADUCIR_POR_DEFECTO = (e, accion) => ({ clave: 'otro', titulo: 'No se pudo ' + (accion || 'completar'), texto: MENSAJE_FALLA });
 
-// El motivo que ve la gente. Un mensaje propio de la app (sin código de Firebase) se respeta tal cual. Y también el de
-// NUESTRAS funciones: el servidor contesta «Ese código ya fue usado» o «Ese código es de otro conductor», frases escritas
-// para el conductor, y cambiarlas por «Eso ya estaba hecho» le quitaría el motivo. Una frase lleva espacios; cuando falla
-// la red, Firebase pone de mensaje el código pelado («internal», «unavailable»), y ese sí se traduce.
-export function enCristiano(e) {
-  const codigo = String((e && e.code) || '').split('/').pop();
-  if (e && /^functions\//.test(e.code) && typeof e.message === 'string' && /\s/.test(e.message.trim())) return e.message;
-  if (ERRORES[codigo]) return ERRORES[codigo];
-  if (e && !e.code && typeof e.message === 'string' && e.message) return e.message;
-  return MENSAJE_FALLA;
-}
-
-// alCambiar(cual | false): cuál acción está corriendo. alAviso({ ok, texto, cual }): la verdad del final.
-// reloj: se cambia en las pruebas para no esperar 20 segundos de verdad.
-export function crearCandado({ alCambiar = () => {}, alAviso = () => {}, tope = TOPE_MS, reloj = { poner: setTimeout, quitar: clearTimeout } } = {}) {
+// alCambiar(cual | false): cuál acción está corriendo. alAviso({ ok, titulo, texto, icono, cual }): la verdad del
+// final, lista para la ventanita. reloj: se cambia en las pruebas para no esperar 20 segundos de verdad.
+export function crearCandado({ alCambiar = () => {}, alAviso = () => {}, tope = TOPE_MS, reloj = { poner: setTimeout, quitar: clearTimeout }, traducir = TRADUCIR_POR_DEFECTO } = {}) {
   let cerrado = false;
   let vuelta = 0; // cuál fue la última acción: un aviso tardío solo corrige el suyo
   return {
     get ocupado() { return cerrado; },
-    // correr(fn, cual, exito): fn es lo que guarda; cual, el nombre de la acción (el mismo que usa texto());
-    // exito, lo que se dice si sale bien: un texto, o una función que recibe lo que fn devolvió («¡Recargaste $20.000!»).
-    // Devuelve { ok: true, valor } | { ok: false, error, sinConfirmar? }, o null si fue un segundo toque mientras el
-    // primero trabajaba.
-    async correr(fn, cual, exito) {
+    // correr(fn, cual, exito, accion): fn es lo que guarda; cual, el nombre de la acción (el mismo que usa texto());
+    // exito, lo que se dice si sale bien: un texto, o una función que recibe lo que fn devolvió («¡Recargaste $20.000!»);
+    // accion, lo que se intentaba en infinitivo («cancelar el viaje»), para el título del fallo: «No se pudo cancelar
+    // el viaje». Devuelve { ok: true, valor } | { ok: false, titulo, error, clave, sinConfirmar? }, o null si fue un
+    // segundo toque mientras el primero trabajaba.
+    async correr(fn, cual, exito, accion) {
       if (typeof cual !== 'string' || !cual) throw new Error('La ley del botón: correr(fn, cual, exito) necesita el nombre de la acción.');
       if (typeof exito !== 'function' && (typeof exito !== 'string' || !exito)) throw new Error('La ley del botón: correr(fn, cual, exito) necesita el texto de «se hizo».');
       if (cerrado) return null;
@@ -64,13 +45,19 @@ export function crearCandado({ alCambiar = () => {}, alAviso = () => {}, tope = 
       const mia = ++vuelta;
       alCambiar(cual);
       const dicho = (v) => (typeof exito === 'function' ? String(exito(v)) : exito);
-      const decir = (r) => { if (mia === vuelta) alAviso(r.ok ? { ok: true, texto: dicho(r.valor), cual } : { ok: false, texto: r.error, cual }); };
+      const decir = (r) => {
+        if (mia !== vuelta) return;
+        alAviso(r.ok ? { ok: true, titulo: '¡Listo!', texto: dicho(r.valor), icono: '✅', cual } : { ok: false, titulo: r.titulo, texto: r.error, icono: '⚠️', cual });
+      };
+      const fallo = (m) => ({ ok: false, titulo: m.titulo, error: m.texto, clave: m.clave });
       const trabajo = Promise.resolve().then(fn).then(
-        (v) => (v && v.ok === false ? { ok: false, error: v.error || MENSAJE_FALLA } : { ok: true, valor: v }),
-        (e) => ({ ok: false, error: enCristiano(e) }),
+        (v) => (v && v.ok === false
+          ? { ok: false, titulo: 'No se pudo ' + (accion || 'completar'), error: v.error || MENSAJE_FALLA, clave: 'otro' }
+          : { ok: true, valor: v }),
+        (e) => fallo(traducir(e, accion)),
       );
       let timer;
-      const vencido = new Promise((ok) => { timer = reloj.poner(() => ok({ ok: false, error: NO_CONFIRMADO, sinConfirmar: true }), tope); });
+      const vencido = new Promise((ok) => { timer = reloj.poner(() => ok({ ok: false, titulo: 'Sin confirmar', error: NO_CONFIRMADO, clave: 'sinRed', sinConfirmar: true }), tope); });
       try {
         const r = await Promise.race([trabajo, vencido]);
         decir(r);

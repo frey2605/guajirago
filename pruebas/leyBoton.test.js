@@ -18,6 +18,8 @@ const { leer, cargarDeLaApp } = require('./cargar.cjs');
 const V = require('../scripts/medir-ley-boton.cjs');
 
 const C = cargarDeLaApp('guajirago/src/candado.js');
+// El motivo de un fallo lo da la pieza ÚNICA (SEGUNDA LEY), la misma que el gancho useAccion le pasa al candado.
+const RZ = cargarDeLaApp('guajirago/src/avisoRechazo.js');
 
 // Un reloj de mentira: el tope se dispara cuando la prueba lo dice, no a los 20 segundos.
 function relojFalso() {
@@ -35,7 +37,7 @@ function candado(tope) {
   const cambios = [];
   const avisos = [];
   const reloj = relojFalso();
-  const c = C.crearCandado({ alCambiar: (x) => cambios.push(x), alAviso: (x) => avisos.push(x), tope, reloj });
+  const c = C.crearCandado({ alCambiar: (x) => cambios.push(x), alAviso: (x) => avisos.push(x), tope, reloj, traducir: RZ.motivoDeRechazo });
   return { c, cambios, avisos, reloj };
 }
 
@@ -55,34 +57,39 @@ describe('LA LEY DEL BOTÓN · el candado, ejecutado', () => {
     assert.strictEqual(veces, 1, '⛔ se hizo dos veces');
     assert.strictEqual(c.ocupado, false);
     assert.deepStrictEqual(cambios, ['guardar', false], 'la pantalla sabe CUÁL botón dice «Guardando…»');
-    assert.deepStrictEqual(avisos, [{ ok: true, texto: 'Quedó guardado.', cual: 'guardar' }], 'la verdad del final la da el candado');
+    assert.deepStrictEqual(avisos, [{ ok: true, titulo: '¡Listo!', texto: 'Quedó guardado.', icono: '✅', cual: 'guardar' }], 'la verdad del final la da el candado');
   });
 
   it('si falla, dice el motivo en cristiano y queda libre', async () => {
     const { c, avisos } = candado();
-    const r = await c.correr(async () => { throw Object.assign(new Error('Missing or insufficient permissions.'), { code: 'permission-denied' }); }, 'pagar', 'Pagado.');
-    assert.deepStrictEqual(r, { ok: false, error: 'No tienes permiso para hacer esto.' });
+    const r = await c.correr(async () => { throw Object.assign(new Error('Missing or insufficient permissions.'), { code: 'permission-denied' }); }, 'pagar', 'Pagado.', 'registrar el pago');
+    const m = RZ.motivoDeRechazo({ code: 'permission-denied' }, 'registrar el pago');
+    assert.deepStrictEqual(r, { ok: false, titulo: 'No se pudo registrar el pago', error: m.texto, clave: 'permiso' });
+    assert.strictEqual(avisos[0].titulo, 'No se pudo registrar el pago', 'el título dice QUÉ no se pudo');
     assert.strictEqual(avisos[0].ok, false);
     assert.ok(!/Missing/.test(avisos[0].texto), '⛔ el error técnico en inglés llegó a la pantalla');
     assert.strictEqual(c.ocupado, false, '⛔ quedó trabado después de fallar');
     assert.deepStrictEqual(await c.correr(async () => 1, 'pagar', 'Pagado.'), { ok: true, valor: 1 }, 'y vuelve a funcionar');
   });
 
-  it('los errores de Firebase se dicen en cristiano; un mensaje propio de la app se respeta; sin motivo, uno claro', () => {
-    assert.strictEqual(C.enCristiano({ code: 'functions/unavailable', message: 'internal' }), C.ERRORES.unavailable);
-    assert.strictEqual(C.enCristiano({ code: 'firestore/permission-denied' }), C.ERRORES['permission-denied']);
-    assert.strictEqual(C.enCristiano(new Error('Ese código ya se usó.')), 'Ese código ya se usó.');
-    assert.strictEqual(C.enCristiano({ code: 'functions/internal', message: 'INTERNAL' }), C.MENSAJE_FALLA);
-    assert.strictEqual(C.enCristiano(undefined), C.MENSAJE_FALLA);
+  it('el candado NO trae su propia tabla de errores: el motivo lo da avisoRechazo.js, y el gancho se la pasa (SEGUNDA LEY)', () => {
+    const cand = leer('guajirago/src/candado.js').replace(/\/\/.*$/gm, '');
+    assert.ok(!/permission-denied|unavailable|ERRORES|enCristiano/.test(cand),
+      '⛔ el candado volvió a traducir errores por su cuenta: son dos calculadoras del mismo mensaje');
+    const g = leer('guajirago/src/useAccion.js');
+    assert.match(g, /import \{ motivoDeRechazo, apuntarRechazo \} from '\.\/avisoRechazo'/);
+    assert.match(g, /crearCandado\(\{[^}]*traducir \}\)/, '⛔ el gancho no le pasa la traducción única al candado');
   });
 
-  it('la frase de NUESTRAS funciones se respeta tal cual («Ese código ya fue usado»), y el código pelado se traduce', () => {
-    assert.strictEqual(C.enCristiano({ code: 'functions/already-exists', message: 'Ese código ya fue usado' }), 'Ese código ya fue usado',
+  it('la pieza única respeta la frase de NUESTRAS funciones, quita el apellido del código, y no enseña el inglés de la base', () => {
+    const f = (e) => RZ.motivoDeRechazo(e, 'canjear el código');
+    assert.strictEqual(f({ code: 'functions/already-exists', message: 'Ese código ya fue usado' }).texto, 'Ese código ya fue usado',
       '⛔ se le quitó al conductor el motivo exacto que escribió el servidor');
-    assert.strictEqual(C.enCristiano({ code: 'functions/permission-denied', message: 'Ese código es de otro conductor' }), 'Ese código es de otro conductor');
-    assert.strictEqual(C.enCristiano({ code: 'functions/deadline-exceeded', message: 'deadline-exceeded' }), C.NO_CONFIRMADO);
-    assert.strictEqual(C.enCristiano({ code: 'firestore/permission-denied', message: 'Missing or insufficient permissions.' }), C.ERRORES['permission-denied'],
-      '⛔ el inglés de la base (también lleva espacios) llegó a la pantalla: solo se respetan las frases de NUESTRAS funciones');
+    assert.strictEqual(f({ code: 'functions/permission-denied', message: 'Ese código es de otro conductor' }).clave, 'permiso', 'con apellido cae en la misma clase');
+    assert.strictEqual(f({ code: 'functions/unavailable', message: 'unavailable' }).clave, 'sinRed');
+    assert.strictEqual(f({ code: 'functions/internal', message: 'internal' }).texto, f(null).texto, 'el código pelado no se enseña');
+    assert.ok(!/Missing/.test(f({ code: 'permission-denied', message: 'Missing or insufficient permissions.' }).texto),
+      '⛔ el inglés de la base llegó a la pantalla: solo se respetan las frases de NUESTRAS funciones');
   });
 
   it('el «se hizo» puede decir lo que devolvió la acción («¡Recargaste $20.000!»)', async () => {
@@ -94,7 +101,7 @@ describe('LA LEY DEL BOTÓN · el candado, ejecutado', () => {
   it('una respuesta { ok: false } del servidor es una falla, no un éxito', async () => {
     const { c, avisos } = candado();
     assert.deepStrictEqual(await c.correr(async () => ({ ok: false, error: 'Saldo insuficiente.' }), 'recargar', 'Recargado.'),
-      { ok: false, error: 'Saldo insuficiente.' });
+      { ok: false, titulo: 'No se pudo completar', error: 'Saldo insuficiente.', clave: 'otro' });
     assert.strictEqual(avisos[0].texto, 'Saldo insuficiente.');
   });
 
@@ -104,7 +111,7 @@ describe('LA LEY DEL BOTÓN · el candado, ejecutado', () => {
     await esperar();
     assert.strictEqual(c.ocupado, true);
     reloj.vencer();
-    assert.deepStrictEqual(await r, { ok: false, error: C.NO_CONFIRMADO, sinConfirmar: true });
+    assert.deepStrictEqual(await r, { ok: false, titulo: 'Sin confirmar', error: C.NO_CONFIRMADO, clave: 'sinRed', sinConfirmar: true });
     assert.strictEqual(c.ocupado, false, '⛔ el botón se quedó en «Enviando…» para siempre');
     assert.deepStrictEqual(cambios, ['enviar', false]);
     assert.ok(/confirmar/i.test(avisos[0].texto) && !/no se guard/i.test(avisos[0].texto),
@@ -151,7 +158,7 @@ describe('LA LEY DEL BOTÓN · el candado, ejecutado', () => {
 describe('LA LEY DEL BOTÓN · una sola pieza en las tres apps', () => {
   for (const app of ['guajirago-admin', 'guajirago-aliados']) {
     it(app + ' lleva el candado y su gancho byte a byte como transporte', () => {
-      for (const f of ['src/candado.js', 'src/useAccion.js']) {
+      for (const f of ['src/candado.js', 'src/useAccion.js', 'src/avisoRechazo.js']) {
         assert.strictEqual(leer(app + '/' + f), leer('guajirago/' + f),
           '⛔ ' + app + '/' + f + ' se separó de guajirago/' + f + ': la copia se cambia en los tres sitios');
       }

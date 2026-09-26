@@ -48,8 +48,20 @@ export const CLAVES = ['permiso', 'sinRed', 'otro'];
  * que ningún aviso, que es de donde venimos.
  */
 export function motivoDeRechazo(e, accion) {
-  const codigo = (e && e.code) ? String(e.code) : '';
+  // Las funciones de la nube mandan el código con apellido («functions/permission-denied»): se le quita, para que
+  // caiga en la MISMA clase que el de la base (26-sep-2026, LA LEY DEL BOTÓN usa esta pieza para todos los botones).
+  const codigo = (e && e.code) ? String(e.code).split('/').pop() : '';
   const queIba = accion || 'guardar el cambio';
+  const m = clasificar(codigo, queIba);
+  // Y la FRASE de nuestras funciones se respeta: el servidor contesta «Ese código ya fue usado» o «Ese código es de
+  // otro conductor», escrito para la persona. Cambiarla por «Algo falló» le quitaría el motivo. Una frase lleva
+  // espacios; cuando falla la red, Firebase pone de mensaje el código pelado («internal»), y ése no se enseña.
+  const frase = e && /^functions\//.test(String(e.code)) && typeof e.message === 'string' && /\s/.test(e.message.trim());
+  if (frase && m.clave !== 'sinRed') return { ...m, texto: e.message };
+  return m;
+}
+
+function clasificar(codigo, queIba) {
   if (codigo === 'permission-denied') {
     return {
       clave: 'permiso',
