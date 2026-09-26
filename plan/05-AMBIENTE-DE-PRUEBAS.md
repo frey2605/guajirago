@@ -38,13 +38,24 @@ Sin esto, **nada de lo demás se puede hacer sin riesgo**. Por eso va primero.
 
 - **Nivel 2 empezado.** `guajirago-pruebas` existe (lo creó el dueño; se llama `-pruebas` y no `-dev`, como
   en Talaria). Tiene app web registrada y tres sitios: `guajirago-pruebas.web.app` (transporte),
-  `guajirago-pruebas-admin.web.app` (panel) y `guajirago-pruebas-aliados.web.app` (aliados). **No tiene todavía** base de
-  Firestore (la API está apagada: se enciende en la consola), ni plan Blaze (funciones y almacén), ni llave
-  de notificaciones.
+  `guajirago-pruebas-admin.web.app` (panel) y `guajirago-pruebas-aliados.web.app` (aliados). Desde la noche del
+  25-sep-2026 tiene, hecho por el dueño en la consola y comprobado contra la nube solo leyendo: **base de Firestore**
+  (nam5, modo producción), **Authentication** con correo/contraseña y los 5 dominios autorizados, **plan Blaze** (con una
+  cuenta de facturación aparte de la de producción), la API de **Cloud Messaging**, y la **llave de notificaciones**
+  (`7ef29a2`). La llave de Maps de producción ya admite `guajirago-pruebas.web.app` y `guajirago-pruebas-aliados.web.app`
+  (el panel no carga Maps). Y desde aquí se le publicaron **las reglas y los 3 índices del repo** (copia limpia de
+  `7ef29a2`, `--project guajirago-pruebas`, leídos de vuelta del servidor: idénticos; antes tenía las reglas «todo
+  cerrado» de la consola y cero índices). **No tiene todavía** Firebase Storage activado (la consola pide «Comenzar»):
+  sin eso no entran las reglas del almacén ni las funciones. Producción no se tocó (sus reglas siguen siendo las del
+  12-sep y sus 3 índices).
 - **La app de transporte cumple las reglas 1, 3 y 4** (`b1c8a63`): proyecto aparte, el ambiente lo fija cómo
   se compila (`npm run build:pruebas` / `build:produccion`, nunca a mano), y la copia de pruebas lleva cartel
-  naranja. La regla 5 se cumple a medias y está escrita: en `guajirago/.env.pruebas` la llave de
-  notificaciones está vacía y lo dice. La regla 2 (sembrar datos falsos con un guion) **no está hecha**.
+  naranja. La regla 5 se cumple: la llave de notificaciones de pruebas la generó el dueño el 25-sep y
+  está en los `.env.pruebas` de transporte y aliados (`7ef29a2`, y `c886693` en el repo de aliados); y transporte ya la
+  lee del ambiente para pasajero y conductor (`f704c34`: antes `src/Notificaciones.js` llevaba la de producción a
+  mano y el medidor no la veía). 🔴 El paquete de pruebas de transporte publicado sigue siendo el de `b1c8a63` (con la
+  llave de producción dentro): se vuelve a publicar con el arreglo de los dos `firebase-messaging-sw.js`, que llevan
+  producción a mano. La regla 2 (sembrar datos falsos con un guion) **no está hecha**.
 - **El panel cumple lo mismo que transporte** (`0664217` de `guajirago-admin`, 25-sep-2026): la MISMA pieza
   `src/ambiente.js` (copia, porque es otro repo; atada byte a byte por `pruebas/elAmbiente.test.js`), `.env`
   por ambiente con las mismas llaves —en producción el panel comparte la app web de Firebase con transporte

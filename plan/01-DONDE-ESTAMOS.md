@@ -8,7 +8,7 @@ No supuesto. Cada fila se puede volver a contar.
 
 | Qué | Cuánto | Con qué se contó |
 |---|---|---|
-| Proyectos Firebase | **2** desde el 25-sep-2026: `guajirago` (producción) y `guajirago-pruebas` (pruebas; creado ese día, todavía sin base de datos ni plan Blaze) | `npx firebase-tools@15 projects:list` |
+| Proyectos Firebase | **2** desde el 25-sep-2026: `guajirago` (producción) y `guajirago-pruebas` (pruebas; creado ese día; desde esa noche con base de datos en nam5, Auth, Blaze, las mismas reglas y los mismos 3 índices que producción, y llave de notificaciones; Storage por activar) | `npx firebase-tools@15 projects:list` |
 | Ambientes | **2 en las tres apps** desde el 25-sep-2026: transporte (`b1c8a63`), panel (`0664217` de `guajirago-admin`) y aliados (`30cd8d1` de `guajirago-aliados`); las tres compilan por ambiente y ninguna lleva llaves a mano | `node scripts/medir-ambientes.cjs` → 6 de 6 en las tres |
 | App Check | **no existe** | `grep -rl "appCheck\|AppCheck" */src */functions` → 0 fuera de `node_modules` |
 | Escrituras del celular directo a la base | **150** | `grep -rhoE "\b(addDoc\|setDoc\|updateDoc\|deleteDoc)\(" */src \| wc -l` |
