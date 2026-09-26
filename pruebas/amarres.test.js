@@ -3348,11 +3348,16 @@ describe('EL VIAJE NO NACE EN LA PLAZA · sin GPS no se pide a ciegas', () => {
       //  mejorar, así que tiene que caer por NOROMPER, no por FALLOS.
       ['se alarga la espera hasta que el aparato ceda (el pasajero, callado)',
         (s) => s.replace(/timeout: 10000, maximumAge: 300000/, 'timeout: 45000, maximumAge: 300000')],
+      //  La guardia «sin punto no se crea» SIN su salida: avisa, pero sigue de largo y crea el viaje. El medidor
+      //  cortaba el trozo al final de la guardia y no lo veía (hueco viejo, destapado por un sabotaje el 26-sep-2026).
+      ['la guardia sin punto avisa pero no corta: el viaje se crea igual',
+        (s) => s.replace(/return \{ ok: false, avisado: true \};/, '')],
     ];
 
     // Y QUE LA LISTA NO SE VACÍE. Sin esto, borrar escapes pondría esta prueba
     // más verde cuanto menos vigilara — que es como se apagan los vigilantes.
-    assert.ok(ESCAPES.length >= 39,
+    // (40 desde el 26-sep-2026: entró la guardia que avisa y no corta.)
+    assert.ok(ESCAPES.length >= 40,
       'esta prueba solo vigila ' + ESCAPES.length + ' escapes, y el 23-sep-2026 vigilaba 39 '
       + '(eran 24 el 15-sep-2026, los 5 del GPS tardío entraron el 21, y el 23 entraron '
       + 'los 5 de las tres salidas mudas del botón verde y los 5 del orden de los intentos). '

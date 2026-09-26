@@ -816,10 +816,15 @@ async function correrElPedido({ punto, pin, ubicacion, esDelGps, origen, encuent
     const correr = new Function('window', 'setCargando', 'setAviso', 'setError', 'esMensajeria',
       'NO_SE_DONDE_ESTAS', 'puntoRecogida', 'pinActivoRef', 'ubicacionPasajero',
       'ubicacionEsDelGps', 'origen', 'destino',
-      'return (async () => {\n' + cadena.trozo + '\nreturn coordsRecogida;\n})();');
+      // 🔴 SI SE LLEGA AQUÍ SIN PUNTO, LA GUARDIA NO CORTÓ. El trozo acaba donde acaba la guardia, así que sin esta
+      // comprobación quitarle su `return` dejaba todo en verde: aquí se devolvía `null` («no se crea») mientras la
+      // pantalla de verdad seguía de largo y creaba el viaje sin punto. Lo destapó un sabotaje el 26-sep-2026, y el
+      // hueco era de antes (probado sobre la versión anterior).
+      'return (async () => {\n' + cadena.trozo + '\nif (!coordsRecogida) return { siguioSinPunto: true };\nreturn coordsRecogida;\n})();');
     const coords = await correr(windowFalso(encuentra), () => {}, (a) => avisos.push(a),
       (t) => avisos.push({ titulo: '', texto: t, enLinea: true }), false, aviso.armar,
       punto, { current: pin }, ubicacion, esDelGps, origen, 'Cl. 1 # 2-3');
+    if (coords && coords.siguioSinPunto) return { falla: 'la guardia sin punto no corta: la pantalla sigue de largo y crea el viaje sin saber dónde recoger' };
     // «No se crea» son DOS formas: el `return` vacío de siempre, y desde LA LEY DEL BOTÓN (26-sep-2026) el
     // `return { ok: false, avisado: true }` con que la guardia le dice al candado «ya avisé yo». Cualquier otra cosa
     // sin coordenada NO se da por buena: sigue reventando más abajo, que es como se ve.
