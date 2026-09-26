@@ -200,6 +200,8 @@ const TRAMPAS = [
     cambiar(`, 'guardar', 'Quedó guardado.')`, `, 'guardar')`), (r) => r.faltas.some((f) => /se hizo/.test(f))],
   ['el botón con candado no se deshabilita',
     cambiar(`<button disabled={!!ocupado} onClick={guardar}>`, `<button onClick={guardar}>`), (r) => r.faltas.some((f) => /deshabilita/.test(f))],
+  ['un campo de archivo con candado no se deshabilita (el segundo intento se frenaría en silencio)',
+    cambiar('</div>;', `<input type="file" onChange={(e) => correr(() => uploadBytes(r, e.target.files[0]), 'foto', 'Foto subida.')} /></div>;`), (r) => r.faltas.some((f) => /campo con candado/.test(f))],
   ['el botón con candado no dice qué está haciendo',
     cambiar(`{texto('guardar', 'Guardando…', 'Guardar')}`, 'Guardar'), (r) => r.faltas.some((f) => /qué está haciendo/.test(f))],
   ['un interruptor que guarda, entregado a otra pieza de la pantalla (así se escapaban los de Configuración)',

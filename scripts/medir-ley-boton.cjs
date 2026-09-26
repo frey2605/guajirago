@@ -198,6 +198,10 @@ function revisarArchivo(fuente, escritores = new Set()) {
     if (r.escribe && !r.candado) sinCandado.push({ linea: h.linea, evento: h.evento, trozo: h.trozo.replace(/\s+/g, ' ').slice(0, 90) });
     if (usaLey && r.candado) {
       const el = elementoEn(codigo, seguro, h.ini);
+      // Y los campos (`<input type="file">` del comprobante, un interruptor): sin disabled, el segundo intento lo frena
+      // el candado EN SILENCIO. Lo cazó el saboteador general el 26-sep-2026 en Creditos.js.
+      // (La caja de texto que manda con Enter no: se sigue escribiendo, y el ➤ de al lado ya dice «…».)
+      if (h.evento !== 'onKeyDown' && /^<(input|select|textarea)\b/.test(el) && !/\bdisabled=/.test(el)) faltas.push(`renglón ${h.linea}: un campo con candado no se deshabilita mientras trabaja`);
       if (/^<button/.test(el)) {
         if (!/\bdisabled=/.test(el)) faltas.push(`renglón ${h.linea}: un botón con candado no se deshabilita mientras trabaja`);
         if (!/…|\btexto\(/.test(el)) faltas.push(`renglón ${h.linea}: un botón con candado no dice qué está haciendo («Guardando…»)`);
