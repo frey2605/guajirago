@@ -85,6 +85,15 @@ describe('EL AMBIENTE (fase 0) · la app de transporte deduce si es PRUEBAS o PR
     assert.match(t, /vapidKey:\s*process\.env\.REACT_APP_FIREBASE_VAPID_KEY/, '⛔ la vapidKey no se lee de REACT_APP_FIREBASE_VAPID_KEY');
     assert.ok(M.leerEnv(leer('guajirago/.env.produccion')).REACT_APP_FIREBASE_VAPID_KEY,
       '⛔ producción se quedó sin su llave de notificaciones: los conductores dejarían de recibir avisos');
+    const pruebas = M.leerEnv(leer('guajirago/.env.pruebas')).REACT_APP_FIREBASE_VAPID_KEY;
+    assert.ok(pruebas, '⛔ pruebas se quedó sin su llave de notificaciones: el conductor de pruebas no recibiría avisos (la generó el dueño el 25-sep-2026)');
+    // FORMA además de valor: la prueba lee el .env con leerEnv y la app con env-cmd, y no parsean igual (env-cmd quita
+    // comillas y corta en #). Unas comillas o un «# ojo» al lado de la llave de PRODUCCIÓN pasaban el notStrictEqual de
+    // abajo y la app compilaba con producción. Lo cazó la segunda opinión el 25-sep-2026. Una llave VAPID pública son
+    // 87 caracteres base64url y empieza por B; lo que no tenga esa forma exacta no es una llave, es un disfraz.
+    assert.match(pruebas, /^B[A-Za-z0-9_-]{86}$/, '⛔ la llave Web Push de pruebas no tiene forma de llave (comillas, espacios, un # al lado o un largo raro): la app la leería distinto a como la lee esta prueba');
+    assert.notStrictEqual(pruebas, M.leerEnv(leer('guajirago/.env.produccion')).REACT_APP_FIREBASE_VAPID_KEY,
+      '⛔ pruebas lleva la llave Web Push de PRODUCCIÓN: los avisos de prueba saldrían por el proyecto de verdad');
   });
 
   it('se compila por ambiente: build:pruebas, build:produccion, build a secas sigue siendo producción, start es pruebas', () => {
@@ -276,5 +285,9 @@ describe('EL AMBIENTE (fase 0) · lo que solo tiene aliados', () => {
     assert.ok(prod, '⛔ producción de aliados se quedó sin su llave de notificaciones: los negocios dejarían de recibir los avisos de pedidos');
     assert.strictEqual(prod, M.leerEnv(leer('guajirago/.env.produccion')).REACT_APP_FIREBASE_VAPID_KEY,
       '⛔ la llave Web Push de aliados no es la del proyecto (la misma de transporte)');
+    const pruebas = M.leerEnv(leer(P + '.env.pruebas')).REACT_APP_FIREBASE_VAPID_KEY;
+    assert.ok(pruebas, '⛔ pruebas de aliados se quedó sin su llave de notificaciones: el negocio de pruebas no recibiría avisos de pedidos');
+    assert.strictEqual(pruebas, M.leerEnv(leer('guajirago/.env.pruebas')).REACT_APP_FIREBASE_VAPID_KEY,
+      '⛔ la llave Web Push de pruebas de aliados no es la del proyecto (la misma de transporte)');
   });
 });
