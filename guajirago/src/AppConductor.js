@@ -14,6 +14,8 @@ import { centroRiohacha } from './riohacha';
 // archivo que usan el panel y aliados, copia idéntica byte a byte.
 import { motivoDeRechazo, apuntarRechazo } from './avisoRechazo';
 import AvisoModal from './AvisoModal';
+// LA LEY DEL BOTÓN (26-sep-2026): todo lo que guarda en la app del conductor pasa por el candado.
+import { useAccion } from './useAccion';
 import { calcularDistanciaKm } from './distancia';
 import { RAZONES_CANCELACION_CONDUCTOR } from './textosViaje';
 import Calificacion from './Calificacion';
@@ -119,7 +121,7 @@ function MensajeGrande({ mensaje, onCerrar }) {
   );
 }
 
-function ModalCancelacion({ razones, onConfirmar, onCerrar }) {
+function ModalCancelacion({ razones, onConfirmar, onCerrar, ocupado }) {
   const [razonSeleccionada, setRazonSeleccionada] = useState('');
   return (
     <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', zIndex: 9997, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
@@ -134,9 +136,9 @@ function ModalCancelacion({ razones, onConfirmar, onCerrar }) {
           ))}
         </div>
         <div style={{ display: 'flex', gap: '12px' }}>
-          <button onClick={onCerrar} style={{ flex: 1, padding: '14px', background: '#FFFFFF', border: '1px solid #ECECEF', borderRadius: '14px', color: '#6B7280', fontSize: '14px', fontWeight: 'bold', cursor: 'pointer' }}>Volver</button>
-          <button onClick={() => razonSeleccionada && onConfirmar(razonSeleccionada)} style={{ flex: 2, padding: '14px', background: razonSeleccionada ? '#FF4444' : '#ECECEF', border: 'none', borderRadius: '14px', color: razonSeleccionada ? '#FFFFFF' : '#6B7280', fontSize: '14px', fontWeight: '900', cursor: razonSeleccionada ? 'pointer' : 'default' }}>
-            Confirmar cancelación
+          <button onClick={onCerrar} disabled={!!ocupado} style={{ flex: 1, padding: '14px', background: '#FFFFFF', border: '1px solid #ECECEF', borderRadius: '14px', color: '#6B7280', fontSize: '14px', fontWeight: 'bold', cursor: 'pointer' }}>Volver</button>
+          <button onClick={() => razonSeleccionada && onConfirmar(razonSeleccionada)} disabled={!!ocupado} style={{ flex: 2, padding: '14px', background: razonSeleccionada ? '#FF4444' : '#ECECEF', border: 'none', borderRadius: '14px', color: razonSeleccionada ? '#FFFFFF' : '#6B7280', fontSize: '14px', fontWeight: '900', cursor: razonSeleccionada ? 'pointer' : 'default' }}>
+            {ocupado === 'cancelar' ? 'Cancelando…' : 'Confirmar cancelación'}
           </button>
         </div>
       </div>
@@ -390,6 +392,15 @@ function TarjetaSolicitud({ solicitud, nombre, telefono, placa, vehiculo, tipoVe
   const [tarifaModificada, setTarifaModificada] = useState(solicitud.tarifaValor || TARIFA_MINIMA);
   const [tarifaCambiada, setTarifaCambiada] = useState(false);
   const [ofertaEnviada, setOfertaEnviada] = useState(null); // monto que ya oferté en este viaje (para poder ajustar)
+  // El candado de esta tarjeta. Su aviso sube a la pantalla por `onAviso` (la tarjeta vive fuera del componente),
+  // solo cuando falla. Por un ref: si el padre pasa una función nueva en cada dibujo, el efecto volvería a abrir un
+  // aviso que el conductor ya cerró.
+  const { ocupado, correr, texto, aviso } = useAccion();
+  const onAvisoRef = useRef(onAviso);
+  onAvisoRef.current = onAviso;
+  useEffect(() => {
+    if (aviso && !aviso.ok && onAvisoRef.current) onAvisoRef.current(aviso);
+  }, [aviso]);
 
   useEffect(() => {
     setTarifaModificada(solicitud.tarifaValor || TARIFA_MINIMA);
@@ -426,7 +437,7 @@ function TarjetaSolicitud({ solicitud, nombre, telefono, placa, vehiculo, tipoVe
     agregarViajeEscuchando(idViaje);
     // Mi oferta va en la subcolección viajes/{id}/contraofertas/{miUid}: no pisa las de otros
     // conductores y puedo AJUSTARLA (mismo doc). La tarjeta NO se descarta: el viaje sigue abierto.
-    setDoc(doc(db, 'viajes', idViaje, 'contraofertas', user.uid), {
+    const r = await correr(() => setDoc(doc(db, 'viajes', idViaje, 'contraofertas', user.uid), {
       conductorId: user.uid,
       conductorNombre: nombre || 'Conductor',
       conductorTelefono: telefono || '',
@@ -441,13 +452,10 @@ function TarjetaSolicitud({ solicitud, nombre, telefono, placa, vehiculo, tipoVe
       vigente: true,
       // REGLA 9. Antes: `.catch(() => {})`. La oferta no salía, la tarjeta decía
       // «oferta enviada» igual, y el conductor se quedaba esperando una respuesta
-      // a algo que el pasajero nunca vio. Ahora se deshace el «enviada» y se dice.
-    }, { merge: true }).catch((e) => {
-      apuntarRechazo('AppConductor.js (aceptarOEnviar)', e);
-      setOfertaEnviada(null);
-      if (onAviso) onAviso(motivoDeRechazo(e, 'enviar tu oferta'));
-    });
-    setOfertaEnviada(monto);
+      // a algo que el pasajero nunca vio. Desde LA LEY DEL BOTÓN el «enviada» se pone
+      // SOLO cuando la oferta entró, y si falla lo dice el candado.
+    }, { merge: true }), 'oferta', 'Oferta enviada.', 'enviar tu oferta');
+    if (r && r.ok) setOfertaEnviada(monto);
   };
 
   return (
@@ -491,9 +499,9 @@ function TarjetaSolicitud({ solicitud, nombre, telefono, placa, vehiculo, tipoVe
         </div>
       )}
       <div style={{ display: 'flex', gap: '10px' }}>
-        <button onClick={() => onRechazar(solicitud.id)} style={{ flex: 1, padding: '13px', background: '#FFFFFF', border: 'none', borderRadius: '13px', color: '#6B7280', fontSize: '13px', fontWeight: 'bold', cursor: 'pointer' }}>{ofertaEnviada != null ? '✗ Quitar' : '✗ Rechazar'}</button>
-        <button onClick={aceptarOEnviar} style={{ flex: 2, padding: '13px', background: ofertaEnviada != null ? 'linear-gradient(135deg, #1C8EF9, #39A6FF)' : (tarifaCambiada ? 'linear-gradient(135deg, #FF7A2F, #D6357E)' : 'linear-gradient(135deg, #FFCF4D, #FF7A2F)'), border: 'none', borderRadius: '13px', color: '#FFFFFF', fontSize: '13px', fontWeight: 'bold', cursor: 'pointer' }}>
-          {ofertaEnviada != null ? '🔄 Actualizar oferta' : (tarifaCambiada ? '💬 Enviar contraoferta' : '✅ Aceptar viaje')}
+        <button onClick={() => onRechazar(solicitud.id)} disabled={!!ocupado} style={{ flex: 1, padding: '13px', background: '#FFFFFF', border: 'none', borderRadius: '13px', color: '#6B7280', fontSize: '13px', fontWeight: 'bold', cursor: 'pointer' }}>{ofertaEnviada != null ? '✗ Quitar' : '✗ Rechazar'}</button>
+        <button onClick={aceptarOEnviar} disabled={!!ocupado} style={{ flex: 2, padding: '13px', background: ofertaEnviada != null ? 'linear-gradient(135deg, #1C8EF9, #39A6FF)' : (tarifaCambiada ? 'linear-gradient(135deg, #FF7A2F, #D6357E)' : 'linear-gradient(135deg, #FFCF4D, #FF7A2F)'), border: 'none', borderRadius: '13px', color: '#FFFFFF', fontSize: '13px', fontWeight: 'bold', cursor: 'pointer' }}>
+          {texto('oferta', 'Enviando…', ofertaEnviada != null ? '🔄 Actualizar oferta' : (tarifaCambiada ? '💬 Enviar contraoferta' : '✅ Aceptar viaje'))}
         </button>
       </div>
     </div>
@@ -518,6 +526,12 @@ function AppConductor({ nombre, telefono, placa, vehiculo, tipoVehiculo, onCerra
   // PASAJERO», y ademas se quedaba TAPADA por el modal del codigo de descuento
   // (los dos a zIndex 9998, y el otro se pinta despues). AvisoModal va a 10000.
   const [aviso, setAviso] = useState(null);
+  // El candado de LA LEY DEL BOTÓN. Su aviso entra por la MISMA ventanita que ya pintan las cuatro pantallas del
+  // conductor (`aviso`), y solo cuando algo FALLA: lo que sale bien se ve solo (la fase avanza, el mensaje sale).
+  const { ocupado, correr, texto, aviso: avisoAccion } = useAccion();
+  useEffect(() => {
+    if (avisoAccion && !avisoAccion.ok) setAviso(avisoAccion);
+  }, [avisoAccion]);
   const [mostrarCancelacion, setMostrarCancelacion] = useState(false);
   const [mostrarCodigo, setMostrarCodigo] = useState(false);
   const [codigoIngresado, setCodigoIngresado] = useState('');
@@ -597,11 +611,13 @@ function AppConductor({ nombre, telefono, placa, vehiculo, tipoVehiculo, onCerra
 
   const cerrarLlamado = async () => {
     if (!puedeCerrarLlamado) return;
-    try {
+    // Antes: `catch(e) {}` y el llamado se cerraba igual; si no se borraba en el servidor, volvía a salir sin que
+    // nadie dijera por qué. Ahora se cierra solo cuando entró, y si falla lo dice el candado.
+    const r = await correr(async () => {
       const user = auth.currentUser;
       await updateDoc(doc(db, 'usuarios', user.uid), { llamadoPendiente: null });
-    } catch(e) {}
-    setLlamadoAtencion(null);
+    }, 'llamado', 'Listo.', 'marcar el llamado como leído');
+    if (r && r.ok) setLlamadoAtencion(null);
   };
 
   const [textoApelacion, setTextoApelacion] = useState('');
@@ -618,7 +634,10 @@ function AppConductor({ nombre, telefono, placa, vehiculo, tipoVehiculo, onCerra
     if (!textoApelacion.trim()) return;
     const user = auth.currentUser;
     if (!user) return;
-    try {
+    // Antes: `catch (e) {}`. (Y ANOTADO sin tocar, PRIMERA LEY: sube la lista entera, así que una respuesta del
+    // panel escrita a la vez puede borrar este mensaje — el mismo fallo que se le quitó al chat de recargas con
+    // arrayUnion. Va aparte.)
+    await correr(async () => {
       const nuevoMensaje = {
         texto: textoApelacion.trim(),
         autor: 'conductor',
@@ -629,7 +648,7 @@ function AppConductor({ nombre, telefono, placa, vehiculo, tipoVehiculo, onCerra
         mensajesApelacion: [...previos, nuevoMensaje],
       });
       setTextoApelacion('');
-    } catch (e) {}
+    }, 'apelacion', 'Mensaje enviado.', 'enviar tu mensaje');
   };
   useEffect(() => {
     const user = auth.currentUser;
@@ -831,13 +850,19 @@ function AppConductor({ nombre, telefono, placa, vehiculo, tipoVehiculo, onCerra
   }, [limpiarTodosVigilantes, limpiarViajesOtrosConductor, invalidarMisOtrasOfertas, tipoVehiculo]);
 
   const cerrarSesion = async () => {
-    try {
+    // Antes: `catch(e) {}` y se salía igual. Si había un viaje en marcha y su cancelación no entraba, el pasajero se
+    // quedaba esperando a un conductor que ya se había ido, sin que nadie lo supiera. Ahora: con viaje en marcha, si
+    // no entra, NO se sale (el candado dice por qué y se puede reintentar). Sin viaje, se sale igual que antes: dejar
+    // a alguien sin poder cerrar sesión por falta de señal sería peor que apagarle el «activo» un rato tarde.
+    const r = await correr(async () => {
       if (viajeActual) {
         await updateDoc(doc(db, 'viajes', viajeActual.id), { estado: 'cancelado_conductor', canceladoPor: 'conductor', razonCancelacion: 'Conductor cerró sesión' });
       }
       const user = auth.currentUser;
       if (user) await setDoc(doc(db, 'conductores', user.uid), { activo: false, ocupado: false, enViajeId: null }, { merge: true });
-    } catch(e) {}
+    }, 'salir', 'Sesión cerrada.', 'cerrar la sesión');
+    if (!r) return; // segundo toque
+    if (!r.ok && viajeActual) return;
     try { await signOut(auth); } catch(e) {}
     if (onCerrarSesion) onCerrarSesion(); else window.location.reload();
   };
@@ -1066,13 +1091,10 @@ const cargarSaldo = useCallback(async (uid) => {
   // en la puerta y el pasajero sigue esperando dentro sin saberlo.
   const llegueAlPunto = async () => {
     if (!viajeActual) return;
-    try {
-      await updateDoc(doc(db, 'viajes', viajeActual.id), { conductorEnPunto: true, fase: 'en_punto', tiempoEspera: new Date().toISOString() });
-    } catch (e) {
-      apuntarRechazo('AppConductor.js (llegueAlPunto)', e);
-      setAviso(motivoDeRechazo(e, 'avisar que llegaste'));
-      return;
-    }
+    // Si no entra, NO se avanza (el candado dice por qué y se puede reintentar).
+    const r = await correr(() => updateDoc(doc(db, 'viajes', viajeActual.id), { conductorEnPunto: true, fase: 'en_punto', tiempoEspera: new Date().toISOString() }),
+      'llegue', 'Le avisamos al pasajero.', 'avisar que llegaste');
+    if (!r || !r.ok) return;
     setRespuestaPasajero(null);
     setFase('en_punto');
     setContador(configApp.tiempoEsperaConductor || 240);
@@ -1092,13 +1114,9 @@ const cargarSaldo = useCallback(async (uid) => {
   const iniciarViaje = async () => {
     if (!viajeActual) return;
     clearInterval(contadorRef.current);
-    try {
-      await updateDoc(doc(db, 'viajes', viajeActual.id), { fase: 'en_viaje' });
-    } catch (e) {
-      apuntarRechazo('AppConductor.js (iniciarViaje)', e);
-      setAviso(motivoDeRechazo(e, 'iniciar el viaje'));
-      return;
-    }
+    const r = await correr(() => updateDoc(doc(db, 'viajes', viajeActual.id), { fase: 'en_viaje' }),
+      'iniciar', 'Viaje iniciado.', 'iniciar el viaje');
+    if (!r || !r.ok) return;
     setFase('en_viaje');
     geocodificarDestino(viajeActual.destino);
   };
@@ -1136,14 +1154,23 @@ const cargarSaldo = useCallback(async (uid) => {
       else setErrorCodigo('Código incorrecto. Verifícalo con el pasajero');
       return;
     }
-    try {
-      const preguntar = httpsCallable(getFunctions(), 'verificarCodigoViaje');
-      const res = await preguntar({ viajeId: viajeActual.id, codigo: codigoIngresado.trim() });
-      if (res && res.data && res.data.ok) acertar();
-      else setErrorCodigo('Código incorrecto. Verifícalo con el pasajero');
-    } catch (e) {
-      setErrorCodigo('No se pudo comprobar el código. Revisa tu conexión');
-    }
+    // El candado bloquea el doble toque; el error se sigue diciendo DENTRO de la ventanita del código, donde el
+    // conductor lo está escribiendo («ya avisé yo»: el candado no le pone otra encima).
+    const r = await correr(async () => {
+      try {
+        const preguntar = httpsCallable(getFunctions(), 'verificarCodigoViaje');
+        const res = await preguntar({ viajeId: viajeActual.id, codigo: codigoIngresado.trim() });
+        return !!(res && res.data && res.data.ok);
+      } catch (e) {
+        apuntarRechazo('AppConductor.js (verificarCodigo)', e);
+        setErrorCodigo('No se pudo comprobar el código. Revisa tu conexión');
+        return { ok: false, avisado: true };
+      }
+    }, 'codigo', 'Código correcto.', 'comprobar el código');
+    if (!r || !r.ok) return;
+    // Se inicia DESPUÉS de soltar el candado: iniciar el viaje pasa por él también.
+    if (r.valor) acertar();
+    else setErrorCodigo('Código incorrecto. Verifícalo con el pasajero');
   };
 
   // REGLA 9, y con la misma cautela que cerrarViajeFinal: si la cancelación no
@@ -1153,13 +1180,9 @@ const cargarSaldo = useCallback(async (uid) => {
   const cancelarViaje = async (razon) => {
     clearInterval(contadorRef.current);
     if (viajeActual) {
-      try {
-        await updateDoc(doc(db, 'viajes', viajeActual.id), { estado: 'cancelado_conductor', canceladoPor: 'conductor', razonCancelacion: razon });
-      } catch (e) {
-        apuntarRechazo('AppConductor.js (cancelarViaje)', e);
-        setAviso(motivoDeRechazo(e, 'cancelar el viaje'));
-        return;
-      }
+      const r = await correr(() => updateDoc(doc(db, 'viajes', viajeActual.id), { estado: 'cancelado_conductor', canceladoPor: 'conductor', razonCancelacion: razon }),
+        'cancelar', 'Viaje cancelado.', 'cancelar el viaje');
+      if (!r || !r.ok) return;
     }
     const user = auth.currentUser;
     if (user) setDoc(doc(db, 'conductores', user.uid), { ocupado: false, enViajeId: null }, { merge: true }).catch((e) => { apuntarRechazo('AppConductor.js (soltar el viaje)', e); setAviso(motivoDeRechazo(e, 'liberarte para recibir viajes')); });
@@ -1187,19 +1210,19 @@ const cargarSaldo = useCallback(async (uid) => {
   // pantalla y el botón sigue ahí. Volver a tocarlo lo reintenta.
   const cerrarViajeFinal = async () => {
     if (viajeActual) {
-      try {
+      const r = await correr(async () => {
         await updateDoc(doc(db, 'viajes', viajeActual.id), { estado: 'finalizado', fase: 'finalizado' });
         setDatosCalificacion({ viajeId: viajeActual.id, nombrePasajero: viajeActual.pasajeroNombre || 'Pasajero', pasajeroId: viajeActual.pasajeroId || '' });
-      } catch (err) {
-        apuntarRechazo('AppConductor.js (cerrarViajeFinal)', err);
+      }, 'cerrar', 'Viaje cerrado.', 'cerrar el viaje');
+      if (!r || !r.ok) {
         // El modal del código de descuento («ANTES DE FINALIZAR») está a zIndex
         // 99999 y la ventanita a 10000: si se queda abierto, TAPA el aviso. Se
         // llega aquí desde su botón «Omitir», así que hay que cerrarlo antes. Sin
         // esto, el conductor toca «Omitir», falla el cierre del viaje y no ve nada
         // — reintenta a ciegas, que es justo lo que la REGLA 9 quiere evitar. Lo
         // encontró la segunda opinión sobre este mismo arreglo a medio hacer.
-        setMostrarCodigoDescuento(false);
-        setAviso(motivoDeRechazo(err, 'cerrar el viaje'));
+        // (El motivo lo dice el candado; y se SALE SIN LIMPIAR: el botón sigue ahí.)
+        if (r) setMostrarCodigoDescuento(false);
         return;
       }
     }
@@ -1225,6 +1248,10 @@ const cargarSaldo = useCallback(async (uid) => {
 
   const verificarCodigoDescuento = async () => {
     if (!viajeActual) return;
+    // El candado bloquea el doble toque (el servidor cobra el descuento: dos toques no pueden ser dos cobros); el
+    // error se sigue diciendo DENTRO de la ventanita del código («ya avisé yo»). Y el motivo ya no se calcula aquí
+    // («si trae espacios es del servidor»): lo da motivoDeRechazo, la pieza única, que sabe lo mismo (SEGUNDA LEY).
+    await correr(async () => {
     try {
       // REGLA 7 — esto ya NO se hace aquí. Hasta el 24-ago-2026 este teléfono
       // comparaba el código, marcaba el descuento como consumido y SE ACREDITABA
@@ -1248,11 +1275,12 @@ const cargarSaldo = useCallback(async (uid) => {
       setSaldoVirtualRecibido(montoDescuento);
     } catch (e) {
       // El motivo lo explica el servidor ("Código incorrecto. Verifícalo con el
-      // pasajero", "Ese descuento ya se cobró"…) y esos mensajes llevan
-      // espacios; si falla la red, la librería pone el código pelado.
-      const delServidor = e && e.message && e.message.includes(' ');
-      setErrorCodigoDescuento(delServidor ? e.message : 'Error al verificar. Intenta de nuevo');
+      // pasajero", "Ese descuento ya se cobró"…) y la pieza única lo respeta tal cual.
+      apuntarRechazo('AppConductor.js (verificarCodigoDescuento)', e);
+      setErrorCodigoDescuento(motivoDeRechazo(e, 'comprobar el código de descuento').texto);
+      return { ok: false, avisado: true };
     }
+    }, 'descuento', 'Descuento cobrado.', 'comprobar el código de descuento');
   };
 
   const omitirCodigoDescuento = async () => {
@@ -1271,7 +1299,8 @@ useEffect(() => {
   const enviarMensajeConductor = async () => {
     if (!textoChat.trim() || !viajeActual?.id) return;
     const user = auth.currentUser;
-    try {
+    // Antes: `catch (e) {}` — si no salía, nadie lo decía. Y dos Enter seguidos lo mandaban dos veces.
+    await correr(async () => {
       await addDoc(collection(db, 'viajes', viajeActual.id, 'mensajes'), {
         texto: textoChat.trim(),
         autor: 'conductor',
@@ -1279,7 +1308,7 @@ useEffect(() => {
         fecha: new Date().toISOString(),
       });
       setTextoChat('');
-    } catch (e) {}
+    }, 'mensaje', 'Mensaje enviado.', 'enviar el mensaje');
   };
   useEffect(() => {
     if (!viajeActual?.id) return;
@@ -1326,7 +1355,7 @@ useEffect(() => {
         </div>
         <div style={{ display: 'flex', gap: '6px' }}>
           <input value={textoChat} onChange={e => setTextoChat(e.target.value)} onKeyDown={e => e.key === 'Enter' && enviarMensajeConductor()} placeholder="Escribe un mensaje..." style={{ flex: 1, background: '#FFFFFF', border: '1px solid #ECECEF', borderRadius: '8px', padding: '7px 10px', color: '#1A1A1E', fontSize: '13px', outline: 'none' }} />
-          <button onClick={enviarMensajeConductor} disabled={!textoChat.trim()} style={{ padding: '7px 12px', background: textoChat.trim() ? 'linear-gradient(135deg, #FF7A2F, #D6357E)' : '#ECECEF', border: 'none', borderRadius: '8px', color: textoChat.trim() ? '#FFFFFF' : '#6B7280', fontSize: '16px', cursor: textoChat.trim() ? 'pointer' : 'default' }}>➤</button>
+          <button onClick={enviarMensajeConductor} disabled={!textoChat.trim() || !!ocupado} style={{ padding: '7px 12px', background: textoChat.trim() ? 'linear-gradient(135deg, #FF7A2F, #D6357E)' : '#ECECEF', border: 'none', borderRadius: '8px', color: textoChat.trim() ? '#FFFFFF' : '#6B7280', fontSize: '16px', cursor: textoChat.trim() ? 'pointer' : 'default' }}>{texto('mensaje', '…', '➤')}</button>
         </div>
       </div>
     </div>
@@ -1363,11 +1392,17 @@ useEffect(() => {
         <h2 style={{ color: '#1A1A1E', fontSize: '24px', fontWeight: '900', margin: '0 0 12px', textAlign: 'center' }}>El pasajero canceló el viaje</h2>
         <p style={{ color: '#6B7280', fontSize: '14px', margin: '0 0 8px', textAlign: 'center' }}>Razón: <span style={{ color: '#FF7A2F' }}>{viajeActual?.razonCancelacion || 'No especificada'}</span></p>
         <p style={{ color: '#6B7280', fontSize: '13px', margin: '0 0 32px', textAlign: 'center' }}>Puedes activarte para recibir nuevos viajes</p>
-        <button onClick={() => {
+        <button onClick={async () => {
           const user = auth.currentUser;
-          if (user) setDoc(doc(db, 'conductores', user.uid), { ocupado: false, enViajeId: null }, { merge: true }).catch((e) => { apuntarRechazo('AppConductor.js (soltar el viaje)', e); setAviso(motivoDeRechazo(e, 'liberarte para recibir viajes')); });
+          // Si no entra, se queda en esta pantalla (el candado dice por qué): antes volvía al inicio igual, y el
+          // conductor quedaba «ocupado» en el servidor sin recibir viajes y sin saberlo.
+          if (user) {
+            const r = await correr(() => setDoc(doc(db, 'conductores', user.uid), { ocupado: false, enViajeId: null }, { merge: true }),
+              'volver', 'Listo para recibir viajes.', 'liberarte para recibir viajes');
+            if (!r || !r.ok) return;
+          }
           setFase(null); faseRef.current = null; setViajeActual(null); setUbicacionPasajero(null); setDestinoCoords(null); setActivo(true);
-        }} style={{ width: '100%', padding: '18px', background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)', border: 'none', borderRadius: '16px', color: '#FFFFFF', fontSize: '18px', fontWeight: '900', cursor: 'pointer' }}>Volver al inicio</button>
+        }} disabled={!!ocupado} style={{ width: '100%', padding: '18px', background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)', border: 'none', borderRadius: '16px', color: '#FFFFFF', fontSize: '18px', fontWeight: '900', cursor: 'pointer' }}>{texto('volver', 'Un momento…', 'Volver al inicio')}</button>
       </div>
     );
   }
@@ -1377,7 +1412,7 @@ useEffect(() => {
       <div style={{ backgroundColor: '#FFFFFF', minHeight: '100vh', position: 'relative' }}>
         <AvisoModal aviso={aviso} onCerrar={() => setAviso(null)} />
         {mensajeGrande && <MensajeGrande mensaje={mensajeGrande} onCerrar={() => setMensajeGrande(null)} />}
-        {mostrarCancelacion && <ModalCancelacion razones={RAZONES_CANCELACION_CONDUCTOR} onConfirmar={cancelarViaje} onCerrar={() => setMostrarCancelacion(false)} />}
+        {mostrarCancelacion && <ModalCancelacion razones={RAZONES_CANCELACION_CONDUCTOR} onConfirmar={cancelarViaje} onCerrar={() => setMostrarCancelacion(false)} ocupado={ocupado} />}
         {mostrarCodigo && (
           <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.9)', zIndex: 9998, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
             <div style={{ background: '#FFFFFF', borderRadius: '28px', padding: '32px 24px', width: '100%', maxWidth: '420px', border: '3px solid #FFCF4D', textAlign: 'center' }}>
@@ -1394,8 +1429,8 @@ useEffect(() => {
               />
               {errorCodigo && <p style={{ color: '#FF4444', fontSize: '13px', margin: '0 0 12px', fontWeight: 'bold' }}>{errorCodigo}</p>}
               <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>
-                <button onClick={() => { setMostrarCodigo(false); setCodigoIngresado(''); setErrorCodigo(''); }} style={{ flex: 1, padding: '16px', background: '#FFFFFF', border: '1px solid #ECECEF', borderRadius: '16px', color: '#6B7280', fontSize: '15px', fontWeight: 'bold', cursor: 'pointer' }}>Cancelar</button>
-                <button onClick={verificarCodigo} disabled={codigoIngresado.length < 4} style={{ flex: 2, padding: '16px', background: codigoIngresado.length < 4 ? '#ECECEF' : 'linear-gradient(135deg, #2ECC71, #27AE60)', border: 'none', borderRadius: '16px', color: codigoIngresado.length < 4 ? '#6B7280' : '#FFFFFF', fontSize: '16px', fontWeight: '900', cursor: codigoIngresado.length < 4 ? 'default' : 'pointer' }}>✅ Verificar</button>
+                <button onClick={() => { setMostrarCodigo(false); setCodigoIngresado(''); setErrorCodigo(''); }} disabled={!!ocupado} style={{ flex: 1, padding: '16px', background: '#FFFFFF', border: '1px solid #ECECEF', borderRadius: '16px', color: '#6B7280', fontSize: '15px', fontWeight: 'bold', cursor: 'pointer' }}>Cancelar</button>
+                <button onClick={verificarCodigo} disabled={codigoIngresado.length < 4 || !!ocupado} style={{ flex: 2, padding: '16px', background: codigoIngresado.length < 4 ? '#ECECEF' : 'linear-gradient(135deg, #2ECC71, #27AE60)', border: 'none', borderRadius: '16px', color: codigoIngresado.length < 4 ? '#6B7280' : '#FFFFFF', fontSize: '16px', fontWeight: '900', cursor: codigoIngresado.length < 4 ? 'default' : 'pointer' }}>{texto('codigo', 'Comprobando…', '✅ Verificar')}</button>
               </div>
             </div>
           </div>
@@ -1429,8 +1464,8 @@ useEffect(() => {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               {comunicacionCompacta}
               <div style={{ display: 'flex', gap: '10px' }}>
-                <button onClick={() => setMostrarCancelacion(true)} style={{ flex: 1, padding: '14px', background: 'transparent', border: '1px solid #FF4444', borderRadius: '14px', color: '#FF4444', fontSize: '14px', cursor: 'pointer' }}>Cancelar</button>
-                <button onClick={llegueAlPunto} style={{ flex: 2, padding: '16px', background: 'linear-gradient(135deg, #2ECC71, #27AE60)', border: 'none', borderRadius: '16px', color: '#FFFFFF', fontSize: '16px', fontWeight: '900', cursor: 'pointer' }}>📍 Llegué al punto</button>
+                <button onClick={() => setMostrarCancelacion(true)} disabled={!!ocupado} style={{ flex: 1, padding: '14px', background: 'transparent', border: '1px solid #FF4444', borderRadius: '14px', color: '#FF4444', fontSize: '14px', cursor: 'pointer' }}>Cancelar</button>
+                <button onClick={llegueAlPunto} disabled={!!ocupado} style={{ flex: 2, padding: '16px', background: 'linear-gradient(135deg, #2ECC71, #27AE60)', border: 'none', borderRadius: '16px', color: '#FFFFFF', fontSize: '16px', fontWeight: '900', cursor: 'pointer' }}>{texto('llegue', 'Avisando…', '📍 Llegué al punto')}</button>
               </div>
             </div>
           )}
@@ -1462,12 +1497,12 @@ useEffect(() => {
                 </div>
                 <div style={{ display: 'flex', gap: '8px' }}>
                   <input value={textoChat} onChange={e => setTextoChat(e.target.value)} onKeyDown={e => e.key === 'Enter' && enviarMensajeConductor()} placeholder="Escribe un mensaje..." style={{ flex: 1, background: '#FFFFFF', border: '1px solid #ECECEF', borderRadius: '10px', padding: '10px 12px', color: '#1A1A1E', fontSize: '14px', outline: 'none' }} />
-                  <button onClick={enviarMensajeConductor} disabled={!textoChat.trim()} style={{ padding: '10px 16px', background: textoChat.trim() ? 'linear-gradient(135deg, #FF7A2F, #D6357E)' : '#ECECEF', border: 'none', borderRadius: '10px', color: textoChat.trim() ? '#FFFFFF' : '#6B7280', fontSize: '18px', cursor: textoChat.trim() ? 'pointer' : 'default' }}>➤</button>
+                  <button onClick={enviarMensajeConductor} disabled={!textoChat.trim() || !!ocupado} style={{ padding: '10px 16px', background: textoChat.trim() ? 'linear-gradient(135deg, #FF7A2F, #D6357E)' : '#ECECEF', border: 'none', borderRadius: '10px', color: textoChat.trim() ? '#FFFFFF' : '#6B7280', fontSize: '18px', cursor: textoChat.trim() ? 'pointer' : 'default' }}>{texto('mensaje', '…', '➤')}</button>
                 </div>
               </div>
               <div style={{ display: 'flex', gap: '12px' }}>
-                <button onClick={() => setMostrarCancelacion(true)} style={{ flex: 1, padding: '14px', background: 'transparent', border: '1px solid #FF4444', borderRadius: '14px', color: '#FF4444', fontSize: '14px', cursor: 'pointer' }}>Cancelar</button>
-                <button onClick={intentarIniciar} style={{ flex: 2, padding: '16px', background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)', border: 'none', borderRadius: '16px', color: '#FFFFFF', fontSize: '16px', fontWeight: '900', cursor: 'pointer' }}>🚀 Iniciar viaje</button>
+                <button onClick={() => setMostrarCancelacion(true)} disabled={!!ocupado} style={{ flex: 1, padding: '14px', background: 'transparent', border: '1px solid #FF4444', borderRadius: '14px', color: '#FF4444', fontSize: '14px', cursor: 'pointer' }}>Cancelar</button>
+                <button onClick={intentarIniciar} disabled={!!ocupado} style={{ flex: 2, padding: '16px', background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)', border: 'none', borderRadius: '16px', color: '#FFFFFF', fontSize: '16px', fontWeight: '900', cursor: 'pointer' }}>{texto('iniciar', 'Iniciando…', '🚀 Iniciar viaje')}</button>
               </div>
             </div>
           )}
@@ -1495,8 +1530,8 @@ useEffect(() => {
               />
               {errorCodigoDescuento && <p style={{ color: '#FF4444', fontSize: '13px', margin: '0 0 12px', fontWeight: 'bold' }}>{errorCodigoDescuento}</p>}
               <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>
-                <button onClick={omitirCodigoDescuento} style={{ flex: 1, padding: '16px', background: '#FFFFFF', border: '1px solid #ECECEF', borderRadius: '16px', color: '#6B7280', fontSize: '14px', fontWeight: 'bold', cursor: 'pointer' }}>Omitir</button>
-                <button onClick={verificarCodigoDescuento} disabled={codigoDescuentoIngresado.length < 4} style={{ flex: 2, padding: '16px', background: codigoDescuentoIngresado.length < 4 ? '#ECECEF' : 'linear-gradient(135deg, #2ECC71, #27AE60)', border: 'none', borderRadius: '16px', color: codigoDescuentoIngresado.length < 4 ? '#6B7280' : '#FFFFFF', fontSize: '15px', fontWeight: '900', cursor: codigoDescuentoIngresado.length < 4 ? 'default' : 'pointer' }}>✅ Verificar</button>
+                <button onClick={omitirCodigoDescuento} disabled={!!ocupado} style={{ flex: 1, padding: '16px', background: '#FFFFFF', border: '1px solid #ECECEF', borderRadius: '16px', color: '#6B7280', fontSize: '14px', fontWeight: 'bold', cursor: 'pointer' }}>{texto('cerrar', 'Cerrando…', 'Omitir')}</button>
+                <button onClick={verificarCodigoDescuento} disabled={codigoDescuentoIngresado.length < 4 || !!ocupado} style={{ flex: 2, padding: '16px', background: codigoDescuentoIngresado.length < 4 ? '#ECECEF' : 'linear-gradient(135deg, #2ECC71, #27AE60)', border: 'none', borderRadius: '16px', color: codigoDescuentoIngresado.length < 4 ? '#6B7280' : '#FFFFFF', fontSize: '15px', fontWeight: '900', cursor: codigoDescuentoIngresado.length < 4 ? 'default' : 'pointer' }}>{texto('descuento', 'Comprobando…', '✅ Verificar')}</button>
               </div>
             </div>
           </div>
@@ -1513,7 +1548,7 @@ useEffect(() => {
           </div>
           {tarjetaMensajeria}
           {comunicacionCompacta}
-          <button onClick={() => { if (viajeActual?.tipo === 'Mensajería') { setConfirmarFin(true); } else { finalizarViaje(); } }} style={{ width: '100%', padding: '16px', background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)', border: 'none', borderRadius: '16px', color: '#FFFFFF', fontSize: '18px', fontWeight: '900', cursor: 'pointer' }}>🏁 Finalizar viaje</button>
+          <button onClick={() => { if (viajeActual?.tipo === 'Mensajería') { setConfirmarFin(true); } else { finalizarViaje(); } }} disabled={!!ocupado} style={{ width: '100%', padding: '16px', background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)', border: 'none', borderRadius: '16px', color: '#FFFFFF', fontSize: '18px', fontWeight: '900', cursor: 'pointer' }}>{texto('cerrar', 'Cerrando…', '🏁 Finalizar viaje')}</button>
           {confirmarFin && (
             <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.88)', zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
               <div style={{ background: '#FFFFFF', borderRadius: '24px', padding: '28px 24px', width: '100%', maxWidth: '420px', border: '2px solid #FF7A2F' }}>
@@ -1531,7 +1566,7 @@ useEffect(() => {
                 )}
                 <div style={{ display: 'flex', gap: '12px' }}>
                   <button onClick={() => setConfirmarFin(false)} style={{ flex: 1, padding: '15px', background: '#FFFFFF', border: '1px solid #ECECEF', borderRadius: '14px', color: '#1A1A1E', fontSize: '15px', fontWeight: 'bold', cursor: 'pointer' }}>No, aún no</button>
-                  <button onClick={() => { setConfirmarFin(false); finalizarViaje(); }} style={{ flex: 1, padding: '15px', background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)', border: 'none', borderRadius: '14px', color: '#FFFFFF', fontSize: '15px', fontWeight: '900', cursor: 'pointer' }}>Sí, ya entregué</button>
+                  <button onClick={() => { setConfirmarFin(false); finalizarViaje(); }} disabled={!!ocupado} style={{ flex: 1, padding: '15px', background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)', border: 'none', borderRadius: '14px', color: '#FFFFFF', fontSize: '15px', fontWeight: '900', cursor: 'pointer' }}>{texto('cerrar', 'Cerrando…', 'Sí, ya entregué')}</button>
                 </div>
               </div>
             </div>
@@ -1573,7 +1608,7 @@ if (sancionActiva) return (
         </div>
         <div style={{ display: 'flex', gap: '8px' }}>
           <input value={textoApelacion} onChange={e => setTextoApelacion(e.target.value)} onKeyDown={e => e.key === 'Enter' && enviarApelacion()} placeholder="Escribe tu mensaje..." style={{ flex: 1, background: '#FFFFFF', border: '1px solid #ECECEF', borderRadius: '12px', padding: '12px 14px', color: '#1A1A1E', fontSize: '15px', outline: 'none' }} />
-          <button onClick={enviarApelacion} disabled={!textoApelacion.trim()} style={{ padding: '12px 18px', background: textoApelacion.trim() ? 'linear-gradient(135deg, #FF7A2F, #D6357E)' : '#ECECEF', border: 'none', borderRadius: '12px', color: textoApelacion.trim() ? '#FFFFFF' : '#6B7280', fontSize: '20px', cursor: textoApelacion.trim() ? 'pointer' : 'default' }}>➤</button>
+          <button onClick={enviarApelacion} disabled={!textoApelacion.trim() || !!ocupado} style={{ padding: '12px 18px', background: textoApelacion.trim() ? 'linear-gradient(135deg, #FF7A2F, #D6357E)' : '#ECECEF', border: 'none', borderRadius: '12px', color: textoApelacion.trim() ? '#FFFFFF' : '#6B7280', fontSize: '20px', cursor: textoApelacion.trim() ? 'pointer' : 'default' }}>{texto('apelacion', '…', '➤')}</button>
         </div>
       </div>
     </div>
@@ -1585,8 +1620,8 @@ if (llamadoAtencion && !fase) return (
         <div style={{ fontSize: '60px', marginBottom: '16px' }}>📢</div>
         <p style={{ color: '#FF7A2F', fontSize: '12px', letterSpacing: '3px', fontWeight: 'bold', margin: '0 0 12px' }}>MENSAJE DE GUAJIRAGO</p>
         <p style={{ color: '#1A1A1E', fontSize: '16px', lineHeight: '1.6', margin: '0 0 28px' }}>{llamadoAtencion}</p>
-        <button onClick={cerrarLlamado} disabled={!puedeCerrarLlamado} style={{ width: '100%', padding: '16px', background: puedeCerrarLlamado ? 'linear-gradient(135deg, #FFCF4D, #FF7A2F)' : '#ECECEF', border: 'none', borderRadius: '16px', color: puedeCerrarLlamado ? '#FFFFFF' : '#6B7280', fontSize: '16px', fontWeight: '900', cursor: puedeCerrarLlamado ? 'pointer' : 'default', transition: 'all 0.5s' }}>
-          {puedeCerrarLlamado ? 'Entendido ✓' : 'Lee el mensaje completo...'}
+        <button onClick={cerrarLlamado} disabled={!puedeCerrarLlamado || !!ocupado} style={{ width: '100%', padding: '16px', background: puedeCerrarLlamado ? 'linear-gradient(135deg, #FFCF4D, #FF7A2F)' : '#ECECEF', border: 'none', borderRadius: '16px', color: puedeCerrarLlamado ? '#FFFFFF' : '#6B7280', fontSize: '16px', fontWeight: '900', cursor: puedeCerrarLlamado ? 'pointer' : 'default', transition: 'all 0.5s' }}>
+          {texto('llamado', 'Un momento…', puedeCerrarLlamado ? 'Entendido ✓' : 'Lee el mensaje completo...')}
         </button>
       </div>
     </div>

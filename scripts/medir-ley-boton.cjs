@@ -119,6 +119,12 @@ function importadosDe(codigo) {
 //     onConfirmar, onGuardar…);
 //   · una función del archivo PASADA a otro sitio sin llamarla ahí (`filaToggle('🔊', 'Sonido', sonido, cambiarSonido)`):
 //     la llama un botón que no se ve desde aquí. Sin esto, los interruptores de Configuración pasaban por debajo.
+// Funciones que se ENTREGAN a otra pieza pero no son un toque que guarda, con su porqué. Pocas y a la vista: la
+// prueba las enseña, y una excepción sin razón escrita no entra.
+const NO_SON_BOTONES = {
+  agregarViajeEscuchando: 'AppConductor.js: registra un oyente del viaje; lo que escribe lo dispara el servidor (el pasajero acepta), no un toque del conductor',
+};
+
 function entradasDe(codigo, seguro, locales) {
   const out = [];
   const tramos = [];
@@ -131,6 +137,7 @@ function entradasDe(codigo, seguro, locales) {
   }
   for (const n of locales.keys()) {
     if (/^[A-Z]/.test(n)) continue; // una pantalla (componente) no es un botón
+    if (NO_SON_BOTONES[n]) continue;
     for (const m of seguro.matchAll(new RegExp('(^|[^\\w$.])' + n.replace(/\$/g, '\\$') + '(?![\\w$])', 'g'))) {
       const i = m.index + m[1].length;
       if (tramos.some(([a, b]) => a < i && i < b)) continue; // ya lo cuenta su `on…=`
@@ -295,7 +302,6 @@ function medir() {
 // El día que nació la ley (26-sep-2026): archivo → [botones sin candado, «guardando» a mano]. SOLO PUEDE BAJAR.
 const PENDIENTES = {
   'guajirago/src/App.js': [1, 1],
-  'guajirago/src/AppConductor.js': [21, 0],
   'guajirago/src/Calificacion.js': [1, 1],
   'guajirago/src/Configuracion.js': [4, 0],
   'guajirago/src/Home.js': [2, 0],
@@ -334,7 +340,7 @@ const PENDIENTES = {
   'guajirago-aliados/src/Tours.js': [4, 1],
 };
 
-module.exports = { revisarArchivo, escritoresDe, medir, PENDIENTES, APPS, ESCRIBE };
+module.exports = { revisarArchivo, escritoresDe, medir, PENDIENTES, APPS, ESCRIBE, NO_SON_BOTONES };
 
 if (require.main === module) {
   const r = medir();

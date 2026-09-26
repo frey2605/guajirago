@@ -188,6 +188,26 @@ describe('LA LEY DEL BOTÓN · una sola pieza en las tres apps', () => {
     assert.match(t, /<TarjetaContraoferta[\s\S]{0,120}ocupado=\{ocupado\}/, 'la tarjeta de oferta no recibe `ocupado`');
   });
 
+  it('el conductor: su ventanita de cancelar bloquea sus botones, y su tarjeta sube el aviso del candado por un ref', () => {
+    const t = leer('guajirago/src/AppConductor.js');
+    const i = t.indexOf('function ModalCancelacion(');
+    const cuerpo = t.slice(i, t.indexOf('\nfunction ', i + 10));
+    assert.match(cuerpo.split('\n')[0], /ocupado \}\)/, 'la ventanita de cancelar del conductor ya no recibe `ocupado`');
+    assert.strictEqual((cuerpo.match(/disabled=\{!!ocupado\}/g) || []).length, 2, '⛔ sus dos botones tienen que bloquearse mientras cancela');
+    assert.match(t, /<ModalCancelacion [^\n]*ocupado=\{ocupado\}/, 'no se le pasa `ocupado`');
+    const tarjeta = t.slice(t.indexOf('function TarjetaSolicitud('), t.indexOf('\nfunction AppConductor('));
+    assert.match(tarjeta, /<button onClick=\{\(\) => onRechazar\(solicitud\.id\)\} disabled=\{!!ocupado\}/, '⛔ «Quitar» se puede tocar mientras la oferta se envía');
+    assert.match(tarjeta, /<button onClick=\{aceptarOEnviar\} disabled=\{!!ocupado\}/, '⛔ la oferta se puede tocar dos veces');
+    assert.match(t, /if \(aviso && !aviso\.ok && onAvisoRef\.current\) onAvisoRef\.current\(aviso\);/,
+      '⛔ la tarjeta de solicitud no sube el fallo del candado a la pantalla: la oferta fallaría callada');
+    assert.match(t, /if \(avisoAccion && !avisoAccion\.ok\) setAviso\(avisoAccion\);/, '⛔ el aviso del candado no entra por la ventanita del conductor');
+  });
+
+  it('las excepciones del vigilante son pocas y cada una dice por qué', () => {
+    for (const [n, porque] of Object.entries(V.NO_SON_BOTONES)) assert.ok(porque && porque.length > 40, n + ' está exceptuada sin razón escrita');
+    assert.ok(Object.keys(V.NO_SON_BOTONES).length <= 3, 'demasiadas excepciones: el vigilante se está ablandando');
+  });
+
   it('el gancho usa el candado y la palabra sale SOLO en el botón cuya acción corre', () => {
     const t = leer('guajirago/src/useAccion.js');
     assert.match(t, /import \{ crearCandado \} from '\.\/candado'/);
