@@ -820,7 +820,11 @@ async function correrElPedido({ punto, pin, ubicacion, esDelGps, origen, encuent
     const coords = await correr(windowFalso(encuentra), () => {}, (a) => avisos.push(a),
       (t) => avisos.push({ titulo: '', texto: t, enLinea: true }), false, aviso.armar,
       punto, { current: pin }, ubicacion, esDelGps, origen, 'Cl. 1 # 2-3');
-    return { coords: coords || null, avisos };
+    // «No se crea» son DOS formas: el `return` vacío de siempre, y desde LA LEY DEL BOTÓN (26-sep-2026) el
+    // `return { ok: false, avisado: true }` con que la guardia le dice al candado «ya avisé yo». Cualquier otra cosa
+    // sin coordenada NO se da por buena: sigue reventando más abajo, que es como se ve.
+    const noSeCrea = coords === undefined || (coords && coords.ok === false && coords.avisado === true);
+    return { coords: noSeCrea ? null : coords, avisos };
   } catch (e) {
     return { falla: 'la decisión del pedido reventó: ' + e.message };
   }

@@ -20,6 +20,8 @@ import { RESPUESTAS_RAPIDAS, RAZONES_CANCELACION_PASAJERO } from './textosViaje'
 // archivo y misma ventanita que usan el conductor, el panel y aliados.
 import { motivoDeRechazo, apuntarRechazo } from './avisoRechazo';
 import AvisoModal from './AvisoModal';
+// LA LEY DEL BOTÓN (26-sep-2026): todo lo que guarda en esta pantalla pasa por el candado.
+import { useAccion } from './useAccion';
 // El texto del mensaje de emergencia. MISMO archivo que el botón de Ajustes:
 // un proceso, un sitio (SEGUNDA LEY). Vive aparte para poder PROBARLO.
 import { armarMensajeDeEmergencia } from './mensajeEmergencia';
@@ -88,7 +90,7 @@ function ConductorLlego({ nombre, placa, onCerrar }) {
   );
 }
 
-function ModalCancelacion({ razones, onConfirmar, onCerrar }) {
+function ModalCancelacion({ razones, onConfirmar, onCerrar, ocupado }) {
   const [razonSeleccionada, setRazonSeleccionada] = useState('');
   return (
     <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', zIndex: 9997, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
@@ -103,8 +105,8 @@ function ModalCancelacion({ razones, onConfirmar, onCerrar }) {
           ))}
         </div>
         <div style={{ display: 'flex', gap: '12px' }}>
-          <button onClick={onCerrar} style={{ flex: 1, padding: '14px', background: '#FFFFFF', border: '1px solid #ECECEF', borderRadius: '14px', color: '#6B7280', fontSize: '14px', fontWeight: 'bold', cursor: 'pointer' }}>Volver</button>
-          <button onClick={() => razonSeleccionada && onConfirmar(razonSeleccionada)} style={{ flex: 2, padding: '14px', background: razonSeleccionada ? '#FF4444' : '#ECECEF', border: 'none', borderRadius: '14px', color: razonSeleccionada ? '#FFFFFF' : '#6B7280', fontSize: '14px', fontWeight: '900', cursor: razonSeleccionada ? 'pointer' : 'default' }}>Confirmar cancelación</button>
+          <button onClick={onCerrar} disabled={!!ocupado} style={{ flex: 1, padding: '14px', background: '#FFFFFF', border: '1px solid #ECECEF', borderRadius: '14px', color: '#6B7280', fontSize: '14px', fontWeight: 'bold', cursor: 'pointer' }}>Volver</button>
+          <button onClick={() => razonSeleccionada && onConfirmar(razonSeleccionada)} disabled={!!ocupado} style={{ flex: 2, padding: '14px', background: razonSeleccionada ? '#FF4444' : '#ECECEF', border: 'none', borderRadius: '14px', color: razonSeleccionada ? '#FFFFFF' : '#6B7280', fontSize: '14px', fontWeight: '900', cursor: razonSeleccionada ? 'pointer' : 'default' }}>{ocupado === 'cancelar' ? 'Cancelando…' : 'Confirmar cancelación'}</button>
         </div>
       </div>
     </div>
@@ -112,7 +114,7 @@ function ModalCancelacion({ razones, onConfirmar, onCerrar }) {
 }
 
 // Tarjeta de contraoferta de un conductor
-function TarjetaContraoferta({ oferta, onAceptar, onRechazar }) {
+function TarjetaContraoferta({ oferta, onAceptar, onRechazar, ocupado }) {
   const progreso = 100;
   const [fotoConductor, setFotoConductor] = useState(null);
 
@@ -152,8 +154,8 @@ function TarjetaContraoferta({ oferta, onAceptar, onRechazar }) {
         <p style={{ color: '#FF7A2F', fontSize: '28px', fontWeight: '900', margin: '0' }}>{oferta.contraoferta}</p>
       </div>
       <div style={{ display: 'flex', gap: '10px' }}>
-        <button onClick={onRechazar} style={{ flex: 1, padding: '12px', background: '#FFFFFF', border: '1px solid #ECECEF', borderRadius: '12px', color: '#FF4444', fontSize: '14px', fontWeight: 'bold', cursor: 'pointer' }}>❌ No</button>
-        <button onClick={onAceptar} style={{ flex: 2, padding: '12px', background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F)', border: 'none', borderRadius: '12px', color: '#1A1A1E', fontSize: '14px', fontWeight: '900', cursor: 'pointer' }}>✅ Aceptar</button>
+        <button onClick={onRechazar} disabled={!!ocupado} style={{ flex: 1, padding: '12px', background: '#FFFFFF', border: '1px solid #ECECEF', borderRadius: '12px', color: '#FF4444', fontSize: '14px', fontWeight: 'bold', cursor: 'pointer' }}>❌ No</button>
+        <button onClick={onAceptar} disabled={!!ocupado} style={{ flex: 2, padding: '12px', background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F)', border: 'none', borderRadius: '12px', color: '#1A1A1E', fontSize: '14px', fontWeight: '900', cursor: 'pointer' }}>{ocupado === 'aceptar' ? 'Aceptando…' : '✅ Aceptar'}</button>
       </div>
     </div>
   );
@@ -507,7 +509,6 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
   const [favoritos, setFavoritos] = useState([]);
   const [avisoLimite, setAvisoLimite] = useState(false);
   const [pantalla, setPantalla] = useState('solicitar');
-  const [cargando, setCargando] = useState(false);
   const [viajeId, setViajeId] = useState(null);
   // REGLAS 5 y 11 — el código ya no viaja dentro del viaje: se lee del cajón
   // privado, que solo puede abrir la pasajera.
@@ -564,6 +565,14 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
   // deciden el viaje —cancelar, aceptar, rechazar— y el que quema el descuento no
   // decían NADA si el servidor los rechazaba.
   const [aviso, setAviso] = useState(null);
+  // El candado de LA LEY DEL BOTÓN. Su aviso entra por la MISMA ventanita que ya pintan las siete pantallas de aquí
+  // (`aviso`), no por una segunda. Y solo cuando algo FALLA: en esta pantalla lo que sale bien se ve solo —el viaje
+  // arranca a buscar, el mensaje sale en el chat, el favorito en la lista—, y una ventanita de «¡Listo!» encima de
+  // cada cosa solo estorbaría.
+  const { ocupado, correr, texto, aviso: avisoAccion } = useAccion();
+  useEffect(() => {
+    if (avisoAccion && !avisoAccion.ok) setAviso(avisoAccion);
+  }, [avisoAccion]);
   const [llamandoConductor, setLlamandoConductor] = useState(false);
   const [llamadaEntrante, setLlamadaEntrante] = useState(false);
   const [tiempoBusqueda, setTiempoBusqueda] = useState(240);
@@ -935,7 +944,9 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
 
   const enviarRespuesta = async (respuesta) => {
     if (!viajeId) return;
-    await updateDoc(doc(db, 'viajes', viajeId), { respuestaPasajero: respuesta });
+    // Antes, si fallaba, no lo decía nadie: el pasajero creía que el conductor ya sabía que sale en un minuto.
+    await correr(() => updateDoc(doc(db, 'viajes', viajeId), { respuestaPasajero: respuesta }),
+      'respuesta:' + respuesta, 'Respuesta enviada.', 'enviar tu respuesta');
   };
   useEffect(() => {
     if (!viajeId) return;
@@ -950,7 +961,8 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
   const enviarMensajeChat = async () => {
     if (!textoChat.trim() || !viajeId) return;
     const user = auth.currentUser;
-    try {
+    // Antes: `catch (e) {}` — si no salía, nadie lo decía. Y dos Enter seguidos lo mandaban dos veces.
+    await correr(async () => {
       await addDoc(collection(db, 'viajes', viajeId, 'mensajes'), {
         texto: textoChat.trim(),
         autor: 'pasajero',
@@ -958,7 +970,7 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
         fecha: new Date().toISOString(),
       });
       setTextoChat('');
-    } catch (e) {}
+    }, 'mensaje', 'Mensaje enviado.', 'enviar el mensaje');
   };
   const llamarEmergencia = () => {
     window.location.href = 'tel:123';
@@ -1021,13 +1033,11 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
     // vivo en el servidor —un conductor en camino a alguien que ya se fue— y sin
     // el botón delante no habría forma de reintentar.
     if (viajeId) {
-      try {
-        await updateDoc(doc(db, 'viajes', viajeId), { estado: 'cancelado', canceladoPor: 'pasajero', razonCancelacion: razon });
-      } catch (e) {
-        apuntarRechazo('Solicitar.js (cancelarViaje)', e);
-        setAviso(motivoDeRechazo(e, 'cancelar el viaje'));
-        return;
-      }
+      // El candado dice el motivo (con motivoDeRechazo, la pieza única) y deja rastro del rechazo; aquí solo se
+      // decide no salir. Y un segundo toque (r === null) tampoco sale: el primero sigue trabajando.
+      const r = await correr(() => updateDoc(doc(db, 'viajes', viajeId), { estado: 'cancelado', canceladoPor: 'pasajero', razonCancelacion: razon }),
+        'cancelar', 'Viaje cancelado.', 'cancelar el viaje');
+      if (!r || !r.ok) return;
     }
     setMostrarCancelacion(false);
     onVolver();
@@ -1041,20 +1051,21 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
     if (favoritos.find(f => f.direccion === destino)) { setError('Ese lugar ya está guardado'); return; }
     const nuevo = { nombre: destino.length > 18 ? destino.slice(0, 18) + '…' : destino, direccion: destino, icono: '⭐' };
     const nuevos = [...favoritos, nuevo];
-    try {
+    await correr(async () => {
       await updateDoc(doc(db, 'usuarios', user.uid), { favoritos: nuevos });
       setFavoritos(nuevos);
-    } catch (e) { setError('No se pudo guardar el lugar'); }
+    }, 'favorito', 'Lugar guardado.', 'guardar el lugar');
   };
 
   const borrarFavorito = async (i) => {
     const user = auth.currentUser;
     if (!user) return;
     const nuevos = favoritos.filter((_, idx) => idx !== i);
-    try {
+    // Antes: `catch (e) {}` — si no se borraba, el lugar seguía ahí y nadie decía por qué.
+    await correr(async () => {
       await updateDoc(doc(db, 'usuarios', user.uid), { favoritos: nuevos });
       setFavoritos(nuevos);
-    } catch (e) {}
+    }, 'borrarFavorito', 'Lugar borrado.', 'borrar el lugar');
   };
 
   const subirNuevaTarifa = () => {
@@ -1072,7 +1083,8 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
 
   const enviarNuevaOferta = async () => {
     if (!viajeId || !nuevaTarifa || nuevaTarifa <= tarifa) return;
-    try {
+    // Antes: `catch(e) {}` — si la oferta nueva no entraba, el pasajero creía que los conductores veían más plata.
+    await correr(async () => {
       await updateDoc(doc(db, 'viajes', viajeId), {
         tarifa: '$' + nuevaTarifa.toLocaleString(),
         tarifaValor: nuevaTarifa,
@@ -1082,14 +1094,18 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
       setTarifa(nuevaTarifa);
       setNuevaTarifa(null);
       setOfertaModificada(false);
-    } catch(e) {}
+    }, 'oferta', 'Nueva oferta enviada.', 'enviar la nueva oferta');
   };
-  const seguirBuscando = () => {
+  const seguirBuscando = async () => {
     if (!viajeId) return;
+    // Revivir el viaje: vuelve a 'esperando' con tiempo nuevo para que reaparezca en los conductores.
+    // Ahora se ESPERA a que entre: antes se pintaba «buscando» con el reloj corriendo aunque la escritura fallara
+    // (`.catch(() => {})`), y el pasajero esperaba a conductores que nunca iban a ver su viaje.
+    const r = await correr(() => updateDoc(doc(db, 'viajes', viajeId), { estado: 'esperando', radioBusqueda: configApp.radioBusquedaInicial, nuevaOferta: new Date().toISOString() }),
+      'seguir', 'Seguimos buscando.', 'volver a buscar conductor');
+    if (!r || !r.ok) return;
     setBuscandoAgotado(false);
     setTiempoBusqueda(120);
-    // Revivir el viaje: vuelve a 'esperando' con tiempo nuevo para que reaparezca en los conductores
-    updateDoc(doc(db, 'viajes', viajeId), { estado: 'esperando', radioBusqueda: configApp.radioBusquedaInicial, nuevaOferta: new Date().toISOString() }).catch(() => {});
     if (radioRef.current) { clearTimeout(radioRef.current.ampliar); clearTimeout(radioRef.current.agotar); }
     radioRef.current = {
       ampliar: setTimeout(() => {
@@ -1143,8 +1159,12 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
     }
     activarAudioiOS();
     precargarAudio();
-    setCargando(true); setError('');
+    setError('');
 
+    // LA LEY DEL BOTÓN: desde aquí hasta crear el viaje, UNA sola vez aunque se toque dos. El candado cubre también
+    // la búsqueda de la dirección: con el «cargando» de antes, un doble toque mientras Google contestaba podía crear
+    // DOS viajes. (El audio de iOS se activa arriba, fuera: iOS solo lo deja en el mismo instante del toque.)
+    await correr(async () => {
     // Punto de recogida:
     // - Si lo escrito COINCIDE con la dirección del pin (movió el mapa o eligió una sugerencia) → usamos el pin (exacto).
     // - Si el usuario ESCRIBIÓ otra dirección a mano (ej: pide para otra persona) → geocodificamos ese texto, NO el pin.
@@ -1192,13 +1212,12 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
     // escribir la dirección. La ventanita las nombra las dos, porque un botón
     // que no responde y no explica es la REGLA 9 rota.
     if (!coordsRecogida) {
-      setCargando(false);
       setAviso(NO_SE_DONDE_ESTAS(esMensajeria,
         'Tu celular no dio la ubicación y no pude encontrar la dirección que escribiste.'));
-      return;
+      // «Ya avisé yo»: esta ventanita nombra las dos salidas; el candado no le pone otra encima.
+      return { ok: false, avisado: true };
     }
 
-    try {
       const user = auth.currentUser;
       // Traer el nombre del pasajero guardado en su registro
       let nombrePasajero = '';
@@ -1254,26 +1273,19 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
       contadorBusquedaRef.current = setInterval(() => {
         setTiempoBusqueda(prev => { if (prev <= 1) { clearInterval(contadorBusquedaRef.current); return 0; } return prev - 1; });
       }, 1000);
-    } catch (err) { setError('Error al solicitar viaje. Intenta de nuevo.'); }
-    setCargando(false);
+    // Si falla, el candado lo dice con su motivo (antes: un renglón rojo «Error al solicitar viaje» sin porqué).
+    }, 'pedir', 'Buscando conductor.', 'pedir el viaje');
   };
 const confirmarViaje = async () => {
     if (!viajeId || !confirmacionPendiente) return;
     const datos = confirmacionPendiente;
     setConfirmacionPendiente(null);
 
-    try {
-      // El pasajero confirma: solo cambia el viaje a 'aceptado'.
-      // El conductor se marca 'ocupado' a sí mismo desde AppConductor.js.
-      await updateDoc(doc(db, 'viajes', viajeId), { estado: 'aceptado' });
-
-      setCelebrando(true);
-      setTimeout(() => {
-        setCelebrando(false);
-        setPantalla('fase1');
-        if (datos.conductorId) escucharConductor(datos.conductorId);
-      }, 3000);
-    } catch (e) {
+    // El pasajero confirma: solo cambia el viaje a 'aceptado'.
+    // El conductor se marca 'ocupado' a sí mismo desde AppConductor.js.
+    const r = await correr(() => updateDoc(doc(db, 'viajes', viajeId), { estado: 'aceptado' }),
+      'confirmar', 'Viaje confirmado.', 'confirmar el viaje');
+    if (!r || !r.ok) {
       // AQUÍ ESTABA LA MENTIRA. Fallara lo que fallara, esto enseñaba la pantalla
       // de «el conductor ya fue tomado». Y en este camino ESO NO PUEDE PASAR: la
       // escritura solo pone `estado: aceptado` en el viaje del propio pasajero;
@@ -1281,11 +1293,17 @@ const confirmarViaje = async () => {
       // (comprobado el 6-sep-2026). O sea que el mensaje era SIEMPRE falso: el
       // pasajero creía que había perdido un viaje que seguía ahí.
       //
-      // Ahora se dice lo que de verdad pasó, y NO se manda a buscar otro conductor.
-      apuntarRechazo('Solicitar.js (confirmarViaje)', e);
-      setAviso(motivoDeRechazo(e, 'confirmar el viaje'));
+      // Ahora se dice lo que de verdad pasó (lo dice el candado, con la pieza única), y NO se manda a buscar otro
+      // conductor: se le devuelve la confirmación para que pueda reintentar.
       setConfirmacionPendiente(datos);
+      return;
     }
+    setCelebrando(true);
+    setTimeout(() => {
+      setCelebrando(false);
+      setPantalla('fase1');
+      if (datos.conductorId) escucharConductor(datos.conductorId);
+    }, 3000);
   };
 
   const rechazarConfirmacion = async () => {
@@ -1298,7 +1316,7 @@ const confirmarViaje = async () => {
     setConfirmacionPendiente(null);
     if (viajeId) {
       // Devolver el viaje a 'esperando' y liberar al conductor
-      updateDoc(doc(db, 'viajes', viajeId), {
+      const r = await correr(() => updateDoc(doc(db, 'viajes', viajeId), {
         estado: 'esperando',
         conductorId: null,
         conductorNombre: null,
@@ -1306,41 +1324,40 @@ const confirmarViaje = async () => {
         conductorVehiculo: null,
         conductorTelefono: null,
         nuevaOferta: new Date().toISOString(),
-      }).catch((e) => {
-        // Si esto no entra, el viaje sigue asignado a un conductor que el pasajero
-        // ya rechazó, y el conductor sigue creyendo que va a recogerlo.
-        apuntarRechazo('Solicitar.js (rechazarConfirmacion)', e);
-        setAviso(motivoDeRechazo(e, 'rechazar al conductor'));
-        setConfirmacionPendiente(datosRechazados);
-      });
+      }), 'rechazar', 'Conductor rechazado.', 'rechazar al conductor');
+      // Si esto no entra, el viaje sigue asignado a un conductor que el pasajero
+      // ya rechazó, y el conductor sigue creyendo que va a recogerlo: se le devuelve la tarjeta para reintentar
+      // (el motivo lo dice el candado).
+      if (!r || !r.ok) setConfirmacionPendiente(datosRechazados);
     }
   };
   const aceptarContraoferta = async (oferta) => {
     if (!viajeId || celebrando) return;
-    setCelebrando(true);
-    try {
+    // El candado: una sola aceptación aunque se toque dos (el «celebrando» de antes hacía de bloqueo a mano). La
+    // respuesta del servidor se envuelve: que el conductor ya esté ocupado NO es un fallo de la conexión, y ése lo
+    // dice esta pantalla con su propio aviso, como antes.
+    const res = await correr(async () => {
       const fn = httpsCallable(getFunctions(), 'confirmarConductor');
-      const res = await fn({ viajeId, conductorId: oferta.conductorId });
-      const r = (res && res.data) || {};
-      if (r.ok) {
-        setContraofertas([]);
-        contaofertasIdsRef.current.clear();
-        setTimeout(() => {
-          setCelebrando(false);
-          setPantalla('fase1');
-          escucharConductor(oferta.conductorId);
-        }, 3000);
-        return;
-      }
-      setCelebrando(false);
-      if (r.motivo === 'ocupado') {
-        setAvisoOcupado(oferta.conductorNombre || 'Ese conductor');
-        setContraofertas(prev => prev.filter(c => c.conductorId !== oferta.conductorId));
-      } else {
-        setAvisoOcupado('__error__');
-      }
-    } catch (e) {
-      setCelebrando(false);
+      const resp = await fn({ viajeId, conductorId: oferta.conductorId });
+      return { respuesta: (resp && resp.data) || {} };
+    }, 'aceptar', 'Oferta aceptada.', 'aceptar la oferta');
+    if (!res || !res.ok) return; // el candado ya dijo el motivo
+    const r = res.valor.respuesta;
+    if (r.ok) {
+      setCelebrando(true);
+      setContraofertas([]);
+      contaofertasIdsRef.current.clear();
+      setTimeout(() => {
+        setCelebrando(false);
+        setPantalla('fase1');
+        escucharConductor(oferta.conductorId);
+      }, 3000);
+      return;
+    }
+    if (r.motivo === 'ocupado') {
+      setAvisoOcupado(oferta.conductorNombre || 'Ese conductor');
+      setContraofertas(prev => prev.filter(c => c.conductorId !== oferta.conductorId));
+    } else {
       setAvisoOcupado('__error__');
     }
   };
@@ -1350,11 +1367,9 @@ const confirmarViaje = async () => {
     setContraofertas(prev => prev.filter(c => c.conductorId !== conductorId));
     // La oferta ya se quitó de la lista de arriba. Si la escritura no entra, el
     // pasajero deja de verla pero el conductor sigue creyendo que está viva.
-    if (viajeId) updateDoc(doc(db, 'viajes', viajeId, 'contraofertas', conductorId), { vigente: false })
-      .catch((e) => {
-        apuntarRechazo('Solicitar.js (rechazarContraoferta)', e);
-        setAviso(motivoDeRechazo(e, 'rechazar esa oferta'));
-      });
+    // El motivo, si falla, lo dice el candado.
+    if (viajeId) await correr(() => updateDoc(doc(db, 'viajes', viajeId, 'contraofertas', conductorId), { vigente: false }),
+      'rechazarOferta', 'Oferta rechazada.', 'rechazar esa oferta');
   };
 const PanelEmergencia = () => (
     mostrarEmergencia ? (
@@ -1405,7 +1420,7 @@ const PanelEmergencia = () => (
           <h2 style={{ color: '#1A1A1E', fontSize: '22px', fontWeight: '900', margin: '0 0 12px' }}>UPP, ESTE CONDUCTOR YA NO ESTÁ DISPONIBLE 🙈</h2>
           <p style={{ color: '#6B7280', fontSize: '14px', margin: '0', lineHeight: '1.5' }}>Otro pasajero lo tomó primero. No te preocupes, seguimos buscando otro conductor para ti.</p>
         </div>
-        <button onClick={() => { setConductorYaTomado(false); seguirBuscando(); }} style={{ marginTop: '28px', width: '100%', maxWidth: '420px', padding: '18px', background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)', border: 'none', borderRadius: '16px', color: '#1A1A1E', fontSize: '17px', fontWeight: '900', cursor: 'pointer' }}>🔄 Seguir buscando</button>
+        <button onClick={() => { setConductorYaTomado(false); seguirBuscando(); }} disabled={!!ocupado} style={{ marginTop: '28px', width: '100%', maxWidth: '420px', padding: '18px', background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)', border: 'none', borderRadius: '16px', color: '#1A1A1E', fontSize: '17px', fontWeight: '900', cursor: 'pointer' }}>{texto('seguir', 'Buscando…', '🔄 Seguir buscando')}</button>
         <AvisoModal aviso={aviso} onCerrar={() => setAviso(null)} />
       </div>
     );
@@ -1428,8 +1443,8 @@ const PanelEmergencia = () => (
         </div>
         <p style={{ color: '#FFFFFF', fontSize: '16px', margin: '24px 0 16px', textAlign: 'center', fontWeight: 'bold' }}>¿Confirmas este viaje?</p>
         <div style={{ display: 'flex', gap: '12px', width: '100%', maxWidth: '440px' }}>
-          <button onClick={rechazarConfirmacion} style={{ flex: 1, padding: '16px', background: '#FFFFFF', border: '1px solid #FF4444', borderRadius: '16px', color: '#FF4444', fontSize: '16px', fontWeight: 'bold', cursor: 'pointer' }}>❌ No</button>
-          <button onClick={confirmarViaje} style={{ flex: 2, padding: '16px', background: 'linear-gradient(135deg, #2ECC71, #27AE60)', border: 'none', borderRadius: '16px', color: '#FFFFFF', fontSize: '17px', fontWeight: '900', cursor: 'pointer' }}>✅ Sí, confirmar</button>
+          <button onClick={rechazarConfirmacion} disabled={!!ocupado} style={{ flex: 1, padding: '16px', background: '#FFFFFF', border: '1px solid #FF4444', borderRadius: '16px', color: '#FF4444', fontSize: '16px', fontWeight: 'bold', cursor: 'pointer' }}>{texto('rechazar', 'Rechazando…', '❌ No')}</button>
+          <button onClick={confirmarViaje} disabled={!!ocupado} style={{ flex: 2, padding: '16px', background: 'linear-gradient(135deg, #2ECC71, #27AE60)', border: 'none', borderRadius: '16px', color: '#FFFFFF', fontSize: '17px', fontWeight: '900', cursor: 'pointer' }}>{texto('confirmar', 'Confirmando…', '✅ Sí, confirmar')}</button>
         </div>
         <style>{`@keyframes pulso { from { transform: scale(1); } to { transform: scale(1.12); } }`}</style>
         <AvisoModal aviso={aviso} onCerrar={() => setAviso(null)} />
@@ -1453,7 +1468,7 @@ const PanelEmergencia = () => (
   if (pantalla === 'fase1') {
     return (
       <div style={{ backgroundColor: '#FFFFFF', minHeight: '100vh', position: 'relative' }}>
-        {mostrarCancelacion && <ModalCancelacion razones={RAZONES_CANCELACION_PASAJERO} onConfirmar={cancelarViaje} onCerrar={() => setMostrarCancelacion(false)} />}
+        {mostrarCancelacion && <ModalCancelacion razones={RAZONES_CANCELACION_PASAJERO} onConfirmar={cancelarViaje} onCerrar={() => setMostrarCancelacion(false)} ocupado={ocupado} />}
         {mostrarLlego && <ConductorLlego nombre={viaje?.conductorNombre} placa={viaje?.conductorPlaca} onCerrar={() => setMostrarLlego(false)} />}
         <PanelEmergencia />
         <MapaPasajero ubicacionPasajero={ubicacionRecogida || ubicacionPasajero} ubicacionConductor={ubicacionConductor} tipo={tipo} />
@@ -1485,7 +1500,7 @@ const PanelEmergencia = () => (
             <p style={{ color: '#6B7280', fontSize: '13px', margin: '0 0 12px', textAlign: 'center' }}>Responde rápido:</p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {RESPUESTAS_RAPIDAS.map((resp, i) => (
-                <button key={i} onClick={() => enviarRespuesta(resp)} style={{ padding: '12px 16px', background: '#FFFFFF', border: '1px solid #ECECEF', borderRadius: '12px', color: '#1A1A1E', fontSize: '14px', cursor: 'pointer', textAlign: 'left', fontWeight: 'bold' }}>{resp}</button>
+                <button key={i} onClick={() => enviarRespuesta(resp)} disabled={!!ocupado} style={{ padding: '12px 16px', background: '#FFFFFF', border: '1px solid #ECECEF', borderRadius: '12px', color: '#1A1A1E', fontSize: '14px', cursor: 'pointer', textAlign: 'left', fontWeight: 'bold' }}>{texto('respuesta:' + resp, 'Enviando…', resp)}</button>
               ))}
             </div>
             <button onClick={() => setMostrarCancelacion(true)} style={{ width: '100%', marginTop: '12px', padding: '14px', background: 'transparent', border: '1px solid #ECECEF', borderRadius: '14px', color: '#FF4444', fontSize: '14px', cursor: 'pointer' }}>Cancelar viaje</button>
@@ -1539,7 +1554,7 @@ const PanelEmergencia = () => (
                 </div>
                 <div style={{ display: 'flex', gap: '8px' }}>
                   <input value={textoChat} onChange={e => setTextoChat(e.target.value)} onKeyDown={e => e.key === 'Enter' && enviarMensajeChat()} placeholder="Escribe un mensaje..." style={{ flex: 1, background: '#FFFFFF', border: '1px solid #ECECEF', borderRadius: '10px', padding: '10px 12px', color: '#1A1A1E', fontSize: '14px', outline: 'none' }} />
-                  <button onClick={enviarMensajeChat} disabled={!textoChat.trim()} style={{ padding: '10px 16px', background: textoChat.trim() ? 'linear-gradient(135deg, #FF7A2F, #D6357E)' : '#ECECEF', border: 'none', borderRadius: '10px', color: '#FFFFFF', fontSize: '18px', cursor: textoChat.trim() ? 'pointer' : 'default' }}>➤</button>
+                  <button onClick={enviarMensajeChat} disabled={!textoChat.trim() || !!ocupado} style={{ padding: '10px 16px', background: textoChat.trim() ? 'linear-gradient(135deg, #FF7A2F, #D6357E)' : '#ECECEF', border: 'none', borderRadius: '10px', color: '#FFFFFF', fontSize: '18px', cursor: textoChat.trim() ? 'pointer' : 'default' }}>{texto('mensaje', '…', '➤')}</button>
                 </div>
               </div>
             )}
@@ -1593,7 +1608,7 @@ const PanelEmergencia = () => (
           <p style={{ color: '#6B7280', fontSize: '11px', letterSpacing: '2px', margin: '12px 0 8px' }}>RESPUESTAS RÁPIDAS</p>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '10px' }}>
             {RESPUESTAS_RAPIDAS.map((resp, i) => (
-              <button key={i} onClick={() => enviarRespuesta(resp)} style={{ padding: '8px 12px', background: '#FFFFFF', border: '1px solid #ECECEF', borderRadius: '10px', color: '#1A1A1E', fontSize: '12px', cursor: 'pointer', fontWeight: 'bold' }}>{resp}</button>
+              <button key={i} onClick={() => enviarRespuesta(resp)} disabled={!!ocupado} style={{ padding: '8px 12px', background: '#FFFFFF', border: '1px solid #ECECEF', borderRadius: '10px', color: '#1A1A1E', fontSize: '12px', cursor: 'pointer', fontWeight: 'bold' }}>{texto('respuesta:' + resp, 'Enviando…', resp)}</button>
             ))}
           </div>
           <div style={{ background: '#FFFFFF', borderRadius: '14px', padding: '10px', border: '1px solid #ECECEF', marginBottom: '8px' }}>
@@ -1610,7 +1625,7 @@ const PanelEmergencia = () => (
             </div>
             <div style={{ display: 'flex', gap: '8px' }}>
               <input value={textoChat} onChange={e => setTextoChat(e.target.value)} onKeyDown={e => e.key === 'Enter' && enviarMensajeChat()} placeholder="Escribe un mensaje..." style={{ flex: 1, background: '#FFFFFF', border: '1px solid #ECECEF', borderRadius: '10px', padding: '10px 12px', color: '#1A1A1E', fontSize: '14px', outline: 'none' }} />
-              <button onClick={enviarMensajeChat} disabled={!textoChat.trim()} style={{ padding: '10px 16px', background: textoChat.trim() ? 'linear-gradient(135deg, #FF7A2F, #D6357E)' : '#ECECEF', border: 'none', borderRadius: '10px', color: '#FFFFFF', fontSize: '18px', cursor: textoChat.trim() ? 'pointer' : 'default' }}>➤</button>
+              <button onClick={enviarMensajeChat} disabled={!textoChat.trim() || !!ocupado} style={{ padding: '10px 16px', background: textoChat.trim() ? 'linear-gradient(135deg, #FF7A2F, #D6357E)' : '#ECECEF', border: 'none', borderRadius: '10px', color: '#FFFFFF', fontSize: '18px', cursor: textoChat.trim() ? 'pointer' : 'default' }}>{texto('mensaje', '…', '➤')}</button>
             </div>
           </div>
         </div>
@@ -1622,7 +1637,7 @@ const PanelEmergencia = () => (
   if (pantalla === 'esperando') {
     return (
       <div style={{ backgroundColor: '#FFFFFF', minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
-        {mostrarCancelacion && <ModalCancelacion razones={RAZONES_CANCELACION_PASAJERO} onConfirmar={cancelarViaje} onCerrar={() => setMostrarCancelacion(false)} />}
+        {mostrarCancelacion && <ModalCancelacion razones={RAZONES_CANCELACION_PASAJERO} onConfirmar={cancelarViaje} onCerrar={() => setMostrarCancelacion(false)} ocupado={ocupado} />}
 
         <div style={{ fontSize: '80px', marginBottom: '24px' }}>{buscandoAgotado ? '😕' : (tipo === 'Taxi' ? '🚗' : '🏍️')}</div>
         <h2 style={{ color: '#1A1A1E', fontSize: '22px', margin: '0 0 8px', textAlign: 'center' }}>{buscandoAgotado ? 'No encontramos conductor' : 'Buscando conductor...'}</h2>
@@ -1645,7 +1660,7 @@ const PanelEmergencia = () => (
         {buscandoAgotado && (
           <div style={{ width: '100%', marginBottom: '24px' }}>
             <p style={{ color: '#6B7280', fontSize: '14px', margin: '0 0 16px', textAlign: 'center', lineHeight: '1.5' }}>No hay conductores disponibles cerca en este momento. Puedes seguir buscando o subir tu oferta.</p>
-            <button onClick={seguirBuscando} style={{ width: '100%', padding: '18px', background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)', border: 'none', borderRadius: '16px', color: '#1A1A1E', fontSize: '17px', fontWeight: '900', cursor: 'pointer' }}>🔄 Seguir buscando</button>
+            <button onClick={seguirBuscando} disabled={!!ocupado} style={{ width: '100%', padding: '18px', background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)', border: 'none', borderRadius: '16px', color: '#1A1A1E', fontSize: '17px', fontWeight: '900', cursor: 'pointer' }}>{texto('seguir', 'Buscando…', '🔄 Seguir buscando')}</button>
           </div>
         )}
 
@@ -1669,6 +1684,7 @@ const PanelEmergencia = () => (
               <TarjetaContraoferta
                 key={oferta.conductorId}
                 oferta={oferta}
+                ocupado={ocupado}
                 onAceptar={() => aceptarContraoferta(oferta)}
                 onRechazar={() => rechazarContraoferta(oferta.conductorId)}
               />
@@ -1687,8 +1703,8 @@ const PanelEmergencia = () => (
             </div>
             <button onClick={subirNuevaTarifa} style={{ width: '48px', height: '48px', background: '#FFFFFF', border: '2px solid #2ECC71', borderRadius: '14px', color: '#2ECC71', fontSize: '24px', cursor: 'pointer', fontWeight: 'bold' }}>+</button>
           </div>
-          <button onClick={enviarNuevaOferta} disabled={!ofertaModificada} style={{ width: '100%', padding: '14px', background: ofertaModificada ? 'linear-gradient(135deg, #FFCF4D, #FF7A2F)' : '#ECECEF', border: 'none', borderRadius: '14px', color: ofertaModificada ? '#FFFFFF' : '#6B7280', fontSize: '15px', fontWeight: '900', cursor: ofertaModificada ? 'pointer' : 'default' }}>
-            {ofertaModificada ? '⬆️ Enviar nueva oferta' : 'Modifica la tarifa para enviar'}
+          <button onClick={enviarNuevaOferta} disabled={!ofertaModificada || !!ocupado} style={{ width: '100%', padding: '14px', background: ofertaModificada ? 'linear-gradient(135deg, #FFCF4D, #FF7A2F)' : '#ECECEF', border: 'none', borderRadius: '14px', color: ofertaModificada ? '#FFFFFF' : '#6B7280', fontSize: '15px', fontWeight: '900', cursor: ofertaModificada ? 'pointer' : 'default' }}>
+            {texto('oferta', 'Enviando…', ofertaModificada ? '⬆️ Enviar nueva oferta' : 'Modifica la tarifa para enviar')}
           </button>
         </div>
 
@@ -1743,7 +1759,7 @@ const PanelEmergencia = () => (
           </div>
           {destino && !favoritos.find(f => f.direccion === destino) && (
             <div onClick={guardarFavorito} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F)', borderRadius: '16px', padding: '0 14px', marginBottom: '12px', cursor: 'pointer', flexShrink: 0 }}>
-              <span style={{ color: '#1A1A1E', fontSize: '20px', fontWeight: '900', lineHeight: '1' }}>➕</span>
+              <span style={{ color: '#1A1A1E', fontSize: '20px', fontWeight: '900', lineHeight: '1' }}>{texto('favorito', '…', '➕')}</span>
               <span style={{ color: '#1A1A1E', fontSize: '9px', fontWeight: '900', marginTop: '2px', textAlign: 'center', lineHeight: '1.1' }}>Guardar<br/>lugar</span>
             </div>
           )}
@@ -1809,7 +1825,7 @@ const PanelEmergencia = () => (
                     <span style={{ fontSize: '18px' }}>{f.icono}</span>
                     <span style={{ color: '#1A1A1E', fontSize: '14px', fontWeight: 'bold' }}>{f.nombre}</span>
                   </div>
-                  <span onClick={() => borrarFavorito(i)} style={{ color: '#FF4444', fontSize: '18px', cursor: 'pointer', fontWeight: 'bold', paddingLeft: '4px' }}>✕</span>
+                  <span onClick={() => borrarFavorito(i)} style={{ color: '#FF4444', fontSize: '18px', cursor: 'pointer', fontWeight: 'bold', paddingLeft: '4px' }}>{texto('borrarFavorito', '…', '✕')}</span>
                 </div>
               ))}
             </div>
@@ -1840,8 +1856,8 @@ const PanelEmergencia = () => (
           </div>
         </div>
         {error && <p style={{ color: '#FF4444', fontSize: '13px', textAlign: 'center', marginBottom: '12px' }}>{error}</p>}
-        <button onClick={solicitarViaje} style={{ width: '100%', padding: '13px', background: cargando ? '#ECECEF' : 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)', border: 'none', borderRadius: '14px', color: cargando ? '#6B7280' : '#FFFFFF', fontSize: '16px', fontWeight: '900', cursor: cargando ? 'default' : 'pointer' }}>
-          {cargando ? 'Enviando...' : (esMensajeria
+        <button onClick={solicitarViaje} disabled={!!ocupado} style={{ width: '100%', padding: '13px', background: ocupado ? '#ECECEF' : 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)', border: 'none', borderRadius: '14px', color: ocupado ? '#6B7280' : '#FFFFFF', fontSize: '16px', fontWeight: '900', cursor: ocupado ? 'default' : 'pointer' }}>
+          {texto('pedir', 'Enviando…', esMensajeria
             ? `Pedir mandado — $${tarifa.toLocaleString()}`
             : `Solicitar ${tipo} — $${tarifa.toLocaleString()}`)}
         </button>

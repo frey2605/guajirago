@@ -51,187 +51,141 @@ const {
 
 const APP = 'guajirago/src/Solicitar.js';
 
-// Los que viven en una función con nombre y llevan try/catch.
-// El tercer campo dice si su catch TIENE QUE CORTAR.
-const CON_NOMBRE = [
-  ['cancelarViaje', 'cancelar el viaje', true],
-  ['confirmarViaje', 'confirmar el viaje', false],
-];
+// ── DESDE LA LEY DEL BOTÓN (26-sep-2026) ─────────────────────────────────────
+// Estas escrituras pasan por el candado (`correr`, de useAccion): el candado nunca se traga un fallo, deja rastro
+// (apuntarRechazo) y saca el motivo con motivoDeRechazo, la pieza única; su aviso entra por la MISMA ventanita que
+// pintan las siete pantallas (`setAviso`). Lo que cada una decidía en su catch —no salir, devolver la tarjeta— lo
+// decide ahora el `if (!r || !r.ok)` de después. Se vigila LO MISMO que antes, con la forma nueva.
 
-// Los que van disparados sin esperar y se protegen con su propio `.catch`.
-const CON_CATCH_PROPIO = [
-  ["updateDoc(doc(db, 'usuarios', user.uid), { descuentoPendiente: null })", 1, 'registrar que usaste tu descuento'],
-  ["updateDoc(doc(db, 'viajes', viajeId, 'contraofertas', conductorId), { vigente: false })", 1, 'rechazar esa oferta'],
-  // Se ancla en UN campo que solo sale aquí. `nuevaOferta: new Date()...` sale DOS
-  // veces —aquí y en enviarNuevaOferta—, y `estado: 'esperando'` sale TRES.
-  //
-  // Y NO se ancla en dos renglones juntos: este archivo es CRLF, así que entre
-  // renglón y renglón hay `\r\n` y un ancla escrita con `\n` no casa NUNCA. Ya
-  // costó una prueba que decía «sale 0 veces» sobre código que estaba ahí.
-  ['conductorVehiculo: null,', 1, 'rechazar al conductor'],
-];
+/** La llamada a correr(...) que hay dentro de `cuerpo`: { args: [fn, cual, exito, accion], despues }. */
+function laAccion(cuerpo) {
+  const seguro = sinTextos(cuerpo);
+  const i = seguro.search(/\bcorrer\s*\(/);
+  if (i < 0) return null;
+  const abre = seguro.indexOf('(', i);
+  const args = [];
+  let hondo = 0;
+  let desde = abre + 1;
+  for (let k = abre; k < seguro.length; k++) {
+    const c = seguro[k];
+    if ('([{'.includes(c)) hondo++;
+    else if (')]}'.includes(c)) {
+      hondo--;
+      if (hondo === 0) { args.push(cuerpo.slice(desde, k).trim()); return { args, despues: cuerpo.slice(k + 1) }; }
+    } else if (c === ',' && hondo === 1) { args.push(cuerpo.slice(desde, k).trim()); desde = k + 1; }
+  }
+  return null;
+}
+
+/** ¿La posición cae dentro del primer argumento de algún correr(...)? */
+function dentroDeCorrer(t, pos) {
+  const seguro = sinTextos(t);
+  for (const m of seguro.matchAll(/\bcorrer\s*\(/g)) {
+    const abre = seguro.indexOf('(', m.index);
+    let hondo = 0;
+    for (let k = abre; k < seguro.length; k++) {
+      if ('([{'.includes(seguro[k])) hondo++;
+      else if (')]}'.includes(seguro[k])) { hondo--; if (hondo === 0) { if (abre < pos && pos < k) return true; break; } }
+    }
+  }
+  return false;
+}
+
+const cuerpoDe = (t, fn) => {
+  const i = t.search(new RegExp('const ' + fn + '\\s*=\\s*(?:async\\s*)?\\('));
+  assert.ok(i >= 0, 'no encontré la función ' + fn + ' en ' + APP);
+  return cuerpoDeLaFuncion(t, i).texto;
+};
 
 describe('REGLA 9 · los botones del pasajero ya no fallan en silencio', () => {
-  for (const [fn, accion, tieneQueCortar] of CON_NOMBRE) {
-    it('EL QUE MUERDE · «' + accion + '» avisa si el servidor dice que no', () => {
-      const t = soloCodigo(leer(APP));
-      const i = t.search(new RegExp('const ' + fn + '\\s*=\\s*(?:async\\s*)?\\('));
-      assert.ok(i >= 0, 'no encontré la función ' + fn + ' en ' + APP);
-      const fnCuerpo = cuerpoDeLaFuncion(t, i);
-      const cuerpo = cuerpoDelCatch(t, i);
-      assert.ok(cuerpo !== null, fn + '(): ya no tiene catch.');
+  it('el aviso del candado entra por la ventanita de la pantalla, y cuando FALLA siempre se enseña', () => {
+    const t = soloCodigo(leer(APP));
+    assert.match(t, /const \{ ocupado, correr, texto, aviso: avisoAccion \} = useAccion\(\);/);
+    assert.match(t, /if \(avisoAccion && !avisoAccion\.ok\) setAviso\(avisoAccion\);/,
+      'el candado dice el motivo pero la pantalla no lo pinta (o lo esconde también cuando falla).');
+  });
 
-      // Sin `await` el catch no se entera: la promesa se rechaza sola y el try se
-      // queda de adorno. Es el mutante más barato contra cualquier arreglo así.
-      for (const m of fnCuerpo.texto.matchAll(/(?:setDoc|updateDoc|addDoc|deleteDoc)\s*\(/g)) {
-        const propio = catchPropioDe(fnCuerpo.texto, m.index);
-        if (propio && propio.trim()) continue;
-        const delante = fnCuerpo.texto.slice(Math.max(0, m.index - 10), m.index);
-        assert.ok(/\.\s*$/.test(delante) || /await\s+$/.test(delante),
-          fn + '(): hay una escritura sin `await` y sin `.catch` propio. El catch no '
-          + 'se entera de que falló y el aviso no sale nunca.');
-      }
-
-      assert.ok(/apuntarRechazo\s*\(/.test(cuerpo), fn + '(): no deja rastro del rechazo');
-      assert.ok(/setAviso\s*\(\s*motivoDeRechazo/.test(cuerpo),
-        fn + '(): no le dice NADA al pasajero. Calcular el motivo y no enseñarlo es lo '
-        + 'mismo que tragárselo.');
-      assert.ok(!/setAviso\s*\(\s*(null|'')\s*\)/.test(cuerpo),
-        fn + '(): pone el aviso y lo borra en el mismo catch. Se ve igual que no avisar.');
-
-      // ── QUE EL AVISO NO SE PISE A SÍ MISMO ────────────────────────────────
-      // Un solo `setAviso` por catch. Con dos, el segundo gana: se podía dejar el
-      // bueno y ponerle detrás un texto a mano, y la prueba seguía verde porque
-      // solo miraba que el bueno estuviera. Lo demostró la segunda opinión.
-      assert.strictEqual((cuerpo.match(/setAviso\s*\(/g) || []).length, 1,
-        fn + '(): hay más de un `setAviso` en el catch. El último gana, así que el '
-        + 'aviso bueno se puede quedar tapado por otro escrito a mano.');
-
-      // ── QUE NO SE VAYA DE LA PANTALLA ─────────────────────────────────────
-      // Vale para las DOS: avisar y marcharse es lo mismo que no avisar, porque el
-      // pasajero no llega a leerlo y pierde el botón para reintentar.
-      for (const salida of [/onVolver\s*\(/, /setPantalla\s*\(/]) {
-        assert.ok(!salida.test(cuerpo),
-          fn + '(): el catch avisa y SE VA de la pantalla. El pasajero no llega a leer '
-          + 'el aviso y se queda sin forma de reintentar.');
-      }
-
-      if (tieneQueCortar) {
-        // `cancelarViaje` hace `onVolver()` detrás del try: si el catch no corta, el
-        // pasajero se va de la pantalla con el viaje AÚN VIVO en el servidor —un
-        // conductor en camino a alguien que ya se fue— y sin botón para reintentar.
-        //
-        // PEDIR SOLO QUE «TERMINE EN RETURN» NO BASTA: la segunda opinión metió el
-        // `onVolver()` DENTRO del catch, justo antes del return, y la prueba siguió
-        // verde reproduciendo el daño exacto que su propio mensaje describe. Por eso
-        // la comprobación de arriba mira el catch entero.
-        const hastaElTry = fnCuerpo.texto.slice(0, fnCuerpo.texto.indexOf('try {'));
-        assert.ok(!/onVolver\s*\(/.test(hastaElTry),
-          fn + '(): se sale de la pantalla ANTES del try.');
-        const limpio = cuerpo.trim().replace(/;\s*$/, '');
-        assert.ok(/\breturn\b\s*$/.test(limpio),
-          fn + '(): el catch no termina en `return`. El `onVolver()` de después corre '
-          + 'igual: el pasajero se va y el viaje se queda vivo.');
-      }
+  for (const [fn, accion] of [['cancelarViaje', 'cancelar el viaje'], ['confirmarViaje', 'confirmar el viaje'], ['rechazarConfirmacion', 'rechazar al conductor']]) {
+    it('EL QUE MUERDE · «' + accion + '» pasa por el candado con su motivo, y decide qué hacer si falla', () => {
+      const cuerpo = cuerpoDe(soloCodigo(leer(APP)), fn);
+      const a = laAccion(cuerpo);
+      assert.ok(a, fn + '(): no pasa por el candado.');
+      assert.match(a.args[0], /updateDoc\(/, fn + '(): la escritura no va DENTRO del candado: si falla, nadie se entera.');
+      assert.strictEqual(a.args[3], "'" + accion + "'", fn + '(): el candado no sabe qué se intentaba: el título del fallo no lo diría.');
+      assert.match(a.despues, /if \(!r \|\| !r\.ok\)/, fn + '(): no mira si el candado dijo que no.');
     });
   }
 
-  it('EL QUE MUERDE · aceptar el viaje ya NO miente diciendo «el conductor ya fue tomado»', () => {
-    // Esta es la razón de ser de este arreglo. Se comprueba en NEGATIVO porque lo
-    // que hacía daño era una línea que sobraba, no una que faltara.
-    const t = soloCodigo(leer(APP));
-    const i = t.search(/const confirmarViaje\s*=\s*(?:async\s*)?\(/);
-    const cuerpo = cuerpoDelCatch(t, i);
-    assert.ok(!/setConductorYaTomado\s*\(\s*true\s*\)/.test(cuerpo),
-      'confirmarViaje volvió a decir «el conductor ya fue tomado» cuando falla. Ese '
-      + 'mensaje es SIEMPRE falso por ese camino: la escritura solo pone '
-      + '`estado: aceptado` en el viaje del propio pasajero y nadie comprueba si el '
-      + 'conductor sigue libre —ni el código ni las reglas—. El pasajero se queda '
-      + 'creyendo que perdió un viaje que seguía ahí.');
+  it('EL QUE MUERDE · cancelar NO se va de la pantalla si la cancelación no entra', () => {
+    // Si el pasajero se va con el viaje AÚN VIVO en el servidor, un conductor va en camino a alguien que ya se fue, y
+    // no queda botón para reintentar. Y la segunda opinión ya metió una vez el `onVolver()` antes del corte.
+    const cuerpo = cuerpoDe(soloCodigo(leer(APP)), 'cancelarViaje');
+    const a = laAccion(cuerpo);
+    assert.ok(!/onVolver\s*\(/.test(cuerpo.slice(0, cuerpo.indexOf('correr('))), 'se sale de la pantalla ANTES de cancelar.');
+    const corte = a.despues.indexOf('if (!r || !r.ok) return;');
+    assert.ok(corte >= 0, 'si la cancelación falla, no se corta: el `onVolver()` de después corre igual.');
+    assert.ok(a.despues.indexOf('onVolver(') > corte, 'el `onVolver()` va antes del corte.');
+  });
 
-    // Y que le devuelva la confirmación, para que pueda volver a intentarlo en vez
-    // de quedarse sin el conductor que ya había elegido.
-    assert.ok(/setConfirmacionPendiente\s*\(\s*datos\s*\)/.test(cuerpo),
-      'confirmarViaje avisa del fallo pero se traga la confirmación: el pasajero se '
-      + 'queda sin la oferta que estaba aceptando y sin forma de reintentar.');
+  it('EL QUE MUERDE · aceptar el viaje ya NO miente diciendo «el conductor ya fue tomado», y devuelve la confirmación', () => {
+    const cuerpo = cuerpoDe(soloCodigo(leer(APP)), 'confirmarViaje');
+    assert.ok(!/setConductorYaTomado\s*\(\s*true\s*\)/.test(cuerpo),
+      'confirmarViaje volvió a decir «el conductor ya fue tomado». Por este camino es SIEMPRE falso: la escritura solo '
+      + 'pone `estado: aceptado` en el viaje del propio pasajero y nadie comprueba si el conductor sigue libre.');
+    const fallo = laAccion(cuerpo).despues.match(/if \(!r \|\| !r\.ok\) \{([\s\S]*?)\n    \}/);
+    assert.ok(fallo, 'no encuentro qué hace confirmarViaje cuando el candado dice que no.');
+    assert.match(fallo[1], /setConfirmacionPendiente\(datos\);\s*return;/, 'no devuelve la confirmación: el pasajero pierde la oferta.');
+    assert.ok(!/setPantalla\s*\(|onVolver\s*\(/.test(fallo[1]), 'avisa y SE VA: el pasajero no llega a leerlo.');
   });
 
   it('EL QUE MUERDE · rechazar al conductor DEVUELVE la tarjeta si falla', () => {
-    // La hermana de la de arriba. `rechazarConfirmacion` quita la tarjeta ANTES de
-    // escribir; si la escritura no entra y no se devuelve, al pasajero se le dice
-    // «no se pudo rechazar» y se queda sin el botón para reintentar, con el viaje
-    // todavía asignado al conductor que acababa de rechazar. Era el mismo agujero
-    // que se le cerró a confirmarViaje, abierto justo al lado — lo vio la segunda
-    // opinión.
-    const t = soloCodigo(leer(APP));
-    const i = t.search(/const rechazarConfirmacion\s*=\s*(?:async\s*)?\(/);
-    assert.ok(i >= 0, 'no encontré rechazarConfirmacion');
-    const fn = cuerpoDeLaFuncion(t, i);
-    assert.ok(/const datosRechazados = confirmacionPendiente;/.test(fn.texto),
-      'rechazarConfirmacion ya no guarda la tarjeta antes de quitarla: si el rechazo '
-      + 'falla no hay nada que devolver.');
-    const pos = t.lastIndexOf('updateDoc(', t.indexOf('conductorVehiculo: null,'));
-    const manejador = catchPropioDe(t, pos) || '';
-    assert.ok(/setConfirmacionPendiente\s*\(\s*datosRechazados\s*\)/.test(manejador),
-      'rechazar al conductor avisa del fallo pero NO devuelve la tarjeta: el pasajero '
-      + 'se queda sin forma de reintentar y el viaje sigue asignado al conductor que '
-      + 'acaba de rechazar.');
+    const cuerpo = cuerpoDe(soloCodigo(leer(APP)), 'rechazarConfirmacion');
+    assert.match(cuerpo, /const datosRechazados = confirmacionPendiente;/, 'ya no guarda la tarjeta antes de quitarla.');
+    assert.match(laAccion(cuerpo).despues, /if \(!r \|\| !r\.ok\) setConfirmacionPendiente\(datosRechazados\);/,
+      'si el rechazo falla NO devuelve la tarjeta: el viaje sigue asignado al conductor que acaba de rechazar.');
   });
 
-  for (const [ancla, veces, accion] of CON_CATCH_PROPIO) {
+  // Las que se protegen con su propio `.catch` o pasan por el candado con su motivo.
+  for (const [ancla, veces, accion] of [
+    ["updateDoc(doc(db, 'usuarios', user.uid), { descuentoPendiente: null })", 1, 'registrar que usaste tu descuento'],
+    ["updateDoc(doc(db, 'viajes', viajeId, 'contraofertas', conductorId), { vigente: false })", 1, 'rechazar esa oferta'],
+  ]) {
     it('EL QUE MUERDE · «' + accion + '» avisa si el servidor dice que no', () => {
       const t = soloCodigo(leer(APP));
-      assert.strictEqual(t.split(ancla).length - 1, veces,
-        'la escritura de «' + accion + '» sale ' + (t.split(ancla).length - 1)
-        + ' veces y se esperaban ' + veces + '. O se copió, o cambió el código y esta '
-        + 'prueba mira al vacío.');
-      // El ancla puede caer DENTRO de la llamada —`conductorVehiculo: null` está en
-      // mitad del objeto que se escribe—, así que se sube hasta el principio de la
-      // escritura que la contiene. Sin esto, `catchPropioDe` empezaba a contar
-      // paréntesis desde mitad del objeto y no encontraba el `.catch` que sí está.
-      const dentro = t.indexOf(ancla);
-      const pos = Math.max(
-        t.lastIndexOf('updateDoc(', dentro), t.lastIndexOf('setDoc(', dentro),
-        t.lastIndexOf('addDoc(', dentro), t.lastIndexOf('deleteDoc(', dentro),
-      );
-      assert.ok(pos >= 0, accion + ': no encontré la escritura que contiene el ancla');
+      assert.strictEqual(t.split(ancla).length - 1, veces, 'la escritura de «' + accion + '» cambió o se copió: esta prueba mira al vacío.');
+      const pos = t.indexOf(ancla);
+      if (dentroDeCorrer(t, pos)) {
+        const cierra = t.indexOf(')', pos + ancla.length - 1);
+        assert.ok(t.slice(cierra, cierra + 400).includes("'" + accion + "'"), accion + ': va por el candado sin decir qué se intentaba.');
+        return;
+      }
       const manejador = catchPropioDe(t, pos);
-      assert.ok(manejador && manejador.trim(),
-        accion + ': la escritura no lleva `.catch` con nada dentro. Un '
-        + '`.catch(() => {})` es tragarse el fallo con otra cara.');
+      assert.ok(manejador && manejador.trim(), accion + ': ni candado ni `.catch` con algo dentro.');
       assert.ok(/apuntarRechazo\s*\(/.test(manejador), accion + ': no deja rastro');
-      assert.ok(/setAviso\s*\(\s*motivoDeRechazo/.test(manejador),
-        accion + ': saca el motivo pero no lo enseña.');
+      assert.ok(/setAviso\s*\(\s*motivoDeRechazo/.test(manejador), accion + ': saca el motivo pero no lo enseña.');
     });
   }
 
-  it('EL QUE MUERDE · no nace ninguna escritura muda nueva entre las cinco', () => {
-    // Las que quedaron FUERA del alcance, dichas por su ancla para que la cuenta no
-    // dependa del renglón. Si aparece una muda que no esté aquí, esto se pone rojo.
+  it('EL QUE MUERDE · no nace ninguna escritura muda nueva', () => {
+    // Las que quedan FUERA a propósito, por su ancla: los temporizadores de la búsqueda (no los toca nadie; los
+    // dispara el reloj) y la creación del viaje, que va dentro del candado de «pedir el viaje».
     const FUERA = [
-      'respuestaPasajero: respuesta',        // enviarRespuesta
-      "'mensajes'",                          // el chat
-      'favoritos: nuevos',                   // borrarFavorito
-      'nuevaOfertaPasajero',                 // enviarNuevaOferta
-      'radioBusqueda',                       // seguirBuscando
-      'estado: ESTADOS_MERCADO',             // seguirBuscando
-      'fechaSolicitud: new Date',            // seguirBuscando / crear
-      "estado: 'vencido'",                    // el temporizador de seguirBuscando
+      'radioBusqueda: configApp.radioBusquedaAmpliado',   // el temporizador que amplía el radio
+      "estado: 'vencido'",                                 // el temporizador que vence la búsqueda
+      'pasajeroFcmToken',                                   // el token, sin bloquear la creación del viaje
     ];
     const t = soloCodigo(leer(APP));
     const seguro = sinTextos(t);
     const mudas = [];
     for (const m of t.matchAll(/(?:setDoc|updateDoc|addDoc|deleteDoc)\s*\(/g)) {
-      if (dentroDeTry(seguro, m.index)) continue;
+      if (dentroDeTry(seguro, m.index) || dentroDeCorrer(t, m.index)) continue;
       const manejador = catchPropioDe(t, m.index);
       if (manejador && manejador.trim()) continue;
       const trozo = t.slice(m.index, m.index + 400);
       if (FUERA.some((x) => trozo.includes(x))) continue;
       mudas.push('renglón ' + t.slice(0, m.index).split('\n').length);
     }
-    assert.deepStrictEqual(mudas, [],
-      'hay ' + mudas.length + ' escritura(s) nuevas que se tragan el fallo ('
-      + mudas.join(', ') + ').');
+    assert.deepStrictEqual(mudas, [], 'hay escritura(s) nuevas que se tragan el fallo (' + mudas.join(', ') + ').');
   });
 });
 

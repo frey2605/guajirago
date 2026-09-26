@@ -231,11 +231,14 @@ function revisarArchivo(fuente, escritores = new Set()) {
     for (const m of seguro.matchAll(/\bcorrer\s*\(/g)) {
       const a = argumentos(seguro, codigo, m.index + m[0].length - 1);
       if (a.length < 3) faltas.push(`renglón ${seguro.slice(0, m.index).split('\n').length}: correr(fn, cual, exito) sin su nombre o sin su «se hizo»`);
-      const lit = (a[1] || '').match(/^['"]([^'"]+)['"]$/);
-      if (lit) corren.add(lit[1]);
+      // Un nombre fijo ('guardar'), o un comienzo fijo más algo que cambia ('respuesta:' + resp): el comienzo tiene que
+      // ser el MISMO en correr y en texto. (Las respuestas rápidas del pasajero, 26-sep-2026: un nombre por respuesta.)
+      const lit = (a[1] || '').match(/^['"]([^'"]+)['"]\s*(\+)?/);
+      if (lit) corren.add(lit[1] + (lit[2] ? '+' : ''));
     }
-    for (const m of codigo.matchAll(/\btexto\(\s*['"]([^'"]+)['"]/g)) {
-      if (!corren.has(m[1])) faltas.push(`la palabra de «${m[1]}» no sale nunca: ninguna acción corre con ese nombre`);
+    for (const m of codigo.matchAll(/\btexto\(\s*['"]([^'"]+)['"]\s*(\+)?/g)) {
+      const clave = m[1] + (m[2] ? '+' : '');
+      if (!corren.has(clave)) faltas.push(`la palabra de «${m[1]}» no sale nunca: ninguna acción corre con ese nombre`);
     }
     // Botón por botón hasta su </button>: la versión de Talaria (`<button\b[^>]*>…Cancelar`) se paraba en el `>` de
     // una flecha `onClick={() => …}` y no veía ningún «Cancelar» escrito así. Lo cazó una trampa el 26-sep-2026.
@@ -302,7 +305,6 @@ const PENDIENTES = {
   'guajirago/src/Promociones.js': [1, 1],
   'guajirago/src/Restaurantes.js': [5, 4],
   'guajirago/src/Seguridad.js': [1, 1],
-  'guajirago/src/Solicitar.js': [18, 2],
   'guajirago/src/Turismo.js': [1, 1],
   'guajirago-admin/src/AliadosPendientes.js': [2, 0],
   'guajirago-admin/src/App.js': [4, 1],

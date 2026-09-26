@@ -171,6 +171,23 @@ describe('LA LEY DEL BOTÓN · una sola pieza en las tres apps', () => {
     }
   });
 
+  it('pedir viaje: la ventanita de cancelar y la tarjeta de oferta bloquean sus botones mientras el candado trabaja', () => {
+    // Reciben la acción desde fuera (onConfirmar, onAceptar), así que el vigilante no la sigue hasta ellos: se exige
+    // aquí. Lo cazó el saboteador general el 26-sep-2026 (quitar su disabled no ponía nada rojo).
+    const t = leer('guajirago/src/Solicitar.js');
+    for (const comp of ['ModalCancelacion', 'TarjetaContraoferta']) {
+      const i = t.indexOf('function ' + comp + '(');
+      assert.ok(i >= 0, 'no encuentro ' + comp);
+      const cuerpo = t.slice(i, t.indexOf('\nfunction ', i + 10));
+      assert.match(cuerpo.split('\n')[0], /ocupado \}\)/, comp + ' ya no recibe `ocupado`');
+      assert.strictEqual((cuerpo.match(/disabled=\{!!ocupado\}/g) || []).length, 2, '⛔ ' + comp + ': sus dos botones tienen que bloquearse mientras trabaja');
+    }
+    // Hasta el fin del renglón, no hasta el primer `>`: el `=>` de `onCerrar={() => …}` cortaba la búsqueda (la misma
+    // trampa que se le encontró a la ley de Talaria).
+    assert.strictEqual((t.match(/<ModalCancelacion [^\n]*ocupado=\{ocupado\}/g) || []).length, 2, 'una ventanita de cancelar no recibe `ocupado`');
+    assert.match(t, /<TarjetaContraoferta[\s\S]{0,120}ocupado=\{ocupado\}/, 'la tarjeta de oferta no recibe `ocupado`');
+  });
+
   it('el gancho usa el candado y la palabra sale SOLO en el botón cuya acción corre', () => {
     const t = leer('guajirago/src/useAccion.js');
     assert.match(t, /import \{ crearCandado \} from '\.\/candado'/);
@@ -203,6 +220,9 @@ const TRAMPAS = [
     cambiar(`    {aviso && <AvisoModal texto={aviso.texto} onCerrar={cerrarAviso} />}\n`, ''), (r) => r.faltas.some((f) => /aviso del final/.test(f))],
   ['«Cancelar» se puede tocar mientras trabaja',
     cambiar(`<button disabled={!!ocupado} onClick={() => setAbierto(false)}>Cancelar`, `<button onClick={() => setAbierto(false)}>Cancelar`), (r) => r.faltas.some((f) => /Cancelar/.test(f))],
+  ['un nombre armado («respuesta:» + resp) cuyo comienzo no coincide entre la acción y la palabra',
+    cambiar('</div>;', `{RESP.map((x) => <button key={x} disabled={!!ocupado} onClick={() => correr(() => updateDoc(d, { r: x }), 'respuesta:' + x, 'Enviada.')}>{texto('resp:' + x, '…', x)}</button>)}</div>;`),
+    (r) => r.faltas.some((f) => /«resp:» no sale nunca/.test(f))],
   ['correr sin su «se hizo»',
     cambiar(`, 'guardar', 'Quedó guardado.')`, `, 'guardar')`), (r) => r.faltas.some((f) => /se hizo/.test(f))],
   ['el botón con candado no se deshabilita',

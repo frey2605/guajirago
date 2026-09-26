@@ -35,8 +35,9 @@ export function crearCandado({ alCambiar = () => {}, alAviso = () => {}, tope = 
     // correr(fn, cual, exito, accion): fn es lo que guarda; cual, el nombre de la acción (el mismo que usa texto());
     // exito, lo que se dice si sale bien: un texto, o una función que recibe lo que fn devolvió («¡Recargaste $20.000!»);
     // accion, lo que se intentaba en infinitivo («cancelar el viaje»), para el título del fallo: «No se pudo cancelar
-    // el viaje». Devuelve { ok: true, valor } | { ok: false, titulo, error, clave, sinConfirmar? }, o null si fue un
-    // segundo toque mientras el primero trabajaba.
+    // el viaje». Devuelve { ok: true, valor } | { ok: false, titulo, error, clave, sinConfirmar?, avisado? }, o null si
+    // fue un segundo toque mientras el primero trabajaba. Si fn devuelve { ok: false, avisado: true }, la pantalla ya
+    // dijo el motivo con su propia ventanita y el candado no saca otra.
     async correr(fn, cual, exito, accion) {
       if (typeof cual !== 'string' || !cual) throw new Error('La ley del botón: correr(fn, cual, exito) necesita el nombre de la acción.');
       if (typeof exito !== 'function' && (typeof exito !== 'string' || !exito)) throw new Error('La ley del botón: correr(fn, cual, exito) necesita el texto de «se hizo».');
@@ -46,13 +47,15 @@ export function crearCandado({ alCambiar = () => {}, alAviso = () => {}, tope = 
       alCambiar(cual);
       const dicho = (v) => (typeof exito === 'function' ? String(exito(v)) : exito);
       const decir = (r) => {
-        if (mia !== vuelta) return;
+        // «Ya avisé yo»: la pantalla sacó su propia ventanita, más completa (el pedido sin punto de recogida nombra
+        // las dos salidas). El candado no le pone otra encima.
+        if (mia !== vuelta || r.avisado) return;
         alAviso(r.ok ? { ok: true, titulo: '¡Listo!', texto: dicho(r.valor), icono: '✅', cual } : { ok: false, titulo: r.titulo, texto: r.error, icono: '⚠️', cual });
       };
       const fallo = (m) => ({ ok: false, titulo: m.titulo, error: m.texto, clave: m.clave });
       const trabajo = Promise.resolve().then(fn).then(
         (v) => (v && v.ok === false
-          ? { ok: false, titulo: 'No se pudo ' + (accion || 'completar'), error: v.error || MENSAJE_FALLA, clave: 'otro' }
+          ? { ok: false, titulo: 'No se pudo ' + (accion || 'completar'), error: v.error || MENSAJE_FALLA, clave: 'otro', ...(v.avisado ? { avisado: true } : {}) }
           : { ok: true, valor: v }),
         (e) => fallo(traducir(e, accion)),
       );
