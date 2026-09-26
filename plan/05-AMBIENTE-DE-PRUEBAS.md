@@ -55,7 +55,12 @@ Sin esto, **nada de lo demás se puede hacer sin riesgo**. Por eso va primero.
   lee del ambiente para pasajero y conductor (`f704c34`: antes `src/Notificaciones.js` llevaba la de producción a
   mano y el medidor no la veía). 🔴 El paquete de pruebas de transporte publicado sigue siendo el de `b1c8a63` (con la
   llave de producción dentro): se vuelve a publicar con el arreglo de los dos `firebase-messaging-sw.js`, que llevan
-  producción a mano. La regla 2 (sembrar datos falsos con un guion) **no está hecha**.
+  producción a mano. **La regla 2 tiene su guion desde el 26-sep-2026**: `node scripts/sembrar-pruebas.cjs` (simulacro;
+  `--de-verdad` siembra, `--comprobar` solo lee). Siembra 7 cuentas `@gg.test` (dos pasajeros, un taxista, un
+  mototaxista, un restaurante, una agencia de turismo y un superadministrador) con sus documentos y `config/global` (la
+  del panel, con restaurantes y turismo encendidos). No siembra viajes, pedidos ni reservas —los crea quien prueba— ni
+  ningún código de avisos. Solo puede escribir en `guajirago-pruebas` (la guardia es `verificarPareja`, la misma de las
+  apps) y no pisa lo que ya exista. La clave de las cuentas vive FUERA del repo, en `PROYECTOS/guajirago/cuentas-de-pruebas.txt`.
 - **El panel cumple lo mismo que transporte** (`0664217` de `guajirago-admin`, 25-sep-2026): la MISMA pieza
   `src/ambiente.js` (copia, porque es otro repo; atada byte a byte por `pruebas/elAmbiente.test.js`), `.env`
   por ambiente con las mismas llaves —en producción el panel comparte la app web de Firebase con transporte

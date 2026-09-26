@@ -216,6 +216,33 @@ function val(v) {
   return undefined;
 }
 
+/**
+ * Lo contrario de `val`: un valor de JavaScript al formato de Firestore, para ESCRIBIR. Vive aquí, al lado del que
+ * lee, para que los dos no se separen (SEGUNDA LEY): hasta el 26-sep-2026 cada guion que escribía armaba a mano el
+ * `{ stringValue: … }` de su único campo. Los enteros van como entero (Firestore los manda como texto: `val` los
+ * devuelve a número) y los decimales como decimal. Lo que no sabe escribir lo DICE, en vez de guardar un hueco.
+ */
+function aValor(v) {
+  if (v === null) return { nullValue: null };
+  if (typeof v === 'string') return { stringValue: v };
+  if (typeof v === 'boolean') return { booleanValue: v };
+  if (typeof v === 'number') {
+    if (!Number.isFinite(v)) throw new Error('aValor: ' + v + ' no es un número que Firestore guarde');
+    return Number.isInteger(v) ? { integerValue: String(v) } : { doubleValue: v };
+  }
+  if (Array.isArray(v)) return { arrayValue: v.length ? { values: v.map(aValor) } : {} };
+  if (typeof v === 'object') return { mapValue: { fields: aCampos(v) } };
+  throw new Error('aValor: no sé escribir un valor de tipo ' + typeof v);
+}
+function aCampos(o) {
+  const f = {};
+  for (const k of Object.keys(o)) {
+    if (o[k] === undefined) throw new Error('aCampos: el campo «' + k + '» está undefined (¿se quería null?)');
+    f[k] = aValor(o[k]);
+  }
+  return f;
+}
+
 /** Un documento entero, con su nombre corto y sus campos ya leídos. */
 function doc(d) {
   const campos = d.fields || {};
@@ -226,6 +253,6 @@ function doc(d) {
 
 module.exports = {
   PROYECTO, BASE, SES,
-  quePuertaHay, armarJwt, token, traer, val, doc,
+  quePuertaHay, armarJwt, token, traer, val, doc, aValor, aCampos,
   tiposQueNoSupe: () => [...TIPOS_QUE_NO_SUPE],
 };
