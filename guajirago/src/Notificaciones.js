@@ -2,7 +2,11 @@ import { db } from './firebase';
 import { doc, setDoc } from 'firebase/firestore';
 import { getMessaging, getToken } from 'firebase/messaging';
 import { auth } from './firebase';
-const VAPID_KEY = 'BLcxcBCOZVLKO-qblckhRh0vcuAZjrXmMLZIQNxI0T6x9Viw0XxbpKoZJmNhvTb173FLjuaBIiRum8fSsZGljY0';
+// La llave pública Web Push del proyecto. Fase 0 (25-sep-2026): sale del ambiente (.env.produccion /
+// .env.pruebas), no del código. Hasta ese día iba escrita aquí la de PRODUCCIÓN, y la compilación de
+// pruebas pedía con ella el token del pasajero (obtenerTokenFCM) y el del conductor (registrarTokenFCM).
+// La vigila pruebas/elAmbiente.test.js.
+const VAPID_KEY = process.env.REACT_APP_FIREBASE_VAPID_KEY;
 // Audio precargado una sola vez, para que suene rápido aunque la conexión esté lenta
 let _audioAlerta = null;
 export const precargarAudio = () => {

@@ -129,7 +129,10 @@ function medirApp(app) {
   if (!alias) porque.push('.firebaserc sin alias pruebas (→ un proyecto de pruebas) y produccion (→ el de verdad)');
 
   // 6 · la llave de notificaciones a mano
-  const vapid = src.filter((f) => /vapidKey:\s*["']B/.test(f.texto)).map((f) => f.nombre);
+  // Se busca LA LLAVE (87 caracteres base64url, empieza por B), no una forma de escribirla: `vapidKey: "B…"` era
+  // solo una, y `const VAPID_KEY = 'B…'` en Notificaciones.js de transporte pasó en verde hasta el 25-sep-2026.
+  // Perseguir formas de escribir no acaba nunca. Se mira el texto crudo, comentarios incluidos.
+  const vapid = src.filter((f) => /B[A-Za-z0-9_-]{86}/.test(f.texto)).map((f) => f.nombre);
   piezas.sinVapidEnSrc = vapid.length === 0;
   if (!piezas.sinVapidEnSrc) porque.push('llave de notificaciones (vapidKey) escrita a mano en: ' + vapid.join(', '));
 

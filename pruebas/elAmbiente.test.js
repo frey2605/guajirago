@@ -79,10 +79,28 @@ describe('EL AMBIENTE (fase 0) · la app de transporte deduce si es PRUEBAS o PR
     assert.match(t, /export const ambiente\b/, '⛔ firebase.js no exporta el ambiente, y el cartel lo necesita');
   });
 
-  it('la llave de notificaciones del conductor sale del ambiente, no del código', () => {
+  it('la llave de notificaciones del conductor y del pasajero sale del ambiente, no del código', () => {
     const t = soloCodigo(leer('guajirago/src/AppConductor.js'));
     assert.ok(!/vapidKey:\s*["']B/.test(t), '⛔ la vapidKey sigue escrita a mano en AppConductor.js');
     assert.match(t, /vapidKey:\s*process\.env\.REACT_APP_FIREBASE_VAPID_KEY/, '⛔ la vapidKey no se lee de REACT_APP_FIREBASE_VAPID_KEY');
+    // El PASAJERO (Solicitar, Restaurantes, Turismo) y el conductor (registrarTokenFCM) piden el token en
+    // Notificaciones.js, no en AppConductor.js. Hasta el 25-sep-2026 ese archivo llevaba la llave de PRODUCCIÓN
+    // escrita a mano y este `it` no lo miraba: la compilación de pruebas pedía con la llave de producción el
+    // token del pasajero y el del conductor, en verde. Se mira el archivo CRUDO (ni en un comentario), como ya
+    // hace el de aliados.
+    const crudo = leer('guajirago/src/Notificaciones.js');
+    assert.ok(!/B[A-Za-z0-9_-]{80,}/.test(crudo), '⛔ la llave Web Push sigue escrita en guajirago/src/Notificaciones.js (ni en un comentario): el pasajero y el conductor de pruebas pedirían su token con la de producción');
+    const n = soloCodigo(crudo);
+    // Ancladas (`;` y `[},]`): sin ancla casan por prefijo, y `REACT_APP_FIREBASE_VAPID_KEY_PROD` o
+    // `vapidKey: VAPID_KEY || RESPALDO` pasaban en verde (segunda opinión, 25-sep-2026).
+    assert.match(n, /const VAPID_KEY = process\.env\.REACT_APP_FIREBASE_VAPID_KEY;/, '⛔ VAPID_KEY de Notificaciones.js no se lee de REACT_APP_FIREBASE_VAPID_KEY (exactamente ese nombre, y nada más)');
+    const llamadas = (n.match(/getToken\(/g) || []).length;
+    const conLaLlave = (n.match(/vapidKey:\s*VAPID_KEY\s*[},]/g) || []).length;
+    assert.ok(llamadas >= 2 && conLaLlave === llamadas, '⛔ en Notificaciones.js hay ' + llamadas + ' getToken y ' + conLaLlave + ' usan VAPID_KEY: alguno pide el token con otra llave');
+    // Y la llave de PRODUCCIÓN no puede estar en .env.pruebas bajo NINGÚN nombre, ni comentada: con otro nombre y un
+    // process.env de ese nombre, todo lo de arriba pasaba (segunda opinión, 25-sep-2026).
+    const laDeProduccion = M.leerEnv(leer('guajirago/.env.produccion')).REACT_APP_FIREBASE_VAPID_KEY;
+    assert.ok(laDeProduccion && !leer('guajirago/.env.pruebas').includes(laDeProduccion), '⛔ la llave Web Push de PRODUCCIÓN aparece en guajirago/.env.pruebas (con cualquier nombre, o comentada): la compilación de pruebas la tendría a mano');
     assert.ok(M.leerEnv(leer('guajirago/.env.produccion')).REACT_APP_FIREBASE_VAPID_KEY,
       '⛔ producción se quedó sin su llave de notificaciones: los conductores dejarían de recibir avisos');
     const pruebas = M.leerEnv(leer('guajirago/.env.pruebas')).REACT_APP_FIREBASE_VAPID_KEY;
@@ -160,6 +178,8 @@ describe('EL AMBIENTE (fase 0) · la app de transporte deduce si es PRUEBAS o PR
       assert.strictEqual(m.puestas, 6, m.porque.join(' · '));
     });
 
+    // Una llave Web Push pública son 87 caracteres base64url y empieza por B: 'BLcx' a secas ya no engaña al medidor.
+    const LLAVE_DE_MENTIRA = 'B' + 'x'.repeat(86);
     const roturas = [
       ['una llave escrita a mano en src', (a) => { a['src/firebase.js'] += 'const x = { projectId: "guajirago" };\n'; }, 'sinLlavesEnSrc'],
       ['sin ambiente.js', (a) => { a['src/ambiente.js'] = null; }, 'ambienteJs'],
@@ -168,7 +188,9 @@ describe('EL AMBIENTE (fase 0) · la app de transporte deduce si es PRUEBAS o PR
       ['los dos .env al mismo proyecto', (a) => { a['.env.produccion'] = a['.env.produccion'].replace('PROJECT_ID=guajirago', 'PROJECT_ID=guajirago-pruebas').replace('AMBIENTE=produccion', 'AMBIENTE=produccion'); }, 'envEnPareja'],
       ['build a secas sin ambiente', (a) => { a['package.json'] = a['package.json'].replace('npm run build:produccion', 'react-scripts build'); }, 'compilaPorAmbiente'],
       ['el alias produccion apuntando a pruebas', (a) => { a['.firebaserc'] = a['.firebaserc'].replace('"produccion":"guajirago"', '"produccion":"guajirago-pruebas"'); }, 'aliasFirebaserc'],
-      ['la vapidKey escrita a mano', (a) => { a['src/firebase.js'] += "const v = { vapidKey: 'BLcx' };\n"; }, 'sinVapidEnSrc'],
+      ['la vapidKey escrita a mano', (a) => { a['src/firebase.js'] += "const v = { vapidKey: '" + LLAVE_DE_MENTIRA + "' };\n"; }, 'sinVapidEnSrc'],
+      ['la llave Web Push en una constante, como estaba en Notificaciones.js de transporte hasta el 25-sep-2026', (a) => { a['src/Notificaciones.js'] = "const VAPID_KEY = '" + LLAVE_DE_MENTIRA + "';\n"; }, 'sinVapidEnSrc'],
+      ['la llave Web Push en un comentario de src', (a) => { a['src/firebase.js'] += "// la de antes: " + LLAVE_DE_MENTIRA + "\n"; }, 'sinVapidEnSrc'],
     ];
     for (const [que, romper, pieza] of roturas) {
       it('se queja si ' + que, () => {
