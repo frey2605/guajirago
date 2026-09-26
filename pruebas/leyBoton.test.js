@@ -243,6 +243,13 @@ const TRAMPAS = [
   ['un nombre armado («respuesta:» + resp) cuyo comienzo no coincide entre la acción y la palabra',
     cambiar('</div>;', `{RESP.map((x) => <button key={x} disabled={!!ocupado} onClick={() => correr(() => updateDoc(d, { r: x }), 'respuesta:' + x, 'Enviada.')}>{texto('resp:' + x, '…', x)}</button>)}</div>;`),
     (r) => r.faltas.some((f) => /«resp:» no sale nunca/.test(f))],
+  ['con la palabra traída con otro nombre (texto: palabra), un nombre que no coincide sigue sin salir',
+    cambiar(`const { ocupado, correr, texto, aviso, cerrarAviso } = useAccion();`, `const { ocupado, correr, texto: palabra, aviso, cerrarAviso } = useAccion();`)
+      .replace(`{texto('guardar', 'Guardando…', 'Guardar')}`, `{palabra('grabar', 'Guardando…', 'Guardar')}`),
+    (r) => r.faltas.some((f) => /«grabar» no sale nunca/.test(f))],
+  ['un botón sin candado DESPUÉS de un accept="image/*" (su `/*` se comía el resto del archivo)',
+    cambiar('</div>;', `<input type="file" accept="image/*" /><button onClick={() => deleteDoc(doc(db, 'a', 'b'))}>Borrar</button></div>;`),
+    (r) => r.sinCandado.length === 1],
   ['correr sin su «se hizo»',
     cambiar(`, 'guardar', 'Quedó guardado.')`, `, 'guardar')`), (r) => r.faltas.some((f) => /se hizo/.test(f))],
   ['el botón con candado no se deshabilita',

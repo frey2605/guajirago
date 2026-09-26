@@ -29,6 +29,9 @@ import {
 } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import Logo from './Logo';
+// LA LEY DEL BOTÓN (26-sep-2026): lo que guarda en esta pantalla pasa por el candado; su aviso, en ventanita.
+import { useAccion } from './useAccion';
+import AvisoModal from './AvisoModal';
 import MenuLateral from './MenuLateral';
 import { obtenerTokenFCM } from './Notificaciones';
 
@@ -73,7 +76,6 @@ function Restaurantes({ nombre, onVolver, foto, onCerrarSesion, onIrPerfil, onIr
   const [avisoPromo, setAvisoPromo] = useState('');
   const [direccion, setDireccion] = useState('');
   const [telefono, setTelefono] = useState('');
-  const [enviando, setEnviando] = useState(false);
   const [numeroPedido, setNumeroPedido] = useState('');
 
   // --- Seguimiento del pedido y chat de soporte de pago ---
@@ -81,14 +83,12 @@ function Restaurantes({ nombre, onVolver, foto, onCerrarSesion, onIrPerfil, onIr
   const [pedidoActivo, setPedidoActivo] = useState(null);
   const [mensajeChat, setMensajeChat] = useState('');
   const [imagenChat, setImagenChat] = useState(null);
-  const [enviandoMensaje, setEnviandoMensaje] = useState(false);
   const [errorChat, setErrorChat] = useState('');
 
   const [errorCarga, setErrorCarga] = useState('');
   const [misPedidos, setMisPedidos] = useState([]);
   const [estrellasCal, setEstrellasCal] = useState(0);
   const [comentarioCal, setComentarioCal] = useState('');
-  const [enviandoCal, setEnviandoCal] = useState(false);
   const [busqueda, setBusqueda] = useState('');
   const [filtroCategoria, setFiltroCategoria] = useState('');
   const [metodoPago, setMetodoPago] = useState('');
@@ -99,7 +99,9 @@ function Restaurantes({ nombre, onVolver, foto, onCerrarSesion, onIrPerfil, onIr
   // Que la calificación YA ENTRÓ, aunque la marca del pedido no llegara a
   // escribirse. Ver el porqué en enviarCalificacion.
   const [califEntro, setCalifEntro] = useState(false);
-  const [cancelando, setCancelando] = useState(false);
+  // El candado. `avisoAccion` es la verdad del final; se pinta en las tres pantallas que guardan.
+  // La palabra del botón se llama `palabra`: esta pantalla ya tiene su propio `texto` (lo que se busca en la lista).
+  const { ocupado, correr, texto: palabra, aviso: avisoAccion, cerrarAviso } = useAccion();
   const [pidiendoMotivoCancel, setPidiendoMotivoCancel] = useState(false);
   const [motivoCancelCliente, setMotivoCancelCliente] = useState('');
   const [califsRestaurante, setCalifsRestaurante] = useState([]);
@@ -303,11 +305,12 @@ function Restaurantes({ nombre, onVolver, foto, onCerrarSesion, onIrPerfil, onIr
   // ---------- Enviar pedido ----------
   const enviarPedido = async () => {
     const tel = telefono.replace(/\D/g, '');
-    if (carrito.length === 0 || !direccion.trim() || tel.length !== 10 || enviando) return;
+    if (carrito.length === 0 || !direccion.trim() || tel.length !== 10) return;
     if (!metodoPago) { setAvisoPago('Escoge cómo vas a pagar tu pedido para continuar.'); return; }
     setAvisoPago('');
-    setEnviando(true);
-    try {
+    // Una sola vez aunque se toque dos: un pedido doble es plata doble. Si falla, lo dice el candado en una
+    // ventanita (antes: un alert() del navegador).
+    await correr(async () => {
       // Verificar el límite POR TELÉFONO de las promociones usadas (además del dispositivo)
       const promosEnCarrito = [...new Set(carrito.filter((l) => l.promoId).map((l) => l.promoId))];
       const promsRest = (restauranteActivo.promociones) || [];
@@ -326,8 +329,7 @@ function Restaurantes({ nombre, onVolver, foto, onCerrarSesion, onIrPerfil, onIr
         const ids = excedidas.map((p) => p.id);
         setCarrito((prev) => prev.map((l) => ids.includes(l.promoId) ? { ...l, precio: l.precioOriginal || l.precio, promoId: undefined, promoNombre: undefined, precioOriginal: undefined } : l));
         setAvisoPromo('Con este teléfono ya usaste el máximo de veces: ' + excedidas.map((p) => p.nombre).join(', ') + '. Se quitó ese descuento; revisa el total y vuelve a enviar.');
-        setEnviando(false);
-        return;
+        return { ok: false, avisado: true };
       }
 
       // Token para avisarle al cliente los cambios de estado (si acepta notificaciones)
@@ -368,28 +370,27 @@ function Restaurantes({ nombre, onVolver, foto, onCerrarSesion, onIrPerfil, onIr
       setDireccion(''); setTelefono(''); setMetodoPago('');
       setPedidoId(ref.id);
       setPantalla('seguimiento');
-    } catch (e) {
-      alert('No se pudo enviar el pedido. Revisa tu conexión e intenta de nuevo.');
-    }
-    setEnviando(false);
+    }, 'pedido', 'Pedido enviado.', 'enviar el pedido');
   };
 
   // ---------- Cancelar mi pedido (solo si aún no entró a preparación) ----------
   const puedeCancelar = (estado) => ['nuevo', 'confirmado'].includes(estado);
   const cancelarMiPedido = async () => {
-    if (!pedidoActivo || cancelando || !puedeCancelar(pedidoActivo.estado)) return;
-    setCancelando(true);
-    try {
-      await updateDoc(doc(db, 'pedidos', pedidoActivo.id), { estado: 'cancelado', canceladoPor: 'cliente' });
-      setMotivoCancelCliente('');
-      setPidiendoMotivoCancel(true);
-    } catch (e) {}
-    setCancelando(false);
+    if (!pedidoActivo || !puedeCancelar(pedidoActivo.estado)) return;
+    // Antes: `catch (e) {}` — si no se cancelaba, nadie lo decía y el restaurante seguía preparando.
+    const r = await correr(() => updateDoc(doc(db, 'pedidos', pedidoActivo.id), { estado: 'cancelado', canceladoPor: 'cliente' }),
+      'cancelar', 'Pedido cancelado.', 'cancelar el pedido');
+    if (!r || !r.ok) return;
+    setMotivoCancelCliente('');
+    setPidiendoMotivoCancel(true);
   };
 
   const guardarMotivoCancel = async () => {
+    // Antes: `catch (e) {}`. La ventanita del motivo se cierra igual (el motivo es opcional); si no se guardó, el
+    // candado lo dice por encima.
     if (pedidoActivo) {
-      try { await updateDoc(doc(db, 'pedidos', pedidoActivo.id), { motivoCancelacion: motivoCancelCliente.trim() || 'Sin especificar' }); } catch (e) {}
+      await correr(() => updateDoc(doc(db, 'pedidos', pedidoActivo.id), { motivoCancelacion: motivoCancelCliente.trim() || 'Sin especificar' }),
+        'motivo', 'Gracias por contarnos.', 'guardar el motivo');
     }
     setPidiendoMotivoCancel(false);
   };
@@ -402,7 +403,7 @@ function Restaurantes({ nombre, onVolver, foto, onCerrarSesion, onIrPerfil, onIr
   };
 
   const enviarMensajeChat = async () => {
-    if (!pedidoActivo || enviandoMensaje) return;
+    if (!pedidoActivo) return;
     const texto = mensajeChat.trim();
     if (!texto && !imagenChat) return;
     if (texto && contieneInfoSensible(texto)) {
@@ -410,8 +411,8 @@ function Restaurantes({ nombre, onVolver, foto, onCerrarSesion, onIrPerfil, onIr
       return;
     }
     setErrorChat('');
-    setEnviandoMensaje(true);
-    try {
+    // Si falla, lo dice el candado (antes: un renglón rojo aquí).
+    await correr(async () => {
       let urlImagen = '';
       if (imagenChat) urlImagen = await subirImagenChat(imagenChat);
       await updateDoc(doc(db, 'pedidos', pedidoActivo.id), {
@@ -424,16 +425,12 @@ function Restaurantes({ nombre, onVolver, foto, onCerrarSesion, onIrPerfil, onIr
       });
       setMensajeChat('');
       setImagenChat(null);
-    } catch (e) {
-      setErrorChat('No se pudo enviar el mensaje. Revisa tu conexión e intenta de nuevo.');
-    }
-    setEnviandoMensaje(false);
+    }, 'mensaje', 'Mensaje enviado.', 'enviar el mensaje');
   };
 
   // ---------- Calificar el pedido/restaurante ----------
   const enviarCalificacion = async () => {
-    if (estrellasCal === 0 || enviandoCal || !pedidoActivo) return;
-    setEnviandoCal(true);
+    if (estrellasCal === 0 || !pedidoActivo) return;
     // Son DOS escrituras seguidas, y la que cuenta es la PRIMERA: si el addDoc
     // entra y el updateDoc falla, la calificación YA ESTÁ GUARDADA. Sin esta
     // bandera se le decía «no pudimos guardarla» a alguien cuya calificación sí
@@ -443,6 +440,7 @@ function Restaurantes({ nombre, onVolver, foto, onCerrarSesion, onIrPerfil, onIr
     // reintento metía OTRO voto en la media. Esa puerta la abrió este mismo
     // arreglo al dejar reintentar, y la cazó la segunda opinión.
     let guardada = false;
+    await correr(async () => {
     try {
       await addDoc(collection(db, 'calificaciones'), {
         pedidoId: pedidoActivo.id,
@@ -475,13 +473,15 @@ function Restaurantes({ nombre, onVolver, foto, onCerrarSesion, onIrPerfil, onIr
         // A la bandeja. Sin await: el cliente ya tiene su ventanita.
         guardarRechazo('pasajero', 'calificar-pedido', motivo.clave, e);
       }
+      // «Ya avisé yo»: esta pantalla tiene su propia ventanita para esto (o la calificación sí entró).
+      return { ok: false, avisado: true };
     }
-    setEnviandoCal(false);
+    }, 'calificar', '¡Gracias por calificar!', 'guardar tu calificación');
   };
 
   // ---------- Solo para probar: crear restaurante demo ----------
   const crearRestauranteDemo = async () => {
-    await setDoc(doc(db, 'negocios', 'donde-meche'), {
+    await correr(() => setDoc(doc(db, 'negocios', 'donde-meche'), {
       nombre: 'Donde Meche',
       emoji: '🍲',
       descripcion: 'Comida guajira de la buena',
@@ -497,7 +497,7 @@ function Restaurantes({ nombre, onVolver, foto, onCerrarSesion, onIrPerfil, onIr
         { id: 8, nombre: 'Limonada de coco', precio: 8000, categoria: 'Bebidas', disponible: true },
         { id: 9, nombre: 'Arroz con leche', precio: 6000, categoria: 'Postres', disponible: true },
       ],
-    });
+    }), 'demo', 'Restaurante de prueba creado.', 'crear el restaurante de prueba');
   };
 
   const categorias = restauranteActivo
@@ -533,6 +533,7 @@ function Restaurantes({ nombre, onVolver, foto, onCerrarSesion, onIrPerfil, onIr
 
     return (
       <div style={{ backgroundColor: '#FFFFFF', minHeight: '100vh', fontFamily: 'Arial, sans-serif', paddingBottom: '160px' }}>
+        {avisoAccion && !avisoAccion.ok && <AvisoModal aviso={avisoAccion} onCerrar={cerrarAviso} />}
 
         {/* Header */}
         <div style={{ background: 'linear-gradient(135deg, #FFFFFF, #ECECEF)', padding: '20px', display: 'flex', alignItems: 'center', gap: '14px' }}>
@@ -589,8 +590,8 @@ function Restaurantes({ nombre, onVolver, foto, onCerrarSesion, onIrPerfil, onIr
 
           {/* Cancelar (solo si aún no entró a preparación) */}
           {puedeCancelar(pedidoActivo.estado) && (
-            <button onClick={cancelarMiPedido} disabled={cancelando} style={{ width: '100%', padding: '14px', background: '#FFFFFF', border: '1.5px solid #FF4444', borderRadius: '14px', color: '#FF4444', fontSize: '14px', fontWeight: '900', cursor: 'pointer', marginBottom: '20px' }}>
-              {cancelando ? 'Cancelando…' : '✕ Cancelar pedido'}
+            <button onClick={cancelarMiPedido} disabled={!!ocupado} style={{ width: '100%', padding: '14px', background: '#FFFFFF', border: '1.5px solid #FF4444', borderRadius: '14px', color: '#FF4444', fontSize: '14px', fontWeight: '900', cursor: 'pointer', marginBottom: '20px' }}>
+              {palabra('cancelar', 'Cancelando…', '✕ Cancelar pedido')}
             </button>
           )}
 
@@ -633,7 +634,7 @@ function Restaurantes({ nombre, onVolver, foto, onCerrarSesion, onIrPerfil, onIr
                     ))}
                   </div>
                   <input value={comentarioCal} onChange={e => setComentarioCal(e.target.value)} placeholder="Comentario (opcional)" style={{ width: '100%', boxSizing: 'border-box', padding: '12px', border: '1px solid #ECECEF', borderRadius: '12px', fontSize: '14px', outline: 'none', marginBottom: '12px' }} />
-                  <button onClick={enviarCalificacion} disabled={estrellasCal === 0 || enviandoCal} style={{ width: '100%', padding: '14px', background: estrellasCal > 0 ? 'linear-gradient(135deg, #FFCF4D, #FF7A2F)' : '#E7E7EA', border: 'none', borderRadius: '12px', color: estrellasCal > 0 ? '#FFF' : '#9AA0A6', fontSize: '15px', fontWeight: '900', cursor: estrellasCal > 0 ? 'pointer' : 'default' }}>{enviandoCal ? 'Enviando...' : 'Enviar calificación'}</button>
+                  <button onClick={enviarCalificacion} disabled={estrellasCal === 0 || !!ocupado} style={{ width: '100%', padding: '14px', background: estrellasCal > 0 ? 'linear-gradient(135deg, #FFCF4D, #FF7A2F)' : '#E7E7EA', border: 'none', borderRadius: '12px', color: estrellasCal > 0 ? '#FFF' : '#9AA0A6', fontSize: '15px', fontWeight: '900', cursor: estrellasCal > 0 ? 'pointer' : 'default' }}>{palabra('calificar', 'Enviando…', 'Enviar calificación')}</button>
                 </>
               )}
             </div>
@@ -684,10 +685,10 @@ function Restaurantes({ nombre, onVolver, foto, onCerrarSesion, onIrPerfil, onIr
               />
               <button
                 onClick={enviarMensajeChat}
-                disabled={enviandoMensaje}
+                disabled={!!ocupado}
                 style={{ background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F)', border: 'none', borderRadius: '12px', width: '42px', height: '42px', color: '#FFFFFF', fontWeight: '900', cursor: 'pointer', flexShrink: 0 }}
               >
-                ➤
+                {palabra('mensaje', '…', '➤')}
               </button>
             </div>
           </div>
@@ -706,7 +707,7 @@ function Restaurantes({ nombre, onVolver, foto, onCerrarSesion, onIrPerfil, onIr
                 ))}
               </div>
               <input value={motivoCancelCliente} onChange={(e) => setMotivoCancelCliente(e.target.value)} placeholder="Otro motivo… (escríbelo)" style={{ width: '100%', boxSizing: 'border-box', padding: '12px', border: '1px solid #ECECEF', borderRadius: '12px', fontSize: '14px', outline: 'none', marginBottom: '16px' }} />
-              <button onClick={guardarMotivoCancel} style={{ width: '100%', padding: '14px', background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F)', border: 'none', borderRadius: '12px', color: '#FFF', fontSize: '15px', fontWeight: '900', cursor: 'pointer' }}>Enviar</button>
+              <button onClick={guardarMotivoCancel} disabled={!!ocupado} style={{ width: '100%', padding: '14px', background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F)', border: 'none', borderRadius: '12px', color: '#FFF', fontSize: '15px', fontWeight: '900', cursor: 'pointer' }}>{palabra('motivo', 'Enviando…', 'Enviar')}</button>
               <p onClick={() => setPidiendoMotivoCancel(false)} style={{ color: '#999', fontSize: '13px', cursor: 'pointer', margin: '12px 0 0' }}>Omitir</p>
             </div>
           </div>
@@ -746,6 +747,7 @@ function Restaurantes({ nombre, onVolver, foto, onCerrarSesion, onIrPerfil, onIr
     const abiertoAhora = restauranteAbiertoAhora(restauranteActivo);
     return (
       <div style={{ backgroundColor: '#FFFFFF', minHeight: '100vh', fontFamily: 'Arial, sans-serif', paddingBottom: carrito.length > 0 ? '210px' : '20px' }}>
+        {avisoAccion && !avisoAccion.ok && <AvisoModal aviso={avisoAccion} onCerrar={cerrarAviso} />}
 
         {/* Header */}
         <div style={{
@@ -954,16 +956,16 @@ function Restaurantes({ nombre, onVolver, foto, onCerrarSesion, onIrPerfil, onIr
 
             <button
               onClick={enviarPedido}
-              disabled={!direccion.trim() || !telValido || enviando || bajoMinimo}
+              disabled={!direccion.trim() || !telValido || !!ocupado || bajoMinimo}
               style={{
                 width: '100%', padding: '16px',
-                background: (!direccion.trim() || !telValido || enviando || bajoMinimo)
+                background: (!direccion.trim() || !telValido || !!ocupado || bajoMinimo)
                   ? '#E7E7EA'
                   : 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)',
                 border: 'none', borderRadius: '14px',
-                color: (!direccion.trim() || !telValido || enviando || bajoMinimo) ? '#9AA0A6' : '#FFFFFF',
+                color: (!direccion.trim() || !telValido || !!ocupado || bajoMinimo) ? '#9AA0A6' : '#FFFFFF',
                 fontSize: '16px', fontWeight: '900',
-                cursor: (!direccion.trim() || !telValido || enviando || bajoMinimo) ? 'default' : 'pointer',
+                cursor: (!direccion.trim() || !telValido || !!ocupado || bajoMinimo) ? 'default' : 'pointer',
               }}
             >
               {bajoMinimo
@@ -972,7 +974,7 @@ function Restaurantes({ nombre, onVolver, foto, onCerrarSesion, onIrPerfil, onIr
                   ? 'Escribe la dirección'
                   : !telValido
                     ? 'Teléfono de 10 dígitos'
-                    : enviando
+                    : ocupado === 'pedido'
                       ? 'Enviando…'
                       : `Pedir ${itemsCarrito} item${itemsCarrito > 1 ? 's' : ''} · ${cop(totalConDom)}`}
             </button>
@@ -1139,6 +1141,7 @@ function Restaurantes({ nombre, onVolver, foto, onCerrarSesion, onIrPerfil, onIr
   });
   return (
     <div style={{ backgroundColor: '#FFFFFF', minHeight: '100vh', fontFamily: 'Arial, sans-serif' }}>
+      {avisoAccion && !avisoAccion.ok && <AvisoModal aviso={avisoAccion} onCerrar={cerrarAviso} />}
 
       {/* Header */}
       <div style={{
@@ -1198,6 +1201,7 @@ function Restaurantes({ nombre, onVolver, foto, onCerrarSesion, onIrPerfil, onIr
             </p>
             <button
               onClick={crearRestauranteDemo}
+              disabled={!!ocupado}
               style={{
                 padding: '14px 20px',
                 background: 'transparent',
@@ -1205,7 +1209,7 @@ function Restaurantes({ nombre, onVolver, foto, onCerrarSesion, onIrPerfil, onIr
                 color: '#FF7A2F', fontSize: '14px', fontWeight: 'bold', cursor: 'pointer',
               }}
             >
-              ⚡ Crear restaurante de prueba
+              {palabra('demo', 'Creando…', '⚡ Crear restaurante de prueba')}
             </button>
           </div>
         )}

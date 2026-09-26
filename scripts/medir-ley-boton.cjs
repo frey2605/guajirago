@@ -33,9 +33,46 @@ const { sinTextos, RAIZ } = require('../pruebas/cargar.cjs');
 
 // Sin comentarios, pero con los MISMOS renglones: `soloCodigo` de cargar.cjs se come los comentarios de bloque
 // enteros y los renglones del informe salían corridos (un botón del renglón 1675 se reportaba en el 1667).
-const soloCodigo = (t) => t
-  .replace(/\/\*[\s\S]*?\*\//g, (c) => c.replace(/[^\n]/g, ' '))
-  .split('\n').map((l) => l.replace(/^(\s*)\/\/.*/, (x, s) => s + ' '.repeat(x.length - s.length))).join('\n');
+// 🔴 Y SOLO LOS DE FUERA DE LOS TEXTOS. La primera versión buscaba `/* … */` a ciegas, y un `accept="image/*"` (el
+// campo de subir una foto) abría un «comentario» que llegaba hasta el siguiente `*/`: se comía un tramo entero del
+// archivo, con sus botones dentro, y el vigilante no los veía. Lo destapó el saboteador el 26-sep-2026 en
+// Restaurantes.js (el chat del pedido). Las comillas simples y dobles no cruzan de renglón en JavaScript, así que
+// un apóstrofo suelto en un texto de pantalla solo puede despistar hasta el fin de su renglón.
+function soloCodigo(t) {
+  let out = '';
+  let q = null;
+  let inicioRenglon = true;
+  for (let i = 0; i < t.length; i++) {
+    const c = t[i];
+    const d = t[i + 1];
+    if (q) {
+      out += c;
+      if (c === '\\' && d !== undefined) { out += d; i++; continue; }
+      if (c === q || (c === '\n' && q !== '`')) q = null;
+      if (c === '\n') inicioRenglon = true;
+      continue;
+    }
+    if (c === '/' && d === '*') {
+      const f = t.indexOf('*/', i + 2);
+      const fin = f < 0 ? t.length : f + 2;
+      out += t.slice(i, fin).replace(/[^\n]/g, ' ');
+      i = fin - 1;
+      continue;
+    }
+    if (c === '/' && d === '/' && inicioRenglon) {
+      const f = t.indexOf('\n', i);
+      const fin = f < 0 ? t.length : f;
+      out += ' '.repeat(fin - i);
+      i = fin - 1;
+      continue;
+    }
+    if (c === '"' || c === "'" || c === '`') q = c;
+    if (c === '\n') inicioRenglon = true;
+    else if (!/\s/.test(c)) inicioRenglon = false;
+    out += c;
+  }
+  return out;
+}
 
 const APPS = ['guajirago/src', 'guajirago-admin/src', 'guajirago-aliados/src'];
 const LA_PIEZA = ['candado.js', 'useAccion.js'];
@@ -199,6 +236,11 @@ function revisarArchivo(fuente, escritores = new Set()) {
   const sinCandado = [];
   const faltas = [];
   const usaLey = /\buseAccion\s*\(/.test(codigo);
+  // La palabra del botón se puede traer con otro nombre (`texto: palabra`) cuando la pantalla ya tenía un `texto`
+  // propio (Restaurantes.js: lo que se busca en la lista). Se mira con el nombre que tenga.
+  const alias = (codigo.match(/\{[^}]*\btexto\s*:\s*([A-Za-z_$][\w$]*)[^}]*\}\s*=\s*useAccion\(/) || [])[1] || 'texto';
+  const PALABRA = new RegExp('\\b' + alias + '\\(');
+  const PALABRA_CON_NOMBRE = new RegExp('\\b' + alias + '\\(\\s*[\'"]([^\'"]+)[\'"]\\s*(\\+)?', 'g');
 
   for (const h of entradasDe(codigo, seguro, locales)) {
     const r = alcance(h.trozo, locales, importados);
@@ -211,7 +253,7 @@ function revisarArchivo(fuente, escritores = new Set()) {
       if (h.evento !== 'onKeyDown' && /^<(input|select|textarea)\b/.test(el) && !/\bdisabled=/.test(el)) faltas.push(`renglón ${h.linea}: un campo con candado no se deshabilita mientras trabaja`);
       if (/^<button/.test(el)) {
         if (!/\bdisabled=/.test(el)) faltas.push(`renglón ${h.linea}: un botón con candado no se deshabilita mientras trabaja`);
-        if (!/…|\btexto\(/.test(el)) faltas.push(`renglón ${h.linea}: un botón con candado no dice qué está haciendo («Guardando…»)`);
+        if (!/…/.test(el) && !PALABRA.test(el)) faltas.push(`renglón ${h.linea}: un botón con candado no dice qué está haciendo («Guardando…»)`);
       }
     }
   }
@@ -243,7 +285,7 @@ function revisarArchivo(fuente, escritores = new Set()) {
       const lit = (a[1] || '').match(/^['"]([^'"]+)['"]\s*(\+)?/);
       if (lit) corren.add(lit[1] + (lit[2] ? '+' : ''));
     }
-    for (const m of codigo.matchAll(/\btexto\(\s*['"]([^'"]+)['"]\s*(\+)?/g)) {
+    for (const m of codigo.matchAll(PALABRA_CON_NOMBRE)) {
       const clave = m[1] + (m[2] ? '+' : '');
       if (!corren.has(clave)) faltas.push(`la palabra de «${m[1]}» no sale nunca: ninguna acción corre con ese nombre`);
     }
@@ -309,7 +351,6 @@ const PENDIENTES = {
   'guajirago/src/Login.js': [3, 3],
   'guajirago/src/MiPerfil.js': [1, 1],
   'guajirago/src/Promociones.js': [1, 1],
-  'guajirago/src/Restaurantes.js': [5, 4],
   'guajirago/src/Seguridad.js': [1, 1],
   'guajirago/src/Turismo.js': [1, 1],
   'guajirago-admin/src/AliadosPendientes.js': [2, 0],
@@ -320,7 +361,7 @@ const PENDIENTES = {
   'guajirago-admin/src/Conductores.js': [14, 0],
   'guajirago-admin/src/Promociones.js': [5, 2],
   'guajirago-admin/src/Restaurantes.js': [3, 0],
-  'guajirago-admin/src/Superadmin.js': [8, 9],
+  'guajirago-admin/src/Superadmin.js': [10, 9], // 8→10 el 26-sep: dos estaban escondidos tras un accept="image/*"
   'guajirago-admin/src/Turismo.js': [3, 0],
   'guajirago-aliados/src/App.js': [2, 1],
   'guajirago-aliados/src/CalificacionesRestaurante.js': [1, 1],
@@ -331,8 +372,8 @@ const PENDIENTES = {
   'guajirago-aliados/src/Inventario.js': [6, 1],
   'guajirago-aliados/src/Login.js': [2, 2],
   'guajirago-aliados/src/Menu.js': [4, 1],
-  'guajirago-aliados/src/Mesero.js': [2, 4],
-  'guajirago-aliados/src/PedidosDomicilio.js': [6, 2],
+  'guajirago-aliados/src/Mesero.js': [6, 4], // 2→6 el 26-sep: cuatro estaban escondidos tras un accept="image/*"
+  'guajirago-aliados/src/PedidosDomicilio.js': [8, 2], // 6→8 el 26-sep: dos estaban escondidos tras un accept="image/*"
   'guajirago-aliados/src/PerfilAgencia.js': [2, 2],
   'guajirago-aliados/src/PerfilRestaurante.js': [2, 2],
   'guajirago-aliados/src/Promociones.js': [7, 1],
