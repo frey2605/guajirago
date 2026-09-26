@@ -1280,3 +1280,4 @@ QUE QUEDA PENDIENTE: la fila en CLAUDE.md, con su propia foto y su permiso.
 EL COMMIT 80213d8 TAMBIEN LO LLEVA MAL en su mensaje («un hallazgo aparte: el
   candado no niega las escrituras hechas desde la consola»). Ya esta empujado y
   NO se reescribe: la correccion es esta, y se nombra en el commit siguiente.
+2026-09-26T03:01:15.601Z	.claude/settings.local.json	NEGADO: fuera de la promesa "Un guion cierra solo los Javas huerfanos del emulador demo-guajirago, arrancando en simulacro"
