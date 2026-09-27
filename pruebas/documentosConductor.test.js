@@ -1,8 +1,8 @@
 // ═══════════════════════════════════════════════════════════════════════════
 //  LOS DOCUMENTOS DEL CONDUCTOR · 27-sep-2026
 //
-//  Decisión del dueño: el conductor sube sus fotos al registrarse (cédula, licencia,
-//  tarjeta de propiedad y el vehículo de lado, de frente y por detrás) y trabaja de una
+//  Decisión del dueño: el conductor sube sus fotos al registrarse (cédula, tarjeta de
+//  propiedad y el vehículo por cada costado, de frente y por detrás) y trabaja de una
 //  vez, sin esperar aprobación. El dueño las revisa en el panel cuando pueda.
 //
 //  Se prueba EJECUTANDO la lista (guajirago/src/documentosConductor.js), su copia del
@@ -19,10 +19,10 @@ const D = cargarDeLaApp('guajirago/src/documentosConductor.js');
 const todas = () => Object.fromEntries(D.DOCUMENTOS_CONDUCTOR.map((d) => [d.campo, 'x.jpg']));
 
 describe('LOS DOCUMENTOS DEL CONDUCTOR · la lista', () => {
-  it('son los seis que pidió el dueño, cada uno con su campo y su carpeta, sin repetir', () => {
+  it('son los seis que pidió el dueño (sin licencia de conducción), cada uno con su campo y su carpeta, sin repetir', () => {
     const campos = D.DOCUMENTOS_CONDUCTOR.map((d) => d.campo);
-    assert.deepStrictEqual(campos, ['fotoCedula', 'fotoLicenciaConduccion', 'fotoTarjetaPropiedad',
-      'fotoVehiculoLado', 'fotoVehiculoFrente', 'fotoVehiculoAtras']);
+    assert.deepStrictEqual(campos, ['fotoCedula', 'fotoTarjetaPropiedad',
+      'fotoVehiculoIzquierdo', 'fotoVehiculoDerecho', 'fotoVehiculoFrente', 'fotoVehiculoAtras']);
     assert.strictEqual(new Set(D.DOCUMENTOS_CONDUCTOR.map((d) => d.carpeta)).size, 6, '⛔ dos documentos irían al mismo archivo');
   });
 
@@ -93,6 +93,6 @@ describe('LOS DOCUMENTOS DEL CONDUCTOR · el medidor', () => {
     assert.strictEqual(r.conductores, 2);
     assert.strictEqual(r.completos, 1);
     assert.strictEqual(r.porDocumento.find((d) => d.campo === 'fotoCedula').tienen, 2);
-    assert.strictEqual(r.porDocumento.find((d) => d.campo === 'fotoVehiculoLado').tienen, 1);
+    assert.strictEqual(r.porDocumento.find((d) => d.campo === 'fotoVehiculoIzquierdo').tienen, 1);
   });
 });
