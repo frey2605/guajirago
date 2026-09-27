@@ -4,9 +4,8 @@
 // Orden del dueño (27-sep-2026): un robot que prueba las apps como una persona y va aprendiendo,
 // «no solo en GuajiraGo, sino en todos los proyectos que yo vaya desarrollando». Por eso el
 // MOTOR (el que maneja el navegador) y el AGENTE viven en la cuenta del dueño, uno solo para
-// todos los proyectos:
-//   C:\Users\Windows 11\.claude\robot\motor.cjs      ← el motor
-//   C:\Users\Windows 11\.claude\agents\probador.md   ← el agente que lo usa
+// todos los proyectos, en la carpeta `.claude` de su cuenta (el motor en `robot`, el agente
+// «probador» en `agents`; no son de este repo, por eso se describen y no se citan).
 // Aquí queda solo lo de GuajiraGo: cuáles son sus sitios de PRUEBA, dónde está su clave, sus
 // recorridos (robot/*.cjs) y lo que aprendió de sus pantallas (robot/APRENDIDO.md).
 //

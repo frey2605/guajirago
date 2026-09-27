@@ -40,6 +40,18 @@ describe('EL ROBOT · solo pruebas', () => {
     }
   });
 
+  it('el mapa no miente: cada recorrido y cada archivo vigilado existen, y elige bien qué correr', () => {
+    const { RECORRIDOS, queProbar } = require('../robot/mapa.cjs');
+    for (const r of RECORRIDOS) {
+      assert.ok(fs.existsSync(path.join(RAIZ, 'robot', r.archivo)), '⛔ el mapa nombra un recorrido que no existe: ' + r.archivo);
+      for (const v of r.vigila) assert.ok(fs.existsSync(path.join(RAIZ, v)), '⛔ ' + r.nombre + ' vigila un archivo que no existe: ' + v);
+    }
+    const a = queProbar(['guajirago/src/documentosConductor.js', 'guajirago/src/Creditos.js', 'pruebas/x.test.js']);
+    assert.deepStrictEqual(a.tocan.map((r) => r.nombre), ['humo', 'registrar-conductor']);
+    assert.deepStrictEqual(a.sinRecorrido, ['guajirago/src/Creditos.js'], '⛔ una pantalla sin recorrido tiene que salir nombrada');
+    assert.deepStrictEqual(queProbar([]).tocan.map((r) => r.nombre), ['humo'], '⛔ el humo corre siempre');
+  });
+
   it('ningún recorrido se salta comun.cjs, abre direcciones a mano ni lleva la clave', () => {
     const dir = path.join(RAIZ, 'robot');
     const recorridos = fs.readdirSync(dir).filter((f) => f.endsWith('.cjs') && f !== 'comun.cjs');

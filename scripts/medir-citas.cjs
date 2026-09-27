@@ -58,6 +58,9 @@ const CARPETAS = [
   // El generador del kit de publicidad: el único archivo citable que se quedaba
   // fuera (medido el 25-sep-2026). El dueño: «arréglalos todos».
   'guajirago-publicidad',
+  // El robot probador (27-sep-2026): sus recorridos y su cuaderno citan pantallas y
+  // archivos, y al entrar al repo se quedaron sin mirar — lo cazó la tanda esa mañana.
+  'robot',
 ];
 // Y las RAÍCES, solo un nivel: ahí viven los README y las reglas.
 const RAICES = ['.', 'guajirago', 'guajirago-admin', 'guajirago-aliados'];
@@ -243,7 +246,7 @@ const CARPETAS_NUESTRAS = new Set(['guajirago', 'guajirago-admin', 'guajirago-al
   // Sin `plan` aquí, una cita escrita `plan/…md` se daba por «de fuera» y NUNCA se
   // comprobaba — aunque `plan/` ya estuviera en CARPETAS. Lo cazó la segunda
   // opinión el 24-sep-2026 metiendo `plan/99-…md` en un clon: ni una alarma.
-  'plan', 'guajirago-publicidad']);
+  'plan', 'guajirago-publicidad', 'robot']);
 
 function deFuera(comentario, desde) {
   // ¿Hay una dirección de internet abierta antes de esta cita, sin espacios?

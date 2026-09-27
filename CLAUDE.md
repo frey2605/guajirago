@@ -107,6 +107,13 @@ el gemelo que se queda viejo. Aquí queda el índice, y lo que es de GuajiraGo y
   borrados: subir a `main` ya no publica nada ni corre la tanda allá, **y apretarlos a mano
   tampoco sirve**. El único juez de la tanda entera es el PC. Se encienden con
   `gh workflow enable <archivo>.yml`; lo cuenta `node scripts/medir-pendientes.cjs`.
+- **Paso 11 · VERIFICAR** — además de comparar byte a byte lo publicado, **el robot prueba el
+  cambio en pruebas como una persona**: `node robot/probar-cambio.cjs` (lo del último commit de
+  cada repo) corre los recorridos que cubren lo que cambió, el humo de las tres apps y el portero
+  de App Check. No gasta del plan: es el Edge del PC. Si nombra una pantalla «SIN RECORRIDO», se le
+  pide al agente `probador` que se lo escriba y lo añada a `robot/mapa.cjs`. Lo que el robot
+  aprende va a `robot/APRENDIDO.md`, y juzga el estilo contra `robot/ESTILO.md` (orden del dueño,
+  27-sep-2026).
 
 ---
 

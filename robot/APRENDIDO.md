@@ -1,9 +1,9 @@
 # 🤖 Lo que el robot aprendió de GuajiraGo
 
-> Cuaderno del robot probador para ESTE proyecto. Lo que vale para cualquier app está en
-> `C:\Users\Windows 11\.claude\robot\APRENDIDO-GENERAL.md`. El agente que lo usa es
-> `C:\Users\Windows 11\.claude\agents\probador.md`. **Cada trampa nueva se anota aquí, con la
-> fecha y cómo se resolvió.**
+> Cuaderno del robot probador para ESTE proyecto. Lo que vale para cualquier app está en el
+> cuaderno general del robot, y el agente que lo usa es el «probador»: los dos viven en la carpeta
+> `.claude` de la cuenta del dueño (no en este repo), dentro de `robot` y de `agents`.
+> **Cada trampa nueva se anota aquí, con la fecha y cómo se resolvió.**
 
 ## Los sitios y las cuentas
 
@@ -19,6 +19,8 @@
 
 | Recorrido | Qué comprueba |
 |---|---|
+| `node robot/probar-cambio.cjs [archivos]` | **tras cada cambio**: corre lo que cubre lo cambiado (según `robot/mapa.cjs`), el humo y el portero; nombra las pantallas SIN RECORRIDO |
+| `node robot/humo.cjs` | las tres apps de pruebas abren con su cartel y sin romperse |
 | `node robot/mirar.cjs transporte\|panel\|aliados` | qué hay en una pantalla (lo primero ante una nueva) |
 | `node robot/registrar-conductor.cjs Taxi\|Mototaxi` | crear cuenta → Soy conductor → con una foto de menos se para y dice cuál; con todas entra |
 | `node robot/revisar-panel.cjs "Robot Taxi De Prueba"` | el panel enseña los 6 documentos del conductor, cargados |
