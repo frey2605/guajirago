@@ -42,10 +42,17 @@ describe('ALIADOS SIN SEÑAL · qué se le dice al negocio', () => {
 });
 
 describe('ALIADOS SIN SEÑAL · el cableado', () => {
-  it('el arranque ya no se traga la respuesta: la guarda en trabajoSinSenal', () => {
+  it('el arranque ya no se calla: escucha el registro de Firebase y la respuesta', () => {
     const t = soloCodigo(leer(A + 'firebase.js'));
     assert.ok(!/enableIndexedDbPersistence\(db\)\.catch\(\(\)\s*=>\s*\{\s*\}\)/.test(t), '⛔ vuelve el catch mudo');
-    assert.match(t, /export const trabajoSinSenal = enableIndexedDbPersistence\(db\)\s*\.then\(\(\) => \(\{ ok: true \}\)\)\s*\.catch\(\(e\) => \(\{ ok: false, codigo:/);
+    // Medido con el robot el 27-sep-2026: esta versión de Firebase NO falla cuando no puede guardar
+    // en el aparato; cae a memoria y lo dice en su registro («Falling back to memory cache»). Mirar
+    // solo la respuesta dejaba la ventanita muda — la primera versión de este arreglo lo hacía.
+    assert.match(t, /import \{[^}]*\bonLog\b[^}]*\} from "firebase\/app"/, '⛔ no escucha el registro de Firebase');
+    assert.match(t, /onLog\(\(\{ message \}\) => \{\s*if \(\/Falling back to memory cache[^/]*\/i\.test\(String\(message\)\)\) \{\s*avisarSinSenal\(/,
+      '⛔ no reacciona cuando Firebase cae a memoria');
+    assert.match(t, /enableIndexedDbPersistence\(db\)\.catch\(\(e\) => avisarSinSenal\(/, '⛔ si la respuesta falla, tampoco avisa');
+    assert.match(t, /export const trabajoSinSenal = new Promise\(\(cumplir\) => \{ avisarSinSenal = cumplir; \}\)/);
   });
 
   it('la ventanita está en el arranque, al lado del cartel, y usa la respuesta y el texto de sinSenal', () => {

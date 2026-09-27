@@ -5,7 +5,7 @@
 // no cierra la sesión del dueño), que desde el 27-sep-2026 también lleva el sello de App Check:
 // después de correr esto, `node robot/portero.cjs` tiene que contar las llamadas con sello válido.
 //   node robot/crear-empleado.cjs
-const { abrir, claveDePruebas } = require('./comun.cjs');
+const { abrir, entrarComoRestaurante } = require('./comun.cjs');
 
 const marca = Date.now();
 const nombre = 'Robot Mesero ' + String(marca).slice(-5);
@@ -16,14 +16,8 @@ const correo = 'robot.empleado.' + marca + '@gg.test';
   const p = r.pagina;
   const fallos = [];
 
-  // ── Entrar como el dueño del restaurante de prueba ──
-  // La portada pregunta el tipo de negocio; para entrar se toca «Ya tengo cuenta · Ingresar».
-  await p.getByText(/Ya tengo cuenta/).first().click();
-  await p.waitForTimeout(1000);
-  await p.locator('input[placeholder="Correo"]').first().fill('restaurante@gg.test');
-  await p.locator('input[placeholder="Contrasena"]').first().fill(claveDePruebas());
-  await p.getByRole('button', { name: 'Entrar', exact: true }).click();
-  await p.waitForTimeout(7000);
+  // ── Entrar como el dueño del restaurante de prueba (pieza común de robot/comun.cjs) ──
+  await entrarComoRestaurante(p);
   await r.captura('dentro');
 
   // ── Configuración → Mi equipo ──

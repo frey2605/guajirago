@@ -60,11 +60,15 @@ empleado», «Correo para que inicie sesión», «Mínimo 6 caracteres», se toc
 («Mesero») y el botón «Crear empleado». Crear el empleado usa la SEGUNDA conexión de aliados: el
 27-sep-2026, antes del arreglo, Google contó esas llamadas como `MISSING` (sin sello); después, con sello.
 
-**Aliados sin señal (dos pestañas).** El navegador deja guardar los datos en el aparato a UNA sola
-pestaña: abriendo aliados en dos pestañas de la misma sesión (`otraPestana` del motor), la segunda no
-puede. Hasta el 27-sep-2026 se callaba (el robot lo vio: «no avisó nada»); desde entonces sale la
-ventanita «Sin internet, este aparato no podrá trabajar». 🪤 `r.pagina.context().newPage()` NO sirve:
-el motor abre cada pestaña con `otraPestana`, que además la vigila.
+**Aliados sin señal.** 🪤🪤 Dos trampas, medidas el 27-sep-2026:
+- **Dos pestañas NO lo provocan:** el almacén local se lo queda la primera pestaña, y la segunda
+  trabaja en memoria SIN quejarse. Lo que sí lo provoca es un navegador sin almacén: se simula con
+  `antesDeCargar` del motor quitándole `window.indexedDB` antes de que cargue la app.
+- **Firebase ya no falla cuando no puede guardar en el aparato:** escribe en su registro «Falling back
+  to memory cache» y sigue. La primera versión del arreglo esperaba un error y se quedó muda; el robot
+  lo cazó. Ahora aliados escucha el registro (`onLog`). Y el aviso sale al ENTRAR, no en la portada:
+  Firebase prueba el almacén la primera vez que usa la base.
+- Para entrar a aliados hay una sola pieza: `entrarComoRestaurante` de `robot/comun.cjs`.
 
 ## Lo que encontró la primera visita de usuario (27-sep-2026)
 

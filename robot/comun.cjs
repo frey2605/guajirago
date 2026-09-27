@@ -30,9 +30,24 @@ function motor() {
   }
 }
 
+/**
+ * Entra a aliados de pruebas como el dueño del restaurante de prueba (restaurante@gg.test).
+ * Una sola vez aquí: la usan todos los recorridos que necesitan estar dentro de aliados.
+ * 🪤 La portada pregunta el tipo de negocio; para entrar se toca «Ya tengo cuenta · Ingresar».
+ */
+async function entrarComoRestaurante(pagina) {
+  await pagina.getByText(/Ya tengo cuenta/).first().click();
+  await pagina.waitForTimeout(1000);
+  await pagina.locator('input[placeholder="Correo"]').first().fill('restaurante@gg.test');
+  await pagina.locator('input[placeholder="Contrasena"]').first().fill(motor().leerClave(ARCHIVO_CLAVE));
+  await pagina.getByRole('button', { name: 'Entrar', exact: true }).click();
+  await pagina.waitForTimeout(7000);
+}
+
 module.exports = {
   SITIOS,
   MOTOR,
+  entrarComoRestaurante,
   abrir: (sitio, opciones = {}) => motor().abrir(sitio, { ...opciones, sitios: SITIOS, proyecto: 'guajirago' }),
   esDePruebas: (url) => motor().esPermitido(url, SITIOS),
   claveDePruebas: () => motor().leerClave(ARCHIVO_CLAVE),
