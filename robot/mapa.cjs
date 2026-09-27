@@ -38,6 +38,13 @@ const RECORRIDOS = [
     vigila: ['guajirago-aliados/src/Empleados.js', 'guajirago-aliados/src/firebaseSecundario.js',
       'guajirago-aliados/src/firebase.js', 'guajirago-aliados/src/Login.js', 'guajirago-aliados/src/Configuracion.js'],
   },
+  {
+    nombre: 'sin-senal-aliados',
+    que: 'aliados avisa cuando no podrá trabajar sin internet (dos pestañas)',
+    archivo: 'sin-senal-aliados.cjs',
+    vigila: ['guajirago-aliados/src/firebase.js', 'guajirago-aliados/src/index.js',
+      'guajirago-aliados/src/AvisoSinSenal.js', 'guajirago-aliados/src/sinSenal.js', 'guajirago-aliados/src/AvisoModal.js'],
+  },
 ];
 
 // Los archivos de pantalla: los que, si cambian, el robot debería poder probar. Todo lo que esté en

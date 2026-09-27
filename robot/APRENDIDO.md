@@ -60,6 +60,12 @@ empleado», «Correo para que inicie sesión», «Mínimo 6 caracteres», se toc
 («Mesero») y el botón «Crear empleado». Crear el empleado usa la SEGUNDA conexión de aliados: el
 27-sep-2026, antes del arreglo, Google contó esas llamadas como `MISSING` (sin sello); después, con sello.
 
+**Aliados sin señal (dos pestañas).** El navegador deja guardar los datos en el aparato a UNA sola
+pestaña: abriendo aliados en dos pestañas de la misma sesión (`otraPestana` del motor), la segunda no
+puede. Hasta el 27-sep-2026 se callaba (el robot lo vio: «no avisó nada»); desde entonces sale la
+ventanita «Sin internet, este aparato no podrá trabajar». 🪤 `r.pagina.context().newPage()` NO sirve:
+el motor abre cada pestaña con `otraPestana`, que además la vigila.
+
 ## Lo que encontró la primera visita de usuario (27-sep-2026)
 
 - 🔴→✓ **El botón «¡A rodar!» de la bienvenida del conductor era blanco sobre blanco.** Arreglado ese
