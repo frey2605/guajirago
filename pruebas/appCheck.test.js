@@ -58,16 +58,34 @@ describe('APP CHECK · las tres apps lo arrancan igual, con la llave del ambient
         '⛔ ' + a + ' no importa App Check con el proveedor de reCAPTCHA Enterprise');
       assert.match(t, /import\s*\{[^}]*\bllaveAppCheckDe\b[^}]*\}\s*from\s*["']\.\/ambiente["']/,
         '⛔ ' + a + ' no saca la llave de ambiente.js: una segunda forma de leerla sería un gemelo');
-      const m = t.match(/const\s+(\w+)\s*=\s*llaveAppCheckDe\(\s*process\.env\s*\)\s*;\s*if\s*\(\s*\1\s*\)\s*initializeAppCheck\(\s*app\s*,\s*\{\s*provider:\s*new\s+ReCaptchaEnterpriseProvider\(\s*\1\s*\)/);
+      // Transporte y panel lo arrancan en línea sobre `app`; aliados, que tiene dos conexiones, lo
+      // hace en UNA pieza (`sellarConAppCheck`) que recibe la conexión y se llama con `app`.
+      const m = t.match(/const\s+(\w+)\s*=\s*llaveAppCheckDe\(\s*process\.env\s*\)\s*;\s*if\s*\(\s*\1\s*\)\s*initializeAppCheck\(\s*(\w+)\s*,\s*\{\s*provider:\s*new\s+ReCaptchaEnterpriseProvider\(\s*\1\s*\)/);
       assert.ok(m, '⛔ ' + a + ' no arranca App Check con la llave del ambiente, o lo arranca sin preguntar si la hay');
+      // Si hay pieza, tiene que sellar LA CONEXIÓN QUE RECIBE, no siempre la principal (un sabotaje
+      // que escapó el 27-sep-2026: con `initializeAppCheck(app, …)` dentro, la de empleados quedaba sin sello).
+      const hayPieza = t.match(/export function (\w+)\(\s*(\w+)\s*\)\s*\{([^}]*)\}/);
+      const pieza = hayPieza && /initializeAppCheck/.test(hayPieza[3]) ? hayPieza : null;
+      if (pieza) assert.strictEqual(m[2], pieza[2], '⛔ ' + a + ': la pieza de App Check sella siempre la misma conexión, no la que recibe');
+      else assert.strictEqual(m[2], 'app', '⛔ ' + a + ': App Check se arranca sobre otra conexión que no es la principal');
       const iApp = t.indexOf('initializeApp(firebaseConfig)');
-      const iCheck = t.indexOf('initializeAppCheck(app');
+      const iCheck = m[2] === 'app' ? t.indexOf('initializeAppCheck(app') : t.indexOf('\n' + pieza[1] + '(app)');
       const iBase = t.indexOf('getFirestore(app)');
       assert.ok(iApp >= 0 && iCheck > iApp, '⛔ ' + a + ': App Check tiene que ir DESPUÉS de initializeApp');
       assert.ok(iBase > iCheck, '⛔ ' + a + ': App Check tiene que ir ANTES de la base, o las primeras llamadas salen sin sello');
       assert.strictEqual((t.match(/initializeAppCheck\s*\(/g) || []).length, 1, '⛔ ' + a + ': App Check se arranca una sola vez');
     });
   }
+
+  it('aliados: la conexión de crear empleados sella con LA MISMA pieza, antes de usarse', () => {
+    const t = soloCodigo(leer('guajirago-aliados/src/firebaseSecundario.js'));
+    assert.match(t, /import\s*\{\s*sellarConAppCheck\s*\}\s*from\s*["']\.\/firebase["']/, '⛔ la conexión secundaria no usa la pieza de firebase.js');
+    assert.ok(!/initializeAppCheck|ReCaptchaEnterpriseProvider/.test(t), '⛔ la conexión secundaria arranca App Check por su cuenta: sería un gemelo');
+    const iNace = t.indexOf('initializeApp(firebaseConfig, "secundaria")');
+    const iSello = t.indexOf('sellarConAppCheck(appSecundaria)');
+    const iAuth = t.indexOf('getAuth(appSecundaria)');
+    assert.ok(iNace >= 0 && iSello > iNace && iAuth > iSello, '⛔ la conexión de crear empleados tiene que sellarse después de nacer y ANTES de crear cuentas');
+  });
 
   it('el medidor ve lo mismo que esta prueba: las tres apps lo arrancan', () => {
     for (const x of contarCodigo().apps) assert.strictEqual(x.arranca, true, '⛔ el medidor dice que ' + x.app + ' no arranca App Check');

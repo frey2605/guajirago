@@ -31,6 +31,13 @@ const RECORRIDOS = [
     vigila: ['guajirago-admin/src/Conductores.js', 'guajirago-admin/src/documentosConductor.js',
       'guajirago-admin/src/App.js', 'guajirago-admin/src/firebase.js'],
   },
+  {
+    nombre: 'crear-empleado',
+    que: 'aliados crea un empleado (usa su segunda conexión, que también lleva el sello)',
+    archivo: 'crear-empleado.cjs',
+    vigila: ['guajirago-aliados/src/Empleados.js', 'guajirago-aliados/src/firebaseSecundario.js',
+      'guajirago-aliados/src/firebase.js', 'guajirago-aliados/src/Login.js', 'guajirago-aliados/src/Configuracion.js'],
+  },
 ];
 
 // Los archivos de pantalla: los que, si cambian, el robot debería poder probar. Todo lo que esté en

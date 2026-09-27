@@ -53,6 +53,13 @@ Enter no entra). 🪤 El menú está ABAJO y son solo íconos: Conductores es el
 cuadro «📂 Documentos (N de 6)»; el `alt` de cada foto es el nombre de la lista (sin la variante
 del mototaxi: la variante sale en el texto de abajo, no en el `alt`).
 
+**Aliados (crear un empleado).** 🪤 La portada pregunta «¿QUÉ TIPO DE NEGOCIO TIENES?»: para entrar se
+toca «Ya tengo cuenta · Ingresar». Campos «Correo» y «Contrasena» (sin tilde), botón «Entrar» (exacto).
+Cuenta: restaurante@gg.test. Luego Configuración → «Mi equipo» → «+ Agregar empleado»: «Nombre del
+empleado», «Correo para que inicie sesión», «Mínimo 6 caracteres», se toca un rol por su nombre
+(«Mesero») y el botón «Crear empleado». Crear el empleado usa la SEGUNDA conexión de aliados: el
+27-sep-2026, antes del arreglo, Google contó esas llamadas como `MISSING` (sin sello); después, con sello.
+
 ## Lo que encontró la primera visita de usuario (27-sep-2026)
 
 - 🔴→✓ **El botón «¡A rodar!» de la bienvenida del conductor era blanco sobre blanco.** Arreglado ese
