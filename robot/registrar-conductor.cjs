@@ -56,6 +56,10 @@ const nombre = 'Robot ' + TIPO + ' De Prueba';
   await p.getByText('Marca del vehículo').click();
   await p.getByText('Otra', { exact: true }).click();
   await p.fill('input[placeholder="Escribe la marca"]', 'Robotica');
+  // La marca escogida tiene que VERSE en su casilla (27-sep-2026: era blanca sobre fondo blanco).
+  const tintaMarca = await p.getByText('Otra', { exact: true }).first().evaluate((e) => getComputedStyle(e).color);
+  console.log('MARCA ESCOGIDA:', tintaMarca === 'rgb(255, 255, 255)' ? 'BLANCA, NO SE VE' : 'se ve (' + tintaMarca + ')');
+  if (tintaMarca === 'rgb(255, 255, 255)') fallos.push('la marca escogida es blanca sobre fondo blanco: no se ve');
   await p.locator('select').nth(1).selectOption({ index: 3 });
   // La lista de colores se abre tocando «Color» y se escoge tocando el NOMBRE (ver APRENDIDO.md).
   await p.getByText(/^Color/).first().click();

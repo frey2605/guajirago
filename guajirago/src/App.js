@@ -321,7 +321,7 @@ function PantallaDatosConductor({ nombre, foto, celular, onGuardar, onVolver, on
       </div>
       <div onClick={() => setListaMarcaAbierta(true)} style={{ ...campoRojo('marca'), cursor: 'pointer' }}>
         <span style={{ fontSize: '20px' }}>🏭</span>
-        <span style={{ color: marca ? '#FFFFFF' : '#AAAAAA', fontSize: '16px', flex: 1 }}>{marca || 'Marca del vehículo'}</span>
+        <span style={{ color: marca ? '#1A1A1E' : '#AAAAAA', fontSize: '16px', flex: 1 }}>{marca || 'Marca del vehículo'}</span>
         <span style={{ color: '#6B7280', fontSize: '14px' }}>▼</span>
       </div>
       {marca === 'Otra' && (

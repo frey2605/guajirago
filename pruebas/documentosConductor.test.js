@@ -87,6 +87,13 @@ describe('LOS DOCUMENTOS DEL CONDUCTOR · el registro y el panel', () => {
     assert.match(reg, /\{iconoDelDocumento\(d,\s*tipoVehiculo\)\}/, '⛔ las fotos no enseñan el dibujo del vehículo escogido');
   });
 
+  it('la marca y el color escogidos se ven: texto oscuro, no blanco sobre el fondo blanco (27-sep-2026)', () => {
+    const marca = reg.match(/<span style=\{\{ color: marca \? '([^']+)'/);
+    assert.ok(marca, 'no encuentro la casilla de la marca');
+    assert.strictEqual(marca[1], '#1A1A1E', '⛔ la marca escogida se pinta en ' + marca[1] + ' sobre fondo blanco: no se ve');
+    assert.match(reg, /<span style=\{\{ color: '#1A1A1E', fontSize: '16px' \}\}>\{color\}<\/span>/, 'el color escogido tiene que seguir viéndose');
+  });
+
   it('pinta un campo de foto por cada documento de la lista', () => {
     assert.match(reg, /DOCUMENTOS_CONDUCTOR\.map\(\(d,\s*i\)\s*=>\s*\(\s*<label key=\{d\.campo\}/);
     assert.match(reg, /setFotosDocs\(prev\s*=>\s*\(\{\s*\.\.\.prev,\s*\[d\.campo\]:\s*f\s*\}\)\)/);
