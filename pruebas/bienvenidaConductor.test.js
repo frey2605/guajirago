@@ -47,6 +47,21 @@ describe('LA BIENVENIDA · el botón para seguir se ve', () => {
     assert.match(t, /<CelebracionBienvenidaConductor[^>]*tipoVehiculo=\{tipoVehiculoUsuario\}/, '⛔ la app no le pasa el vehículo a la bienvenida');
   });
 
+  it('la tarjeta del bono usa los mismos colores que la del pasajero (título, número y texto)', () => {
+    const colores = (archivo, desde) => {
+      const t = soloCodigo(leer(archivo));
+      const i = desde ? t.indexOf(desde) : 0;
+      const j = t.indexOf("background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)', borderRadius: '28px'", i);
+      assert.ok(j >= 0, 'no encuentro la tarjeta del bono en ' + archivo);
+      const tarjeta = t.slice(j, t.indexOf('</div>', j));
+      return [...tarjeta.matchAll(/<p style=\{\{ color: '([^']+)'/g)].map((m) => m[1]);
+    };
+    const pasajero = colores('guajirago/src/Login.js');
+    const conductor = colores('guajirago/src/App.js', 'function CelebracionBienvenidaConductor');
+    assert.strictEqual(pasajero.length, 3, 'la tarjeta del pasajero tiene título, número y texto');
+    assert.deepStrictEqual(conductor, pasajero, '⛔ las dos tarjetas del bono se pintan distinto: ' + JSON.stringify({ conductor, pasajero }));
+  });
+
   it('se ve igual que su gemelo, el del pasajero', () => {
     const t = soloCodigo(leer('guajirago/src/Login.js'));
     const m = t.match(/<button onClick=\{onContinuar\} style=\{\{([^}]*)\}\}/);
