@@ -316,7 +316,7 @@ function PantallaDatosConductor({ nombre, foto, celular, onGuardar, onVolver, on
         <input value={telefono} onChange={e => setTelefono(e.target.value)} placeholder="Número de teléfono" type="tel" style={estiloInput} />
       </div>
       <div style={campoRojo('placa')}>
-        <span style={{ fontSize: '20px' }}>🚘</span>
+        <span style={{ fontSize: '20px' }}>{iconoDelDocumento({ icono: '🚘' }, tipoVehiculo)}</span>
         <input value={placa} onChange={e => setPlaca(e.target.value.toUpperCase().slice(0, 6))} placeholder="Placa del vehículo (6 caracteres)" style={estiloInput} />
       </div>
       <div onClick={() => setListaMarcaAbierta(true)} style={{ ...campoRojo('marca'), cursor: 'pointer' }}>

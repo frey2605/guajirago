@@ -70,10 +70,14 @@ const nombre = 'Robot ' + TIPO + ' De Prueba';
   const etiquetas = await p.$$eval('label', (ls) => ls.map((l) => l.innerText.replace(/\s+/g, ' ').trim()).filter(Boolean));
   console.log('CAMPOS DE FOTO (' + cuantos + '):', etiquetas.join(' | '));
   // Al mototaxi se le habla de «moto» y se le enseña la moto (27-sep-2026).
+  // Y el dibujo de la casilla de la placa, el que está al lado de donde se escribe (27-sep-2026).
+  const dibujoPlaca = await p.locator('input[placeholder="Placa del vehículo (6 caracteres)"]').evaluate((e) => e.previousElementSibling && e.previousElementSibling.innerText.trim());
+  console.log('DIBUJO DE LA PLACA:', dibujoPlaca);
   if (TIPO === 'Mototaxi') {
     const conVehiculo = etiquetas.filter((e) => /Subir foto/.test(e) && /veh[ií]culo|🚘|🚗/i.test(e));
     if (conVehiculo.length) fallos.push('al mototaxi le hablan de «vehículo» o le enseñan un carro: ' + conVehiculo.join(' | '));
-  }
+    if (/🚘|🚗/.test(dibujoPlaca || '')) fallos.push('al mototaxi le enseñan un carro en la casilla de la placa: ' + dibujoPlaca);
+  } else if (dibujoPlaca !== '🚘') fallos.push('al taxi le cambió el dibujo de la placa: ' + dibujoPlaca);
 
   // 1. Con una foto de menos, se tiene que parar y decir cuál falta.
   for (let i = 0; i < cuantos - 1; i++) await archivos.nth(i).setInputFiles(fotoDeMentira('foto' + i));

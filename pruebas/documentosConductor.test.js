@@ -87,6 +87,14 @@ describe('LOS DOCUMENTOS DEL CONDUCTOR · el registro y el panel', () => {
     assert.match(reg, /\{iconoDelDocumento\(d,\s*tipoVehiculo\)\}/, '⛔ las fotos no enseñan el dibujo del vehículo escogido');
   });
 
+  it('la casilla de la placa enseña la moto al mototaxi y el carro al taxi, con la misma regla de las fotos (27-sep-2026)', () => {
+    const placa = reg.match(/<span style=\{\{ fontSize: '20px' \}\}>([^<]*)<\/span>\s*<input value=\{placa\}/);
+    assert.ok(placa, 'no encuentro la casilla de la placa');
+    assert.strictEqual(placa[1], "{iconoDelDocumento({ icono: '🚘' }, tipoVehiculo)}", '⛔ la casilla de la placa tiene un dibujo fijo: ' + placa[1]);
+    assert.strictEqual(D.iconoDelDocumento({ icono: '🚘' }, 'Mototaxi'), '🏍️');
+    assert.strictEqual(D.iconoDelDocumento({ icono: '🚘' }, 'Taxi'), '🚘', 'el taxi conserva su dibujo de siempre');
+  });
+
   it('la marca y el color escogidos se ven: texto oscuro, no blanco sobre el fondo blanco (27-sep-2026)', () => {
     const marca = reg.match(/<span style=\{\{ color: marca \? '([^']+)'/);
     assert.ok(marca, 'no encuentro la casilla de la marca');
