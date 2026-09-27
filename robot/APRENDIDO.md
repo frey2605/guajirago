@@ -53,6 +53,21 @@ Enter no entra). 🪤 El menú está ABAJO y son solo íconos: Conductores es el
 cuadro «📂 Documentos (N de 6)»; el `alt` de cada foto es el nombre de la lista (sin la variante
 del mototaxi: la variante sale en el texto de abajo, no en el `alt`).
 
+## Lo que encontró la primera visita de usuario (27-sep-2026)
+
+- 🔴→✓ **El botón «¡A rodar!» de la bienvenida del conductor era blanco sobre blanco.** Arreglado ese
+  día; `registrar-conductor.cjs` ahora mira el color que pinta el navegador y falla si vuelve.
+- El bono de bienvenida del conductor **cambia según el vehículo, a propósito** (el servidor lo decide
+  en `creditosDeBienvenida`): el mototaxi recibe menos que el taxi. No es falla.
+- Mejoras anotadas, sin hacer: al mototaxi todo le dice «vehículo» y le enseña un carro 🚗; al escoger
+  la marca «Otra» la casilla queda vacía y solo abajo sale lo escrito; el número del bono va negro
+  en el conductor y blanco en el pasajero; registrarse como conductor cuesta ~30 toques.
+- 🪤 **El resumen de `robot/probar-cambio.cjs` solo copia las 3 últimas líneas de cada recorrido:** se
+  pierden renglones (el de transporte en el humo, el correo de la cuenta creada). Para verlo todo,
+  correr el recorrido solo.
+- Las capturas de página entera enseñan el cartel de PRUEBAS a media imagen (es fijo arriba); no es
+  falla de la app.
+
 ## Lo que el robot dejó creado en pruebas
 
 - 27-sep-2026: «Robot Taxi De Prueba» (robot.taxi.1790508222079@gg.test) y

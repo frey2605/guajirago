@@ -84,6 +84,15 @@ const nombre = 'Robot ' + TIPO + ' De Prueba';
   await r.captura('registrado');
   const t = await r.texto();
   if (!/Bienvenido, conductor/.test(t)) fallos.push('con todas las fotos NO entró: ' + t.slice(0, 200));
+  // El botón para seguir tiene que VERSE (27-sep-2026: era blanco sobre fondo blanco). Se mira el
+  // color que pinta el navegador de verdad, no el código.
+  const seguir = p.getByRole('button', { name: /A rodar/ });
+  if (await seguir.count()) {
+    const fondo = await seguir.first().evaluate((e) => { const s = getComputedStyle(e); return s.backgroundImage + ' | ' + s.backgroundColor; });
+    const invisible = !/gradient/.test(fondo) && /rgb\(255, 255, 255\)/.test(fondo);
+    console.log('BOTÓN PARA SEGUIR:', invisible ? 'BLANCO SOBRE BLANCO' : 'se ve (' + (/gradient/.test(fondo) ? 'degradado' : fondo) + ')');
+    if (invisible) fallos.push('el botón «¡A rodar!» es blanco sobre fondo blanco: el conductor no ve dónde tocar');
+  }
 
   console.log('CONDUCTOR:', nombre, '·', correo);
   console.log('CAPTURAS:', r.carpeta);

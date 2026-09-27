@@ -444,7 +444,7 @@ function CelebracionBienvenidaConductor({ monto, onContinuar }) {
         <p style={{ color: '#141416', fontSize: '54px', fontWeight: '900', margin: '0', lineHeight: '1' }}>${(monto || 0).toLocaleString()}</p>
         <p style={{ color: '#3A2400', fontSize: '13px', margin: '14px 0 0', lineHeight: '1.5', fontWeight: 'bold' }}>Ya está en tu saldo. Úsalo para pagar tus primeras comisiones 🚀</p>
       </div>
-      <button onClick={onContinuar} style={{ marginTop: '28px', width: '100%', maxWidth: '420px', padding: '18px', background: '#FFFFFF', border: 'none', borderRadius: '16px', color: '#141416', fontSize: '18px', fontWeight: '900', cursor: 'pointer', zIndex: 2 }}>¡A rodar! 🎉</button>
+      <button onClick={onContinuar} style={{ marginTop: '28px', width: '100%', maxWidth: '420px', padding: '18px', background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)', border: 'none', borderRadius: '16px', color: '#FFFFFF', fontSize: '18px', fontWeight: '900', cursor: 'pointer', zIndex: 2 }}>¡A rodar! 🎉</button>
       <style>{`
         @keyframes caerBienvenidaC { from { transform: translateY(-24px) rotate(0deg); opacity: 1; } to { transform: translateY(100vh) rotate(360deg); opacity: 0.2; } }
         @keyframes rebotarBienvenidaC { from { transform: scale(1); } to { transform: scale(1.12); } }
