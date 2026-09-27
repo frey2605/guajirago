@@ -42,6 +42,16 @@ export function configFirebaseDe(env) {
   return cfg;
 }
 
+// App Check (fase 1 del plan, 26-sep-2026): la llave PÚBLICA del sitio de reCAPTCHA
+// Enterprise de este ambiente. Si el .env no la trae, App Check no se arranca y la app
+// sigue exactamente como antes: así se enciende ambiente por ambiente, y producción no
+// cambia hasta que su .env la tenga. Qué hace el servidor con una llamada sin App Check
+// (solo mirar o rechazar) NO se decide aquí: se decide en la consola, por servicio.
+export function llaveAppCheckDe(env) {
+  const v = env.REACT_APP_APPCHECK_SITE_KEY;
+  return v && v.trim() ? v.trim() : null;
+}
+
 // El proyecto tiene que corresponder al ambiente: una copia de PRUEBAS jamás
 // apunta a la base de PRODUCCIÓN, ni al revés.
 export function verificarPareja(modo, projectId) {
