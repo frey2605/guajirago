@@ -1,0 +1,56 @@
+// ═══════════════════════════════════════════════════════════════════════════
+//  EL ROBOT PROBADOR · nunca entra a producción · 27-sep-2026
+//
+//  El robot crea cuentas y sube fotos manejando el navegador. Su motor vive en la cuenta del
+//  dueño (en su carpeta .claude, uno solo para todos sus proyectos; no es de este repo) y lo de
+//  GuajiraGo en robot/comun.cjs. Aquí se EJECUTA la guardia con direcciones de mentira —las de
+//  producción, las parecidas y las mal escritas— y se exige que se niegue ANTES de abrir el
+//  navegador. Y que ningún recorrido se salte robot/comun.cjs ni lleve la clave dentro.
+// ═══════════════════════════════════════════════════════════════════════════
+const { describe, it } = require('node:test');
+const assert = require('node:assert');
+const fs = require('node:fs');
+const path = require('node:path');
+const R = require('../robot/comun.cjs');
+
+const RAIZ = path.join(__dirname, '..');
+const PRODUCCION = ['https://guajirago.web.app/', 'https://guajirago-admin.web.app/', 'https://guajirago-aliados.web.app/',
+  'https://guajirago.firebaseapp.com/'];
+
+describe('EL ROBOT · solo pruebas', () => {
+  it('sus sitios son los tres de guajirago-pruebas, y ninguno de producción', () => {
+    assert.deepStrictEqual(Object.keys(R.SITIOS).sort(), ['aliados', 'panel', 'transporte']);
+    for (const s of Object.values(R.SITIOS)) assert.match(new URL(s).host, /^guajirago-pruebas(-admin|-aliados)?\.web\.app$/);
+  });
+
+  it('la guardia acepta pruebas y rechaza producción, direcciones parecidas y basura', () => {
+    for (const s of Object.values(R.SITIOS)) assert.strictEqual(R.esDePruebas(s + 'algo?x=1'), true, s);
+    const malas = [...PRODUCCION, 'http://guajirago-pruebas.web.app/', 'https://guajirago-pruebas.web.app.malo.com/',
+      'https://malo.com/?guajirago-pruebas.web.app', 'guajirago-pruebas.web.app', '', undefined];
+    for (const m of malas) assert.strictEqual(R.esDePruebas(m), false, '⛔ el robot aceptaría «' + m + '»');
+  });
+
+  it('abrir producción se niega ANTES de arrancar el navegador', async () => {
+    for (const p of PRODUCCION) {
+      // Primero se pregunta, y solo se intenta abrir si la guardia ya dijo que no: si la guardia
+      // estuviera rota, esta prueba NO debe llegar a abrir producción (pasó en un sabotaje del
+      // 27-sep-2026: abrió la portada y se quedó colgada con el navegador vivo).
+      assert.strictEqual(R.esDePruebas(p), false, '⛔ la guardia dejaría abrir ' + p);
+      await assert.rejects(R.abrir(p), /solo entra a sitios de PRUEBA/, p);
+    }
+  });
+
+  it('ningún recorrido se salta comun.cjs, abre direcciones a mano ni lleva la clave', () => {
+    const dir = path.join(RAIZ, 'robot');
+    const recorridos = fs.readdirSync(dir).filter((f) => f.endsWith('.cjs') && f !== 'comun.cjs');
+    assert.ok(recorridos.length >= 3, 'faltan recorridos');
+    let clave = null;
+    try { clave = R.claveDePruebas(); } catch (e) { clave = null; }
+    for (const f of recorridos) {
+      const t = fs.readFileSync(path.join(dir, f), 'utf8');
+      assert.ok(!/require\(['"]playwright/.test(t), '⛔ ' + f + ' abre el navegador sin pasar por la guardia');
+      assert.ok(!/https:\/\/guajirago[\w-]*\.(web\.app|firebaseapp\.com)/.test(t), '⛔ ' + f + ' escribe una dirección a mano en vez de usar SITIOS');
+      if (clave) assert.ok(!t.includes(clave), '⛔ ' + f + ' lleva la clave de las cuentas de prueba dentro (el repo es público)');
+    }
+  });
+});
