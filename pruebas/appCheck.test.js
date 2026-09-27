@@ -35,11 +35,12 @@ describe('APP CHECK · la llave sale del ambiente, y sin llave nada cambia', () 
     }
   });
 
-  it('PRODUCCIÓN no trae llave en ninguna de las tres apps: no cambia hasta que el dueño lo decida', () => {
-    for (const a of APPS) {
-      assert.ok(!M.leerEnv(leer(a + '/.env.produccion'))[LLAVE],
-        '⛔ ' + a + '/.env.produccion trae llave de App Check: encenderlo en producción es decisión aparte');
-    }
+  it('PRODUCCIÓN trae LA MISMA llave en las tres apps, y no es la de pruebas (encendido el 27-sep-2026)', () => {
+    const prod = APPS.map((a) => M.leerEnv(leer(a + '/.env.produccion'))[LLAVE] || null);
+    const pru = M.leerEnv(leer('guajirago/.env.pruebas'))[LLAVE];
+    assert.ok(prod[0], '⛔ producción perdió su llave de App Check: dejaría de mandar el sello');
+    assert.ok(prod.every((k) => k === prod[0]), '⛔ las llaves de producción no coinciden entre las tres apps: ' + JSON.stringify(prod));
+    assert.notStrictEqual(prod[0], pru, '⛔ producción usa la llave de PRUEBAS: su sello no valdría en producción');
   });
 
   it('en PRUEBAS, si una app trae llave, las tres traen LA MISMA (comparten la app web)', () => {
