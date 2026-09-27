@@ -25,7 +25,7 @@ import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 // REGLA 7: los créditos de bienvenida los da el servidor, no este teléfono.
 import { getFunctions, httpsCallable } from 'firebase/functions';
-import { DOCUMENTOS_CONDUCTOR, documentoQueFalta, nombreDelDocumento } from './documentosConductor';
+import { DOCUMENTOS_CONDUCTOR, documentoQueFalta, nombreDelDocumento, iconoDelDocumento, iconoDelVehiculo } from './documentosConductor';
 const MARCAS_VEHICULO = [
   'AKT', 'Auteco', 'Bajaj', 'BMW', 'BYD', 'Chery', 'Chevrolet',
   'Citroen', 'Ford', 'Foton', 'Hero', 'Honda', 'Hyundai', 'JAC',
@@ -299,7 +299,7 @@ function PantallaDatosConductor({ nombre, foto, celular, onGuardar, onVolver, on
       <MenuLateral nombre={nombre} foto={foto} onIrPerfil={onIrPerfil} onIrGanancias={onIrGanancias} onIrSeguridad={onIrSeguridad} onIrViajes={onIrViajes} onIrCreditos={onIrCreditos} onIrAyuda={onIrAyuda} onIrConfig={onIrConfig} onIrPromociones={onIrPromociones} onCerrarSesion={onCerrarSesion} />
       <div onClick={onVolver} style={{ position: 'absolute', top: '18px', left: '120px', display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(0,0,0,0.06)', borderRadius: '12px', color: '#1A1A1E', fontSize: '14px', fontWeight: '500', padding: '8px 16px', cursor: 'pointer', zIndex: 5 }}><span style={{ fontSize: '20px', fontWeight: '900', lineHeight: '1' }}>‹</span> Volver</div>
       <div style={{ textAlign: 'center', marginBottom: '32px' }}>
-        <span style={{ fontSize: '48px' }}>🚗</span>
+        <span style={{ fontSize: '48px' }}>{iconoDelVehiculo(tipoVehiculo)}</span>
         <h2 style={{ color: '#1A1A1E', fontSize: '22px', fontWeight: '900', margin: '12px 0 4px' }}>Datos del conductor</h2>
         <p style={{ color: '#6B7280', fontSize: '13px', margin: '0' }}>Completa tu perfil de conductor</p>
       </div>
@@ -393,7 +393,7 @@ function PantallaDatosConductor({ nombre, foto, celular, onGuardar, onVolver, on
 
       {DOCUMENTOS_CONDUCTOR.map((d, i) => (
         <label key={d.campo} style={{ ...campoRojo(d.campo), cursor: 'pointer', marginBottom: i === DOCUMENTOS_CONDUCTOR.length - 1 ? '20px' : '12px' }}>
-          <span style={{ fontSize: '20px' }}>{d.icono}</span>
+          <span style={{ fontSize: '20px' }}>{iconoDelDocumento(d, tipoVehiculo)}</span>
           <span style={{ color: fotosDocs[d.campo] ? '#2ECC71' : '#AAAAAA', fontSize: '15px', flex: 1 }}>
             {fotosDocs[d.campo] ? '✓ ' + nombreDelDocumento(d, tipoVehiculo) + ': lista' : 'Subir foto: ' + nombreDelDocumento(d, tipoVehiculo)}
           </span>
@@ -422,7 +422,7 @@ function PantallaMantenimiento({ mensaje, onVolver }) {
   );
 }
 
-function CelebracionBienvenidaConductor({ monto, onContinuar }) {
+function CelebracionBienvenidaConductor({ monto, tipoVehiculo, onContinuar }) {
   const confeti = Array.from({ length: 40 }, (_, i) => i);
   const colores = ['#FFCF4D', '#FF7A2F', '#D6357E', '#2ECC71', '#4DA3FF', '#1C8EF9'];
   return (
@@ -436,7 +436,7 @@ function CelebracionBienvenidaConductor({ monto, onContinuar }) {
         }}>●</span>
       ))}
       <div style={{ fontSize: '30px', marginBottom: '4px', animation: 'rebotarBienvenidaC 0.6s infinite alternate', zIndex: 2 }}>🎉🎊🎉</div>
-      <div style={{ fontSize: '90px', margin: '8px 0 4px', animation: 'rebotarBienvenidaC 0.6s infinite alternate', zIndex: 2 }}>🚗💰</div>
+      <div style={{ fontSize: '90px', margin: '8px 0 4px', animation: 'rebotarBienvenidaC 0.6s infinite alternate', zIndex: 2 }}>{iconoDelVehiculo(tipoVehiculo)}💰</div>
       <h1 style={{ color: '#1A1A1E', fontSize: '26px', fontWeight: '900', margin: '8px 0 4px', textAlign: 'center', zIndex: 2 }}>¡Bienvenido, conductor!</h1>
       <p style={{ color: '#FF7A2F', fontSize: '15px', margin: '0 0 24px', textAlign: 'center', fontWeight: 'bold', zIndex: 2 }}>Empiezas con saldo en tu cuenta 🥳</p>
       <div style={{ background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)', borderRadius: '28px', padding: '32px 28px', width: '100%', maxWidth: '420px', textAlign: 'center', zIndex: 2, boxShadow: '0 8px 32px rgba(255,122,47,0.4)' }}>
@@ -599,7 +599,7 @@ function App() {
     setScreen('login');
   };
 
-  if (celebracionCreditosConductor) return <CelebracionBienvenidaConductor monto={celebracionCreditosConductor} onContinuar={() => { setCelebracionCreditosConductor(null); setScreen('home'); }} />;
+  if (celebracionCreditosConductor) return <CelebracionBienvenidaConductor monto={celebracionCreditosConductor} tipoVehiculo={tipoVehiculoUsuario} onContinuar={() => { setCelebracionCreditosConductor(null); setScreen('home'); }} />;
   if (verPerfil) return <MiPerfil onVolver={() => setVerPerfil(false)} />;
   if (verGanancias) return <Ganancias onVolver={() => setVerGanancias(false)} />;
   if (verSeguridad) return <Seguridad onVolver={() => setVerSeguridad(false)} />;

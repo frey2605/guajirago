@@ -65,6 +65,11 @@ const nombre = 'Robot ' + TIPO + ' De Prueba';
   const cuantos = await archivos.count();
   const etiquetas = await p.$$eval('label', (ls) => ls.map((l) => l.innerText.replace(/\s+/g, ' ').trim()).filter(Boolean));
   console.log('CAMPOS DE FOTO (' + cuantos + '):', etiquetas.join(' | '));
+  // Al mototaxi se le habla de «moto» y se le enseña la moto (27-sep-2026).
+  if (TIPO === 'Mototaxi') {
+    const conVehiculo = etiquetas.filter((e) => /Subir foto/.test(e) && /veh[ií]culo|🚘|🚗/i.test(e));
+    if (conVehiculo.length) fallos.push('al mototaxi le hablan de «vehículo» o le enseñan un carro: ' + conVehiculo.join(' | '));
+  }
 
   // 1. Con una foto de menos, se tiene que parar y decir cuál falta.
   for (let i = 0; i < cuantos - 1; i++) await archivos.nth(i).setInputFiles(fotoDeMentira('foto' + i));

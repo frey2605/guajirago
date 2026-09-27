@@ -46,6 +46,18 @@ describe('LOS DOCUMENTOS DEL CONDUCTOR · la lista', () => {
     assert.ok(/placa/.test(D.nombreDelDocumento(atras, 'Mototaxi')));
   });
 
+  it('al mototaxi se le habla de «moto» y se le enseña la moto; al taxi, igual que antes', () => {
+    for (const d of D.DOCUMENTOS_CONDUCTOR) {
+      assert.ok(!/veh[ií]culo/i.test(D.nombreDelDocumento(d, 'Mototaxi')), '⛔ al mototaxi le sale «vehículo» en: ' + D.nombreDelDocumento(d, 'Mototaxi'));
+      assert.notStrictEqual(D.iconoDelDocumento(d, 'Mototaxi'), '🚘', '⛔ al mototaxi le sale un carro en: ' + d.nombre);
+      assert.strictEqual(D.nombreDelDocumento(d, 'Taxi'), d.nombre, 'al taxi no le cambia nada');
+      assert.strictEqual(D.iconoDelDocumento(d, 'Taxi'), d.icono, 'al taxi no le cambia nada');
+    }
+    assert.strictEqual(D.iconoDelVehiculo('Mototaxi'), '🏍️');
+    assert.strictEqual(D.iconoDelVehiculo('Taxi'), '🚗');
+    assert.strictEqual(D.iconoDelVehiculo(''), '🚗', 'antes de escoger vehículo se ve el carro, como antes');
+  });
+
   it('el panel lleva la MISMA lista, byte a byte', () => {
     assert.strictEqual(leer('guajirago-admin/src/documentosConductor.js'), leer('guajirago/src/documentosConductor.js'),
       '⛔ la lista del panel se separó de la del registro: el panel enseñaría huecos');
@@ -68,6 +80,11 @@ describe('LOS DOCUMENTOS DEL CONDUCTOR · el registro y el panel', () => {
   it('sube TODAS las de la lista, cada una a su carpeta, y guarda cada dirección en su campo', () => {
     assert.match(reg, /for\s*\(\s*const\s+d\s+of\s+DOCUMENTOS_CONDUCTOR\s*\)\s*urlsDocs\[d\.campo\]\s*=\s*await\s+subirFoto\(fotosDocs\[d\.campo\],\s*d\.carpeta,\s*user\.uid\)/);
     assert.match(reg, /setDoc\(doc\(db,\s*'usuarios',\s*user\.uid\),\s*\{[^}]*\.\.\.urlsDocs,/, '⛔ las direcciones de las fotos no se guardan en la ficha');
+  });
+
+  it('el formulario enseña el dibujo del vehículo escogido, en la cabecera y en cada foto', () => {
+    assert.match(reg, /fontSize:\s*'48px'\s*\}\}>\{iconoDelVehiculo\(tipoVehiculo\)\}<\/span>/, '⛔ la cabecera del formulario tiene el carro fijo');
+    assert.match(reg, /\{iconoDelDocumento\(d,\s*tipoVehiculo\)\}/, '⛔ las fotos no enseñan el dibujo del vehículo escogido');
   });
 
   it('pinta un campo de foto por cada documento de la lista', () => {

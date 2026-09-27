@@ -38,6 +38,15 @@ describe('LA BIENVENIDA · el botón para seguir se ve', () => {
     assert.strictEqual(conductor.color, '#FFFFFF');
   });
 
+  it('enseña el dibujo del vehículo del conductor (al mototaxi, la moto), y la app se lo pasa', () => {
+    const t = soloCodigo(leer('guajirago/src/App.js'));
+    const i = t.indexOf('function CelebracionBienvenidaConductor');
+    const cuerpo = t.slice(i, t.indexOf('\nfunction ', i + 10));
+    assert.match(cuerpo, /function CelebracionBienvenidaConductor\(\{[^}]*\btipoVehiculo\b[^}]*\}\)/);
+    assert.match(cuerpo, /\{iconoDelVehiculo\(tipoVehiculo\)\}💰/, '⛔ la bienvenida enseña un carro fijo');
+    assert.match(t, /<CelebracionBienvenidaConductor[^>]*tipoVehiculo=\{tipoVehiculoUsuario\}/, '⛔ la app no le pasa el vehículo a la bienvenida');
+  });
+
   it('se ve igual que su gemelo, el del pasajero', () => {
     const t = soloCodigo(leer('guajirago/src/Login.js'));
     const m = t.match(/<button onClick=\{onContinuar\} style=\{\{([^}]*)\}\}/);
