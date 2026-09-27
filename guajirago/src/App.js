@@ -25,6 +25,7 @@ import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 // REGLA 7: los créditos de bienvenida los da el servidor, no este teléfono.
 import { getFunctions, httpsCallable } from 'firebase/functions';
+import { DOCUMENTOS_CONDUCTOR, documentoQueFalta, nombreDelDocumento } from './documentosConductor';
 const MARCAS_VEHICULO = [
   'AKT', 'Auteco', 'Bajaj', 'BMW', 'BYD', 'Chery', 'Chevrolet',
   'Citroen', 'Ford', 'Foton', 'Hero', 'Honda', 'Hyundai', 'JAC',
@@ -201,7 +202,8 @@ function PantallaDatosConductor({ nombre, foto, celular, onGuardar, onVolver, on
   const [documento, setDocumento] = React.useState('');
   const [telefono, setTelefono] = React.useState(celular || '');
   const [fotoConductor, setFotoConductor] = React.useState(null);
-  const [fotoCedula, setFotoCedula] = React.useState(null);
+  // Las fotos de los documentos, por campo (documentosConductor.js es la lista).
+  const [fotosDocs, setFotosDocs] = React.useState({});
   const [error, setError] = React.useState('');
   const [campoError, setCampoError] = React.useState('');
   const [cargando, setCargando] = React.useState(false);
@@ -223,14 +225,16 @@ function PantallaDatosConductor({ nombre, foto, celular, onGuardar, onVolver, on
     if (!color) { setError('Falta escoger el color'); setCampoError('color'); return; }
     if (!documento) { setError('Falta el documento de identidad'); setCampoError('documento'); return; }
     if (!fotoConductor) { setError('Falta subir la foto del conductor'); setCampoError('fotoConductor'); return; }
-    if (!fotoCedula) { setError('Falta subir la foto de la cédula'); setCampoError('fotoCedula'); return; }
+    const falta = documentoQueFalta(fotosDocs);
+    if (falta) { setError('Falta subir la foto: ' + nombreDelDocumento(falta, tipoVehiculo)); setCampoError(falta.campo); return; }
     setCampoError('');
     setCargando(true); setError('');
     try {
       const user = auth.currentUser;
       if (!user) { setError('Error de sesión. Vuelve a iniciar sesión'); setCargando(false); return; }
       const urlFotoConductor = await subirFoto(fotoConductor, 'conductor', user.uid);
-      const urlFotoCedula = await subirFoto(fotoCedula, 'cedula', user.uid);
+      const urlsDocs = {};
+      for (const d of DOCUMENTOS_CONDUCTOR) urlsDocs[d.campo] = await subirFoto(fotosDocs[d.campo], d.carpeta, user.uid);
       const marcaFinal = marca === 'Otra' ? marcaOtra.trim() : marca;
       const vehiculo = `${marcaFinal} ${modelo}`;
 
@@ -251,7 +255,7 @@ function PantallaDatosConductor({ nombre, foto, celular, onGuardar, onVolver, on
         vehiculo,
         telefono,
         fotoConductor: urlFotoConductor,
-        fotoCedula: urlFotoCedula,
+        ...urlsDocs,
       }, { merge: true });
 
       // Ya con la ficha guardada, el servidor decide si le tocan créditos de
@@ -387,13 +391,15 @@ function PantallaDatosConductor({ nombre, foto, celular, onGuardar, onVolver, on
         <input type="file" accept="image/*" onChange={e => setFotoConductor(e.target.files[0])} style={{ display: 'none' }} />
       </label>
 
-      <label style={{ ...campoRojo('fotoCedula'), cursor: 'pointer', marginBottom: '20px' }}>
-        <span style={{ fontSize: '20px' }}>🪪</span>
-        <span style={{ color: fotoCedula ? '#2ECC71' : '#AAAAAA', fontSize: '15px', flex: 1 }}>
-          {fotoCedula ? '✓ Foto de la cédula lista' : 'Subir foto de la cédula'}
-        </span>
-        <input type="file" accept="image/*" onChange={e => setFotoCedula(e.target.files[0])} style={{ display: 'none' }} />
-      </label>
+      {DOCUMENTOS_CONDUCTOR.map((d, i) => (
+        <label key={d.campo} style={{ ...campoRojo(d.campo), cursor: 'pointer', marginBottom: i === DOCUMENTOS_CONDUCTOR.length - 1 ? '20px' : '12px' }}>
+          <span style={{ fontSize: '20px' }}>{d.icono}</span>
+          <span style={{ color: fotosDocs[d.campo] ? '#2ECC71' : '#AAAAAA', fontSize: '15px', flex: 1 }}>
+            {fotosDocs[d.campo] ? '✓ ' + nombreDelDocumento(d, tipoVehiculo) + ': lista' : 'Subir foto: ' + nombreDelDocumento(d, tipoVehiculo)}
+          </span>
+          <input type="file" accept="image/*" onChange={e => { const f = e.target.files[0]; setFotosDocs(prev => ({ ...prev, [d.campo]: f })); }} style={{ display: 'none' }} />
+        </label>
+      ))}
 
       {error && <p style={{ color: '#FF4444', fontSize: '13px', textAlign: 'center', marginBottom: '12px' }}>{error}</p>}
       <button onClick={guardar} disabled={cargando} style={{ width: '100%', padding: '18px', background: cargando ? '#2A2A2E' : 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)', border: 'none', borderRadius: '16px', color: cargando ? '#AAAAAA' : '#141416', fontSize: '18px', fontWeight: '900', cursor: 'pointer', marginBottom: '12px' }}>
