@@ -162,6 +162,14 @@ ya estaba guardado («Contacto de Prueba», 3000000001); si sale «Sin número»
 - La ventanita del conductor es la MISMA (ModalCancelacion.js), pero allí solo se abre con un viaje aceptado: este
   recorrido NO la cubre. La cubre la prueba de Node (pruebas/modalCancelacion.test.js).
 
+**El conductor sale por el menú (28-sep-2026, G07, `salir-por-el-menu.cjs`).** Cuenta taxi@gg.test → entrar →
+«Transporte y movilidad» → «Soy conductor» → (ventanita de avisos: «Entendido») → interruptor «Estoy disponible» →
+«Menú» (el botón «☰ Menú» de arriba a la izquierda; `getByText('Menú')`) → «Cerrar sesión» → vuelve a «Ya tengo cuenta».
+- 🔑 **Lo que se juzga está en la base, no en la pantalla**: la pantalla vuelve a la de entrar con el código viejo Y con
+  el nuevo. La diferencia es la ficha `conductores/{uid}`: con lo publicado antes de G07 queda `activo: true` (y la
+  ubicación guardada) y en la consola sale un 403 —la escritura de apagarse, rechazada porque ya no había sesión—.
+- Al final el recorrido deja `activo` como estaba antes de empezar.
+
 ## Lo que el robot dejó creado en pruebas
 
 - 27-sep-2026: «Robot Taxi De Prueba» (robot.taxi.1790508222079@gg.test) y

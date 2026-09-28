@@ -141,8 +141,11 @@ describe('REGLA 9 · los botones del viaje del conductor ya no fallan en silenci
     // Si se va, el pasajero se queda esperando a un conductor que ya se fue, y nadie lo sabe.
     const a = laAccion(cuerpoDe(soloCodigo(leer(APP)), 'cerrarSesion'));
     assert.ok(a && /updateDoc\(doc\(db, 'viajes', viajeActual\.id\)/.test(a.args[0]), 'la cancelación de cerrar sesión no va por el candado.');
+    // Desde G07 (28-sep-2026) la sesión la cierra la salida de la app (App.js), así que «irse» es llamar a onCerrarSesion.
     const corta = a.despues.indexOf('if (!r.ok && viajeActual) return;');
-    assert.ok(corta >= 0 && corta < a.despues.indexOf('signOut('), 'con viaje en marcha, cierra la sesión aunque la cancelación haya fallado.');
+    const seVa = a.despues.indexOf('onCerrarSesion(');
+    assert.ok(seVa >= 0, 'cerrarSesion ya no sale por la salida de la app (onCerrarSesion).');
+    assert.ok(corta >= 0 && corta < seVa, 'con viaje en marcha, cierra la sesión aunque la cancelación haya fallado.');
   });
 
   it('EL QUE MUERDE · los códigos (seguridad y descuento) dicen el error DENTRO de su ventanita', () => {

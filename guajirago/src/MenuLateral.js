@@ -1,16 +1,13 @@
 import React, { useState } from 'react';
-import { auth } from './firebase';
-import { signOut } from 'firebase/auth';
 
 function MenuLateral({ nombre, foto, onIrPerfil, onIrCreditos, onIrViajes, onIrGanancias, onIrSeguridad, onIrAyuda, onIrConfig, onIrPromociones, onCerrarSesion, onCambiarNegocio }) {
   const [abierto, setAbierto] = useState(false);
 
   const cerrar = () => setAbierto(false);
 
-  const cerrarSesion = async () => {
-    try { await signOut(auth); } catch (e) {}
-    if (onCerrarSesion) onCerrarSesion(); else window.location.reload();
-  };
+  // Salir lo hace la pantalla que abrió el menú, y la sesión se cierra AL FINAL (G07, 28-sep-2026). Antes el menú la
+  // cerraba primero: sin sesión, apagar al conductor ya no entraba y su ficha se quedaba «activo».
+  const cerrarSesion = () => onCerrarSesion();
 
   const compartir = async () => {
     const texto = '¡Pide tu taxi o mototaxi en Riohacha con GuajiraGo! 🚗 https://guajirago.web.app';

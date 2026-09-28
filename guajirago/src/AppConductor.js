@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { db, auth } from './firebase';
 import { collection, query, where, limit, onSnapshot, doc, updateDoc, setDoc, getDoc, getDocs, addDoc, orderBy, deleteField } from 'firebase/firestore';
 import { registrarTokenFCM, alertarNuevoViaje, activarAudioiOS, precargarAudio, permisoDeAvisos, avisoDeAvisos } from './Notificaciones';
-import { signOut } from 'firebase/auth';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { COMISIONES_DEFECTO, comisionSegunTipoDeViaje, comisionParaActivarse } from './comisiones';
 import { porQueNoLeToca } from './leTocaElViaje';
@@ -826,7 +825,11 @@ function AppConductor({ nombre, telefono, placa, vehiculo, tipoVehiculo, onCerra
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [limpiarTodosVigilantes, limpiarViajesOtrosConductor, invalidarMisOtrasOfertas, tipoVehiculo]);
 
-  const cerrarSesion = async () => {
+  // G07 (28-sep-2026): ésta es la única salida del conductor —el menú, Configuración y «Eliminar cuenta» llaman
+  // aquí—. Primero se apaga con la sesión viva y después sale por la salida de la app (App.js, handleCerrarSesion),
+  // que cierra la sesión al final. `ultimoPaso` («Eliminar cuenta»: borrar el usuario) va después de apagarse.
+  // Devuelve true si salió.
+  const cerrarSesion = async (ultimoPaso) => {
     // Antes: `catch(e) {}` y se salía igual. Si había un viaje en marcha y su cancelación no entraba, el pasajero se
     // quedaba esperando a un conductor que ya se había ido, sin que nadie lo supiera. Ahora: con viaje en marcha, si
     // no entra, NO se sale (el candado dice por qué y se puede reintentar). Sin viaje, se sale igual que antes: dejar
@@ -840,8 +843,7 @@ function AppConductor({ nombre, telefono, placa, vehiculo, tipoVehiculo, onCerra
     }, 'salir', 'Sesión cerrada.', 'cerrar la sesión');
     if (!r) return; // segundo toque
     if (!r.ok && viajeActual) return;
-    try { await signOut(auth); } catch(e) {}
-    if (onCerrarSesion) onCerrarSesion(); else window.location.reload();
+    return onCerrarSesion(ultimoPaso);
   };
 
   // Al abrir: se pide el token y, si este celular no le va a avisar de los viajes, se le dice en una ventanita

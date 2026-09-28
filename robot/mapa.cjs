@@ -82,6 +82,14 @@ const RECORRIDOS = [
     // recorrido NO lo cubre, y por eso AppConductor.js no se nombra aquí (ver APRENDIDO.md).
     vigila: ['guajirago/src/ModalCancelacion.js', 'guajirago/src/Solicitar.js', 'guajirago/src/textosViaje.js'],
   },
+  {
+    nombre: 'salir-por-el-menu',
+    que: 'el conductor disponible sale por «☰ Menú → Cerrar sesión» y su ficha queda APAGADA (mira la base de pruebas) (G07)',
+    archivo: 'salir-por-el-menu.cjs',
+    // «Eliminar cuenta» (Configuracion.js) usa la misma salida, pero probarla borraría la cuenta de prueba: NO la cubre
+    // este recorrido, y por eso Configuracion.js no se nombra aquí. La cubre pruebas/salirDeLaApp.test.js.
+    vigila: ['guajirago/src/MenuLateral.js', 'guajirago/src/App.js', 'guajirago/src/AppConductor.js'],
+  },
 ];
 
 // Los archivos de pantalla: los que, si cambian, el robot debería poder probar. Todo lo que esté en

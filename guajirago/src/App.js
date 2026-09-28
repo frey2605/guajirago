@@ -20,7 +20,7 @@ import Creditos from './Creditos';
 import Anuncio from './Anuncio';
 import Logo from './Logo';
 import { auth, db, storage } from './firebase';
-import { onAuthStateChanged } from 'firebase/auth';
+import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 // REGLA 7: los créditos de bienvenida los da el servidor, no este teléfono.
@@ -594,9 +594,15 @@ function App() {
     }
   };
 
-  const handleCerrarSesion = () => {
+  // La única salida de la app (G07, 28-sep-2026): cada pantalla escribe lo suyo ANTES de llamarla, y aquí se cierra la
+  // sesión, al final. `ultimoPaso` es lo que tiene que pasar con la sesión todavía abierta: «Eliminar cuenta» borra el
+  // usuario ahí. Devuelve true cuando salió.
+  const handleCerrarSesion = async (ultimoPaso) => {
+    if (typeof ultimoPaso === 'function') await ultimoPaso();
+    try { await signOut(auth); } catch (e) {}
     try { localStorage.removeItem(STORAGE_KEY); } catch (e) {}
     setScreen('login');
+    return true;
   };
 
   if (celebracionCreditosConductor) return <CelebracionBienvenidaConductor monto={celebracionCreditosConductor} tipoVehiculo={tipoVehiculoUsuario} onContinuar={() => { setCelebracionCreditosConductor(null); setScreen('home'); }} />;

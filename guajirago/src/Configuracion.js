@@ -77,8 +77,10 @@ function Configuracion({ onVolver, onCerrarSesion }) {
       if (!user || !user.email) return;
       const credencial = EmailAuthProvider.credential(user.email, contrasenaEliminar);
       await reauthenticateWithCredential(user, credencial);
-      await deleteUser(user);
-      if (onCerrarSesion) onCerrarSesion();
+      // G07 (28-sep-2026): el usuario se borra DENTRO de la salida, con la sesión aún abierta y después de que la
+      // pantalla escriba lo suyo (el conductor se apaga). Antes se borraba primero y apagarlo ya no entraba.
+      const salio = await onCerrarSesion(() => deleteUser(user));
+      if (!salio) setErrorEliminar('No se pudo cancelar tu viaje en curso, así que la cuenta no se eliminó. Inténtalo de nuevo');
     } catch (e) {
       if (e.code === 'auth/wrong-password' || e.code === 'auth/invalid-credential') {
         setErrorEliminar('Contraseña incorrecta. Inténtalo de nuevo');
