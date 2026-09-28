@@ -236,6 +236,15 @@ la placa de `conductores/{uid}` (la escribe su GPS con la misma placa que va en 
 - No se lee la lista de Viajes: ahí sale el `tarifa` GUARDADO de cada viaje, y los viejos siguen diciendo «$10,000»
   (G13 midió 30). Eso es dato, no pantalla, y G14 no lo toca.
 
+### ganancias-panel (G15, 28-sep-2026)
+- «GANANCIAS HOY» es una de las tarjetas de ARRIBA del panel (solo la ve el superadmin) y sale en TODAS las pantallas,
+  también dentro de 👑 Superadmin: en «Ingresos reales» se busca la columna con `\bHOY` para no confundirla.
+- La config de la base de pruebas trae 300 / 800 / 1.000, los MISMOS números del respaldo del panel: comparar las
+  cifras de la nota no distingue la versión vieja de la nueva. Lo que sí la distingue es que la nota nueva nombra
+  también el «mandado»; la vieja no. Y en pruebas no hay viajes finalizados hoy, así que las dos ganancias dan $ 0:
+  la cuenta con viajes de verdad la ejecuta `pruebas/gananciasTablero.test.js`. Solo lee (usa `entrarALaBase` para
+  leer config/global).
+
 ## Lo que el robot dejó creado en pruebas
 
 - 27-sep-2026: «Robot Taxi De Prueba» (robot.taxi.1790508222079@gg.test) y

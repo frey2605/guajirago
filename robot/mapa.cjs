@@ -129,6 +129,14 @@ const RECORRIDOS = [
     vigila: ['guajirago-admin/src/Superadmin.js', 'guajirago-admin/src/moneda.js'],
   },
   {
+    nombre: 'ganancias-panel',
+    que: 'el tablero del panel («GANANCIAS HOY») y 👑 Superadmin → «Ingresos reales» dicen la misma ganancia, y la nota enseña las comisiones de config/global (G15; solo lee)',
+    archivo: 'ganancias-panel.cjs',
+    // En pruebas no hay viajes finalizados hoy y config/global trae 300/800/1000 (los mismos del respaldo): la cuenta
+    // con viajes de verdad y con otra config la EJECUTA pruebas/gananciasTablero.test.js.
+    vigila: ['guajirago-admin/src/App.js', 'guajirago-admin/src/Superadmin.js', 'guajirago-admin/src/comisiones.js'],
+  },
+  {
     nombre: 'placa-fresca',
     que: 'el admin corrige la placa del taxista en su ficha y, con la copia del teléfono puesta, la app enseña y manda la placa nueva (mira la base de pruebas) (G09)',
     archivo: 'placa-fresca.cjs',
