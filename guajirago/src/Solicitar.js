@@ -8,8 +8,8 @@ import Calificacion from './Calificacion';
 import Llamada from './Llamada';
 import { alertarNuevoViaje, precargarAudio, activarAudioiOS, prepararTokenDeAvisos } from './Notificaciones';
 import { getFunctions, httpsCallable } from 'firebase/functions';
-import { CONFIG_TARIFAS_DEFECTO, calcularTarifaMinima } from './tarifas';
-import { CONFIG_COMPARTIDA, segundosDeEspera, BUSQUEDA, marcaDelVencido, maximoDeFavoritos, lugaresFavoritos } from './configApp';
+import { calcularTarifaMinima } from './tarifas';
+import { RESPALDO_CONFIG, leerConfig, segundosDeEspera, BUSQUEDA, marcaDelVencido, maximoDeFavoritos, lugaresFavoritos } from './configApp';
 import { cop } from './moneda';
 import { aplicarDescuento, armarDescuentoInfo, tarifaParaPasajero } from './descuentos';
 import { generarCodigoSeguridad, guardarCodigoDeViaje, cargarCodigoDeViaje } from './codigoSeguridad';
@@ -59,13 +59,9 @@ const NO_SE_DONDE_ESTAS = (esMensajeria, porque) => ({
 });
 
 // Valores por defecto (respaldo). Se reemplazan por los de config/global cuando cargan.
-const CONFIG_APP_DEFECTO = {
-  // Las tarifas mínimas salen de tarifas.js: una sola calculadora para toda la app.
-  ...CONFIG_TARIFAS_DEFECTO,
-  // Y los números de respaldo (radios, tiempos, favoritos, incremento) de
-  // configApp.js: un solo sitio, amarrado por prueba a la copia del panel.
-  ...CONFIG_COMPARTIDA,
-};
+// G36/G66: el respaldo ENTERO sale de configApp.js (tarifas, comisiones, números y módulos), el mismo de toda la app,
+// amarrado por prueba a la copia del panel. Las claves que esta pantalla no usa son inertes.
+const CONFIG_APP_DEFECTO = RESPALDO_CONFIG;
 
 // La tarifa mínima ya NO se calcula aquí: vive en tarifas.js, que es el único sitio
 // donde se calcula para toda la app (SEGUNDA LEY). Se importa arriba.
@@ -529,19 +525,17 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
   // Cargar la configuración global (tarifas, radios, etc.) una sola vez al abrir
   useEffect(() => {
     const cargarConfigApp = async () => {
-      try {
-        const snap = await getDoc(doc(db, 'config', 'global'));
-        if (snap.exists()) {
-          const nueva = { ...CONFIG_APP_DEFECTO, ...snap.data() };
-          setConfigApp(nueva);
-          // Si el pasajero aún no ha tocado la tarifa, ajustarla a la mínima según la config real
-          setTarifa(prev => {
-            const minimaVieja = calcularTarifaMinima(tipo, CONFIG_APP_DEFECTO);
-            // Solo la reajustamos si sigue en la mínima por defecto (no la ha modificado el usuario)
-            return prev === minimaVieja ? calcularTarifaMinima(tipo, nueva) : prev;
-          });
-        }
-      } catch (e) {}
+      // G66: la lectura sale de configApp.js (lo del servidor encima del respaldo; si falla, se queda el respaldo).
+      const { config: nueva, existe } = await leerConfig({ getDoc, doc, db });
+      if (existe) {
+        setConfigApp(nueva);
+        // Si el pasajero aún no ha tocado la tarifa, ajustarla a la mínima según la config real
+        setTarifa(prev => {
+          const minimaVieja = calcularTarifaMinima(tipo, CONFIG_APP_DEFECTO);
+          // Solo la reajustamos si sigue en la mínima por defecto (no la ha modificado el usuario)
+          return prev === minimaVieja ? calcularTarifaMinima(tipo, nueva) : prev;
+        });
+      }
     };
     cargarConfigApp();
   }, [tipo]);

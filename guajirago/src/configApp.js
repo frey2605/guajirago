@@ -19,6 +19,8 @@
  * pruebas/amarres.test.js que compara los dos lados, número por número, y se
  * pone rojo si se separan.
  */
+import { CONFIG_TARIFAS_DEFECTO } from './tarifas';
+import { COMISIONES_DEFECTO } from './comisiones';
 
 export const CONFIG_COMPARTIDA = {
   incrementoTarifa: 1000,     // cuánto sube/baja la oferta con cada toque de +/−
@@ -87,4 +89,76 @@ export function marcaDelVencido(ahoraIso) {
     expiradoPor: 'app-pasajero',
     motivoExpiracion: 'llevaba ' + Math.round(BUSQUEDA.segundos / 60) + ' min buscando conductor y nadie lo tomó',
   };
+}
+
+/**
+ * G36 (28-sep-2026): LOS INTERRUPTORES DE MÓDULOS — un solo respaldo. Estaban escritos a mano en App.js
+ * (`PantallaModulos`), con `!== false` para los dos primeros y `=== true` para los otros dos, y en el CONFIG_POR_DEFECTO
+ * del panel, sin prueba que los atara. Ahora la tabla vive aquí y pruebas/amarres.test.js la compara con la del panel.
+ * Transporte y Mensajería se ven si el panel no dice nada; Restaurantes y Turismo solo si el panel los prende.
+ */
+export const MODULOS_DEFECTO = {
+  moduloTransporte: true,
+  moduloMensajeria: true,
+  moduloRestaurantes: false,
+  moduloTurismo: false,
+};
+
+/** G36: qué módulos se ven con esta config. Lo que no sea verdadero/falso de verdad cae en el respaldo de arriba. */
+export function modulosDe(config) {
+  const o = {};
+  for (const k of Object.keys(MODULOS_DEFECTO)) {
+    const v = config && config[k];
+    o[k] = typeof v === 'boolean' ? v : MODULOS_DEFECTO[k];
+  }
+  return o;
+}
+
+/**
+ * G36: EL MENSAJE DE MANTENIMIENTO cuando el panel no escribió ninguno. Había TRES versiones: la app decía «Estamos
+ * haciendo mejoras. Volvemos muy pronto.», el panel al cargar «…en GuajiraGo. Volvemos muy pronto. ¡Gracias por tu
+ * paciencia!» y el panel si fallaba la carga «…en GuajiraGo. Volvemos muy pronto.». Queda la del panel al cargar, que
+ * es la que el dueño ve en la cajita y la que producción tiene guardada. El panel no puede importar este archivo (otro
+ * repositorio): su copia (MENSAJE_MANTENIMIENTO_DEFECTO en Superadmin.js) la ata pruebas/configGlobal.test.js.
+ */
+export const MENSAJE_MANTENIMIENTO = 'Estamos haciendo mejoras en GuajiraGo. Volvemos muy pronto. ¡Gracias por tu paciencia!';
+
+/** G36: el mensaje que se enseña: el del panel si trae texto de verdad; si no (falta, vacío, solo espacios), el respaldo. */
+export function mensajeDeMantenimiento(config) {
+  const m = config && config.mensajeMantenimiento;
+  return typeof m === 'string' && m.trim() ? m : MENSAJE_MANTENIMIENTO;
+}
+
+/**
+ * G36/G66: EL RESPALDO ENTERO de config/global en la app — tarifas (tarifas.js), comisiones (comisiones.js), los números
+ * de arriba y los módulos. Antes cada pantalla armaba el suyo (Solicitar sin comisiones, Ganancias solo comisiones,
+ * Ayuda solo los números, App.js los módulos a mano); las claves de más son inertes.
+ */
+export const RESPALDO_CONFIG = {
+  ...CONFIG_TARIFAS_DEFECTO,
+  ...COMISIONES_DEFECTO,
+  ...CONFIG_COMPARTIDA,
+  ...MODULOS_DEFECTO,
+};
+
+/**
+ * G66 (28-sep-2026): LA ÚNICA FORMA DE LEER config/global EN LA APP. Antes cada pantalla (App.js dos veces,
+ * AppConductor, Solicitar, Ganancias, AyudaSoporte) hacía su propio getDoc, con su respaldo y su `catch` mudo.
+ * Devuelve SIEMPRE una config usable — lo del servidor ENCIMA del respaldo — y dice qué pasó:
+ *   · existe: true  → vino del servidor;
+ *   · existe: false, error: null → el documento no existe (manda el respaldo);
+ *   · existe: false, error: <el fallo> → no se pudo leer; se avisa en la consola y manda el respaldo.
+ * Las piezas de Firestore llegan de la pantalla (`{ getDoc, doc, db }`), así este archivo sigue siendo puro y se prueba
+ * ejecutándolo.
+ */
+export function leerConfig({ getDoc, doc, db }) {
+  return Promise.resolve()
+    .then(() => getDoc(doc(db, 'config', 'global')))
+    .then((snap) => (snap.exists()
+      ? { config: { ...RESPALDO_CONFIG, ...snap.data() }, existe: true, error: null }
+      : { config: { ...RESPALDO_CONFIG }, existe: false, error: null }))
+    .catch((e) => {
+      console.warn('config/global no cargó; se usa el respaldo de configApp.js:', (e && (e.code || e.message)) || e);
+      return { config: { ...RESPALDO_CONFIG }, existe: false, error: e || new Error('fallo sin detalle') };
+    });
 }

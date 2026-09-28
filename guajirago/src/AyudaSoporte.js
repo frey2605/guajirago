@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from './firebase';
 import Logo from './Logo';
-import { CONFIG_COMPARTIDA, lugaresFavoritos } from './configApp';
+import { RESPALDO_CONFIG, leerConfig, lugaresFavoritos } from './configApp';
 
 const CORREO_SOPORTE = 'soporte@guajirago.com.co';
 
@@ -51,11 +51,10 @@ function AyudaSoporte({ onVolver }) {
   // G35: el tope de favoritos sale de config/global con la misma pieza que usa Solicitar.js. Mientras carga, o si no
   // carga, vale el respaldo de configApp.js — el MISMO que usa Solicitar.js cuando tampoco le carga, así que las dos
   // siguen diciendo lo mismo. No es un rechazo de nada que el usuario hiciera: es el texto de una respuesta.
-  const [configApp, setConfigApp] = useState(CONFIG_COMPARTIDA);
+  const [configApp, setConfigApp] = useState(RESPALDO_CONFIG);
   useEffect(() => {
-    getDoc(doc(db, 'config', 'global'))
-      .then((snap) => { if (snap.exists()) setConfigApp({ ...CONFIG_COMPARTIDA, ...snap.data() }); })
-      .catch(() => { /* se queda el respaldo de configApp.js, igual que en Solicitar.js */ });
+    // G66: la misma lectura que Solicitar.js (configApp.js); si falla, se queda el respaldo, igual que allá.
+    leerConfig({ getDoc, doc, db }).then(({ config, existe }) => { if (existe) setConfigApp(config); });
   }, []);
   const PREGUNTAS = preguntasCon(lugaresFavoritos(configApp));
 

@@ -3,10 +3,10 @@ import { db, auth } from './firebase';
 import { collection, query, where, limit, onSnapshot, doc, updateDoc, setDoc, getDoc, getDocs, addDoc, orderBy, deleteField } from 'firebase/firestore';
 import { registrarTokenFCM, alertarNuevoViaje, activarAudioiOS, precargarAudio, permisoDeAvisos, avisoDeAvisos } from './Notificaciones';
 import { getFunctions, httpsCallable } from 'firebase/functions';
-import { COMISIONES_DEFECTO, comisionSegunTipoDeViaje, comisionParaActivarse } from './comisiones';
+import { comisionSegunTipoDeViaje, comisionParaActivarse } from './comisiones';
 import { porQueNoLeToca } from './leTocaElViaje';
-import { CONFIG_TARIFAS_DEFECTO, calcularTarifaMinima } from './tarifas';
-import { CONFIG_COMPARTIDA, segundosDeEspera, BUSQUEDA } from './configApp';
+import { calcularTarifaMinima } from './tarifas';
+import { RESPALDO_CONFIG, leerConfig, segundosDeEspera, BUSQUEDA } from './configApp';
 import { cop } from './moneda';
 import { ESTADOS_MERCADO, ESTADOS_TERMINADOS, ESTADOS_QUE_CIERRA_EL_SERVIDOR, avisoDelCierre, comoTermino, meAceptaronEsteViaje } from './estadosViaje';
 import { consultaDeGanancias, resumenDeGanancias } from './gananciasConductor';
@@ -36,17 +36,9 @@ import { pedirGps, seguirGps } from './pedirGps';
 import MapaConRuta from './MapaConRuta';
 
 // Valores por defecto (respaldo). Se reemplazan por los de config/global cuando cargan.
-const CONFIG_APP_DEFECTO = {
-  // Las tarifas mínimas salen de tarifas.js: una sola calculadora para toda la app.
-  ...CONFIG_TARIFAS_DEFECTO,
-  // Los números de respaldo (radios, tiempos, favoritos, incremento) de
-  // configApp.js: un solo sitio, amarrado por prueba a la copia del panel.
-  // Trae claves que esta pantalla no usa (radios, favoritos): son inertes,
-  // nadie las recorre ni las escribe — igual que ya pasaba con las tarifas.
-  ...CONFIG_COMPARTIDA,
-  // Las comisiones salen de comisiones.js: una sola calculadora para toda la app.
-  ...COMISIONES_DEFECTO,
-};
+// G36/G66: el respaldo ENTERO sale de configApp.js (tarifas, comisiones, números y módulos), el mismo de toda la app,
+// amarrado por prueba a la copia del panel. Las claves que esta pantalla no usa son inertes.
+const CONFIG_APP_DEFECTO = RESPALDO_CONFIG;
 
 // La tarifa mínima ya NO se calcula aquí: vive en tarifas.js (SEGUNDA LEY). Se importa arriba.
 //
@@ -475,16 +467,14 @@ function AppConductor({ nombre, telefono, placa, vehiculo, tipoVehiculo, onCerra
   const [, setDebugConfig] = useState('Cargando config...');
   useEffect(() => {
     const cargarConfigApp = async () => {
-      try {
-        const snap = await getDoc(doc(db, 'config', 'global'));
-        if (snap.exists()) {
-          const d = snap.data();
-          setConfigApp({ ...CONFIG_APP_DEFECTO, ...d });
-          setDebugConfig('CONFIG OK → comisionTaxi=' + d.comisionTaxi + ' / comisionMoto=' + d.comisionMototaxi);
-        } else {
-          setDebugConfig('config/global NO EXISTE');
-        }
-      } catch (e) {
+      // G66: la lectura sale de configApp.js (lo del servidor encima del respaldo, y dice si falló).
+      const { config: d, existe, error: e } = await leerConfig({ getDoc, doc, db });
+      if (existe) {
+        setConfigApp(d);
+        setDebugConfig('CONFIG OK → comisionTaxi=' + d.comisionTaxi + ' / comisionMoto=' + d.comisionMototaxi);
+      } else if (!e) {
+        setDebugConfig('config/global NO EXISTE');
+      } else {
         setDebugConfig('ERROR: ' + (e.code || '') + ' ' + (e.message || ''));
       }
     };

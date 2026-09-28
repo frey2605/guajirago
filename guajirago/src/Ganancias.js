@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { db, auth } from './firebase';
 import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
 import Logo from './Logo';
-import { COMISIONES_DEFECTO } from './comisiones';
+import { leerConfig } from './configApp';
 import { cop } from './moneda';
 import { consultaDeGanancias, resumenDeGanancias } from './gananciasConductor';
 
@@ -19,12 +19,9 @@ function Ganancias({ onVolver }) {
         if (!user) { setCargando(false); return; }
 
         // Las comisiones vigentes, por si algún viaje es tan viejo que no guarda
-        // lo que se le cobró. La fuente buena es config/global.
-        let cfgComisiones = COMISIONES_DEFECTO;
-        try {
-          const snapCfg = await getDoc(doc(db, 'config', 'global'));
-          if (snapCfg.exists()) cfgComisiones = { ...COMISIONES_DEFECTO, ...snapCfg.data() };
-        } catch (eCfg) {}
+        // lo que se le cobró. La fuente buena es config/global. G66: la lectura y el respaldo (las comisiones de
+        // comisiones.js, dentro del respaldo entero) salen de configApp.js; si falla, se sigue con el respaldo.
+        const { config: cfgComisiones } = await leerConfig({ getDoc, doc, db });
 
         // G23 — la consulta y la cuenta son las MISMAS del recuadro «GANANCIAS DE HOY» del historial
         // (gananciasConductor.js): días de Colombia, no del teléfono, y sin el tope de 50 del historial.

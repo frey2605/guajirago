@@ -55,11 +55,14 @@ describe('G35 · el tope de lugares favoritos, una sola cuenta', () => {
 
   it('Ayuda lee config/global y la pone ENCIMA del mismo respaldo que Solicitar', () => {
     const ayuda = soloCodigo(leer('guajirago/src/AyudaSoporte.js')).replace(/\s+/g, ' ');
-    assert.ok(/getDoc\(doc\(db, 'config', 'global'\)\)/.test(ayuda), 'AyudaSoporte.js ya no lee config/global');
-    assert.ok(ayuda.includes('setConfigApp({ ...CONFIG_COMPARTIDA, ...snap.data() })'),
-      'AyudaSoporte.js ya no pone lo del servidor encima del respaldo de configApp.js (como hace Solicitar.js)');
-    assert.ok(ayuda.includes('useState(CONFIG_COMPARTIDA)'),
+    // G66: la lectura (lo del servidor ENCIMA del respaldo) es `leerConfig` de configApp.js, la misma de Solicitar.js;
+    // pruebas/configGlobal.test.js la ejecuta. Aquí se exige que Ayuda la use y ponga lo que devuelve.
+    assert.ok(ayuda.includes('leerConfig({ getDoc, doc, db }).then(({ config, existe }) => { if (existe) setConfigApp(config); })'),
+      'AyudaSoporte.js ya no lee config/global con leerConfig de configApp.js (como hace Solicitar.js)');
+    assert.ok(ayuda.includes('useState(RESPALDO_CONFIG)'),
       'AyudaSoporte.js ya no arranca con el respaldo de configApp.js: mientras carga diría otra cosa que Solicitar.js');
+    assert.ok(soloCodigo(leer('guajirago/src/Solicitar.js')).includes('const CONFIG_APP_DEFECTO = RESPALDO_CONFIG;'),
+      'Solicitar.js ya no arranca con el mismo respaldo (RESPALDO_CONFIG) que Ayuda');
   });
 
   it('y el medidor SÍ ve la diferencia con el código de antes (si no, no estaría mirando nada)', () => {

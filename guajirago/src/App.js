@@ -28,6 +28,7 @@ import { getFunctions, httpsCallable } from 'firebase/functions';
 import { DOCUMENTOS_CONDUCTOR, documentoQueFalta, nombreDelDocumento, iconoDelDocumento, iconoDelVehiculo } from './documentosConductor';
 import { telefonoDe } from './telefonoUsuario';
 import { cop } from './moneda';
+import { leerConfig, modulosDe, mensajeDeMantenimiento } from './configApp';
 const MARCAS_VEHICULO = [
   'AKT', 'Auteco', 'Bajaj', 'BMW', 'BYD', 'Chery', 'Chevrolet',
   'Citroen', 'Ford', 'Foton', 'Hero', 'Honda', 'Hyundai', 'JAC',
@@ -72,20 +73,13 @@ function datosDeLaFicha(f) {
 }
 
 function PantallaModulos({ nombre, foto, onSeleccionar, onVolver, onCerrarSesion, onIrPerfil, onIrGanancias, onIrSeguridad, onIrViajes, onIrCreditos, onIrAyuda, onIrConfig, onIrPromociones }) {
-  // NUEVO: interruptores de módulos desde config/global (Superadmin). Por defecto Transporte y Mensajería van prendidos.
-  const [modulos, setModulos] = useState({ moduloTransporte: true, moduloMensajeria: true, moduloRestaurantes: false, moduloTurismo: false });
+  // Interruptores de módulos desde config/global (Superadmin). G36/G66: el respaldo y la lectura salen de configApp.js
+  // (Transporte y Mensajería prendidos si el panel no dice nada), el mismo respaldo que el panel, atado por prueba.
+  const [modulos, setModulos] = useState(() => modulosDe(null));
   useEffect(() => {
-    getDoc(doc(db, 'config', 'global')).then(snap => {
-      if (snap.exists()) {
-        const d = snap.data();
-        setModulos({
-          moduloTransporte: d.moduloTransporte !== false,
-          moduloMensajeria: d.moduloMensajeria !== false,
-          moduloRestaurantes: d.moduloRestaurantes === true,
-          moduloTurismo: d.moduloTurismo === true,
-        });
-      }
-    }).catch(() => {});
+    leerConfig({ getDoc, doc, db }).then(({ config, existe }) => {
+      if (existe) setModulos(modulosDe(config));
+    });
   }, []);
   return (
     <div style={{ backgroundColor: '#FFFFFF', minHeight: '100vh', fontFamily: 'Arial, sans-serif', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start', padding: '72px 24px 32px', position: 'relative' }}>
@@ -567,16 +561,14 @@ function App() {
 
   // Revisa si hay mantenimiento activo para el tipo de usuario. Devuelve true si está bloqueado.
   const revisarMantenimiento = async (rol) => {
-    try {
-      const snap = await getDoc(doc(db, 'config', 'global'));
-      if (!snap.exists()) return false;
-      const d = snap.data();
-      const bloqueado = (rol === 'pasajero' && d.mantPasajeros) || (rol === 'conductor' && d.mantConductores);
-      if (bloqueado) {
-        setMensajeMantenimiento(d.mensajeMantenimiento || 'Estamos haciendo mejoras. Volvemos muy pronto.');
-        return true;
-      }
-    } catch (e) {}
+    // G66: la lectura sale de configApp.js; si falla o no existe, no se bloquea a nadie (como antes).
+    const { config: d, existe } = await leerConfig({ getDoc, doc, db });
+    if (!existe) return false;
+    const bloqueado = (rol === 'pasajero' && d.mantPasajeros) || (rol === 'conductor' && d.mantConductores);
+    if (bloqueado) {
+      setMensajeMantenimiento(mensajeDeMantenimiento(d)); // G36: un solo texto de respaldo, el mismo del panel
+      return true;
+    }
     return false;
   };
 

@@ -307,10 +307,10 @@ describe('AMARRES · el respaldo del panel y el de la app son el MISMO número a
     // Su copia pesa más que ninguna: si config/global no existiera, el panel la
     // ESCRIBE ENTERA como configuración inicial (Superadmin.js ~192). Un número
     // distinto ahí se convertiría en la configuración real del negocio.
-    const { CONFIG_TARIFAS_DEFECTO } = cargarDeLaApp('guajirago/src/tarifas.js');
-    const { COMISIONES_DEFECTO } = cargarDeLaApp('guajirago/src/comisiones.js');
-    const { CONFIG_COMPARTIDA } = cargarDeLaApp('guajirago/src/configApp.js');
-    const delaApp = { ...CONFIG_TARIFAS_DEFECTO, ...COMISIONES_DEFECTO, ...CONFIG_COMPARTIDA };
+    // G36: el lado de la app es RESPALDO_CONFIG de configApp.js, el respaldo ENTERO que usan las pantallas (tarifas,
+    // comisiones, números y los cuatro módulos), no una suma armada aquí.
+    const { RESPALDO_CONFIG } = cargarDeLaApp('guajirago/src/configApp.js');
+    const delaApp = { ...RESPALDO_CONFIG };
 
     const panel = leer('guajirago-admin/src/Superadmin.js');
     const bloque = panel.match(/const CONFIG_POR_DEFECTO = \{[\s\S]*?\n\};/);
@@ -320,11 +320,11 @@ describe('AMARRES · el respaldo del panel y el de la app son el MISMO número a
     const delPanel = new Function(bloque[0] + '\nreturn CONFIG_POR_DEFECTO;')();
 
     const comunes = Object.keys(delaApp).filter((k) => k in delPanel);
-    // EXACTAMENTE 15: si baja, alguien renombró una clave (y salió de la
+    // EXACTAMENTE 19 (15 números + 4 módulos desde el G36): si baja, alguien renombró una clave (y salió de la
     // comparación en silencio); si sube, ambos lados ganaron una clave común y
     // este número se sube A PROPÓSITO, mirando que valga lo mismo en los dos.
-    assert.strictEqual(comunes.length, 15,
-      'hay ' + comunes.length + ' números en común entre panel y app, y deben ser 15. ' +
+    assert.strictEqual(comunes.length, 19,
+      'hay ' + comunes.length + ' números en común entre panel y app, y deben ser 19. ' +
       'Si se renombró o añadió una clave compartida, se actualizan los dos lados y este número.');
     for (const k of comunes) {
       assert.strictEqual(delPanel[k], delaApp[k],
