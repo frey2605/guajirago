@@ -56,12 +56,40 @@ const DEBE_OFRECER = ['Con conductor', 'Nadie lo tomó', 'Quedó sin terminar'];
     const sale = await tarjeta.count();
     console.log('TARJETA DEL VIAJE EXPIRADO EN EL RESULTADO:', sale ? 'sí' : 'no');
     if (!sale) fallos.push('buscando «Quedó sin terminar» no sale la tarjeta «' + ORIGEN + '» con su etiqueta');
+
+    // LA FICHA DEL PASAJERO (🙋 Pasajeros → Buscar por correo): con el viaje del robot en `expirado`, «❌ Cancelados»
+    // tiene que bajar en UNO al pasarlo a `finalizado` (con la lista vieja no lo contaba, y no bajaba). Después se
+    // deja otra vez en `expirado`.
+    const leerFicha = async (paso) => {
+      await p.reload();
+      await p.waitForTimeout(8000);
+      await p.locator('button, div').filter({ hasText: /^🙋$/ }).last().click();
+      await p.waitForTimeout(5000);
+      await p.getByText('Buscar', { exact: true }).first().click();
+      await p.locator('input[placeholder="Correo electrónico"]').first().fill('pasajero@gg.test');
+      await p.getByText('🔍 Buscar', { exact: true }).first().click();
+      await p.waitForTimeout(1500);
+      await p.locator('div').filter({ hasText: 'pasajero@gg.test' }).last().click();
+      await p.waitForTimeout(1500);
+      await r.captura('ficha-' + paso);
+      const m = (await p.locator('body').innerText()).match(/❌ Cancelados: (\d+)/);
+      return m ? Number(m[1]) : null;
+    };
+    const conExpirado = await leerFicha('expirado');
+    await base.cambiar('viajes/' + ID, { estado: 'finalizado' });
+    const conFinalizado = await leerFicha('finalizado');
+    await base.cambiar('viajes/' + ID, { estado: 'expirado' });
+    console.log('FICHA DEL PASAJERO «❌ Cancelados»: con el viaje expirado', conExpirado, '· con el viaje finalizado', conFinalizado);
+    if (conExpirado == null || conFinalizado == null) fallos.push('no pude leer «❌ Cancelados» en la ficha del pasajero');
+    else if (conExpirado - conFinalizado !== 1) {
+      fallos.push('la ficha del pasajero no cuenta el viaje expirado como cancelado (' + conExpirado + ' → ' + conFinalizado + ')');
+    }
   } finally {
     console.log('CAPTURAS:', r.carpeta);
     console.log('ERRORES DE LA PÁGINA:', r.errores.join(' || ') || 'ninguno');
     await r.cerrar();
   }
   console.log(fallos.length ? '🔴 FALLÓ:\n  · ' + fallos.join('\n  · ')
-    : '✓ el buscador del panel ofrece todos los estados y encuentra el viaje expirado');
+    : '✓ el buscador del panel ofrece todos los estados y encuentra el viaje expirado, y la ficha del pasajero lo cuenta como cancelado');
   process.exit(fallos.length ? 1 : 0);
 })().catch((e) => { console.log('🔴 ' + e.message.split('\n')[0]); process.exit(1); });

@@ -330,6 +330,18 @@ la placa de `conductores/{uid}` (la escribe su GPS con la misma placa que va en 
   devolverla). Al final el taxista cancela el viaje y su ficha vuelve a como estaba (enViajeId, ocupado, activo).
 - El 403 de la consola sale igual que en los demás recorridos.
 
+### estados-panel (G25, 28-sep-2026)
+- El pasajero de prueba puede dejar SU viaje en `expirado` o `finalizado` (las reglas le dejan cambiar el `estado` de
+  su viaje sin `conductorId`): así se fabrica el caso que la lista vieja no veía, siempre en el mismo documento.
+- 🛣️ Viajes → «Buscar» (texto exacto) tiene UN solo `<select>`, el de ESTADO: se leen sus opciones con
+  `allInnerTexts()` y se escoge por VALOR (`selectOption('expirado')`), no por el texto.
+- La ficha del pasajero: 🙋 → «Buscar» → «Correo electrónico» = pasajero@gg.test → «🔍 Buscar» → tocar la tarjeta.
+  El panel carga los viajes UNA vez al abrir, así que para ver un cambio de la base hay que recargar la página y
+  volver a entrar. El caso que muerde es la DIFERENCIA: «❌ Cancelados» baja en uno al pasar el viaje de `expirado`
+  a `finalizado` (con la lista vieja no bajaba). Con el pasajero de prueba salió 21 → 20.
+- Lo que NO mira: el tablero (App.js) y las cajas de Mensajería; esas cuentas las EJECUTA
+  `pruebas/estadosPanel.test.js` viaje por viaje.
+
 ## Lo que el robot dejó creado en pruebas
 
 - 27-sep-2026: «Robot Taxi De Prueba» (robot.taxi.1790508222079@gg.test) y
@@ -356,3 +368,5 @@ la placa de `conductores/{uid}` (la escribe su GPS con la misma placa que va en 
   por «el sistema» y sin conductor (el primero: qo4yNd13wlwWQs3We2D1).
 - 28-sep-2026 en adelante: un viaje de Taxi `viajes/robotG24<hora>` de pasajero@gg.test por cada corrida de
   `me-aceptaron.cjs`, aceptado por el taxista y ya `cancelado_conductor` (el primero: robotG241790613250747).
+- 28-sep-2026 en adelante: UN solo viaje `viajes/robot-estados-panel-g25` de pasajero@gg.test, `expirado`, sin
+  conductor; cada corrida de `estados-panel.cjs` lo reusa (lo pasa un momento a `finalizado` y lo devuelve).
