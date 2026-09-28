@@ -4,7 +4,7 @@ import { collection, query, where, limit, onSnapshot, doc, updateDoc, setDoc, ge
 import { registrarTokenFCM, alertarNuevoViaje, activarAudioiOS, precargarAudio, permisoDeAvisos, avisoDeAvisos } from './Notificaciones';
 import { signOut } from 'firebase/auth';
 import { getFunctions, httpsCallable } from 'firebase/functions';
-import { COMISIONES_DEFECTO, comisionSegunTipo } from './comisiones';
+import { COMISIONES_DEFECTO, comisionSegunTipoDeViaje, comisionParaActivarse, tiposDeViajeQueVe } from './comisiones';
 import { CONFIG_TARIFAS_DEFECTO, calcularTarifaMinima } from './tarifas';
 import { CONFIG_COMPARTIDA } from './configApp';
 import { ESTADOS_MERCADO, ESTADOS_TERMINADOS } from './estadosViaje';
@@ -424,7 +424,8 @@ function TarjetaSolicitud({ solicitud, nombre, telefono, placa, vehiculo, tipoVe
   };
 
   const aceptarOEnviar = async () => {
-    const comisionAplicable = comisionSegunTipo(tipoVehiculo, configApp, solicitud.tipo);
+    // G03: la misma cifra que cobrará el servidor, que mira el tipo del VIAJE (no el vehículo del conductor).
+    const comisionAplicable = comisionSegunTipoDeViaje(solicitud.tipo, configApp);
     if (saldoCreditos !== null && saldoCreditos < comisionAplicable) {
       alert('No tienes saldo suficiente para tomar viajes. Recarga tus créditos.');
       return;
@@ -995,10 +996,8 @@ const cargarSaldo = useCallback(async (uid) => {
           if (!v.nuevaOferta && !v.fechaSolicitud) return false;
           // Filtro por tipo: el conductor ve solicitudes de su tipo de vehículo.
           // Los mototaxistas ADEMÁS ven los mandados de mensajería.
-          if (tipoVehiculo && v.tipo && v.tipo !== tipoVehiculo) {
-            const esMandadoParaMoto = v.tipo === 'Mensajería' && tipoVehiculo === 'Mototaxi';
-            if (!esMandadoParaMoto) return false;
-          }
+          // La lista sale de comisiones.js (tiposDeViajeQueVe): la misma que usa el interruptor para saber qué puede tomar.
+          if (tipoVehiculo && v.tipo && !tiposDeViajeQueVe(tipoVehiculo).includes(v.tipo)) return false;
           // Filtro por distancia: solo mostrar si el pasajero está dentro del radio de búsqueda actual
           if (ubicacionRef.current && v.pasajeroLat && v.pasajeroLng) {
             const radio = v.radioBusqueda || 7;
@@ -1658,7 +1657,7 @@ if (llamadoAtencion && !fase) return (
         
         <div style={{ background: '#FFFFFF', border: '1.5px solid #ECECEF', borderRadius: '14px', padding: '12px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
           <p style={{ color: activo ? '#1A1A1E' : '#6B7280', fontWeight: '900', fontSize: '15px', margin: '0' }}>{activo ? '🟢 Estoy disponible' : '⚪ No disponible'}</p>
-          <div onClick={() => { if (!activo && saldoCreditos !== null && saldoCreditos < comisionSegunTipo(tipoVehiculo, configApp)) { alert('No tienes saldo suficiente para recibir viajes. Recarga tus créditos.'); return; } activarAudioiOS(); precargarAudio(); setActivo(!activo); }} style={{ width: '52px', height: '30px', borderRadius: '15px', background: activo ? 'linear-gradient(135deg, #FFCF4D, #FF7A2F)' : '#ECECEF', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '0 4px', justifyContent: activo ? 'flex-end' : 'flex-start', flexShrink: 0 }}>
+          <div onClick={() => { if (!activo && saldoCreditos !== null && saldoCreditos < comisionParaActivarse(tipoVehiculo, configApp)) { alert('No tienes saldo suficiente para recibir viajes. Recarga tus créditos.'); return; } activarAudioiOS(); precargarAudio(); setActivo(!activo); }} style={{ width: '52px', height: '30px', borderRadius: '15px', background: activo ? 'linear-gradient(135deg, #FFCF4D, #FF7A2F)' : '#ECECEF', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '0 4px', justifyContent: activo ? 'flex-end' : 'flex-start', flexShrink: 0 }}>
             <div style={{ width: '22px', height: '22px', borderRadius: '50%', background: '#FFFFFF' }}/>
           </div>
         </div>

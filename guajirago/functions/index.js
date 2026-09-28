@@ -36,6 +36,8 @@ const { esFecha } = require('./suscripcion.js');
 const { porQueNoSeLeAvisa } = require('./avisables.cjs');
 // G01: el descuento se rehace sobre la tarifa aceptada (copia de guajirago/src/descuentos.js, atada por prueba).
 const { descuentoSobreTarifaAceptada } = require('./descuentos.cjs');
+// G03: la comisión se cobra según el tipo del VIAJE (la app y el panel tienen copias, atadas por prueba).
+const { comisionSegunTipoDeViaje } = require('./comisiones.cjs');
 
 // Distancia en km entre dos coordenadas (Haversine)
 function distanciaKm(lat1, lng1, lat2, lng2) {
@@ -332,10 +334,7 @@ exports.confirmarConductor = onCall(async (request) => {
       if (!ofertaSnap.exists) return { ok: false, motivo: "sin_oferta" };
       const of = ofertaSnap.data();
       const cfg = configSnap.exists ? configSnap.data() : {};
-      const tipo = viaje.tipo || "Taxi";
-      const comision = tipo === "Mototaxi" ? (cfg.comisionMototaxi ?? 300)
-        : tipo === "Mensajería" ? (cfg.comisionDomicilio ?? 1000)
-          : (cfg.comisionTaxi ?? 800);
+      const comision = comisionSegunTipoDeViaje(viaje.tipo, cfg);
       const creditosActuales = (usuarioSnap.exists ? usuarioSnap.data().creditos : 0) || 0;
       // G01 — la tarifa que se cobra la fija ESTA línea (la oferta aceptada). La ficha del descuento se armó en el
       // celular con la oferta de antes, así que se rehace aquí, en la misma operación, sobre la tarifa aceptada:

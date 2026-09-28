@@ -143,26 +143,99 @@ describe('AMARRES · el formateador de pesos escribe IGUAL en las dos apps', () 
   });
 });
 
-describe('AMARRES · la comisión: el paracaídas del servidor y el de la app son el mismo', () => {
-  it('los tres números de respaldo (mototaxi, taxi, domicilio) coinciden con el servidor', () => {
-    // El servidor (functions/index.js) es QUIEN COBRA, y si config/global no
-    // carga usa sus paracaídas «?? 300/800/1000». La app enseña la comisión con
-    // comisiones.js, que tiene los suyos. Las funciones se despliegan con su
-    // propia carpeta y no pueden importar comisiones.js — si los números se
-    // separan, el conductor vería una comisión y pagaría otra.
-    const { COMISIONES_DEFECTO } = cargarDeLaApp('guajirago/src/comisiones.js');
-    const servidor = leer('guajirago/functions/index.js');
-    const saca = (clave) => {
-      const m = servidor.match(new RegExp('cfg\\.' + clave + ' \\?\\? (\\d+)'));
-      assert.ok(m, 'el servidor ya no tiene el paracaídas «cfg.' + clave + ' ?? número» en functions/index.js');
-      return Number(m[1]);
-    };
-    assert.strictEqual(saca('comisionMototaxi'), COMISIONES_DEFECTO.comisionMototaxi,
-      'el paracaídas de mototaxi del servidor y el de la app se separaron');
-    assert.strictEqual(saca('comisionTaxi'), COMISIONES_DEFECTO.comisionTaxi,
-      'el paracaídas de taxi del servidor y el de la app se separaron');
-    assert.strictEqual(saca('comisionDomicilio'), COMISIONES_DEFECTO.comisionDomicilio,
-      'el paracaídas de domicilio del servidor y el de la app se separaron');
+describe('AMARRES · la comisión: el servidor, la app del conductor y el panel dicen la MISMA cifra (G03)', () => {
+  // El servidor (guajirago/functions/comisiones.cjs, que usa confirmarConductor) es QUIEN COBRA, y cobra según el
+  // tipo del VIAJE. La app del conductor (guajirago/src/comisiones.js) decide con eso si le alcanza el saldo, y el
+  // panel (guajirago-admin/src/Superadmin.js, `comisionDe`) cuenta las ganancias. Ninguno puede importar al otro:
+  // son tres paquetes. Hasta el 27-sep-2026 la app decidía con el vehículo del CONDUCTOR y con un campo del viaje
+  // que nadie escribe (`tipoVehiculo`): un conductor sin tipo de vehículo ante un mototaxi tenía que tener $800
+  // aunque el servidor le cobraba $400. Estas pruebas EJECUTAN las tres copias con los mismos casos.
+  // (Este describe reemplaza al que solo comparaba los tres números de respaldo leyendo el texto del servidor.)
+  const SERVIDOR = require('../guajirago/functions/comisiones.cjs');
+  const APP = cargarDeLaApp('guajirago/src/comisiones.js');
+  const panel = () => {
+    const fuente = leer('guajirago-admin/src/Superadmin.js');
+    const desde = fuente.indexOf('const comisionDe = (v) =>');
+    assert.ok(desde >= 0, 'el panel ya no tiene «const comisionDe = (v) =>» en Superadmin.js');
+    const cuerpo = cuerpoDeLaFuncion(fuente, desde);
+    assert.ok(cuerpo, 'no pude sacar el cuerpo de comisionDe del panel');
+    // eslint-disable-next-line no-new-func
+    const f = new Function('cfgCom', 'v', cuerpo.texto);
+    return (v, cfg) => f(cfg, v);
+  };
+  const TIPOS = ['Taxi', 'Mototaxi', 'Mensajería', undefined, '', 'Carro'];
+  const CONFIGS = [
+    {},
+    { comisionMototaxi: 400, comisionTaxi: 800, comisionDomicilio: 1000 },
+    { comisionMototaxi: 5, comisionTaxi: 6, comisionDomicilio: 7 },
+    { comisionMototaxi: 0, comisionTaxi: 0, comisionDomicilio: 0 },
+    { comisionTaxi: 1234 },
+  ];
+
+  it('los tres números de respaldo (mototaxi, taxi, domicilio) son los mismos en el servidor y en la app', () => {
+    assert.deepStrictEqual({ ...APP.COMISIONES_DEFECTO }, { ...SERVIDOR.COMISIONES_DEFECTO },
+      'el paracaídas del servidor y el de la app se separaron');
+  });
+
+  it('confirmarConductor cobra con la regla de functions/comisiones.cjs, pasándole el tipo del VIAJE', () => {
+    const idx = soloCodigo(leer('guajirago/functions/index.js'));
+    const desde = idx.indexOf('exports.confirmarConductor');
+    assert.ok(desde >= 0, 'no está exports.confirmarConductor');
+    const cuerpo = cuerpoDeLaFuncion(idx, desde).texto;
+    assert.match(cuerpo, /const comision = comisionSegunTipoDeViaje\(viaje\.tipo, cfg\);/,
+      'confirmarConductor ya no calcula la comisión con comisionSegunTipoDeViaje(viaje.tipo, cfg)');
+    assert.match(idx, /const \{ comisionSegunTipoDeViaje \} = require\('\.\/comisiones\.cjs'\);/,
+      'el servidor ya no importa la regla de comisiones.cjs');
+  });
+
+  it('para cada tipo de viaje y cada config, la app exige lo mismo que cobra el servidor', () => {
+    for (const cfg of CONFIGS) for (const tipo of TIPOS) {
+      assert.strictEqual(APP.comisionSegunTipoDeViaje(tipo, cfg), SERVIDOR.comisionSegunTipoDeViaje(tipo, cfg),
+        'la app y el servidor dicen distinto para un viaje «' + tipo + '» con ' + JSON.stringify(cfg));
+    }
+  });
+
+  it('las ganancias de un viaje viejo (sin comisionCobrada) se cuentan igual en la app, el panel y el servidor', () => {
+    const PANEL = panel();
+    for (const cfg of CONFIGS) for (const tipo of TIPOS) {
+      const cobra = SERVIDOR.comisionSegunTipoDeViaje(tipo, cfg);
+      // El viaje trae además un tipoVehiculo que NO debe mandar (ningún viaje lo lleva; si lo llevara, manda el tipo).
+      const viaje = { tipo, tipoVehiculo: tipo === 'Mototaxi' ? 'Taxi' : 'Mototaxi' };
+      assert.strictEqual(APP.comisionDeViaje(viaje, cfg), cobra,
+        'Ganancias cuenta un viaje «' + tipo + '» distinto de lo que cobra el servidor con ' + JSON.stringify(cfg));
+      assert.strictEqual(PANEL(viaje, { ...cfg }), cobra,
+        'el panel cuenta un viaje «' + tipo + '» distinto de lo que cobra el servidor con ' + JSON.stringify(cfg));
+    }
+    // Y lo que el viaje GUARDA que se le cobró manda sobre todo, en los dos.
+    assert.strictEqual(APP.comisionDeViaje({ tipo: 'Taxi', comisionCobrada: 350 }), 350);
+    assert.strictEqual(PANEL({ tipo: 'Taxi', comisionCobrada: 350 }, {}), 350);
+  });
+
+  it('el interruptor pide la comisión más barata de lo que ese conductor puede tomar, con la regla del servidor', () => {
+    assert.deepStrictEqual(APP.tiposDeViajeQueVe('Mototaxi'), ['Mototaxi', 'Mensajería']);
+    assert.deepStrictEqual(APP.tiposDeViajeQueVe('Taxi'), ['Taxi']);
+    assert.deepStrictEqual(APP.tiposDeViajeQueVe(''), ['Taxi', 'Mototaxi', 'Mensajería']);
+    for (const cfg of CONFIGS) for (const tv of ['Taxi', 'Mototaxi', '', undefined]) {
+      const minimo = Math.min(...APP.tiposDeViajeQueVe(tv).map((t) => SERVIDOR.comisionSegunTipoDeViaje(t, cfg)));
+      assert.strictEqual(APP.comisionParaActivarse(tv, cfg), minimo,
+        'el interruptor de un conductor «' + tv + '» no pide lo más barato que puede tomar, con ' + JSON.stringify(cfg));
+    }
+    // El caso de la auditoría: sin tipo de vehículo, config de hoy, saldo $500 → puede activarse (el mototaxi cuesta $400).
+    assert.strictEqual(APP.comisionParaActivarse('', { comisionMototaxi: 400, comisionTaxi: 800, comisionDomicilio: 1000 }), 400);
+  });
+
+  it('la pantalla del conductor usa esas funciones: por viaje, el tipo del VIAJE; para activarse y para la lista, las de comisiones.js', () => {
+    const fuente = soloCodigo(leer('guajirago/src/AppConductor.js'));
+    const desde = fuente.indexOf('const aceptarOEnviar = async () =>');
+    assert.ok(desde >= 0, 'no está aceptarOEnviar en AppConductor.js');
+    const cuerpo = cuerpoDeLaFuncion(fuente, desde).texto;
+    assert.match(cuerpo, /const comisionAplicable = comisionSegunTipoDeViaje\(solicitud\.tipo, configApp\);\s*if \(saldoCreditos !== null && saldoCreditos < comisionAplicable\)/,
+      'aceptarOEnviar ya no compara el saldo con la comisión del tipo del VIAJE');
+    assert.match(fuente, /!activo && saldoCreditos !== null && saldoCreditos < comisionParaActivarse\(tipoVehiculo, configApp\)\)/,
+      'el interruptor de activarse ya no usa comisionParaActivarse');
+    assert.match(fuente, /if \(tipoVehiculo && v\.tipo && !tiposDeViajeQueVe\(tipoVehiculo\)\.includes\(v\.tipo\)\) return false;/,
+      'la lista de solicitudes ya no filtra con tiposDeViajeQueVe (la misma lista que usa el interruptor)');
+    assert.ok(!/comisionSegunTipo\(/.test(fuente), 'volvió la calculadora vieja que decidía con el vehículo del conductor');
   });
 });
 
