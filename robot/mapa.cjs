@@ -74,6 +74,14 @@ const RECORRIDOS = [
     vigila: ['guajirago/src/candado.js', 'guajirago/src/useAccion.js', 'guajirago/src/Creditos.js',
       'guajirago-admin/src/candado.js', 'guajirago-aliados/src/candado.js'],
   },
+  {
+    nombre: 'cancelar-viaje',
+    que: 'el pasajero pide un taxi, lo cancela y LEE los cinco motivos de «¿Por qué cancelas?» (color que pinta el navegador); el viaje queda cancelado con el motivo escogido (G06)',
+    archivo: 'cancelar-viaje.cjs',
+    // La ventanita es la misma para el conductor (AppConductor.js), pero probarla allí pide un viaje aceptado: este
+    // recorrido NO lo cubre, y por eso AppConductor.js no se nombra aquí (ver APRENDIDO.md).
+    vigila: ['guajirago/src/ModalCancelacion.js', 'guajirago/src/Solicitar.js', 'guajirago/src/textosViaje.js'],
+  },
 ];
 
 // Los archivos de pantalla: los que, si cambian, el robot debería poder probar. Todo lo que esté en

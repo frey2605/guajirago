@@ -234,10 +234,12 @@ describe('LA LEY DEL BOTÓN · una sola pieza en las tres apps', () => {
     // Reciben la acción desde fuera (onConfirmar, onAceptar), así que el vigilante no la sigue hasta ellos: se exige
     // aquí. Lo cazó el saboteador general el 26-sep-2026 (quitar su disabled no ponía nada rojo).
     const t = leer('guajirago/src/Solicitar.js');
-    for (const comp of ['ModalCancelacion', 'TarjetaContraoferta']) {
-      const i = t.indexOf('function ' + comp + '(');
+    // La ventanita de cancelar vive en su propio archivo desde G06 (28-sep-2026): la misma para pasajero y conductor.
+    for (const [comp, fuente] of [['ModalCancelacion', leer('guajirago/src/ModalCancelacion.js')], ['TarjetaContraoferta', t]]) {
+      const i = fuente.indexOf('function ' + comp + '(');
       assert.ok(i >= 0, 'no encuentro ' + comp);
-      const cuerpo = t.slice(i, t.indexOf('\nfunction ', i + 10));
+      const fin = fuente.indexOf('\nfunction ', i + 10);
+      const cuerpo = fuente.slice(i, fin < 0 ? undefined : fin);
       assert.match(cuerpo.split('\n')[0], /ocupado \}\)/, comp + ' ya no recibe `ocupado`');
       assert.strictEqual((cuerpo.match(/disabled=\{!!ocupado\}/g) || []).length, 2, '⛔ ' + comp + ': sus dos botones tienen que bloquearse mientras trabaja');
     }
@@ -249,10 +251,10 @@ describe('LA LEY DEL BOTÓN · una sola pieza en las tres apps', () => {
 
   it('el conductor: su ventanita de cancelar bloquea sus botones, y su tarjeta sube el aviso del candado por un ref', () => {
     const t = leer('guajirago/src/AppConductor.js');
-    const i = t.indexOf('function ModalCancelacion(');
-    const cuerpo = t.slice(i, t.indexOf('\nfunction ', i + 10));
-    assert.match(cuerpo.split('\n')[0], /ocupado \}\)/, 'la ventanita de cancelar del conductor ya no recibe `ocupado`');
-    assert.strictEqual((cuerpo.match(/disabled=\{!!ocupado\}/g) || []).length, 2, '⛔ sus dos botones tienen que bloquearse mientras cancela');
+    // Su ventanita es la MISMA que la del pasajero (ModalCancelacion.js, G06): sus botones los exige la prueba de
+    // arriba; aquí se exige que el conductor use ésa y no una propia, y que le pase `ocupado`.
+    assert.ok(!/function ModalCancelacion\(/.test(t), '⛔ el conductor volvió a escribir su propia ventanita de cancelar');
+    assert.match(t, /^import ModalCancelacion from '\.\/ModalCancelacion';/m, 'el conductor no importa la ventanita común');
     assert.match(t, /<ModalCancelacion [^\n]*ocupado=\{ocupado\}/, 'no se le pasa `ocupado`');
     const tarjeta = t.slice(t.indexOf('function TarjetaSolicitud('), t.indexOf('\nfunction AppConductor('));
     assert.match(tarjeta, /<button onClick=\{\(\) => onRechazar\(solicitud\.id\)\} disabled=\{!!ocupado\}/, '⛔ «Quitar» se puede tocar mientras la oferta se envía');

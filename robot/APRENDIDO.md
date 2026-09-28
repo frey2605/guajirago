@@ -147,7 +147,24 @@ ya estaba guardado («Contacto de Prueba», 3000000001); si sale «Sin número»
   registro del rechazo SÍ sale en la consola («[rechazo] useAccion (canjear el código) · functions/not-found»): la
   acción corrió y se tradujo, pero la carrera contra el tope ya había reventado antes de decirlo.
 
+**El pasajero cancela un viaje (28-sep-2026, G06, `cancelar-viaje.cjs`).** Cuenta pasajero@gg.test → «Ya tengo cuenta»
+→ entrar (cae directo en su inicio, «¿QUÉ NECESITAS?») → «Taxi» → campos «¿Dónde estás? (Riohacha)» y «¿A dónde vas?
+(Riohacha)» → botón «Solicitar Taxi — $…» → pantalla de espera → «Cancelar viaje» → ventanita «¿Por qué cancelas?».
+- 🔑 **Se puede pedir un viaje sin mapa**: con el GPS fingido (`antesDeCargar`), si la dirección escrita no se
+  encuentra el viaje nace en la ubicación del aparato. El viaje es de verdad en la base de PRUEBAS.
+- 🔑 **El id del viaje sale de lo que la app le manda a Firestore** (`page.on('request')`, se busca
+  `documents/viajes/<id>` en el cuerpo): el SDK arma el id en el aparato, y el código de seguridad NO está en el
+  navegador (va al cajón privado del viaje). Con el id, `entrarALaBase` lee el viaje y se comprueba estado y motivo.
+- 🔴 **Con lo publicado ANTES de G06, el robot sale rojo**: los cinco motivos se pintan `rgb(255, 255, 255)` sobre
+  `rgb(255, 255, 255)`, contraste 1. El viaje igual quedó cancelado con «Otro motivo»: la caja funciona, solo no se ve.
+- Visto de paso, sin tocar: al cancelar, la pantalla vuelve al inicio y el «Viaje cancelado.» del candado **no llega a
+  verse nunca** (la pantalla se cierra en el mismo instante). Sale un 403 en la consola de la página en cada corrida.
+- La ventanita del conductor es la MISMA (ModalCancelacion.js), pero allí solo se abre con un viaje aceptado: este
+  recorrido NO la cubre. La cubre la prueba de Node (pruebas/modalCancelacion.test.js).
+
 ## Lo que el robot dejó creado en pruebas
 
 - 27-sep-2026: «Robot Taxi De Prueba» (robot.taxi.1790508222079@gg.test) y
   «Robot Mototaxi De Prueba» (robot.mototaxi.1790509022569@gg.test), con fotos de mentira.
+- 28-sep-2026 en adelante: un viaje de Taxi de pasajero@gg.test por cada corrida de `cancelar-viaje.cjs`, ya
+  cancelado por el pasajero con «Otro motivo» (el primero: ZV3QbClY4rj2kZgUILGO).
