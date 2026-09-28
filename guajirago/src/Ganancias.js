@@ -2,9 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { db, auth } from './firebase';
 import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
 import Logo from './Logo';
-import { COMISIONES_DEFECTO, comisionDeViaje } from './comisiones';
+import { COMISIONES_DEFECTO } from './comisiones';
 import { cop } from './moneda';
-import { valorDelViaje } from './valorViaje';
+import { consultaDeGanancias, resumenDeGanancias } from './gananciasConductor';
 
 function Ganancias({ onVolver }) {
   const [cargando, setCargando] = useState(true);
@@ -26,38 +26,16 @@ function Ganancias({ onVolver }) {
           if (snapCfg.exists()) cfgComisiones = { ...COMISIONES_DEFECTO, ...snapCfg.data() };
         } catch (eCfg) {}
 
-        const q = query(collection(db, 'viajes'),
-          where('conductorId', '==', user.uid),
-          where('estado', '==', 'finalizado')
-        );
-        const snap = await getDocs(q);
-        const viajes = snap.docs.map(d => ({ ...d.data() }));
-
+        // G23 — la consulta y la cuenta son las MISMAS del recuadro «GANANCIAS DE HOY» del historial
+        // (gananciasConductor.js): días de Colombia, no del teléfono, y sin el tope de 50 del historial.
+        // La comisión sale de comisiones.js (SEGUNDA LEY), con lo que el viaje GUARDA que se le cobró.
         const ahora = new Date();
-        const inicioHoy = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate());
-        const inicioSemana = new Date(inicioHoy);
-        inicioSemana.setDate(inicioHoy.getDate() - inicioHoy.getDay());
-        const inicioMes = new Date(ahora.getFullYear(), ahora.getMonth(), 1);
+        const snap = await getDocs(consultaDeGanancias({ collection, query, where }, db, user.uid, ahora));
+        const r = resumenDeGanancias(snap.docs.map(d => ({ ...d.data() })), ahora, cfgComisiones);
 
-        // SEGUNDA LEY — una sola calculadora, la de comisiones.js. Manda lo que el
-        // viaje GUARDA que se le cobró; solo si no lo trae se calcula. Antes esta
-        // pantalla tenía su propia cuenta y NO conocía la mensajería: le cobraba
-        // comisión de taxi a los mandados, $200 de menos en cada uno.
-        const comisionDe = (v) => comisionDeViaje(v, cfgComisiones);
-
-        const calcular = (lista) => {
-          const total = lista.reduce((acc, v) => acc + valorDelViaje(v), 0);
-          const comision = lista.reduce((acc, v) => acc + comisionDe(v), 0);
-          return { total, viajes: lista.length, comision };
-        };
-
-        const viajesHoy = viajes.filter(v => new Date(v.fechaSolicitud) >= inicioHoy);
-        const viajesSemana = viajes.filter(v => new Date(v.fechaSolicitud) >= inicioSemana);
-        const viajesMes = viajes.filter(v => new Date(v.fechaSolicitud) >= inicioMes);
-
-        setHoy(calcular(viajesHoy));
-        setSemana(calcular(viajesSemana));
-        setMes(calcular(viajesMes));
+        setHoy(r.hoy);
+        setSemana(r.semana);
+        setMes(r.mes);
       } catch (e) {}
       setCargando(false);
     };

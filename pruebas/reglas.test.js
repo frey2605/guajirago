@@ -903,11 +903,12 @@ describe('REGLA 6 · cada quien ve lo suyo', () => {
     )));
   });
 
-  it('el conductor SIGUE viendo sus ganancias (Ganancias.js:32)', async () => {
+  it('el conductor SIGUE viendo sus ganancias (consultaDeGanancias, gananciasConductor.js)', async () => {
     const { collection, query, where, getDocs } = FS;
     await RUT.assertSucceeds(getDocs(query(
       collection(como('conductor1'), 'viajes'),
-      where('conductorId', '==', 'conductor1'), where('estado', '==', 'finalizado')
+      where('conductorId', '==', 'conductor1'), where('estado', '==', 'finalizado'),
+      where('fechaSolicitud', '>=', '2026-09-01T05:00:00.000Z')
     )));
   });
 

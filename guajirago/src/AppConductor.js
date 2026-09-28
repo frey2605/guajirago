@@ -9,7 +9,7 @@ import { CONFIG_TARIFAS_DEFECTO, calcularTarifaMinima } from './tarifas';
 import { CONFIG_COMPARTIDA } from './configApp';
 import { cop } from './moneda';
 import { ESTADOS_MERCADO, ESTADOS_TERMINADOS, ESTADOS_QUE_CIERRA_EL_SERVIDOR, avisoDelCierre, comoTermino } from './estadosViaje';
-import { valorDelViaje } from './valorViaje';
+import { consultaDeGanancias, resumenDeGanancias } from './gananciasConductor';
 // Los datos que comparten las pantallas salen de archivos únicos (SEGUNDA LEY).
 import { centroRiohacha } from './riohacha';
 // REGLA 9 · qué se le dice al conductor cuando el servidor dice que no. Mismo
@@ -272,11 +272,12 @@ function HistorialConductor({ onVolver }) {
           // **en vez de** decirle al servidor por cuál empezar.
           .sort((a, b) => new Date(b.fechaSolicitud) - new Date(a.fechaSolicitud));
         setViajes(lista);
-        const hoy = new Date().toDateString();
-        const gananciaHoy = lista
-          .filter(v => v.estado === 'finalizado' && new Date(v.fechaSolicitud).toDateString() === hoy)
-          .reduce((acc, v) => acc + valorDelViaje(v), 0);
-        setTotalHoy(gananciaHoy);
+        // G23 — «GANANCIAS DE HOY» es la MISMA cuenta que la tarjeta HOY de la pantalla Ganancias
+        // (gananciasConductor.js): día de Colombia y su propia consulta, así que no depende del tope
+        // de 50 de la lista de arriba.
+        const ahora = new Date();
+        const snapGanancias = await getDocs(consultaDeGanancias({ collection, query, where }, db, user.uid, ahora));
+        setTotalHoy(resumenDeGanancias(snapGanancias.docs.map(d => d.data()), ahora).hoy.total);
       } catch (e) { console.error(e); }
       setCargando(false);
     };

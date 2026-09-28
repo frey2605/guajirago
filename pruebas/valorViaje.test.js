@@ -59,11 +59,16 @@ describe('¿CUÁNTO VALIÓ ESTE VIAJE? · una sola regla en la app y su copia at
   });
 
   it('las seis pantallas importan la regla y ninguna lee contraofertaValor', () => {
-    for (const ruta of ['guajirago/src/AppConductor.js', 'guajirago/src/Ganancias.js', 'guajirago-admin/src/Viajes.js',
+    // G23 (28-sep-2026): el historial y Ganancias del conductor ya no suman por su cuenta; lo hace
+    // gananciasConductor.js, que es quien importa la regla (pruebas/gananciasHoy.test.js exige que la usen).
+    for (const ruta of ['guajirago/src/gananciasConductor.js', 'guajirago-admin/src/Viajes.js',
       'guajirago-admin/src/Conductores.js', 'guajirago-admin/src/Pasajeros.js', 'guajirago-admin/src/Mensajeria.js']) {
       const t = codigo(ruta);
       assert.match(t, /^import \{ valorDelViaje \} from '\.\/valorViaje';$/m, ruta + ' no importa la regla única');
       assert.ok(!/contraofertaValor/.test(t), ruta + ' volvió a leer contraofertaValor');
+    }
+    for (const ruta of ['guajirago/src/AppConductor.js', 'guajirago/src/Ganancias.js']) {
+      assert.ok(!/contraofertaValor/.test(codigo(ruta)), ruta + ' volvió a leer contraofertaValor');
     }
   });
 
@@ -92,21 +97,14 @@ describe('¿CUÁNTO VALIÓ ESTE VIAJE? · una sola regla en la app y su copia at
     assert.strictEqual(conteo.k.valor, BUENO, 'el ranking de domiciliarios no suma con la regla única');
   });
 
-  it('la app del conductor: «Ganancias de hoy» del historial y la pantalla Ganancias cuentan con la regla (ejecutado)', () => {
-    const t = codigo('guajirago/src/AppConductor.js');
-    const desde = t.indexOf('function HistorialConductor(');
-    assert.ok(desde >= 0, 'AppConductor.js ya no tiene HistorialConductor');
-    const cuerpo = cuerpoDeLaFuncion(t, desde).texto;
-    const m = cuerpo.match(/const gananciaHoy = lista[\s\S]*?\.reduce\([^;]*;/);
-    assert.ok(m, 'no encuentro la cuenta gananciaHoy en HistorialConductor');
-    const hoy = new Date().toISOString();
-    const lista = MEZCLA.map((v) => ({ ...v, fechaSolicitud: hoy }));
-    const gananciaHoy = correr([renglon(cuerpo, 'hoy'), m[0], 'return gananciaHoy;'], ['lista', 'valorDelViaje'], [lista, APP.valorDelViaje]);
-    assert.strictEqual(gananciaHoy, BUENO, 'el historial del conductor no suma con la regla única');
-
-    const g = codigo('guajirago/src/Ganancias.js');
-    const total = correr([renglon(g, 'total'), 'return total;'], ['lista', 'valorDelViaje'], [MEZCLA, APP.valorDelViaje]);
-    assert.strictEqual(total, BUENO, 'la pantalla Ganancias no suma con la regla única');
+  it('la app del conductor: la cuenta de ganancias (historial y pantalla Ganancias) suma con la regla (ejecutado)', () => {
+    // G23 (28-sep-2026): las dos pantallas cuentan con gananciasConductor.js; aquí se ejecuta esa cuenta.
+    const GAN = cargarDeLaApp('guajirago/src/gananciasConductor.js');
+    const ahora = new Date();
+    const lista = MEZCLA.map((v) => ({ ...v, fechaSolicitud: ahora.toISOString() }));
+    const r = GAN.resumenDeGanancias(lista, ahora, {});
+    assert.strictEqual(r.hoy.total, BUENO, 'la cuenta de ganancias del conductor no suma con la regla única');
+    assert.strictEqual(r.mes.total, BUENO, 'la cuenta de ganancias del mes no suma con la regla única');
   });
 
   it('el medidor cuenta los viajes cuya oferta vieja no es el precio (scripts/medir-valor-viaje.cjs)', () => {
