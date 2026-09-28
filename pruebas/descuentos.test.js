@@ -81,10 +81,11 @@ describe('SEGUNDA LEY · el descuento, una sola calculadora', () => {
   it('al pasajero se le enseña lo que VA A PAGAR, no la tarifa completa', () => {
     const viajeConDescuento = { tarifa: '$10.000', descuentoInfo: { tarifaPasajeroPaga: 2000 } };
     const viajeSinDescuento = { tarifa: '$10.000' };
-    assert.strictEqual(tarifaParaPasajero(viajeConDescuento), `$${(2000).toLocaleString()}`);
+    // G14: se escribe con cop() (espacio duro entre el signo y el número), no con el idioma del teléfono.
+    assert.strictEqual(tarifaParaPasajero(viajeConDescuento), '$\u00a02.000');
     assert.strictEqual(tarifaParaPasajero(viajeSinDescuento), '$10.000');
     // Y con paga $0 se enseña $0, no la tarifa completa: != null, no falsy.
-    assert.strictEqual(tarifaParaPasajero({ tarifa: '$5.000', descuentoInfo: { tarifaPasajeroPaga: 0 } }), '$0');
+    assert.strictEqual(tarifaParaPasajero({ tarifa: '$5.000', descuentoInfo: { tarifaPasajeroPaga: 0 } }), '$\u00a00');
   });
 
   it('NINGUNA pantalla tiene su propia copia de la cuenta', () => {

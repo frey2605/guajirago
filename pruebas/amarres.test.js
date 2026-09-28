@@ -124,17 +124,21 @@ describe('AMARRES · el filtro anti-datos juzga IGUAL en la app y en el panel', 
   });
 });
 
-describe('AMARRES · el formateador de pesos escribe IGUAL en las dos apps', () => {
-  it('las dos moneda.js (app y aliados) formatean idéntico, incluido el dato vacío', () => {
+describe('AMARRES · el formateador de pesos escribe IGUAL en las tres apps', () => {
+  it('las tres moneda.js (app, aliados y panel) formatean idéntico, incluido el dato vacío', () => {
     // Son gemelas a propósito: los repos no pueden compartir archivo. Este
     // amarre EJECUTA las dos. Si un día una escribe «$ 8.000» y la otra
     // «COP 8.000», el cliente y el restaurante verían la misma plata escrita
     // distinto.
     const app = cargarDeLaApp('guajirago/src/moneda.js').cop;
     const aliados = cargarDeLaApp('guajirago-aliados/src/moneda.js').cop;
-    for (const n of [0, 1, 999, 8000, 125500, 1000000, null, undefined]) {
+    // G14 (28-sep-2026): el panel también tiene la suya.
+    const panel = cargarDeLaApp('guajirago-admin/src/moneda.js').cop;
+    for (const n of [0, 1, 999, 8000, 125500, 1000000, -500, 1234.56, null, undefined]) {
       assert.strictEqual(app(n), aliados(n),
         'con ' + String(n) + ' la app escribe «' + app(n) + '» y aliados «' + aliados(n) + '»');
+      assert.strictEqual(app(n), panel(n),
+        'con ' + String(n) + ' la app escribe «' + app(n) + '» y el panel «' + panel(n) + '»');
     }
     // Y el dato vacío se enseña como $ 0, jamás como $ NaN (la mitad de las 13
     // copias viejas escribía NaN en pantalla).

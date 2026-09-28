@@ -110,8 +110,9 @@ describe('LA PANTALLA · las fechas y la plata, escritas para una persona', () =
   });
 
   it('la plata se escribe como se escribe aquí', () => {
-    assert.strictEqual(panel.enPesos(80000), '$80.000');
-    assert.strictEqual(panel.enPesos(0), '$0');
+    // G14: con el formateador de todo el proyecto (cop), espacio duro incluido.
+    assert.strictEqual(panel.enPesos(80000), '$\u00a080.000');
+    assert.strictEqual(panel.enPesos(0), '$\u00a00');
     // Un precio que no es número NO se pinta como «$0»: eso se leería como
     // «este cliente no paga nada», que es justo lo contrario de «no lo sé».
     assert.strictEqual(panel.enPesos(undefined), '—');

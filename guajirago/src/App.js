@@ -27,6 +27,7 @@ import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { DOCUMENTOS_CONDUCTOR, documentoQueFalta, nombreDelDocumento, iconoDelDocumento, iconoDelVehiculo } from './documentosConductor';
 import { telefonoDe } from './telefonoUsuario';
+import { cop } from './moneda';
 const MARCAS_VEHICULO = [
   'AKT', 'Auteco', 'Bajaj', 'BMW', 'BYD', 'Chery', 'Chevrolet',
   'Citroen', 'Ford', 'Foton', 'Hero', 'Honda', 'Hyundai', 'JAC',
@@ -453,7 +454,7 @@ function CelebracionBienvenidaConductor({ monto, tipoVehiculo, onContinuar }) {
       <p style={{ color: '#FF7A2F', fontSize: '15px', margin: '0 0 24px', textAlign: 'center', fontWeight: 'bold', zIndex: 2 }}>Empiezas con saldo en tu cuenta 🥳</p>
       <div style={{ background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)', borderRadius: '28px', padding: '32px 28px', width: '100%', maxWidth: '420px', textAlign: 'center', zIndex: 2, boxShadow: '0 8px 32px rgba(255,122,47,0.4)' }}>
         <p style={{ color: '#FFFFFF', fontSize: '13px', margin: '0 0 8px', letterSpacing: '2px', fontWeight: '900' }}>CRÉDITOS DE BIENVENIDA</p>
-        <p style={{ color: '#FFFFFF', fontSize: '54px', fontWeight: '900', margin: '0', lineHeight: '1' }}>${(monto || 0).toLocaleString()}</p>
+        <p style={{ color: '#FFFFFF', fontSize: '54px', fontWeight: '900', margin: '0', lineHeight: '1' }}>{cop(monto || 0)}</p>
         <p style={{ color: 'rgba(255,255,255,0.9)', fontSize: '13px', margin: '14px 0 0', lineHeight: '1.5', fontWeight: 'bold' }}>Ya está en tu saldo. Úsalo para pagar tus primeras comisiones 🚀</p>
       </div>
       <button onClick={onContinuar} style={{ marginTop: '28px', width: '100%', maxWidth: '420px', padding: '18px', background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)', border: 'none', borderRadius: '16px', color: '#FFFFFF', fontSize: '18px', fontWeight: '900', cursor: 'pointer', zIndex: 2 }}>¡A rodar! 🎉</button>

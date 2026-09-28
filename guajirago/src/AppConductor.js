@@ -101,7 +101,7 @@ function CelebracionConductor({ monto, onCerrar }) {
       <p style={{ color: '#FF7A2F', fontSize: '16px', margin: '0 0 24px', textAlign: 'center', fontWeight: 'bold' }}>El descuento del pasajero es tuyo 🎁</p>
       <div style={{ background: '#FFFFFF', borderRadius: '28px', padding: '32px 24px', width: '100%', maxWidth: '420px', border: '3px solid #2ECC71', textAlign: 'center', zIndex: 2 }}>
         <p style={{ color: '#2ECC71', fontSize: '12px', margin: '0 0 12px', letterSpacing: '2px', fontWeight: 'bold' }}>SALDO ACREDITADO A TUS CRÉDITOS</p>
-        <p style={{ color: '#1A1A1E', fontSize: '52px', fontWeight: '900', margin: '0' }}>${(monto || 0).toLocaleString()}</p>
+        <p style={{ color: '#1A1A1E', fontSize: '52px', fontWeight: '900', margin: '0' }}>{cop(monto || 0)}</p>
         <p style={{ color: '#6B7280', fontSize: '13px', margin: '16px 0 0', lineHeight: '1.5' }}>Ya está sumado a tu saldo de créditos. ¡Gracias por rodar con GuajiraGo!</p>
       </div>
       <button onClick={onCerrar} style={{ marginTop: '28px', width: '100%', maxWidth: '420px', padding: '18px', background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)', border: 'none', borderRadius: '16px', color: '#FFFFFF', fontSize: '17px', fontWeight: '900', cursor: 'pointer', zIndex: 2 }}>Continuar</button>
@@ -292,7 +292,7 @@ function HistorialConductor({ onVolver }) {
         <div style={{ margin: '16px 20px 0', background: '#FFFFFF', borderRadius: '16px', padding: '16px 20px', border: '1.5px solid #ECECEF', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
             <p style={{ color: '#6B7280', fontSize: '11px', margin: '0', letterSpacing: '2px' }}>GANANCIAS DE HOY</p>
-            <p style={{ color: '#2ECC71', fontSize: '28px', fontWeight: '900', margin: '4px 0 0' }}>${totalHoy.toLocaleString()}</p>
+            <p style={{ color: '#2ECC71', fontSize: '28px', fontWeight: '900', margin: '4px 0 0' }}>{cop(totalHoy)}</p>
           </div>
           <span style={{ fontSize: '36px' }}>💰</span>
         </div>
@@ -461,7 +461,7 @@ function TarjetaSolicitud({ solicitud, nombre, telefono, placa, vehiculo, tipoVe
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px', background: '#FFFFFF', borderRadius: '14px', padding: '14px' }}>
         <div>
           <p style={{ color: '#6B7280', fontSize: '10px', margin: '0' }}>{tarifaCambiada ? 'TU CONTRAOFERTA' : 'OFERTA DEL PASAJERO'}</p>
-          <p style={{ color: tarifaCambiada ? '#FF7A2F' : '#2ECC71', fontWeight: '900', fontSize: '26px', margin: '4px 0 0' }}>${(tarifaCambiada ? tarifaModificada : (solicitud.tarifaValor || TARIFA_MINIMA)).toLocaleString()}</p>
+          <p style={{ color: tarifaCambiada ? '#FF7A2F' : '#2ECC71', fontWeight: '900', fontSize: '26px', margin: '4px 0 0' }}>{cop(tarifaCambiada ? tarifaModificada : (solicitud.tarifaValor || TARIFA_MINIMA))}</p>
           {!tarifaCambiada && solicitud.nuevaOferta && <p style={{ color: '#FF7A2F', fontSize: '11px', margin: '4px 0 0' }}>⬆️ Pasajero actualizó su oferta</p>}
           {tarifaCambiada && <p style={{ color: '#6B7280', fontSize: '11px', margin: '4px 0 0' }}>Oferta original: {solicitud.tarifa}</p>}
         </div>
@@ -472,7 +472,7 @@ function TarjetaSolicitud({ solicitud, nombre, telefono, placa, vehiculo, tipoVe
       </div>
       {ofertaEnviada != null && (
         <div style={{ background: '#EAF9EF', border: '1px solid #2ECC71', borderRadius: '12px', padding: '10px 12px', marginBottom: '10px', textAlign: 'center' }}>
-          <p style={{ color: '#1B8A4A', fontSize: '13px', fontWeight: '900', margin: 0 }}>✅ Enviaste tu oferta: ${ofertaEnviada.toLocaleString()}</p>
+          <p style={{ color: '#1B8A4A', fontSize: '13px', fontWeight: '900', margin: 0 }}>✅ Enviaste tu oferta: {cop(ofertaEnviada)}</p>
           <p style={{ color: '#1B8A4A', fontSize: '11px', margin: '2px 0 0' }}>Puedes ajustar el precio con − / + y volver a enviar.</p>
         </div>
       )}
@@ -1627,7 +1627,7 @@ if (llamadoAtencion && !fase) return (
         <div onClick={() => setVerCreditos(true)} style={{ background: '#FFFFFF', borderRadius: '14px', padding: '12px 16px', display: 'flex', alignItems: 'center', gap: '12px', border: '1px solid #FF7A2F', cursor: 'pointer', marginBottom: '12px' }}>
           <span style={{ fontSize: '24px' }}>💰</span>
           <p style={{ color: '#1A1A1E', fontWeight: '900', fontSize: '15px', margin: '0', flex: 1 }}>Mis créditos</p>
-          <p style={{ color: '#2ECC71', fontSize: '20px', fontWeight: '900', margin: '0' }}>{saldoCreditos === null ? '...' : `$${saldoCreditos.toLocaleString()}`}</p>
+          <p style={{ color: '#2ECC71', fontSize: '20px', fontWeight: '900', margin: '0' }}>{saldoCreditos === null ? '...' : cop(saldoCreditos)}</p>
         </div>
         
         <div style={{ background: '#FFFFFF', border: '1.5px solid #ECECEF', borderRadius: '14px', padding: '12px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>

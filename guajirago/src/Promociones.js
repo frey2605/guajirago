@@ -5,6 +5,7 @@ import { collection, getDocs, doc, getDoc } from 'firebase/firestore';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import Logo from './Logo';
 import { motivoPorLaPromocion } from './reglaPromocion';
+import { cop } from './moneda';
 
 function CelebracionPromo({ codigo, textoValor, onCerrar }) {
   const confeti = Array.from({ length: 30 }, (_, i) => i);
@@ -65,7 +66,7 @@ function Promociones({ onVolver }) {
           tipo = snapU.data().tipo || '';
           const descPend = snapU.data().descuentoPendiente;
           if (descPend) {
-            const texto = descPend.tipoBeneficio === 'credito' ? `$${(descPend.valorBeneficio || 0).toLocaleString()}` : `${descPend.valorBeneficio}%`;
+            const texto = descPend.tipoBeneficio === 'credito' ? cop(descPend.valorBeneficio || 0) : `${descPend.valorBeneficio}%`;
             setDescuentoActivo({ codigoVerificacion: descPend.codigoVerificacion, textoValor: texto });
           }
         }
@@ -103,7 +104,7 @@ function Promociones({ onVolver }) {
       const respuesta = await reclamar({ codigo: cod });
       const resultado = respuesta.data;
 
-      const textoValor = resultado.tipo === 'credito' ? `$${resultado.valor.toLocaleString()}` : `${resultado.valor}%`;
+      const textoValor = resultado.tipo === 'credito' ? cop(resultado.valor) : `${resultado.valor}%`;
       setCelebrandoPromo({ codigo: resultado.codigoVerificacion, textoValor });
       setDescuentoActivo({ codigoVerificacion: resultado.codigoVerificacion, textoValor });
       setCodigo('');
@@ -178,7 +179,7 @@ function Promociones({ onVolver }) {
                   <span style={{ fontSize: '10px', fontWeight: 'bold', padding: '3px 10px', borderRadius: '20px', background: 'rgba(255,122,47,0.15)', color: '#FF7A2F' }}>{cat.icono} {cat.label}</span>
                   <p style={{ color: '#1A1A1E', fontSize: '17px', fontWeight: '900', margin: '10px 0 6px' }}>{p.nombre}</p>
                   <p style={{ color: '#2ECC71', fontSize: '20px', fontWeight: '900', margin: '0 0 8px' }}>
-                    {p.tipoBeneficio === 'descuento' ? `${p.valorBeneficio}% de descuento` : `$${(p.valorBeneficio || 0).toLocaleString()} de crédito`}
+                    {p.tipoBeneficio === 'descuento' ? `${p.valorBeneficio}% de descuento` : `${cop(p.valorBeneficio || 0)} de crédito`}
                   </p>
                   {p.descripcion && <p style={{ color: '#6B7280', fontSize: '13px', margin: '0 0 10px', lineHeight: '1.5' }}>{p.descripcion}</p>}
                   {p.requiereCodigo ? (

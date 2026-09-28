@@ -191,7 +191,7 @@ async function avisarDelPedidoNuevo(p) {
       return null;
     }
 
-    const totalTxt = p.total ? ("$" + Number(p.total).toLocaleString("es-CO")) : "";
+    const totalTxt = p.total ? cop(Number(p.total)) : "";
     await admin.messaging().sendEachForMulticast({
       notification: {
         title: "🍽️ Nuevo pedido a domicilio",
@@ -269,7 +269,7 @@ exports.notificarNuevaReserva = onDocumentCreated("reservasTurismo/{id}", async 
       if (d.fcmToken && d.activo !== false && (d.roles || {}).administrador) tokens.push(d.fcmToken);
     });
     if (tokens.length === 0) return null;
-    const totalTxt = r.total ? ("$" + Number(r.total).toLocaleString("es-CO")) : "";
+    const totalTxt = r.total ? cop(Number(r.total)) : "";
     await admin.messaging().sendEachForMulticast({
       notification: {
         title: "🧭 Nueva reserva",

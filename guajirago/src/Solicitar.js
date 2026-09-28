@@ -1458,7 +1458,7 @@ const PanelEmergencia = () => (
           <h2 style={{ color: '#FFFFFF', fontSize: '24px', fontWeight: '900', margin: '0 0 12px' }}>{confirmacionPendiente.conductorNombre || 'Conductor'}</h2>
           {confirmacionPendiente.conductorPlaca && <p style={{ color: '#FF7A2F', fontSize: '18px', fontWeight: '900', margin: '0 0 4px' }}>🚘 {confirmacionPendiente.conductorPlaca}</p>}
           {confirmacionPendiente.conductorVehiculo && <p style={{ color: '#6B7280', fontSize: '14px', margin: '0 0 12px' }}>{confirmacionPendiente.conductorVehiculo}{datosConductor?.color ? ` · ${datosConductor.color}` : ''}</p>}
-          <p style={{ color: '#2ECC71', fontSize: '32px', fontWeight: '900', margin: '8px 0 0' }}>{descuentoPendiente ? `$${calcularTarifaConDescuento(confirmacionPendiente.tarifaValor || parseInt((confirmacionPendiente.tarifa || '0').replace(/\D/g, ''), 10)).toLocaleString()}` : confirmacionPendiente.tarifa}</p>
+          <p style={{ color: '#2ECC71', fontSize: '32px', fontWeight: '900', margin: '8px 0 0' }}>{descuentoPendiente ? cop(calcularTarifaConDescuento(confirmacionPendiente.tarifaValor || parseInt((confirmacionPendiente.tarifa || '0').replace(/\D/g, ''), 10))) : confirmacionPendiente.tarifa}</p>
           {descuentoPendiente && <p style={{ color: '#6B7280', fontSize: '13px', margin: '4px 0 0', textDecoration: 'line-through' }}>{confirmacionPendiente.tarifa}</p>}
         </div>
         <p style={{ color: '#FFFFFF', fontSize: '16px', margin: '24px 0 16px', textAlign: 'center', fontWeight: 'bold' }}>¿Confirmas este viaje?</p>
@@ -1665,8 +1665,8 @@ const PanelEmergencia = () => (
         {resumenMandado}
         {!buscandoAgotado && (
           <p style={{ color: '#2ECC71', fontSize: '20px', fontWeight: '900', margin: '0 0 16px', textAlign: 'center' }}>
-            Tu oferta: ${tarifa.toLocaleString()}
-            {descuentoPendiente && <span style={{ color: '#FF7A2F', fontSize: '14px' }}> · Pagas ${calcularTarifaConDescuento(tarifa).toLocaleString()} con tu descuento</span>}
+            Tu oferta: {cop(tarifa)}
+            {descuentoPendiente && <span style={{ color: '#FF7A2F', fontSize: '14px' }}> · Pagas {cop(calcularTarifaConDescuento(tarifa))} con tu descuento</span>}
           </p>
         )}
         {!buscandoAgotado && (
@@ -1718,8 +1718,8 @@ const PanelEmergencia = () => (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
             <button onClick={bajarNuevaTarifa} style={{ width: '48px', height: '48px', background: (nuevaTarifa || tarifa) <= tarifa ? '#ECECEF' : '#FFFFFF', border: `2px solid ${(nuevaTarifa || tarifa) <= tarifa ? '#ECECEF' : '#FF7A2F'}`, borderRadius: '14px', color: (nuevaTarifa || tarifa) <= tarifa ? '#6B7280' : '#FF7A2F', fontSize: '24px', cursor: (nuevaTarifa || tarifa) <= tarifa ? 'default' : 'pointer', fontWeight: 'bold' }}>−</button>
             <div style={{ textAlign: 'center' }}>
-              <p style={{ color: '#1A1A1E', fontSize: '32px', fontWeight: '900', margin: '0' }}>${(nuevaTarifa || tarifa).toLocaleString()}</p>
-              <p style={{ color: '#6B7280', fontSize: '11px', margin: '4px 0 0' }}>Oferta actual: ${tarifa.toLocaleString()}</p>
+              <p style={{ color: '#1A1A1E', fontSize: '32px', fontWeight: '900', margin: '0' }}>{cop(nuevaTarifa || tarifa)}</p>
+              <p style={{ color: '#6B7280', fontSize: '11px', margin: '4px 0 0' }}>Oferta actual: {cop(tarifa)}</p>
             </div>
             <button onClick={subirNuevaTarifa} style={{ width: '48px', height: '48px', background: '#FFFFFF', border: '2px solid #2ECC71', borderRadius: '14px', color: '#2ECC71', fontSize: '24px', cursor: 'pointer', fontWeight: 'bold' }}>+</button>
           </div>
@@ -1857,7 +1857,7 @@ const PanelEmergencia = () => (
             <span style={{ fontSize: '28px' }}>🎁</span>
             <div>
               <p style={{ color: '#FFFFFF', fontWeight: '900', fontSize: '15px', margin: '0' }}>
-                Tienes un descuento activo de {descuentoPendiente.tipoBeneficio === 'credito' ? `$${descuentoPendiente.valorBeneficio.toLocaleString()}` : `${descuentoPendiente.valorBeneficio}%`}
+                Tienes un descuento activo de {descuentoPendiente.tipoBeneficio === 'credito' ? cop(descuentoPendiente.valorBeneficio) : `${descuentoPendiente.valorBeneficio}%`}
               </p>
               <p style={{ color: 'rgba(255,255,255,0.85)', fontSize: '12px', margin: '2px 0 0' }}>Se aplicará automáticamente a este viaje</p>
             </div>
@@ -1869,7 +1869,7 @@ const PanelEmergencia = () => (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <button onClick={bajarTarifa} style={{ width: '36px', height: '36px', background: tarifa <= TARIFA_MINIMA ? '#ECECEF' : '#FFFFFF', border: `2px solid ${tarifa <= TARIFA_MINIMA ? '#ECECEF' : '#FF7A2F'}`, borderRadius: '10px', color: tarifa <= TARIFA_MINIMA ? '#6B7280' : '#FF7A2F', fontSize: '20px', cursor: tarifa <= TARIFA_MINIMA ? 'default' : 'pointer', fontWeight: 'bold' }}>−</button>
             <div style={{ textAlign: 'center' }}>
-              <p style={{ color: '#1A1A1E', fontSize: '24px', fontWeight: '900', margin: '0' }}>${tarifa.toLocaleString()}</p>
+              <p style={{ color: '#1A1A1E', fontSize: '24px', fontWeight: '900', margin: '0' }}>{cop(tarifa)}</p>
               <p style={{ color: '#6B7280', fontSize: '9px', margin: '1px 0 0' }}>{tarifa === TARIFA_MINIMA ? 'Tarifa mínima' : 'Oferta personalizada'}</p>
             </div>
             <button onClick={subirTarifa} style={{ width: '36px', height: '36px', background: '#FFFFFF', border: '2px solid #2ECC71', borderRadius: '10px', color: '#2ECC71', fontSize: '20px', cursor: 'pointer', fontWeight: 'bold' }}>+</button>
@@ -1878,8 +1878,8 @@ const PanelEmergencia = () => (
         {error && <p style={{ color: '#FF4444', fontSize: '13px', textAlign: 'center', marginBottom: '12px' }}>{error}</p>}
         <button onClick={solicitarViaje} disabled={!!ocupado} style={{ width: '100%', padding: '13px', background: ocupado ? '#ECECEF' : 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)', border: 'none', borderRadius: '14px', color: ocupado ? '#6B7280' : '#FFFFFF', fontSize: '16px', fontWeight: '900', cursor: ocupado ? 'default' : 'pointer' }}>
           {texto('pedir', 'Enviando…', esMensajeria
-            ? `Pedir mandado — $${tarifa.toLocaleString()}`
-            : `Solicitar ${tipo} — $${tarifa.toLocaleString()}`)}
+            ? `Pedir mandado — ${cop(tarifa)}`
+            : `Solicitar ${tipo} — ${cop(tarifa)}`)}
         </button>
       </div>
       <AvisoModal aviso={aviso} onCerrar={() => setAviso(null)} />

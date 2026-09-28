@@ -12,6 +12,7 @@ import { contieneInfoSensible } from './filtroChat';
 // toque dos, su palabra mientras trabaja, la verdad al final en una ventanita, y nunca trabado sin señal.
 import { useAccion } from './useAccion';
 import AvisoModal from './AvisoModal';
+import { cop } from './moneda';
 
 function Creditos({ onVolver }) {
   const [saldo, setSaldo] = useState(null);
@@ -135,7 +136,7 @@ function Creditos({ onVolver }) {
       // El motivo del fallo lo explica el servidor ("Ese código ya fue usado", etc.) y el candado lo respeta tal cual;
       // cuando falla la red y Firebase pone el código pelado ('internal', 'deadline-exceeded'), lo traduce
       // (enCristiano, en candado.js: el criterio que vivía aquí se mudó allí, para todas las pantallas).
-    }, 'recargar', (valor) => `¡Recargaste $${valor.toLocaleString()} en créditos! 🎉`, 'canjear el código');
+    }, 'recargar', (valor) => `¡Recargaste ${cop(valor)} en créditos! 🎉`, 'canjear el código');
   };
 
   return (
@@ -145,7 +146,7 @@ function Creditos({ onVolver }) {
         <div style={{ background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F)', borderRadius: '14px', padding: '6px 24px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1 }}>
           <p style={{ color: '#FFFFFF', fontSize: '11px', margin: '0', letterSpacing: '1px', fontWeight: '900' }}>SALDO DISPONIBLE</p>
           <p style={{ color: '#FFFFFF', fontSize: '26px', fontWeight: '900', margin: '0' }}>
-            {saldo === null ? '...' : `$${saldo.toLocaleString()}`}
+            {saldo === null ? '...' : cop(saldo)}
           </p>
         </div>
         <Logo size={28} style={{ position: 'absolute', top: '14px', right: '16px', zIndex: 6 }} />

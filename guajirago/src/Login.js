@@ -10,6 +10,7 @@ import PoliticaPrivacidad from './PoliticaPrivacidad';
 import Logo from './Logo';
 import { telefonoDe } from './telefonoUsuario';
 import { telefonoSirve } from './telefonoValido';
+import { cop } from './moneda';
 
 const VALOR_CREDITO_BIENVENIDA = 8000; // Crédito fijo de bienvenida para pasajeros nuevos
 
@@ -57,7 +58,7 @@ function CelebracionBienvenida({ monto, onContinuar }) {
       <p style={{ color: '#FF7A2F', fontSize: '15px', margin: '0 0 24px', textAlign: 'center', fontWeight: 'bold', zIndex: 2 }}>Tenemos un regalo para ti 🥳</p>
       <div style={{ background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)', borderRadius: '28px', padding: '32px 28px', width: '100%', maxWidth: '420px', textAlign: 'center', zIndex: 2, boxShadow: '0 8px 32px rgba(255,122,47,0.4)' }}>
         <p style={{ color: '#FFFFFF', fontSize: '13px', margin: '0 0 8px', letterSpacing: '2px', fontWeight: '900' }}>CRÉDITO DE BIENVENIDA</p>
-        <p style={{ color: '#FFFFFF', fontSize: '54px', fontWeight: '900', margin: '0', lineHeight: '1' }}>${(monto || 0).toLocaleString()}</p>
+        <p style={{ color: '#FFFFFF', fontSize: '54px', fontWeight: '900', margin: '0', lineHeight: '1' }}>{cop(monto || 0)}</p>
         <p style={{ color: 'rgba(255,255,255,0.9)', fontSize: '13px', margin: '14px 0 0', lineHeight: '1.5', fontWeight: 'bold' }}>Ya está en tu cuenta. Úsalo automáticamente en tu primer viaje 🚀</p>
       </div>
       <button onClick={onContinuar} style={{ marginTop: '28px', width: '100%', maxWidth: '420px', padding: '18px', background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)', border: 'none', borderRadius: '16px', color: '#FFFFFF', fontSize: '18px', fontWeight: '900', cursor: 'pointer', zIndex: 2 }}>¡Vamos! 🎉</button>

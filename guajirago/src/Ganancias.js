@@ -3,6 +3,7 @@ import { db, auth } from './firebase';
 import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
 import Logo from './Logo';
 import { COMISIONES_DEFECTO, comisionDeViaje } from './comisiones';
+import { cop } from './moneda';
 
 function Ganancias({ onVolver }) {
   const [cargando, setCargando] = useState(true);
@@ -71,7 +72,7 @@ function Ganancias({ onVolver }) {
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px' }}>
         <div style={{ flex: 1, background: '#FFFFFF', border: '1.5px solid #ECECEF', borderRadius: '14px', padding: '14px', textAlign: 'center' }}>
           <p style={{ color: '#6B7280', fontSize: '10px', margin: '0', letterSpacing: '1px' }}>GANADO</p>
-          <p style={{ color: '#2ECC71', fontSize: '22px', fontWeight: '900', margin: '6px 0 0' }}>${datos.total.toLocaleString()}</p>
+          <p style={{ color: '#2ECC71', fontSize: '22px', fontWeight: '900', margin: '6px 0 0' }}>{cop(datos.total)}</p>
         </div>
         <div style={{ flex: 1, background: '#FFFFFF', border: '1.5px solid #ECECEF', borderRadius: '14px', padding: '14px', textAlign: 'center' }}>
           <p style={{ color: '#6B7280', fontSize: '10px', margin: '0', letterSpacing: '1px' }}>VIAJES</p>
@@ -79,13 +80,13 @@ function Ganancias({ onVolver }) {
         </div>
         <div style={{ flex: 1, background: '#FFFFFF', border: '1.5px solid #ECECEF', borderRadius: '14px', padding: '14px', textAlign: 'center' }}>
           <p style={{ color: '#6B7280', fontSize: '10px', margin: '0', letterSpacing: '1px' }}>COMISIÓN</p>
-          <p style={{ color: '#FF4444', fontSize: '22px', fontWeight: '900', margin: '6px 0 0' }}>${datos.comision.toLocaleString()}</p>
+          <p style={{ color: '#FF4444', fontSize: '22px', fontWeight: '900', margin: '6px 0 0' }}>{cop(datos.comision)}</p>
         </div>
       </div>
       {datos.viajes > 0 && (
         <div style={{ marginTop: '12px', background: '#FFFFFF', border: '1.5px solid #ECECEF', borderRadius: '12px', padding: '12px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <p style={{ color: '#6B7280', fontSize: '12px', margin: '0' }}>Neto después de comisión</p>
-          <p style={{ color: '#1A1A1E', fontSize: '16px', fontWeight: '900', margin: '0' }}>${(datos.total - datos.comision).toLocaleString()}</p>
+          <p style={{ color: '#1A1A1E', fontSize: '16px', fontWeight: '900', margin: '0' }}>{cop(datos.total - datos.comision)}</p>
         </div>
       )}
       {datos.viajes === 0 && (

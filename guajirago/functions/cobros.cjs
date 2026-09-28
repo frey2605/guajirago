@@ -29,6 +29,7 @@
  *    ensucia el historial y dispara escuchas en las apps sin motivo.
  */
 const { estadoQueLeToca, precioAPagar, esFecha } = require('./suscripcion.js');
+const { cop } = require('./moneda.cjs');
 
 /** Los tres estados que le duelen al cliente: los que se le avisan, y los únicos
  *  ante los que se exige tener los datos completos antes de actuar. */
@@ -204,7 +205,7 @@ function loQueSeEscribe(decision, hoy, avisoQueSalio) {
  */
 function mensajeDelAviso(r, ficha, hoy) {
   const p = precioAPagar(ficha, hoy);
-  const cuanto = p.precio === null ? '' : ' de $' + p.precio.toLocaleString('es-CO');
+  const cuanto = p.precio === null ? '' : ' de ' + cop(p.precio);
 
   if (r.estado === 'porVencer') {
     return {

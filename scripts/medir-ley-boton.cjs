@@ -381,7 +381,7 @@ const PENDIENTES = {
   'guajirago-aliados/src/Tours.js': [4, 1],
 };
 
-module.exports = { revisarArchivo, escritoresDe, medir, PENDIENTES, APPS, ESCRIBE, NO_SON_BOTONES };
+module.exports = { revisarArchivo, escritoresDe, medir, PENDIENTES, APPS, ESCRIBE, NO_SON_BOTONES, soloCodigo };
 
 if (require.main === module) {
   const r = medir();

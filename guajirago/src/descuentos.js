@@ -31,6 +31,7 @@
  * guajirago/functions/descuentos.cjs, y pruebas/descuentoAceptado.test.js ejecuta
  * las dos con los mismos casos. Si cambias la cuenta aquí, cámbiala allá.
  */
+import { cop } from './moneda';
 
 /**
  * Cuánto paga el pasajero por una tarifa, con su descuento pendiente aplicado.
@@ -75,7 +76,7 @@ export function armarDescuentoInfo(tarifa, descuentoPendiente) {
  */
 export function tarifaParaPasajero(v) {
   if (v?.descuentoInfo?.tarifaPasajeroPaga != null) {
-    return `$${v.descuentoInfo.tarifaPasajeroPaga.toLocaleString()}`;
+    return cop(v.descuentoInfo.tarifaPasajeroPaga);
   }
   return v?.tarifa;
 }
