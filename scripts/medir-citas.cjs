@@ -61,6 +61,8 @@ const CARPETAS = [
   // El robot probador (27-sep-2026): sus recorridos y su cuaderno citan pantallas y
   // archivos, y al entrar al repo se quedaron sin mirar — lo cazó la tanda esa mañana.
   'robot',
+  // G31 (28-sep-2026): el generador del service worker de avisos y su plantilla.
+  'guajirago/sw',
 ];
 // Y las RAÍCES, solo un nivel: ahí viven los README y las reglas.
 const RAICES = ['.', 'guajirago', 'guajirago-admin', 'guajirago-aliados'];
@@ -127,6 +129,16 @@ const HUECOS = /^(archivo|fichero|nombre|algo|xxx|ejemplo)\./i;
  *  guion lo canta — porque si no, esta lista sería la puerta para perdonar
  *  cualquier cita rota escribiendo su nombre.
  */
+/**
+ * ── ARCHIVOS QUE NACEN AL COMPILAR (G31, 28-sep-2026) ────────────────────────
+ *  El service worker de avisos ya no está en el repo: lo ESCRIBE el generador en build/ al compilar, desde el .env
+ *  del ambiente. Nombrarlo no es citar un archivo borrado. 🔑 Igual que arriba, la excusa no se cree sola: el
+ *  archivo que se nombra como su autor tiene que escribirlo de verdad en build/ (`path.join(build, '<nombre>')`).
+ */
+const NACEN_AL_COMPILAR = [
+  ['firebase-messaging-sw.js', 'guajirago/sw/generar-sw.cjs', 'el service worker de avisos: lo escribe el generador en build/ al compilar'],
+];
+
 const NACEN_AL_TRABAJAR = [
   ['guardian-foto.json', 'la foto del guardián: la crea `guardian.cjs foto` y git la ignora'],
 ];
@@ -284,9 +296,16 @@ function medir() {
   const excusasSinRespaldo = NACEN_AL_TRABAJAR
     .filter(([n]) => !loQueGitIgnora.includes(n))
     .map(([n, porque]) => n + ' — dice «' + porque + '» pero .gitignore no lo nombra');
+  const loEscribe = ([n, quien]) => {
+    try { return fs.readFileSync(path.join(RAIZ, quien), 'utf8').includes("path.join(build, '" + n + "')"); } catch (e) { return false; }
+  };
+  for (const x of NACEN_AL_COMPILAR) {
+    if (!loEscribe(x)) excusasSinRespaldo.push(x[0] + ' — dice «' + x[2] + '» pero ' + x[1] + ' no lo escribe en build/');
+  }
   const naceAlTrabajar = (nombre) => NACEN_AL_TRABAJAR
     .some(([n]) => n.toLowerCase() === nombre.toLowerCase()
-      && loQueGitIgnora.includes(n));
+      && loQueGitIgnora.includes(n))
+    || NACEN_AL_COMPILAR.some((x) => x[0].toLowerCase() === nombre.toLowerCase() && loEscribe(x));
   const usadas = new Set();
 
   const fuera = { total: 0, conRenglon: 0, sinArchivo: [], sinRenglon: [], historiaViva: [],

@@ -17,8 +17,8 @@
   "scripts": {
     "start": "env-cmd -f .env.pruebas react-scripts start",
     "build": "npm run build:produccion",
-    "build:pruebas": "env-cmd -f .env.pruebas react-scripts build",
-    "build:produccion": "env-cmd -f .env.produccion react-scripts build",
+    "build:pruebas": "env-cmd -f .env.pruebas react-scripts build && env-cmd -f .env.pruebas node sw/generar-sw.cjs",
+    "build:produccion": "env-cmd -f .env.produccion react-scripts build && env-cmd -f .env.produccion node sw/generar-sw.cjs",
     "test": "react-scripts test",
     "eject": "react-scripts eject"
   },
