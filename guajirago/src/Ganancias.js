@@ -4,6 +4,7 @@ import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firesto
 import Logo from './Logo';
 import { COMISIONES_DEFECTO, comisionDeViaje } from './comisiones';
 import { cop } from './moneda';
+import { valorDelViaje } from './valorViaje';
 
 function Ganancias({ onVolver }) {
   const [cargando, setCargando] = useState(true);
@@ -45,7 +46,7 @@ function Ganancias({ onVolver }) {
         const comisionDe = (v) => comisionDeViaje(v, cfgComisiones);
 
         const calcular = (lista) => {
-          const total = lista.reduce((acc, v) => acc + (v.tarifaValor || 0), 0);
+          const total = lista.reduce((acc, v) => acc + valorDelViaje(v), 0);
           const comision = lista.reduce((acc, v) => acc + comisionDe(v), 0);
           return { total, viajes: lista.length, comision };
         };

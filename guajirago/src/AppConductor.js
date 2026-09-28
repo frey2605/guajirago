@@ -9,6 +9,7 @@ import { CONFIG_TARIFAS_DEFECTO, calcularTarifaMinima } from './tarifas';
 import { CONFIG_COMPARTIDA } from './configApp';
 import { cop } from './moneda';
 import { ESTADOS_MERCADO, ESTADOS_TERMINADOS } from './estadosViaje';
+import { valorDelViaje } from './valorViaje';
 // Los datos que comparten las pantallas salen de archivos únicos (SEGUNDA LEY).
 import { centroRiohacha } from './riohacha';
 // REGLA 9 · qué se le dice al conductor cuando el servidor dice que no. Mismo
@@ -274,7 +275,7 @@ function HistorialConductor({ onVolver }) {
         const hoy = new Date().toDateString();
         const gananciaHoy = lista
           .filter(v => v.estado === 'finalizado' && new Date(v.fechaSolicitud).toDateString() === hoy)
-          .reduce((acc, v) => acc + (v.tarifaValor || 0), 0);
+          .reduce((acc, v) => acc + valorDelViaje(v), 0);
         setTotalHoy(gananciaHoy);
       } catch (e) { console.error(e); }
       setCargando(false);
