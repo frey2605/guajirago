@@ -157,16 +157,11 @@ describe('AMARRES · la comisión: el servidor, la app del conductor y el panel 
   // (Este describe reemplaza al que solo comparaba los tres números de respaldo leyendo el texto del servidor.)
   const SERVIDOR = require('../guajirago/functions/comisiones.cjs');
   const APP = cargarDeLaApp('guajirago/src/comisiones.js');
-  const panel = () => {
-    const fuente = leer('guajirago-admin/src/Superadmin.js');
-    const desde = fuente.indexOf('const comisionDe = (v) =>');
-    assert.ok(desde >= 0, 'el panel ya no tiene «const comisionDe = (v) =>» en Superadmin.js');
-    const cuerpo = cuerpoDeLaFuncion(fuente, desde);
-    assert.ok(cuerpo, 'no pude sacar el cuerpo de comisionDe del panel');
-    // eslint-disable-next-line no-new-func
-    const f = new Function('cfgCom', 'v', cuerpo.texto);
-    return (v, cfg) => f(cfg, v);
-  };
+  // G15 (28-sep-2026): la cuenta del panel vive en guajirago-admin/src/comisiones.js, y la usan el tablero (App.js)
+  // y «Ingresos reales» (Superadmin.js). Se EJECUTA ese archivo; que las dos pantallas lo usen lo vigila
+  // pruebas/gananciasTablero.test.js.
+  const PANEL_COMISIONES = cargarDeLaApp('guajirago-admin/src/comisiones.js');
+  const panel = () => (v, cfg) => PANEL_COMISIONES.comisionDeViaje(v, cfg);
   const TIPOS = ['Taxi', 'Mototaxi', 'Mensajería', undefined, '', 'Carro'];
   const CONFIGS = [
     {},
@@ -179,6 +174,8 @@ describe('AMARRES · la comisión: el servidor, la app del conductor y el panel 
   it('los tres números de respaldo (mototaxi, taxi, domicilio) son los mismos en el servidor y en la app', () => {
     assert.deepStrictEqual({ ...APP.COMISIONES_DEFECTO }, { ...SERVIDOR.COMISIONES_DEFECTO },
       'el paracaídas del servidor y el de la app se separaron');
+    assert.deepStrictEqual({ ...PANEL_COMISIONES.COMISIONES_DEFECTO }, { ...SERVIDOR.COMISIONES_DEFECTO },
+      'el paracaídas del servidor y el del panel (guajirago-admin/src/comisiones.js) se separaron');
   });
 
   it('confirmarConductor cobra con la regla de functions/comisiones.cjs, pasándole el tipo del VIAJE', () => {
