@@ -84,4 +84,42 @@ export function textoParaQuienLaUsa(motivo) {
   return 'Esta promoción ya no está disponible';
 }
 
+/**
+ * G17 · ¿CUÁNTOS PESOS COSTÓ ESTE USO? `descuentoDelViaje` = lo que se le descontó a un viaje
+ * (descuentoInfo.descuentoAplicado), cuando el uso sale de un viaje. Sin viaje, solo una promoción de CRÉDITO tiene
+ * costo en pesos (su valorBeneficio); una de porcentaje no: su 20 es un 20 %, no $20. Devuelve null si no se sabe.
+ */
+export function pesosDelUso(promo, descuentoDelViaje) {
+  const esPesos = (n) => typeof n === 'number' && Number.isFinite(n) && n >= 0;
+  if (descuentoDelViaje !== undefined) return esPesos(descuentoDelViaje) ? descuentoDelViaje : null;
+  if (!promo || promo.tipoBeneficio !== 'credito') return null;
+  const v = Number(promo.valorBeneficio || 0);
+  return esPesos(v) ? v : null;
+}
+
+/**
+ * G17 · «Esta persona usó la promoción»: lo que se apunta en promociones/{id}/usos/{uid}. Es el contador del tope
+ * por persona (lo lee reclamarPromocion y el panel). No lleva pesos.
+ */
+export function apunteDeLaPersona(usoPrevio, fecha) {
+  return { veces: ((usoPrevio && usoPrevio.veces) || 0) + 1, ultimaFecha: fecha };
+}
+
+/**
+ * G17 · «Se usó la promoción y costó tantos pesos»: lo que se apunta en promociones/{id} (los usos y el
+ * «Invertido» que enseña el panel). `pesos` sale de pesosDelUso: si no es un número de pesos, REVIENTA en vez de
+ * sumar un porcentaje como si fuera plata.
+ */
+export function apunteEnLaPromocion(promo, usuarioId, fecha, pesos) {
+  if (!(typeof pesos === 'number' && Number.isFinite(pesos) && pesos >= 0)) {
+    throw new Error('El costo del uso no está en pesos: ' + pesos);
+  }
+  const p = promo || {};
+  return {
+    usosTotales: (p.usosTotales || 0) + 1,
+    inversionTotal: (p.inversionTotal || 0) + pesos,
+    historialUsos: [...(p.historialUsos || []), { usuarioId, fecha, valor: pesos }],
+  };
+}
+
 // ── FIN DE LA REGLA ──

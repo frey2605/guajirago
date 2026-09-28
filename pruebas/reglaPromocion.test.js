@@ -146,11 +146,12 @@ describe('G12 · la lista de ofertas de la app usa la regla', () => {
 function elBotonAsignar() {
   const f = leer('guajirago-admin/src/Promociones.js');
   // G16: el panel también pide de ahí `etapaDeVigencia` (las pestañas Activas/Próximas/Vencidas).
-  assert.match(f, /import \{ motivoParaNoUsar(, etapaDeVigencia)? \} from '\.\/reglaPromocion';/, 'el panel no importa la copia de la regla');
+  // G17: y la receta del uso (pesosDelUso, apunteDeLaPersona, apunteEnLaPromocion).
+  assert.match(f, /import \{ motivoParaNoUsar(, etapaDeVigencia)?(, pesosDelUso, apunteDeLaPersona, apunteEnLaPromocion)? \} from '\.\/reglaPromocion';/, 'el panel no importa la copia de la regla');
   const desde = f.indexOf('const asignarPromoManual');
   assert.ok(desde >= 0, 'no está asignarPromoManual');
   const cuerpo = cuerpoDeLaFuncion(f, desde).texto;
-  const NOMBRES = ['db', 'getDocs', 'query', 'collection', 'where', 'doc', 'runTransaction', 'motivoParaNoUsar',
+  const NOMBRES = ['db', 'getDocs', 'query', 'collection', 'where', 'doc', 'runTransaction', 'motivoParaNoUsar', 'pesosDelUso', 'apunteDeLaPersona', 'apunteEnLaPromocion',
     'promoAsignar', 'usuarioAsignar', 'setErrorAsignar', 'setAsignando', 'setAviso', 'setAsignadoOk', 'cargarPromos'];
   // eslint-disable-next-line no-new-func
   return new Function(...NOMBRES, 'return (async () => {' + cuerpo + '})();');
@@ -179,6 +180,7 @@ async function asignar(promo, usuario, viajes, usos = {}) {
     },
   };
   await elBotonAsignar()(fs.db, fs.getDocs, fs.query, fs.collection, fs.where, fs.doc, fs.runTransaction, PANEL.motivoParaNoUsar,
+    PANEL.pesosDelUso, PANEL.apunteDeLaPersona, PANEL.apunteEnLaPromocion,
     { id: 'P', ...promo }, usuario, (e) => { salida.error = e; }, () => {}, (a) => { salida.aviso = a; }, (v) => { salida.ok = v; }, () => {});
   return { ...salida, base };
 }
@@ -240,5 +242,137 @@ describe('G12 · el panel no asigna lo que la regla no deja, y lo dice en ventan
     assert.match(r.aviso?.texto || '', /tiene 2/);
     const r2 = await asignar(vigente({ viajesMinimosRequeridos: 2 }), cond, viajes);
     assert.strictEqual(r2.ok, true);
+  });
+});
+
+// ══ G17 · «SE USÓ ESTA PROMOCIÓN, Y COSTÓ TANTOS PESOS» — UNA SOLA RECETA (28-sep-2026) ══
+// El servidor (consumirDescuentoViaje) y el panel (asignar a mano) apuntaban el uso cada uno a su manera, y el panel
+// sumaba al «Invertido» el valorBeneficio: con una de porcentaje, un 20 % entraba como $20. Ahora los dos apuntan con
+// pesosDelUso / apunteDeLaPersona / apunteEnLaPromocion (promociones.cjs y sus copias, dentro de las marcas).
+const PCT = (extra) => PROMO({ tipoBeneficio: 'descuento', valorBeneficio: 20, ...extra });
+const CASOS_PESOS = [
+  [PROMO(), undefined], [PCT(), undefined], [PCT(), 3000], [PROMO(), 8000], [PCT(), '3000'], [PCT(), -5], [PCT(), NaN],
+  [PROMO({ valorBeneficio: undefined }), undefined], [PROMO({ valorBeneficio: '5000' }), undefined], [null, undefined], [{}, 0],
+];
+
+describe('G17 · la receta del uso es UNA, y las tres copias dicen lo mismo', () => {
+  it('pesosDelUso: sin viaje, solo el crédito cuesta pesos; un porcentaje NO es plata', () => {
+    assert.strictEqual(NUBE.pesosDelUso(PROMO()), 8000);
+    assert.strictEqual(NUBE.pesosDelUso(PCT()), null, 'un 20 % se tomó por $20');
+    assert.strictEqual(NUBE.pesosDelUso(PCT(), 3000), 3000, 'con viaje, el costo es lo que se le descontó al viaje');
+    assert.strictEqual(NUBE.pesosDelUso(PCT(), '3000'), null);
+    assert.strictEqual(NUBE.pesosDelUso(PCT(), -5), null);
+  });
+
+  it('apunteEnLaPromocion suma PESOS y revienta si le dan otra cosa', () => {
+    const p = PCT({ usosTotales: 4, inversionTotal: 32000, historialUsos: [{ usuarioId: 'x', fecha: 'f', valor: 32000 }] });
+    const a = NUBE.apunteEnLaPromocion(p, 'ana', '2026-09-28T10:00:00.000Z', 3000);
+    assert.strictEqual(a.usosTotales, 5);
+    assert.strictEqual(a.inversionTotal, 35000);
+    assert.deepStrictEqual(a.historialUsos[1], { usuarioId: 'ana', fecha: '2026-09-28T10:00:00.000Z', valor: 3000 });
+    assert.throws(() => NUBE.apunteEnLaPromocion(p, 'ana', 'f', NUBE.pesosDelUso(p)), /no está en pesos/);
+    assert.throws(() => NUBE.apunteEnLaPromocion(p, 'ana', 'f', '20'), /no está en pesos/);
+    assert.deepStrictEqual(NUBE.apunteDeLaPersona({ veces: 2, nombreUsuario: 'Ana' }, 'f'), { veces: 3, ultimaFecha: 'f' });
+    assert.deepStrictEqual(NUBE.apunteDeLaPersona(null, 'f'), { veces: 1, ultimaFecha: 'f' });
+  });
+
+  it('la app y el panel, ejecutados, dan lo mismo que el servidor', () => {
+    for (const [p, d] of CASOS_PESOS) {
+      const args = d === undefined ? [p] : [p, d];
+      assert.strictEqual(PANEL.pesosDelUso(...args), NUBE.pesosDelUso(...args), 'panel ≠ servidor con ' + JSON.stringify([p, d]));
+      assert.strictEqual(APP.pesosDelUso(...args), NUBE.pesosDelUso(...args));
+      const pesos = NUBE.pesosDelUso(...args);
+      if (pesos === null) {
+        assert.throws(() => PANEL.apunteEnLaPromocion(p, 'u', 'f', pesos));
+      } else {
+        assert.deepStrictEqual(PANEL.apunteEnLaPromocion(p, 'u', 'f', pesos), NUBE.apunteEnLaPromocion(p, 'u', 'f', pesos));
+      }
+      assert.deepStrictEqual(PANEL.apunteDeLaPersona(p, 'f'), NUBE.apunteDeLaPersona(p, 'f'));
+    }
+  });
+
+  it('nadie más suma usos o «Invertido» a mano, en las tres apps ni en el servidor', () => {
+    const fsn = require('node:fs'); const pathn = require('node:path');
+    const RAIZ = pathn.resolve(__dirname, '..');
+    const PERMITIDOS = [NUBE_RUTA, APP_RUTA, PANEL_RUTA];
+    const culpables = [];
+    const recorrer = (dir) => {
+      for (const e of fsn.readdirSync(pathn.join(RAIZ, dir), { withFileTypes: true })) {
+        const rel = dir + '/' + e.name;
+        if (e.isDirectory()) { if (e.name !== 'node_modules' && e.name !== 'build') recorrer(rel); continue; }
+        if (!/\.(c?js)$/.test(e.name) || PERMITIDOS.includes(rel)) continue;
+        const t = fsn.readFileSync(pathn.join(RAIZ, rel), 'utf8');
+        if (/inversionTotal\s*:\s*\(|usosTotales\s*:\s*\(|historialUsos\s*:\s*\[/.test(t)) culpables.push(rel);
+      }
+    };
+    for (const d of ['guajirago/src', 'guajirago/functions', 'guajirago-admin/src', 'guajirago-aliados/src']) recorrer(d);
+    assert.deepStrictEqual(culpables, [], 'estos archivos apuntan el uso de una promoción con su propia receta');
+  });
+});
+
+describe('G17 · el panel y el servidor apuntan con la receta, ejecutándolos', () => {
+  const vigente = (extra) => ({ ...PROMO(), fechaInicio: '2020-01-01', fechaFin: '2099-12-31', ...extra });
+
+  it('el panel: una de crédito suma sus pesos al «Invertido», con el crédito y el uso de la persona', async () => {
+    const r = await asignar(vigente({ usosTotales: 4, inversionTotal: 32000, historialUsos: [] }), { id: 'ana', tipo: '', nombre: 'Ana' }, [],
+      { 'promociones/P/usos/ana': { veces: 0 } });
+    assert.strictEqual(r.ok, true, JSON.stringify(r.aviso));
+    assert.strictEqual(r.base['usuarios/ana'].creditos, 9000);
+    assert.strictEqual(r.base['promociones/P'].inversionTotal, 40000);
+    assert.strictEqual(r.base['promociones/P'].usosTotales, 5);
+    assert.strictEqual(r.base['promociones/P'].historialUsos[0].valor, 8000);
+    assert.strictEqual(r.base['promociones/P/usos/ana'].veces, 1);
+    assert.strictEqual(r.base['promociones/P/usos/ana'].nombreUsuario, 'Ana');
+  });
+
+  it('el panel: una de PORCENTAJE no suma nada al «Invertido» (antes: un 20 % entraba como $20)', async () => {
+    const r = await asignar(vigente({ tipoBeneficio: 'descuento', valorBeneficio: 20, inversionTotal: 32000 }), { id: 'ana', tipo: '', nombre: 'Ana' }, []);
+    assert.match(r.aviso?.texto || '', /porcentaje/);
+    assert.strictEqual(r.base['promociones/P'].inversionTotal, 32000, 'sumó un porcentaje como si fueran pesos');
+  });
+
+  // La analítica de consumirDescuentoViaje (va APARTE del cobro), sacada del archivo y ejecutada con una base de mentira.
+  function laAnaliticaDelServidor() {
+    const idx = leer('guajirago/functions/index.js');
+    const desde = idx.indexOf('exports.consumirDescuentoViaje');
+    assert.ok(desde >= 0);
+    const fn = cuerpoDeLaFuncion(idx, desde).texto;
+    assert.match(fn, /t\.set\(refUso, apunteDeLaPersona\(usoPrevio, fechaUso\), \{ merge: true \}\)/,
+      'el servidor no apunta el uso de la persona con la receta');
+    const i = fn.indexOf('if (resultado.promoId && resultado.pasajeroId)');
+    assert.ok(i >= 0, 'no está la analítica del servidor');
+    const bloque = cuerpoDeLaFuncion(fn, i).texto;
+    // eslint-disable-next-line no-new-func
+    return new Function('db', 'resultado', 'apunteEnLaPromocion', 'pesosDelUso', 'console', 'return (async () => {' + bloque + '})();');
+  }
+  async function analitica(promo, resultado) {
+    const base = { 'promociones/P': promo };
+    const errores = [];
+    const db = {
+      collection: (c) => ({ doc: (id) => ({ ruta: c + '/' + id }) }),
+      runTransaction: async (fn) => {
+        const pend = [];
+        await fn({ get: async (ref) => ({ exists: base[ref.ruta] !== undefined, data: () => base[ref.ruta] }),
+          update: (ref, d) => pend.push([ref.ruta, d]) });
+        for (const [r, d] of pend) base[r] = { ...base[r], ...d };
+      },
+    };
+    await laAnaliticaDelServidor()(db, resultado, NUBE.apunteEnLaPromocion, NUBE.pesosDelUso, { error: (...a) => errores.push(a.join(' ')) });
+    return { promo: base['promociones/P'], errores };
+  }
+
+  it('el servidor: un 20 % sobre un viaje de $15.000 suma $3.000 al «Invertido», no $20', async () => {
+    const r = await analitica(PCT({ usosTotales: 1, inversionTotal: 1000, historialUsos: [] }),
+      { promoId: 'P', pasajeroId: 'ana', fechaUso: 'f', monto: 3000 });
+    assert.strictEqual(r.promo.inversionTotal, 4000);
+    assert.strictEqual(r.promo.usosTotales, 2);
+    assert.deepStrictEqual(r.promo.historialUsos, [{ usuarioId: 'ana', fecha: 'f', valor: 3000 }]);
+  });
+
+  it('el servidor: si lo descontado no es un número de pesos, NO suma y lo anota (el cobro ya se hizo)', async () => {
+    const r = await analitica(PCT({ usosTotales: 1, inversionTotal: 1000 }), { promoId: 'P', pasajeroId: 'ana', fechaUso: 'f', monto: '3000' });
+    assert.strictEqual(r.promo.inversionTotal, 1000, 'sumó algo que no son pesos');
+    assert.strictEqual(r.promo.usosTotales, 1);
+    assert.strictEqual(r.errores.length, 1, 'no lo anotó');
   });
 });

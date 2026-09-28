@@ -39,7 +39,7 @@ const { descuentoSobreTarifaAceptada } = require('./descuentos.cjs');
 // G03: la comisión se cobra según el tipo del VIAJE (la app y el panel tienen copias, atadas por prueba).
 const { comisionSegunTipoDeViaje } = require('./comisiones.cjs');
 // G12: ¿puede esta persona usar esta promoción? UNA regla (la app y el panel tienen copias, atadas por prueba).
-const { viajesMinimosDe, motivoParaNoUsar, textoParaQuienLaUsa } = require('./promociones.cjs');
+const { viajesMinimosDe, motivoParaNoUsar, textoParaQuienLaUsa, pesosDelUso, apunteDeLaPersona, apunteEnLaPromocion } = require('./promociones.cjs');
 // G04: ¿le toca este viaje a este conductor? (tipo de vehículo + radio; la lista del conductor tiene la copia, atada por prueba).
 const { porQueNoLeToca } = require('./leTocaElViaje.cjs');
 // G13: el texto del precio del viaje sale de UN formateador (copia de guajirago/src/moneda.js, atada por prueba).
@@ -890,11 +890,11 @@ exports.consumirDescuentoViaje = onCall(async (request) => {
       // COBRO del conductor. Lo cazó una prueba el 24-ago-2026. Si el id viene
       // raro, no se cuenta el uso, pero el conductor cobra igual.
       const idSano = (v) => typeof v === "string" && v.length > 0 && !v.includes("/");
-      let refUso = null; let usosPrevios = 0;
+      let refUso = null; let usoPrevio = null;
       if (idSano(info.promoId) && idSano(viaje.pasajeroId)) {
         refUso = db.collection("promociones").doc(info.promoId).collection("usos").doc(viaje.pasajeroId);
         const snapUso = await t.get(refUso);
-        usosPrevios = snapUso.exists ? (snapUso.data().veces || 0) : 0;
+        usoPrevio = snapUso.exists ? snapUso.data() : null;
       }
 
       const fechaUso = new Date().toISOString();
@@ -905,7 +905,8 @@ exports.consumirDescuentoViaje = onCall(async (request) => {
       if (refUso) {
         // Este contador es el que hace de verdad el tope por persona: lo lee
         // reclamarPromocion. Cuenta descuentos USADOS, no reclamados.
-        t.set(refUso, { veces: usosPrevios + 1, ultimaFecha: fechaUso }, { merge: true });
+        // G17: lo que se apunta sale de UNA receta (promociones.cjs), la misma que usa el panel al asignar a mano.
+        t.set(refUso, apunteDeLaPersona(usoPrevio, fechaUso), { merge: true });
       }
 
       return { monto, saldo: saldoActual + monto, promoId: refUso ? info.promoId : null, pasajeroId: viaje.pasajeroId, fechaUso };
@@ -931,12 +932,10 @@ exports.consumirDescuentoViaje = onCall(async (request) => {
         const snapPromo = await t.get(refPromo);
         if (!snapPromo.exists) return;
         const promo = snapPromo.data() || {};
-        t.update(refPromo, {
-          usosTotales: (promo.usosTotales || 0) + 1,
-          inversionTotal: (promo.inversionTotal || 0) + resultado.monto,
-          historialUsos: [...(promo.historialUsos || []),
-            { usuarioId: resultado.pasajeroId, fecha: resultado.fechaUso, valor: resultado.monto }],
-        });
+        // G17: el «Invertido» suma PESOS: lo que se le descontó al viaje. Si no es un número de pesos, la receta
+        // revienta aquí (y se anota abajo) en vez de sumar algo que no es plata; el cobro ya se hizo.
+        t.update(refPromo, apunteEnLaPromocion(promo, resultado.pasajeroId, resultado.fechaUso,
+          pesosDelUso(promo, resultado.monto)));
       });
     } catch (ePromo) {
       console.error("consumirDescuentoViaje: el cobro SI se hizo, falló solo la analítica:", ePromo.message);
