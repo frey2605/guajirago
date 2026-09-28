@@ -159,6 +159,14 @@ const RECORRIDOS = [
     archivo: 'placa-fresca.cjs',
     vigila: ['guajirago/src/App.js'],
   },
+  {
+    nombre: 'bienvenida-pasajero',
+    que: 'crear una cuenta de pasajero: la celebración enseña el crédito que dio el servidor ($ 8.000) y la ficha lleva el descuento firmado por el servidor (G18; crea una cuenta nueva en pruebas)',
+    archivo: 'bienvenida-pasajero.cjs',
+    // «Una sola vez por persona y por aparato» y «el teléfono no pide el valor» los EJECUTA pruebas/funciones.test.js
+    // (G18 · descuentoDeBienvenida) con el emulador: aquí cada cuenta es nueva y el navegador también.
+    vigila: ['guajirago/src/Login.js'],
+  },
 ];
 
 // Los archivos de pantalla: los que, si cambian, el robot debería poder probar. Todo lo que esté en

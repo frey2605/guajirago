@@ -38,6 +38,12 @@ mismo placeholder es el del contacto de confianza), la fecha con tres `select` (
 - 🪤 **El celular no se puede repetir**: «Ese número de celular ya está registrado en otra cuenta».
   Se genera con la hora.
 - Al crearla sale «¡Bienvenido a GuajiraGo! … $8.000» con el botón «¡Vamos!»: cerrarlo.
+  · 28-sep-2026 (G18): ese $8.000 ya NO lo pone el teléfono: se lo pide al servidor (`descuentoDeBienvenida`)
+    DESPUÉS de guardar la ficha, así que la celebración tarda un poco más (medido: 3,9 s con la función caliente).
+    🪤 Recién publicada la función (fría), `registrar-conductor.cjs` no la vio en sus 6 s y encontró los módulos: la app
+    (App.js, el vigilante de la sesión) salta a «¿QUÉ QUIERES HACER?» 2 s después de ver la ficha, y si la
+    celebración llega tarde ya no se ve (el descuento SÍ queda en la ficha). Las dos corridas siguientes pasaron.
+    Para esperarla se usa `waitFor` con tope, no una pausa fija.
 
 **Módulos → Soy conductor.** «Transporte y movilidad» → «Soy conductor».
 
@@ -282,3 +288,6 @@ la placa de `conductores/{uid}` (la escribe su GPS con la misma placa que va en 
   `vigencia-promo.cjs`, ya apagada.
 - 28-sep-2026 en adelante: dos promociones `promociones/ROBOT-G17C-<hora>` (crédito, con 1 uso) y `ROBOT-G17P-<hora>`
   (porcentaje) por cada corrida de `uso-promo.cjs`, ya apagadas; el saldo del pasajero se devuelve.
+- 28-sep-2026 en adelante: una cuenta de pasajero nueva «Robot Pasajero De Prueba» (robot.pasajero.<hora>@gg.test, con
+  la clave de pruebas) por cada corrida de `bienvenida-pasajero.cjs`, con su crédito de bienvenida sin usar (la primera:
+  robot.pasajero.1790596960121@gg.test).
