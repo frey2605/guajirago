@@ -191,6 +191,14 @@ const RECORRIDOS = [
     // terminados: lo EJECUTA el amarre «EL HISTORIAL DEL CONDUCTOR» de pruebas/amarres.test.js, y por eso no se nombra.
     vigila: ['guajirago/src/Home.js', 'guajirago/src/MisViajes.js', 'guajirago/src/estadosViaje.js'],
   },
+  {
+    nombre: 'ganancias-conductor',
+    que: 'la app del conductor: «Ganancias» y el recuadro «GANANCIAS DE HOY» de «Mis viajes» abren con la consulta de gananciasConductor.js sin error y dicen la misma cifra (G23; solo mira)',
+    archivo: 'ganancias-conductor.cjs',
+    // La SUMA con viajes de verdad no la puede ver: un viaje con conductor solo lo escribe el servidor y el taxista de
+    // prueba no tiene ninguno. La EJECUTA pruebas/gananciasHoy.test.js contra un Firestore de mentira.
+    vigila: ['guajirago/src/Ganancias.js', 'guajirago/src/gananciasConductor.js'],
+  },
 ];
 
 // Los archivos de pantalla: los que, si cambian, el robot debería poder probar. Todo lo que esté en

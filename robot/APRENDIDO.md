@@ -304,6 +304,17 @@ la placa de `conductores/{uid}` (la escribe su GPS con la misma placa que va en 
 - No escribe nada: se apoya en los viajes `expirado` que deja `viaje-cerrado.cjs` (salen «Quedó sin terminar»).
 - El portero avisó de sellos INVALID en esta tanda; los recorridos pasaron igual. No se investigó aquí.
 
+### ganancias-conductor (G23, 28-sep-2026)
+- El conductor llega a las dos pantallas por «Transporte y movilidad → Soy conductor → Menú»: «Ganancias» (tarjeta HOY,
+  texto «HOY … GANADO $ x») y «Mis viajes» (recuadro «GANANCIAS DE HOY», que SOLO sale si la cifra es mayor que 0).
+- 🔴 No se puede fabricar un viaje finalizado de un conductor desde afuera: las reglas no dejan poner `conductorId` a
+  nadie (ni al admin: «Missing or insufficient permissions»); solo lo pone el servidor en `confirmarConductor`. Y el
+  taxista de prueba no tiene ningún viaje. Por eso el recorrido solo comprueba que las dos pantallas abren con la
+  consulta nueva sin error en la consola y dicen lo mismo ($ 0 y sin recuadro, hoy); la suma la ejecuta
+  `pruebas/gananciasHoy.test.js`.
+- Si la consulta fallara (índice `conductorId + estado + fechaSolicitud` o reglas), el historial lo escribe en la
+  consola (`console.error`) y «Ganancias» se queda callada en $ 0: el recorrido mira la consola por eso.
+
 ## Lo que el robot dejó creado en pruebas
 
 - 27-sep-2026: «Robot Taxi De Prueba» (robot.taxi.1790508222079@gg.test) y
