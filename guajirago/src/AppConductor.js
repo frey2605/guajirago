@@ -8,7 +8,7 @@ import { porQueNoLeToca } from './leTocaElViaje';
 import { CONFIG_TARIFAS_DEFECTO, calcularTarifaMinima } from './tarifas';
 import { CONFIG_COMPARTIDA } from './configApp';
 import { cop } from './moneda';
-import { ESTADOS_MERCADO, ESTADOS_TERMINADOS, ESTADOS_QUE_CIERRA_EL_SERVIDOR, avisoDelCierre } from './estadosViaje';
+import { ESTADOS_MERCADO, ESTADOS_TERMINADOS, ESTADOS_QUE_CIERRA_EL_SERVIDOR, avisoDelCierre, comoTermino } from './estadosViaje';
 import { valorDelViaje } from './valorViaje';
 // Los datos que comparten las pantallas salen de archivos únicos (SEGUNDA LEY).
 import { centroRiohacha } from './riohacha';
@@ -320,14 +320,10 @@ function HistorialConductor({ onVolver }) {
           // hace un fallo peor que el que había.
           //
           // Completado es UNO; todo lo demás que entra aquí es un final que no
-          // se completó.
-          const noCompletado = v.estado !== 'finalizado';
-          const QUE_PASO = {
-            cancelado: 'Lo canceló el cliente',
-            cancelado_conductor: 'Lo cancelaste tú',
-            vencido: 'Nadie lo tomó',
-            expirado: 'Quedó sin terminar',
-          };
+          // se completó. Desde G21 (28-sep-2026) eso, las palabras de cada final
+          // y su color salen de `comoTermino` (estadosViaje.js), la MISMA pieza
+          // de los historiales del pasajero (Home.js y MisViajes.js).
+          const fin = comoTermino(v, 'conductor');
           return (
             <div key={v.id} style={{ background: '#FFFFFF', borderRadius: '20px', padding: '20px', marginBottom: '12px', border: '1.5px solid #ECECEF' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
@@ -339,7 +335,7 @@ function HistorialConductor({ onVolver }) {
                   </div>
                 </div>
                 <div style={{ textAlign: 'right' }}>
-                  <p style={{ color: noCompletado ? '#FF4444' : '#2ECC71', fontSize: '13px', fontWeight: 'bold', margin: '0' }}>{noCompletado ? (QUE_PASO[v.estado] || v.estado) : 'Completado'}</p>
+                  <p style={{ color: fin.color, fontSize: '13px', fontWeight: 'bold', margin: '0' }}>{fin.texto}</p>
                   <p style={{ color: '#1A1A1E', fontSize: '18px', fontWeight: '900', margin: '4px 0 0' }}>{v.tarifa}</p>
                 </div>
               </div>
@@ -353,7 +349,7 @@ function HistorialConductor({ onVolver }) {
                   <p style={{ color: '#1A1A1E', fontSize: '13px', margin: '0' }}>{v.destino}</p>
                 </div>
               </div>
-              {noCompletado && v.razonCancelacion && <p style={{ color: '#6B7280', fontSize: '12px', margin: '10px 0 0' }}>Razón: {v.razonCancelacion}</p>}
+              {!fin.completado && v.razonCancelacion && <p style={{ color: '#6B7280', fontSize: '12px', margin: '10px 0 0' }}>Razón: {v.razonCancelacion}</p>}
             </div>
           );
         })}

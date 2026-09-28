@@ -51,6 +51,25 @@
           "order": "ASCENDING"
         },
         {
+          "fieldPath": "fechaSolicitud",
+          "order": "DESCENDING"
+        },
+        {
+          "fieldPath": "__name__",
+          "order": "DESCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "viajes",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "pasajeroId",
+          "order": "ASCENDING"
+        },
+        {
           "fieldPath": "estado",
           "order": "ASCENDING"
         },

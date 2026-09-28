@@ -143,7 +143,7 @@ function pareceSeguro(trozo, esFlecha) {
   return null;
 }
 
-function loQueHaceLaPantalla(fuenteDePrueba) {
+function loQueHaceLaPantalla(fuenteDePrueba, piezaDePrueba) {
   const { soloCodigo, cuerpoDeLaFuncion } = require('../pruebas/cargar.cjs');
   const crudo = fuenteDePrueba != null ? fuenteDePrueba
     : fs.readFileSync(path.join(RAIZ, PANTALLA), 'utf8');
@@ -353,39 +353,66 @@ function loQueHaceLaPantalla(fuenteDePrueba) {
     if (pasa) entran.push(e);
   }
 
-  // ── LA SEGUNDA MITAD: LA BANDERA, TAMBIÉN CORRIDA ───────────────────────
-  //  Una sola, en todo el archivo: un señuelo puesto en un ayudante de arriba
-  //  dejaba la bandera de la tarjeta con la lista corta y los 40 en verde.
-  // `const`, `let` o `var`: exigir `const` daba ROJO FALSO sobre código igual
-  // de bueno.
-  const banderas = [...archivo.matchAll(/(?:const|let|var)\s+(\w+)\s*=\s*(v\.estado[^;]*);/g)];
-  if (banderas.length !== 1) {
-    quejas.push(banderas.length === 0
-      ? 'no encuentro la bandera que decide si el viaje sale verde «Completado» o rojo. Si '
-        + 'cambió de forma, hay que mirarla a mano.'
-      : 'en AppConductor.js hay ' + banderas.length + ' banderas `const ... = v.estado...`, y '
-        + 'debe haber UNA. Con dos, la de arriba puede decir la verdad y la de la tarjeta no.');
-    return { entran, rojos: null, bandera: null, tope, quejas };
+  // ── LA SEGUNDA MITAD: CÓMO TERMINÓ CADA VIAJE, TAMBIÉN CORRIDO ──────────
+  //  G21 (28-sep-2026): verde o rojo, las palabras de cada final y su color ya
+  //  NO se escriben en esta pantalla: salen de `comoTermino(v, 'conductor')`, en
+  //  estadosViaje.js, la pieza de los TRES historiales. Aquí se exige que la
+  //  tarjeta la llame UNA vez en todo el archivo (un señuelo arriba dejaba la
+  //  tarjeta con otra cosa), con el viaje tal cual y como CONDUCTOR, y se CORRE la
+  //  que la pantalla use de verdad —la importada, o la que le disfracen con ese
+  //  nombre—, estado por estado. `piezaDePrueba` deja a la prueba darle una pieza
+  //  de mentira (palabras vacías, colores iguales) y exigir que se queje.
+  const pieza = piezaDePrueba || LISTAS;
+  const nada2 = (b) => ({ entran, rojos: null, bandera: b || null, tope, quejas });
+  if (/(?:function\s+comoTermino\b|(?:const|let|var)\s+comoTermino\s*=)/.test(archivo)) {
+    quejas.push('dentro de AppConductor.js hay otra `comoTermino` que TAPA a la importada: el nombre sigue '
+      + 'escrito y la tarjeta dice lo que diga la de mentira.');
+    return nada2();
   }
-  const bandera = banderas[0];
-  const raraBandera = pareceSeguro(bandera[2], false);
-  if (raraBandera) {
-    quejas.push('la bandera ' + raraBandera + ': «' + bandera[2].trim() + '». Aquí ese trozo '
-      + 'SE EJECUTA para medir qué sale rojo, así que no se corre.');
-    return { entran, rojos: null, bandera: bandera[1], tope, quejas };
+  let decide = null;
+  if (piezas.includes('comoTermino')) decide = pieza.comoTermino;
+  else {
+    const disfrazada = piezas.find((s) => /\bas\s+comoTermino$/.test(s));
+    if (disfrazada) {
+      decide = pieza[disfrazada.split(/\s+as\s+/)[0].trim()];
+      quejas.push('el import disfraza otra cosa de `comoTermino`: «' + disfrazada + '».');
+    } else {
+      quejas.push('AppConductor.js no importa `comoTermino` de `./estadosViaje`: la tarjeta no puede decir cómo '
+        + 'terminó cada viaje con la pieza común de los tres historiales.');
+      return nada2();
+    }
   }
-  let decide;
-  try {
-    decide = new Function('return (v) => (' + bandera[2] + ');')();
-  } catch (e) {
-    quejas.push('la bandera «' + bandera[2].trim() + '» no se puede correr aquí: ' + e.message);
-    return { entran, rojos: null, bandera: bandera[1], tope, quejas };
+  const llamadas = (archivo.match(/\bcomoTermino\s*\(/g) || []).length;
+  const decl = [...archivo.matchAll(/(?:const|let|var)\s+(\w+)\s*=\s*comoTermino\(([^)]*)\)\s*;/g)];
+  if (llamadas !== 1 || decl.length !== 1) {
+    quejas.push('en AppConductor.js `comoTermino(...)` se llama ' + llamadas + ' veces y debe llamarse UNA, '
+      + 'guardada en una variable de la tarjeta (`const fin = comoTermino(v, \'conductor\');`). Con dos, una '
+      + 'puede decir la verdad y la de la tarjeta no.');
+    return nada2();
+  }
+  const bandera = decl[0];
+  const args = bandera[2].split(',').map((s) => s.trim());
+  if (args.length !== 2 || args[0] !== 'v' || !/^['"]conductor['"]$/.test(args[1])) {
+    quejas.push('la tarjeta llama `comoTermino(' + bandera[2].trim() + ')`, y debe ser `comoTermino(v, '
+      + '\'conductor\')`: con el viaje tal cual (si se le cambia algo, decide sobre un dato inventado) y '
+      + 'como conductor (si no, le habla al conductor como si fuera el pasajero).');
+    return nada2(bandera[1]);
+  }
+  if (typeof decide !== 'function') {
+    quejas.push('lo que la pantalla usa como `comoTermino` no es una función.');
+    return nada2(bandera[1]);
   }
   const rojos = [];
+  const finales = {};
   for (const e of entran) {
-    let rojo;
-    try { rojo = !!decide({ estado: e }); } catch (err) { rojo = false; }
-    if (rojo) rojos.push(e);
+    let r;
+    try { r = decide({ estado: e }, 'conductor'); } catch (err) { r = null; }
+    if (!r || typeof r !== 'object') {
+      quejas.push('`comoTermino` no contesta nada con sentido para «' + e + '».');
+      return nada2(bandera[1]);
+    }
+    finales[e] = r;
+    if (!r.completado) rojos.push(e);
   }
 
   // 🔴 LOS TROZOS, TAL COMO ESTÁN ESCRITOS. La prueba «no se puede ablandar»
@@ -395,6 +422,7 @@ function loQueHaceLaPantalla(fuenteDePrueba) {
   return {
     entran, rojos, tope, quejas, archivo, cuerpo: t,
     bandera: bandera[1],
+    finales,
     trozos: {
       importe: trae ? trae[0] : null,
       filtro: '.filter(' + laFlecha + ')',
@@ -443,54 +471,62 @@ function elTrozoDelResultado(p) {
       + 'pintan — desaparecen igual, solo que un paso más tarde.');
   }
 
-  const cuantos = (cuerpo.match(/['"]Completado['"]/g) || []).length;
-  if (cuantos !== 1) {
-    return malo('en la tarjeta del historial hay ' + cuantos + ' sitios que dicen «Completado»'
-      + (cuantos === 0 ? ', y debería haber UNO: la palabra que ve el conductor cuando el viaje '
-        + 'sí se completó.'
-        : ', y debería haber UNO. Con dos, uno puede decir la verdad y el otro no.'));
+  // ── G21 (28-sep-2026): EL RESULTADO SALE DE LA PIEZA, NO DE LA PANTALLA ──
+  //  «Completado», las palabras de cada final y los dos colores viven ahora en
+  //  `comoTermino` (estadosViaje.js). Así que en la tarjeta NO puede quedar
+  //  ninguno escrito a mano: un «Completado» o un color a pelo aquí es un
+  //  señuelo o una vuelta atrás, y la pieza puede estar perfecta y no usarse.
+  if (/['"]Completado['"]/.test(cuerpo)) {
+    return malo('la pantalla del historial escribe «Completado» a mano. Desde G21 esa palabra la dice '
+      + '`comoTermino` (estadosViaje.js): escrita aquí, la tarjeta puede decirla de un viaje que no se '
+      + 'completó sin que la pieza tenga la culpa.');
   }
-  const i = cuerpo.search(/['"]Completado['"]/);
+  // Y la llamada a la pieza tiene que estar DENTRO de la tarjeta: un señuelo con la llamada buena arriba del
+  // archivo y, en la tarjeta, una variable del mismo nombre hecha a mano, pasaba todo lo demás.
+  const laLlamada = p.trozos && p.trozos.banderaEntera;
+  if (!laLlamada || cuerpoTarjeta.indexOf(laLlamada) < 0) {
+    return malo('la llamada `' + (laLlamada || 'comoTermino(...)') + '` no está dentro de la tarjeta del '
+      + 'historial. La tarjeta puede estar usando otra «' + bandera + '» hecha a mano con el mismo nombre.');
+  }
+  const textos = (cuerpoTarjeta.match(new RegExp('\\b' + bandera + '\\.texto\\b', 'g')) || []).length;
+  const elTexto = new RegExp('\\{\\s*' + bandera + '\\.texto\\s*\\}').exec(cuerpo);
+  if (!elTexto || textos !== 1) {
+    return malo('la tarjeta tiene que enseñar `{' + bandera + '.texto}` UNA vez (lo encuentro ' + textos
+      + '). Es lo que dice en palabras cómo terminó el viaje; sin eso, la pieza puede estar perfecta y '
+      + 'no usarse.');
+  }
+  const i = elTexto.index;
   const abre = cuerpo.lastIndexOf('<p', i);
   const cierra = cuerpo.indexOf('</p>', i);
   if (abre < 0 || cierra < 0) {
-    return malo('el «Completado» de la tarjeta ya no está dentro de un `<p>`: no sé qué trozo '
+    return malo('el `' + bandera + '.texto` de la tarjeta ya no está dentro de un `<p>`: no sé qué trozo '
       + 'de pantalla mirar.');
   }
   const texto = cuerpo.slice(abre, cierra);
 
-  // EL COLOR, EXACTO. Con un «contiene» bastaba dejar
-  // `color: x ? '#2ECC71' : '#2ECC71'` y un `#FF4444` de adorno al lado para
-  // pintarlo todo verde con la prueba en verde.
-  //  Se exige la FORMA —la bandera manda, y los dos colores son DISTINTOS—, no
-  //  los códigos concretos: comparándolos letra por letra, cambiar el rojo o el
-  //  verde del tema ponía la suite roja sobre un cambio que no rompe nada.
+  // EL COLOR, EXACTO: el de la pieza, en el mismo `<p>` que dice el resultado.
+  // Con el color a pelo (`'#2ECC71'`) y un rojo de adorno al lado, todo sale
+  // verde con las palabras bien puestas.
   const apretado = texto.replace(/\s+/g, '').split('"').join("'");
-  const elTernario = new RegExp('color:' + bandera + "\\?'(#\\w+)':'(#\\w+)'").exec(apretado);
-  if (!elTernario) {
-    return malo('el color del resultado ya no es «' + bandera + ' ? un color : otro». Dice: '
+  if (!new RegExp('color:' + bandera + '\\.color[,}]').test(apretado)) {
+    return malo('el color del resultado ya no es `' + bandera + '.color`. Dice: '
       + (/color:[^,]*/.exec(apretado) || ['?'])[0] + '. Con el color suelto, un viaje que no se '
       + 'completó se ve igual que uno hecho.');
   }
-  if (elTernario[1] === elTernario[2]) {
-    return malo('el resultado le pregunta a «' + bandera + '» y luego pinta el MISMO color en '
-      + 'los dos casos (' + elTernario[1] + '). La pregunta está y no sirve de nada: un viaje '
-      + 'que no se completó se ve igual que uno hecho.');
-  }
 
-  // ── 🔴 LA BANDERA SE USA EN TODA LA TARJETA UN NÚMERO EXACTO DE VECES ───
+  // ── 🔴 LA VARIABLE DEL RESULTADO SE USA EN TODA LA TARJETA UN NÚMERO EXACTO DE VECES ───
   //
   //  Y se cuenta en LA TARJETA ENTERA, no dentro del `<p>`. Contándola solo en
   //  el `<p>` la segunda opinión la burló dos veces, las dos sacando el uso un
   //  renglón afuera:
-  //    · `return noCompletado ? null : (` — la tarjeta no se pinta
-  //    · `<div style={{ display: noCompletado ? 'none' : 'block', ... }}>`
+  //    · `return bandera ? null : (` — la tarjeta no se pinta
+  //    · `<div style={{ display: bandera ? 'none' : 'block', ... }}>`
   //  Las dos con el color exacto, la lista entera y todo en verde; y las dos
   //  dejan al conductor sin ver 40 viajes.
   //
   //  Es un NÚMERO, no una lista de palabras prohibidas, y a propósito: las dos
   //  versiones anteriores prohibían palabras (`null`, y luego `return`) y a las
-  //  dos se les dio la vuelta con otra palabra. La bandera decide QUÉ VE el
+  //  dos se les dio la vuelta con otra palabra. Esta variable decide QUÉ VE el
   //  conductor: cualquier uso nuevo cambia eso, así que cualquier uso nuevo
   //  tiene que mirarlo una persona. Si el que llega es legítimo, se sube el
   //  número aquí y se dice por qué.
@@ -504,69 +540,49 @@ function elTrozoDelResultado(p) {
       + 'uso nuevo es bueno, se sube el número en `medir-historial-conductor.cjs` y se explica.');
   }
 
-  // EL NOMBRE DE LA TABLA SE SACA DE AQUÍ, no se da por supuesto: renombrarla es
-  // legítimo y exigir «QUE_PASO» daba ROJO FALSO sobre código correcto.
-  const laTabla = /(\w+)\s*\[\s*v\.estado\s*\]/.exec(texto);
-  if (!laTabla) {
-    return malo('el trozo del resultado escribe el texto a mano en vez de sacarlo de una tabla '
-      + 'de nombres (`TABLA[v.estado]`). La tabla puede estar perfecta y no usarse.');
-  }
-
-  // ── LOS NOMBRES EN PALABRAS ─────────────────────────────────────────────
-  //  Vive AQUÍ, no en el amarre, para que lo vean los dos y para que la prueba
-  //  que le mete escapes al lector también lo cubra.
-  //  Se busca en TODO el archivo, no dentro de la función: sacar la tabla al
-  //  módulo —para no rehacerla en cada tarjeta— es legítimo, y exigirla dentro
-  //  daba ROJO sobre código correcto.
-  const tabla = laTabla[1];
-  const decl = new RegExp('(?:const|let|var)\\s+' + tabla + '\\s*=\\s*\\{([\\s\\S]*?)\\n\\s*\\};')
-    .exec(p.archivo);
-  if (!decl) {
-    return malo('la tarjeta saca el texto de `' + tabla + '[v.estado]` y no encuentro dónde se '
-      + 'declara `' + tabla + '`, que es lo que pone en palabras cada forma de no completar.');
-  }
+  // ── LO QUE DICE Y CÓMO SE PINTA CADA FINAL: CORRIDO EN LA PIEZA ─────────
+  //  `p.finales` sale de correr `comoTermino` estado por estado (arriba), no de
+  //  leer una tabla: aquí se exige que lo que contesta tenga sentido.
+  const fins = p.finales || {};
+  const bueno = fins.finalizado;
   const dice = {};
-  for (const m of decl[1].matchAll(/['"]?([a-z_]+)['"]?\s*:\s*['"]([^'"]*)['"]/g)) {
-    dice[m[1]] = m[2];
-  }
   for (const e of (p.rojos || [])) {
-    if (dice[e] === undefined) {
-      return malo('a `' + tabla + '` le falta «' + e + '», así que ese viaje saldría con el '
-        + 'nombre CRUDO del estado en la pantalla del conductor.');
+    const r = fins[e] || {};
+    const t = typeof r.texto === 'string' ? r.texto.trim() : '';
+    dice[e] = t;
+    if (!t) {
+      return malo('`comoTermino` no dice nada para «' + e + '»: en la pantalla del conductor ese final '
+        + 'sale sin palabras.');
     }
-    // 🔴 Que la llave esté no basta. Con `cancelado: ''` la tabla tiene sus
-    // cuatro llaves, el `|| v.estado` de la tarjeta se dispara y sale el nombre
-    // crudo igual. Lo midió la segunda opinión.
-    if (!dice[e].trim()) {
-      return malo('en `' + tabla + '`, «' + e + '» no dice nada («' + dice[e] + '»). La llave '
-        + 'está, pero en pantalla sale el nombre crudo del estado igual.');
+    if (t === e) {
+      return malo('`comoTermino` devuelve el nombre CRUDO del estado para «' + e + '»: el conductor lee '
+        + 'la palabra de la base de datos, no lo que pasó.');
     }
-  }
-  if (/Completado/.test(decl[1])) {
-    return malo('uno de los nombres de `' + tabla + '` dice «Completado». Son los finales que '
-      + 'NO se completaron: si uno dice eso, vuelve la mentira por la puerta de al lado.');
+    if (/Completado/.test(t)) {
+      return malo('`comoTermino` dice «' + t + '» de «' + e + '», que NO se completó: la mentira vuelve '
+        + 'por la puerta de al lado.');
+    }
+    if (bueno && r.color === bueno.color) {
+      return malo('`comoTermino` pinta «' + e + '» del MISMO color que un viaje completado (' + r.color
+        + '): un viaje que no se completó se ve igual que uno hecho.');
+    }
   }
   // Y que no digan todos lo mismo: cuatro finales con un solo nombre es
   // volver a «no se completó» y no decir CUÁL de las cuatro cosas pasó.
   const distintos = new Set((p.rojos || []).map((e) => dice[e]));
   if ((p.rojos || []).length > 1 && distintos.size === 1) {
-    return malo('los ' + p.rojos.length + ' finales de `' + tabla + '» dicen todos lo mismo («'
-      + [...distintos][0] + '»). El conductor vuelve a no saber cuál de las cuatro cosas pasó.');
+    return malo('los ' + p.rojos.length + ' finales dicen todos lo mismo («' + [...distintos][0]
+      + '»). El conductor vuelve a no saber cuál de las cuatro cosas pasó.');
   }
 
-  // El color y el `.map(` tal como están escritos: anclas para la prueba de los
+  // El color y el texto tal como están escritos: anclas para la prueba de los
   // escapes, que si no tendría que llevarlos copiados y se quedaría vieja.
   const elColor = /color:\s*[^,}]*/.exec(texto);
-  // El texto del resultado tal como está escrito (`TABLA[v.estado] || v.estado`,
-  // o con `??`): era el ÚLTIMO ancla que la prueba de los escapes llevaba
-  // copiada a mano, y cambiar el `||` por `??` la ponía roja sobre código bueno.
-  const elTexto = /\w+\s*\[\s*v\.estado\s*\]\s*(?:\|\||\?\?)\s*v\.estado/.exec(texto);
   return {
-    texto, tarjetas: lasTarjetas[0], tabla, nombres: dice,
+    texto, tarjetas: lasTarjetas[0], nombres: dice,
     flechaTarjeta: cuerpoTarjeta,
-    declTabla: decl[0],
     color: elColor ? elColor[0] : null,
-    elTexto: elTexto ? elTexto[0] : null,
+    elTexto: elTexto[0],
     tarjetaAbre: (/<div[^>]*style=\{\{ [^}]*\}\}>/.exec(cuerpoTarjeta) || [null])[0],
     // El `return (` de la tarjeta CON su `<div` pegado: a secas hay otros
     // `return (` antes en el archivo y el ancla cogía el que no era.
@@ -609,7 +625,11 @@ const val = (v) => (v == null ? undefined : v.stringValue);
 // (SEGUNDA LEY). Por eso el informe de abajo va detrás de `require.main`: sin
 // eso, cada `npm test` abriría sesión contra Firestore vivo y se pondría a
 // pedir los 91 viajes — una prueba no sale a internet.
-module.exports = { loQueHaceLaPantalla, elTrozoDelResultado };
+// G21 (28-sep-2026): los cuatro ayudantes de leer código también se exportan, para que el medidor del historial
+// del PASAJERO (`medir-historial-pasajero.cjs`) los use en vez de escribir otra versión de ellos (SEGUNDA LEY).
+module.exports = {
+  loQueHaceLaPantalla, elTrozoDelResultado, argumentoDe, hastaElPuntoYComa, pareceSeguro, sinRabo,
+};
 if (require.main !== module) return;
 
 (async () => {

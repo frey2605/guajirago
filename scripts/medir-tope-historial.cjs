@@ -108,13 +108,9 @@ function elTopeDeLaPantalla() {
  */
 const PENDIENTES = [
   // [archivo, cuántas consultas con tope y sin orden, por qué siguen así]
-  ['guajirago/src/Home.js', 1,
-    'el historial del pasajero. Ya está anotado en CLAUDE.md por OTRO fallo (la lista de '
-    + 'estados corta), y los dos se arreglan juntos cuando le toque: es el mismo archivo y '
-    + 'la misma consulta. No estaba en la foto del 15-sep-2026 (PRIMERA LEY).'],
-  ['guajirago/src/MisViajes.js', 2,
-    'las dos consultas de «Mis viajes» —la del pasajero y la del conductor—. Mismo caso que '
-    + 'Home.js: anotado, con su fallo hermano, y fuera de la foto.'],
+  // G21 (28-sep-2026): las tres que quedaban —la de Home.js y las dos de MisViajes.js— ya piden los ÚLTIMOS 50
+  // con `orderBy('fechaSolicitud', 'desc')`, junto con su fallo hermano (la lista de estados corta). Vacía: una
+  // consulta nueva con tope y sin orden se pone roja el mismo día.
 ];
 
 function lasConsultasConTope() {

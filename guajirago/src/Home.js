@@ -10,7 +10,9 @@ import Configuracion from './Configuracion';
 import Promociones from './Promociones';
 import Logo from './Logo';
 import { auth, db } from './firebase';
-import { collection, query, where, limit, getDocs, doc, getDoc, onSnapshot, updateDoc } from 'firebase/firestore';
+import { collection, query, where, orderBy, limit, getDocs, doc, getDoc, onSnapshot, updateDoc } from 'firebase/firestore';
+// G21: qué viajes salen en el historial y cómo terminó cada uno salen de UNA pieza, la misma de las otras dos pantallas.
+import { ESTADOS_TERMINADOS, comoTermino } from './estadosViaje';
 // El marco de Riohacha vive en riohacha.js (SEGUNDA LEY): un solo sitio para la geografía.
 import { BOUNDS_RIOHACHA } from './riohacha';
 
@@ -74,11 +76,15 @@ function Historial({ onVolver }) {
       try {
         const user = auth.currentUser;
         if (!user) return;
-        const q = query(collection(db, 'viajes'), where('pasajeroId', '==', user.uid), limit(50));
+        // G21: los ÚLTIMOS 50, no 50 cualesquiera (con `limit` a pelo el servidor elegía). Pide el índice
+        // viajes: pasajeroId ASC + fechaSolicitud DESC (firestore.indexes.json), que va ANTES que esta app.
+        const q = query(collection(db, 'viajes'), where('pasajeroId', '==', user.uid), orderBy('fechaSolicitud', 'desc'), limit(50));
         const snap = await getDocs(q);
         const lista = snap.docs
           .map(d => ({ id: d.id, ...d.data() }))
-          .filter(v => v.estado === 'finalizado' || v.estado === 'cancelado')
+          // G21: TODOS los terminados. Con `finalizado || cancelado` no salían los que canceló el conductor ni los
+          // que se quedaron colgados (40 viajes escondidos, medido con scripts/medir-historial-pasajero.cjs).
+          .filter(v => ESTADOS_TERMINADOS.includes(v.estado))
           .sort((a, b) => new Date(b.fechaSolicitud) - new Date(a.fechaSolicitud));
         setViajes(lista);
       } catch (e) {}
@@ -104,9 +110,9 @@ function Historial({ onVolver }) {
         )}
         {viajes.map((v) => {
           const fecha = v.fechaSolicitud ? new Date(v.fechaSolicitud).toLocaleDateString('es-CO', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
-          const cancelado = v.estado === 'cancelado';
+          const fin = comoTermino(v, 'pasajero');
           return (
-            <div key={v.id} style={{ background: '#FFFFFF', borderRadius: '20px', padding: '20px', marginBottom: '12px', border: `1px solid ${cancelado ? '#2A1A1A' : '#1A2A1A'}` }}>
+            <div key={v.id} style={{ background: '#FFFFFF', borderRadius: '20px', padding: '20px', marginBottom: '12px', border: '1px solid #ECECEF' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                   <span style={{ fontSize: '28px' }}>{v.tipo === 'Taxi' ? '🚗' : '🏍️'}</span>
@@ -116,7 +122,7 @@ function Historial({ onVolver }) {
                   </div>
                 </div>
                 <div style={{ textAlign: 'right' }}>
-                  <p style={{ color: cancelado ? '#FF4444' : '#2ECC71', fontSize: '13px', fontWeight: 'bold', margin: '0' }}>{cancelado ? 'Cancelado' : 'Completado'}</p>
+                  <p style={{ color: fin.color, fontSize: '13px', fontWeight: 'bold', margin: '0' }}>{fin.texto}</p>
                   <p style={{ color: '#1A1A1E', fontSize: '18px', fontWeight: '900', margin: '4px 0 0' }}>{v.tarifa}</p>
                 </div>
               </div>
@@ -131,7 +137,7 @@ function Historial({ onVolver }) {
                 </div>
               </div>
               {v.conductorNombre && <p style={{ color: '#6B7280', fontSize: '12px', margin: '10px 0 0' }}>Conductor: <span style={{ color: '#FF7A2F' }}>{v.conductorNombre}</span></p>}
-              {cancelado && v.razonCancelacion && <p style={{ color: '#6B7280', fontSize: '12px', margin: '4px 0 0' }}>Razón: {v.razonCancelacion}</p>}
+              {!fin.completado && v.razonCancelacion && <p style={{ color: '#6B7280', fontSize: '12px', margin: '4px 0 0' }}>Razón: {v.razonCancelacion}</p>}
             </div>
           );
         })}

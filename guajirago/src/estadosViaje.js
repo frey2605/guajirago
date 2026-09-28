@@ -139,6 +139,54 @@ export function avisoDelCierre(viaje, quien) {
   return { icono: '⏱️', titulo: 'Este viaje ya se cerró', texto: porque + ahora };
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// EL HISTORIAL: CÓMO TERMINÓ CADA VIAJE, EN PALABRAS Y CON SU COLOR — G21 (28-sep-2026)
+// ═══════════════════════════════════════════════════════════════════════════
+//  El historial de viajes está en TRES pantallas: el del conductor (`AppConductor.js`, `HistorialConductor`), el del
+//  pasajero (`Home.js`, `Historial`) y el del menú de módulos (`MisViajes.js`, que junta los dos lados). QUÉ viajes
+//  salen lo dice `ESTADOS_TERMINADOS`, la lista de arriba; CÓMO se llama cada final y DE QUÉ COLOR sale, esto. Antes
+//  cada pantalla lo decidía a mano: la del conductor ya decía cada final en palabras, y las otras dos solo conocían
+//  `cancelado` — lo demás salía VERDE «Completado» o ni salía (medido con `scripts/medir-historial-pasajero.cjs`: 40
+//  viajes escondidos en el historial del pasajero y 72 en «Mis viajes»).
+//
+//  Las palabras cambian según QUIÉN MIRA, y solo eso: `cancelado` lo escribe el pasajero al cancelar
+//  (`Solicitar.js`, `canceladoPor: 'pasajero'`) y `cancelado_conductor` el conductor (`AppConductor.js`). Así que al
+//  pasajero `cancelado` le dice «Lo cancelaste tú» y al conductor «Lo canceló el cliente».
+//  (El panel tiene sus propias tablas, en tercera persona y en OTRO repo: `guajirago-admin/src/Viajes.js` y
+//  `Mensajeria.js`. No pueden importar esto.)
+export const FINAL_EN_PALABRAS = {
+  pasajero: {
+    cancelado: 'Lo cancelaste tú',
+    cancelado_conductor: 'Lo canceló el conductor',
+    vencido: 'Nadie lo tomó',
+    expirado: 'Quedó sin terminar',
+  },
+  conductor: {
+    cancelado: 'Lo canceló el cliente',
+    cancelado_conductor: 'Lo cancelaste tú',
+    vencido: 'Nadie lo tomó',
+    expirado: 'Quedó sin terminar',
+  },
+};
+
+/**
+ * CÓMO TERMINÓ UN VIAJE, para su tarjeta del historial.
+ *
+ * @param viaje  el documento del viaje, tal cual
+ * @param quien  'pasajero' o 'conductor': quién está mirando (cambia las palabras, no el color)
+ * @returns `{ completado, texto, color }`
+ *
+ * Completado es UNO (`finalizado`): todo lo demás es un final que NO se completó y sale en rojo, con sus palabras. Un
+ * estado que no conozca sale en rojo con su nombre crudo, nunca en verde: equivocarse por defecto es no dar por hecho
+ * un trabajo que no se hizo.
+ */
+export function comoTermino(viaje, quien) {
+  const estado = (viaje || {}).estado;
+  if (estado === 'finalizado') return { completado: true, texto: 'Completado', color: '#2ECC71' };
+  const palabras = FINAL_EN_PALABRAS[quien === 'conductor' ? 'conductor' : 'pasajero'];
+  return { completado: false, texto: palabras[estado] || String(estado || '—'), color: '#FF4444' };
+}
+
 // Las fases que SÍ se guardan en el viaje (`AppConductor.js:980` y `:1006`).
 // `recogiendo` no está: no se guarda nunca.
 export const FASES_GUARDADAS = ['en_punto', 'en_viaje', 'finalizado'];

@@ -542,6 +542,12 @@ describe('AMARRES · el panel y la app dicen lo mismo', () => {
     // misma tabla de deuda). Antes se le llamaba `.replace` a `null` AL ARMAR
     // ESTA LISTA y la prueba reventaba con un `TypeError` sin mensaje.
     const ojo = (x, hacer) => (x == null ? [null, null] : [x, hacer(x)]);
+    // G21: una PIEZA de mentira es la de verdad (estadosViaje.js) con `comoTermino` cambiado por encima.
+    const PIEZA = Symbol('pieza');
+    const LA_PIEZA = cargarDeLaApp('guajirago/src/estadosViaje.js');
+    const conFin = (cambiar) => ({
+      ...LA_PIEZA, comoTermino: (v, q) => cambiar(LA_PIEZA.comoTermino(v, q), v),
+    });
 
     const ESCAPES = [
       ['la lista corta de siempre', Z.filtro, CORTO],
@@ -597,10 +603,26 @@ describe('AMARRES · el panel y la app dicen lo mismo', () => {
       // espacio de menos —lo que deja Prettier por defecto— ponían esta prueba
       // ROJA acusando al medidor, sobre código correcto.
       ['el color, verde siempre, con un rojo de adorno', T.color,
-        'color: ' + base.bandera + " ? '#2ECC71' : '#2ECC71', borderColor: '#FF4444'"],
+        "color: '#2ECC71', borderColor: '#FF4444'"],
       ['el color escondido: una tercera pregunta a la bandera', T.color,
         T.color + ', display: ' + base.bandera + " ? 'none' : 'block'"],
-      ['el texto a mano, dejando el color bueno', T.elTexto, "'Cancelado'"],
+      ['el texto a mano, dejando el color bueno', T.elTexto, "{'Cancelado'}"],
+      // ── G21 (28-sep-2026): el resultado sale de `comoTermino` (estadosViaje.js), la pieza de los tres
+      //  historiales. Cinco formas de que la tarjeta deje de usarla bien sin que nada más cambie.
+      ['la tarjeta habla como si fuera el pasajero', Z.banderaEntera,
+        Z.banderaEntera.replace("'conductor'", "'pasajero'")],
+      ['la pieza decide sobre un viaje inventado', Z.banderaEntera,
+        Z.banderaEntera.replace('(v,', "({ ...v, estado: 'finalizado' },")],
+      ['una `comoTermino` local tapa la importada', 'function HistorialConductor',
+        "function comoTermino() { return { completado: true, texto: 'Hecho', color: '#2ECC71' }; }\n"
+        + 'function HistorialConductor'],
+      ['no se importa `comoTermino`', ...ojo(Z.importe, (x) => x.replace(', comoTermino', ''))],
+      ['la llamada buena arriba, y en la tarjeta una hecha a mano', [
+        [Z.banderaEntera, 'const ' + base.bandera
+          + " = { completado: v.estado !== 'cancelado', texto: 'Listo', color: '#2ECC71' };"],
+        ['function HistorialConductor', "const v = { estado: '' };\n" + Z.banderaEntera
+          + '\nfunction HistorialConductor'],
+      ]],
       // Dos formas de esconder la tarjeta entera SIN tocar el color ni la
       // lista. Las dos sacan el uso de la bandera un renglón afuera del `<p>`,
       // que es donde antes se contaba.
@@ -609,10 +631,16 @@ describe('AMARRES · el panel y la app dicen lo mismo', () => {
       ['la tarjeta escondida con `display: none`', T.tarjetaAbre,
         T.tarjetaAbre.replace('style={{ ', 'style={{ display: ' + base.bandera
           + " ? 'none' : 'block', ")],
-      ['los nombres, todos vacíos', T.declTabla,
-        T.declTabla.replace(/: '[^']*'/g, ": ''")],
-      ['los nombres, todos iguales', T.declTabla,
-        T.declTabla.replace(/: '[^']*'/g, ": 'Terminado'")],
+      // Las palabras y los colores ya no están en AppConductor.js sino en la pieza: estos escapes le dan al
+      // lector una PIEZA de mentira (tercer elemento) en vez de tocar la pantalla.
+      ['los nombres, todos vacíos', PIEZA, conFin((r) => (r.completado ? r : { ...r, texto: '' }))],
+      ['los nombres, todos iguales', PIEZA, conFin((r) => (r.completado ? r : { ...r, texto: 'Terminado' }))],
+      ['los nombres, el estado crudo', PIEZA, conFin((r, v) => (r.completado ? r : { ...r, texto: v.estado }))],
+      ['uno de los finales dice «Completado»', PIEZA,
+        conFin((r, v) => (v.estado === 'expirado' ? { ...r, texto: 'Completado a medias' } : r))],
+      ['los colores iguales', PIEZA, conFin((r) => ({ ...r, color: '#2ECC71' }))],
+      ['un final que no se completó sale completado', PIEZA,
+        conFin((r, v) => (v.estado === 'vencido' ? { ...r, completado: true } : r))],
       ['el resultado, a pelo', EL_P,
         "<p style={{ color: '#2ECC71', fontSize: '13px' }}>{'Completado'}</p>"],
       ['la pantalla apagada desde donde se abre', ...ojo(Z.abreLaPantalla,
@@ -635,7 +663,9 @@ describe('AMARRES · el panel y la app dicen lo mismo', () => {
       const nombre = entrada[0];
       // Un escape puede necesitar varios cambios a la vez (el señuelo de la
       // bandera, por ejemplo): se admite un par suelto o una lista de pares.
-      const pares = Array.isArray(entrada[1]) ? entrada[1] : [[entrada[1], entrada[2]]];
+      // Y desde G21, un escape de la PIEZA: la pantalla buena con una pieza de mentira.
+      const conPieza = entrada[1] === PIEZA ? entrada[2] : undefined;
+      const pares = conPieza ? [] : (Array.isArray(entrada[1]) ? entrada[1] : [[entrada[1], entrada[2]]]);
       // Si un ancla no existe HOY, este escape no se puede montar y se salta.
       // No es dejarlo pasar: es que el sitio ya no está. Antes reventaba con un
       // `TypeError` sin mensaje ante dos arreglos legítimos que la propia tabla
@@ -654,7 +684,7 @@ describe('AMARRES · el panel y la app dicen lo mismo', () => {
           + 'archivo, no borrarla.');
         roto = roto.replace(de, alDelArchivo(par[1]));
       }
-      const q = loQueHaceLaPantalla(roto);
+      const q = loQueHaceLaPantalla(roto, conPieza);
       const seQueja = q.quejas.length > 0
         || !q.entran || q.entran.length !== base.entran.length
         || !q.rojos || q.rojos.length !== base.rojos.length

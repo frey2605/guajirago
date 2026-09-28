@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { db, auth } from './firebase';
-import { collection, query, where, limit, getDocs } from 'firebase/firestore';
+import { collection, query, where, orderBy, limit, getDocs } from 'firebase/firestore';
 import Logo from './Logo';
+// G21: qué viajes salen en el historial y cómo terminó cada uno salen de UNA pieza, la misma de las otras dos pantallas.
+import { ESTADOS_TERMINADOS, comoTermino } from './estadosViaje';
 
 function MisViajes({ onVolver }) {
   const [viajes, setViajes] = useState([]);
@@ -13,9 +15,11 @@ function MisViajes({ onVolver }) {
         const user = auth.currentUser;
         if (!user) { setCargando(false); return; }
 
+        // G21: los ÚLTIMOS 50 de cada lado, no 50 cualesquiera. Piden los índices pasajeroId/conductorId ASC +
+        // fechaSolicitud DESC (firestore.indexes.json), que van ANTES que esta app.
         const [snapPasajero, snapConductor] = await Promise.all([
-          getDocs(query(collection(db, 'viajes'), where('pasajeroId', '==', user.uid), limit(50))),
-          getDocs(query(collection(db, 'viajes'), where('conductorId', '==', user.uid), limit(50))),
+          getDocs(query(collection(db, 'viajes'), where('pasajeroId', '==', user.uid), orderBy('fechaSolicitud', 'desc'), limit(50))),
+          getDocs(query(collection(db, 'viajes'), where('conductorId', '==', user.uid), orderBy('fechaSolicitud', 'desc'), limit(50))),
         ]);
 
         const idsSeen = new Set();
@@ -28,13 +32,12 @@ function MisViajes({ onVolver }) {
           }
         });
 
-        lista
-          .filter(v => v.estado === 'finalizado' || v.estado === 'cancelado')
-          .sort((a, b) => new Date(b.fechaSolicitud) - new Date(a.fechaSolicitud));
-
+        // G21: TODOS los terminados (antes solo `finalizado || cancelado`: 72 viajes escondidos, medido con
+        // scripts/medir-historial-pasajero.cjs). Y una sola vez: aquí había otra copia de este filtro que filtraba,
+        // ordenaba y tiraba el resultado.
         setViajes(
           lista
-            .filter(v => v.estado === 'finalizado' || v.estado === 'cancelado')
+            .filter(v => ESTADOS_TERMINADOS.includes(v.estado))
             .sort((a, b) => new Date(b.fechaSolicitud) - new Date(a.fechaSolicitud))
         );
       } catch (e) {}
@@ -63,11 +66,11 @@ function MisViajes({ onVolver }) {
         )}
         {viajes.map((v) => {
           const fecha = v.fechaSolicitud ? new Date(v.fechaSolicitud).toLocaleDateString('es-CO', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
-          const cancelado = v.estado === 'cancelado';
           const user = auth.currentUser;
           const fuiConductor = v.conductorId === user?.uid;
+          const fin = comoTermino(v, fuiConductor ? 'conductor' : 'pasajero');
           return (
-            <div key={v.id} style={{ background: '#FFFFFF', borderRadius: '20px', padding: '20px', marginBottom: '12px', border: `1px solid ${cancelado ? '#ECECEF' : '#ECECEF'}` }}>
+            <div key={v.id} style={{ background: '#FFFFFF', borderRadius: '20px', padding: '20px', marginBottom: '12px', border: '1px solid #ECECEF' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                   <span style={{ fontSize: '28px' }}>{v.tipo === 'Taxi' ? '🚗' : '🏍️'}</span>
@@ -78,7 +81,7 @@ function MisViajes({ onVolver }) {
                   </div>
                 </div>
                 <div style={{ textAlign: 'right' }}>
-                  <p style={{ color: cancelado ? '#FF4444' : '#2ECC71', fontSize: '13px', fontWeight: 'bold', margin: '0' }}>{cancelado ? 'Cancelado' : 'Completado'}</p>
+                  <p style={{ color: fin.color, fontSize: '13px', fontWeight: 'bold', margin: '0' }}>{fin.texto}</p>
                   <p style={{ color: '#1A1A1E', fontSize: '18px', fontWeight: '900', margin: '4px 0 0' }}>{v.tarifa}</p>
                 </div>
               </div>
@@ -93,7 +96,7 @@ function MisViajes({ onVolver }) {
                 </div>
               </div>
               {!fuiConductor && v.conductorNombre && <p style={{ color: '#6B7280', fontSize: '12px', margin: '10px 0 0' }}>Conductor: <span style={{ color: '#FF7A2F' }}>{v.conductorNombre}</span></p>}
-              {cancelado && v.razonCancelacion && <p style={{ color: '#6B7280', fontSize: '12px', margin: '4px 0 0' }}>Razón: {v.razonCancelacion}</p>}
+              {!fin.completado && v.razonCancelacion &&<p style={{ color: '#6B7280', fontSize: '12px', margin: '4px 0 0' }}>Razón: {v.razonCancelacion}</p>}
             </div>
           );
         })}

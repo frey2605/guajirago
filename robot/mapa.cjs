@@ -183,6 +183,14 @@ const RECORRIDOS = [
     // cubre, y por eso AppConductor.js no se nombra aquí; lo EJECUTA pruebas/viajeCerrado.test.js.
     vigila: ['guajirago/src/estadosViaje.js', 'guajirago/src/Solicitar.js'],
   },
+  {
+    nombre: 'historial-viajes',
+    que: 'las dos pantallas «Mis viajes» del pasajero (menú de módulos y menú de transporte) enseñan también los viajes que no se completaron, en palabras (G21; solo mira)',
+    archivo: 'historial-viajes.cjs',
+    // El historial del CONDUCTOR (AppConductor.js) usa la misma pieza, pero verlo pide entrar como conductor con viajes
+    // terminados: lo EJECUTA el amarre «EL HISTORIAL DEL CONDUCTOR» de pruebas/amarres.test.js, y por eso no se nombra.
+    vigila: ['guajirago/src/Home.js', 'guajirago/src/MisViajes.js', 'guajirago/src/estadosViaje.js'],
+  },
 ];
 
 // Los archivos de pantalla: los que, si cambian, el robot debería poder probar. Todo lo que esté en
