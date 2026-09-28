@@ -245,6 +245,16 @@ la placa de `conductores/{uid}` (la escribe su GPS con la misma placa que va en 
   la cuenta con viajes de verdad la ejecuta `pruebas/gananciasTablero.test.js`. Solo lee (usa `entrarALaBase` para
   leer config/global).
 
+### vigencia-promo (G16, 28-sep-2026)
+- Una promoción que dura UN solo día (inicio = fin = hoy en Colombia) es la que enseña el fallo de pintar: antes la
+  app decía «Válida hasta» AYER y el panel pintaba «ayer → ayer». Se lee el día y el mes del texto («28/9/2026»),
+  no el texto entero, porque el formato de Edge y el de Node pueden diferir en ceros.
+- En el panel la tarjeta se busca en «Activas» (se toca el texto exacto `Activas`): si la regla la mandara a
+  Próximas o Vencidas, no se encuentra y el robot lo dice.
+- Lo que NO puede probar: la hora que importa (de 7 p. m. a medianoche) — el reloj del servidor no se mueve. Eso, y
+  los anuncios (Anuncio.js), las promos de restaurante (Restaurantes.js) y el Superadmin, los EJECUTA
+  `pruebas/vigenciaHoy.test.js` en cuatro zonas horarias. Por eso Anuncio.js y Restaurantes.js salen «SIN RECORRIDO».
+
 ## Lo que el robot dejó creado en pruebas
 
 - 27-sep-2026: «Robot Taxi De Prueba» (robot.taxi.1790508222079@gg.test) y
@@ -258,3 +268,5 @@ la placa de `conductores/{uid}` (la escribe su GPS con la misma placa que va en 
   Y al pasajero de prueba se le puso el documento `ROBOT-PASAJERO`.
 - 28-sep-2026 en adelante: un viaje de Taxi de pasajero@gg.test por cada corrida de `precio-viaje.cjs`, ya cancelado
   por el pasajero con «Otro motivo» (el primero: qxSxf8ofamCWGFng3Xzu).
+- 28-sep-2026 en adelante: una promoción `promociones/ROBOT-G16-<hora>` de un solo día por cada corrida de
+  `vigencia-promo.cjs`, ya apagada.
