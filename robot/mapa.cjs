@@ -121,6 +121,14 @@ const RECORRIDOS = [
     vigila: ['guajirago/src/viajeNuevo.js', 'guajirago/src/moneda.js'],
   },
   {
+    nombre: 'pesos-panel',
+    que: 'el panel con el navegador en inglés escribe la plata con cop() («$ 125.500»), no a mano («$125,500»), en Superadmin → Ingresos reales y Control de créditos (G14; solo lee)',
+    archivo: 'pesos-panel.cjs',
+    // Las demás pantallas del panel y de transporte que pasaron a cop() (Viajes, Códigos, Ganancias…) NO las recorre:
+    // las cubre pruebas/formateoPesos.test.js, que cuenta los formateos a mano en las tres apps y el servidor.
+    vigila: ['guajirago-admin/src/Superadmin.js', 'guajirago-admin/src/moneda.js'],
+  },
+  {
     nombre: 'placa-fresca',
     que: 'el admin corrige la placa del taxista en su ficha y, con la copia del teléfono puesta, la app enseña y manda la placa nueva (mira la base de pruebas) (G09)',
     archivo: 'placa-fresca.cjs',

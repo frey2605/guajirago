@@ -227,6 +227,15 @@ la placa de `conductores/{uid}` (la escribe su GPS con la misma placa que va en 
 - Pedir y cancelar es el mismo camino de `cancelar-viaje.cjs` (Taxi, GPS de mentira, «Otro motivo»).
 - La oferta del conductor y la nueva oferta del pasajero no se prueban aquí: piden un conductor ofertando en vivo.
 
+### pesos-panel (G14, 28-sep-2026)
+- Mismo truco de `antesDeCargar` que `precio-viaje`, pero en el PANEL: el computador «en inglés» escribe 125500 como
+  «125,500». Solo lee: no toca la base.
+- Se lee la PANTALLA de 👑 Superadmin → «Ingresos reales» (la nota «mototaxi $ 800 · taxi $ 1.000») y «Control de
+  créditos» («CRÉDITOS EN CIRCULACIÓN $ 460.000» el día que nació). Las secciones se abren con `getByText(label, exact)`.
+- Lo que se busca como fallo es cualquier «$» PEGADO a un dígito (`/\$\d/`): así caen «$800» y «$125,500» a la vez.
+- No se lee la lista de Viajes: ahí sale el `tarifa` GUARDADO de cada viaje, y los viejos siguen diciendo «$10,000»
+  (G13 midió 30). Eso es dato, no pantalla, y G14 no lo toca.
+
 ## Lo que el robot dejó creado en pruebas
 
 - 27-sep-2026: «Robot Taxi De Prueba» (robot.taxi.1790508222079@gg.test) y
