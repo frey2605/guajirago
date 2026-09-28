@@ -271,6 +271,17 @@ la placa de `conductores/{uid}` (la escribe su GPS con la misma placa que va en 
 - Lo que NO puede probar: la otra mitad (el servidor apuntando el uso al cobrar el descuento de un viaje), porque pide
   un viaje entero con el código verificado por el conductor. Esa la ejecuta `pruebas/reglaPromocion.test.js`.
 
+### valor-viaje-panel (G19, 28-sep-2026)
+- En pruebas no había ningún viaje con `contraofertaValor` (el campo es del flujo viejo de contraofertas): el robot se
+  fabrica UNO como el pasajero de prueba (las reglas le dejan crear un viaje suyo sin `conductorId`), siempre con el
+  mismo id, `robot-valor-viaje-g19`: la primera vez lo crea y las siguientes solo lo pone al día (`cambiar` hace PATCH).
+- Va SIN el texto `tarifa` a propósito: las tarjetas de Viajes pintan `v.tarifa || cop(valorViaje(v))`, así que con el
+  texto puesto la regla no se ve nunca.
+- La tarjeta se busca como el ÚLTIMO `div` que tiene el origen y un «$»: es la fila de dentro de la tarjeta, con una
+  sola cifra. Viajes es el ícono 🛣️ del menú de abajo, y la pestaña se toca con el texto exacto «Sin completar».
+- Lo que NO puede probar: las sumas (Conductores, Pasajeros, Mensajería, el historial y Ganancias del conductor), que
+  piden viajes finalizados; esas las EJECUTA `pruebas/valorViaje.test.js`.
+
 ## Lo que el robot dejó creado en pruebas
 
 - 27-sep-2026: «Robot Taxi De Prueba» (robot.taxi.1790508222079@gg.test) y
@@ -291,3 +302,5 @@ la placa de `conductores/{uid}` (la escribe su GPS con la misma placa que va en 
 - 28-sep-2026 en adelante: una cuenta de pasajero nueva «Robot Pasajero De Prueba» (robot.pasajero.<hora>@gg.test, con
   la clave de pruebas) por cada corrida de `bienvenida-pasajero.cjs`, con su crédito de bienvenida sin usar (la primera:
   robot.pasajero.1790596960121@gg.test).
+- 28-sep-2026 en adelante: UN solo viaje `viajes/robot-valor-viaje-g19` de pasajero@gg.test, cancelado, con
+  tarifaValor 10.000 y contraofertaValor 11.000; cada corrida de `valor-viaje-panel.cjs` lo reusa (no se amontonan).

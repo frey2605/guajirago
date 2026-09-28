@@ -167,6 +167,14 @@ const RECORRIDOS = [
     // (G18 · descuentoDeBienvenida) con el emulador: aquí cada cuenta es nueva y el navegador también.
     vigila: ['guajirago/src/Login.js'],
   },
+  {
+    nombre: 'valor-viaje-panel',
+    que: 'el panel enseña lo que valió el viaje (tarifaValor $ 10.000) y no la oferta vieja (contraofertaValor $ 11.000) (G19; usa un solo viaje de mentira en pruebas)',
+    archivo: 'valor-viaje-panel.cjs',
+    // Las sumas (Conductores, Pasajeros, Mensajería, el historial y Ganancias del conductor) piden viajes finalizados:
+    // esas las EJECUTA pruebas/valorViaje.test.js.
+    vigila: ['guajirago-admin/src/Viajes.js', 'guajirago-admin/src/valorViaje.js'],
+  },
 ];
 
 // Los archivos de pantalla: los que, si cambian, el robot debería poder probar. Todo lo que esté en

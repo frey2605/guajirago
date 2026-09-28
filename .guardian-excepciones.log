@@ -1299,3 +1299,4 @@ EL COMMIT 80213d8 TAMBIEN LO LLEVA MAL en su mensaje («un hallazgo aparte: el
 2026-09-28T08:52:48.182Z	robot/pesos-panel.cjs	NEGADO: fuera de la promesa "G14: los pesos se pintan con cop() y no a mano, en las tres apps y el servidor; prueba que impide que vuelvan"
 2026-09-28T10:56:46.169Z	scripts/medir-invertido-promociones.cjs	NEGADO: fuera de la promesa "G16: la vigencia de promociones y anuncios se decide con UNA regla en hora de Colombia (servidor, app, panel), y las fechas de promociones se pintan sin correrse un dia"
 2026-09-28T11:32:54.357Z	scripts/medir-descuento-bienvenida.cjs	NEGADO: fuera de la promesa "G17 robot: recorrido uso-promo (asignar una de credito suma sus pesos al Invertido; una de porcentaje no se asigna ni suma)"
+2026-09-28T12:29:38.940Z	robot/valor-viaje-panel.cjs	NEGADO: fuera de la promesa "G19: una sola regla de cuanto valio un viaje (tarifaValor) en la app y copia atada en el panel"
