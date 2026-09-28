@@ -59,6 +59,17 @@ function cargarLocal() {
   try { return JSON.parse(localStorage.getItem(STORAGE_KEY)); } catch (e) { return null; }
 }
 
+// Lo que la app toma de la ficha `usuarios/{uid}` (gemelo G09, 28-sep-2026). La ficha MANDA: la copia del teléfono
+// (guardarLocal) solo sirve para arrancar rápido, y al abrir se vuelve a leer la ficha y se pisa la copia. Hasta hoy,
+// con copia puesta, la app solo traía la foto: si el panel corregía la placa, el conductor seguía mandando la vieja
+// en sus ofertas (y el servidor la copiaba al viaje), y el tipo de vehículo viejo decidía qué viajes veía.
+function datosDeLaFicha(f) {
+  return {
+    nombre: f.nombre || '', telefonoActual: telefonoDe(f), placa: f.placa || '', vehiculo: f.vehiculo || '',
+    tipoVehiculo: f.tipoVehiculo || '', foto: f.fotoConductor || f.foto || null,
+  };
+}
+
 function PantallaModulos({ nombre, foto, onSeleccionar, onVolver, onCerrarSesion, onIrPerfil, onIrGanancias, onIrSeguridad, onIrViajes, onIrCreditos, onIrAyuda, onIrConfig, onIrPromociones }) {
   // NUEVO: interruptores de módulos desde config/global (Superadmin). Por defecto Transporte y Mensajería van prendidos.
   const [modulos, setModulos] = useState({ moduloTransporte: true, moduloMensajeria: true, moduloRestaurantes: false, moduloTurismo: false });
@@ -475,23 +486,32 @@ function App() {
   const [verPromociones, setVerPromociones] = useState(false);
 
   useEffect(() => {
+    const ponerFicha = (f) => {
+      setNombreUsuario(f.nombre);
+      setTelefonoUsuario(f.telefonoActual);
+      setPlacaUsuario(f.placa);
+      setVehiculoUsuario(f.vehiculo);
+      setTipoVehiculoUsuario(f.tipoVehiculo);
+      setFotoUsuario(f.foto);
+    };
     const local = cargarLocal();
     if (local && local.tipo) {
+      // Con copia: se arranca con ella (rápido) y se relee la ficha, que manda (G09). El `tipo` de la copia es el
+      // último papel escogido (pasajero o conductor) y ese se queda; lo demás sale de la ficha y se guarda en la copia.
       setTipoUsuario(local.tipo);
-      setNombreUsuario(local.nombre || '');
-      setTelefonoUsuario(telefonoDe(local));
-      setPlacaUsuario(local.placa || '');
-      setVehiculoUsuario(local.vehiculo || '');
-      setTipoVehiculoUsuario(local.tipoVehiculo || '');
-      const desuscribirFoto = onAuthStateChanged(auth, (user) => {
+      ponerFicha(datosDeLaFicha(local));
+      const desuscribirFicha = onAuthStateChanged(auth, (user) => {
         if (user) {
           getDoc(doc(db, 'usuarios', user.uid)).then(snap => {
-            if (snap.exists()) setFotoUsuario(snap.data().fotoConductor || snap.data().foto || null);
+            if (!snap.exists()) return;
+            const f = datosDeLaFicha(snap.data());
+            ponerFicha(f);
+            guardarLocal({ ...local, nombre: f.nombre, telefono: f.telefonoActual, placa: f.placa, vehiculo: f.vehiculo, tipoVehiculo: f.tipoVehiculo });
           }).catch(() => {});
         }
       });
       setTimeout(() => setScreen('modulos'), 2000);
-      return () => desuscribirFoto();
+      return () => desuscribirFicha();
     }
 
     const unsub = onAuthStateChanged(auth, async (user) => {
@@ -500,14 +520,9 @@ function App() {
           const snap = await getDoc(doc(db, 'usuarios', user.uid));
           if (snap.exists()) {
             const datos = snap.data();
-            setNombreUsuario(datos.nombre || '');
-            setTelefonoUsuario(telefonoDe(datos));
-            setPlacaUsuario(datos.placa || '');
-            setVehiculoUsuario(datos.vehiculo || '');
-            setTipoVehiculoUsuario(datos.tipoVehiculo || '');
+            ponerFicha(datosDeLaFicha(datos));
             setTipoUsuario(datos.tipo || '');
             guardarLocal(datos);
-            setFotoUsuario(datos.fotoConductor || datos.foto || null);
             setTimeout(() => setScreen('modulos'), 2000);
             return;
           }

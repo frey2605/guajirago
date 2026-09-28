@@ -173,6 +173,18 @@ ya estaba guardado («Contacto de Prueba», 3000000001); si sale «Sin número»
   quita (`deleteField`); la salida solo pone `activo: false`.
 - Al final el recorrido deja `activo` como estaba antes de empezar.
 
+**La placa fresca (28-sep-2026, G09, `placa-fresca.cjs`).** Cuenta taxi@gg.test → entrar → «Transporte y movilidad» →
+«Soy conductor» (la app deja su copia en `localStorage`, clave `guajirago_usuario`) → el ADMIN de prueba
+(admin@gg.test, con `entrarALaBase`) cambia `placa` en `usuarios/{uid}` del taxista → `p.reload()` (la copia sigue
+puesta) → otra vez «Transporte y movilidad» → «Soy conductor» → se busca la placa en la pantalla → disponible → se lee
+la placa de `conductores/{uid}` (la escribe su GPS con la misma placa que va en sus ofertas).
+- 🔑 **`p.reload()` conserva el `localStorage`**: es la forma de «volver a abrir la app con la copia puesta» sin
+  cerrar sesión. Con lo publicado ANTES de G09 sale 🔴 dos veces: la pantalla enseña PRU001 y la hoja lleva PRU001,
+  con la ficha diciendo la nueva.
+- 🔑 **El admin de prueba SÍ puede cambiar la ficha de otro** (como el panel); el taxista escribe su propia hoja.
+- Al final se devuelven la placa de la ficha y la de la hoja, y `activo`, a lo que había. Los 403 de la consola salen
+  aquí también (como en `conductor-en-turno` y `salir-por-el-menu`): no son la señal.
+
 ## Lo que el robot dejó creado en pruebas
 
 - 27-sep-2026: «Robot Taxi De Prueba» (robot.taxi.1790508222079@gg.test) y

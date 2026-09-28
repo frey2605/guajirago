@@ -90,6 +90,12 @@ const RECORRIDOS = [
     // este recorrido, y por eso Configuracion.js no se nombra aquí. La cubre pruebas/salirDeLaApp.test.js.
     vigila: ['guajirago/src/MenuLateral.js', 'guajirago/src/App.js', 'guajirago/src/AppConductor.js'],
   },
+  {
+    nombre: 'placa-fresca',
+    que: 'el admin corrige la placa del taxista en su ficha y, con la copia del teléfono puesta, la app enseña y manda la placa nueva (mira la base de pruebas) (G09)',
+    archivo: 'placa-fresca.cjs',
+    vigila: ['guajirago/src/App.js'],
+  },
 ];
 
 // Los archivos de pantalla: los que, si cambian, el robot debería poder probar. Todo lo que esté en
