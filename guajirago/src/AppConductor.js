@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { db, auth } from './firebase';
 import { collection, query, where, limit, onSnapshot, doc, updateDoc, setDoc, getDoc, getDocs, addDoc, orderBy, deleteField } from 'firebase/firestore';
-import { registrarTokenFCM, alertarNuevoViaje, activarAudioiOS, precargarAudio, setDebugCallback } from './Notificaciones';
+import { registrarTokenFCM, alertarNuevoViaje, activarAudioiOS, precargarAudio, permisoDeAvisos, avisoDeAvisos } from './Notificaciones';
 import { signOut } from 'firebase/auth';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { COMISIONES_DEFECTO, comisionSegunTipo } from './comisiones';
@@ -557,7 +557,6 @@ function AppConductor({ nombre, telefono, placa, vehiculo, tipoVehiculo, onCerra
   const [textoChat, setTextoChat] = useState('');
   const chatFinRef = useRef(null);
   const contadorRef = useRef(null);
-  const [debugMsg, setDebugMsg] = React.useState('');
   const ultimoMensajeRef = useRef(null);
   const descartadosRef = useRef({});
   const celebrandoRef = useRef(false);
@@ -867,12 +866,10 @@ function AppConductor({ nombre, telefono, placa, vehiculo, tipoVehiculo, onCerra
     if (onCerrarSesion) onCerrarSesion(); else window.location.reload();
   };
 
+  // Al abrir: se pide el token y, si este celular no le va a avisar de los viajes, se le dice en una ventanita
+  // (27-sep-2026). Antes se pintaba el registro técnico «FCM: permiso=denied» y nada más.
   useEffect(() => {
-    setDebugCallback((msg) => {
-      setDebugMsg(msg);
-      setTimeout(() => setDebugMsg(''), 8000);
-    });
-    registrarTokenFCM();
+    registrarTokenFCM().then(() => { const a = avisoDeAvisos(permisoDeAvisos()); if (a) setAviso(a); });
   }, []);
 const cargarSaldo = useCallback(async (uid) => {
     try {
@@ -1653,11 +1650,6 @@ if (llamadoAtencion && !fase) return (
         </div>
       </div>
       <div style={{ padding: '24px 20px' }}>
-        {debugMsg && (
-          <div style={{ background: '#FFFFFF', borderRadius: '12px', padding: '10px 14px', marginBottom: '12px', border: '1px solid #FFCF4D' }}>
-            <p style={{ color: '#FF7A2F', fontSize: '12px', margin: '0', fontFamily: 'monospace' }}>{debugMsg}</p>
-          </div>
-        )}
         <div onClick={() => setVerCreditos(true)} style={{ background: '#FFFFFF', borderRadius: '14px', padding: '12px 16px', display: 'flex', alignItems: 'center', gap: '12px', border: '1px solid #FF7A2F', cursor: 'pointer', marginBottom: '12px' }}>
           <span style={{ fontSize: '24px' }}>💰</span>
           <p style={{ color: '#1A1A1E', fontWeight: '900', fontSize: '15px', margin: '0', flex: 1 }}>Mis créditos</p>

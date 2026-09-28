@@ -106,6 +106,41 @@ describe('EL TOKEN DE AVISOS · un solo camino (27-sep-2026)', () => {
   });
 });
 
+describe('SIN PERMISO DE AVISOS · se le dice al conductor (27-sep-2026)', () => {
+  // Las dos piezas se SACAN de Notificaciones.js y se EJECUTAN (el archivo entero importa Firebase).
+  const t = leer('guajirago/src/Notificaciones.js').replace(/\r\n/g, '\n');
+  const trozo = t.slice(t.indexOf('export const permisoDeAvisos'), t.indexOf('// Callback para mostrar'));
+  const piezas = (Notification) => new Function('Notification', trozo.replace(/^export\s+/gm, '') + '\nreturn { permisoDeAvisos, avisoDeAvisos };')(Notification);
+
+  it('con permiso no sale nada; bloqueado, sin contestar o sin soporte, sale su ventanita', () => {
+    const { avisoDeAvisos } = piezas(undefined);
+    assert.strictEqual(avisoDeAvisos('granted'), null);
+    const textos = {};
+    for (const p of ['denied', 'default', 'no-soportado']) {
+      const a = avisoDeAvisos(p);
+      assert.ok(a && a.icono && a.titulo && a.texto.length > 40, 'sin ventanita para ' + p);
+      assert.ok(!/\b(FCM|token|permission|denied|granted|default|push)\b/i.test(a.titulo + ' ' + a.texto), '⛔ palabras técnicas o en inglés: ' + a.texto);
+      textos[p] = a.texto;
+    }
+    assert.match(textos.denied, /Permitir/);
+    assert.match(textos.default, /Permitir/);
+    assert.match(textos['no-soportado'], /abierta/);
+    assert.strictEqual(new Set(Object.values(textos)).size, 3, 'cada caso dice lo suyo');
+  });
+
+  it('el permiso sale del celular: sin Notification es «no-soportado»', () => {
+    assert.strictEqual(piezas(undefined).permisoDeAvisos(), 'no-soportado');
+    assert.strictEqual(piezas({ permission: 'denied' }).permisoDeAvisos(), 'denied');
+    assert.strictEqual(piezas({ permission: 'granted' }).permisoDeAvisos(), 'granted');
+  });
+
+  it('la pantalla del conductor enseña la ventanita al abrir y ya no pinta el registro técnico', () => {
+    const app = soloCodigo(leer('guajirago/src/AppConductor.js'));
+    assert.match(app, /registrarTokenFCM\(\)\.then\(\(\) => \{ const a = avisoDeAvisos\(permisoDeAvisos\(\)\); if \(a\) setAviso\(a\); \}\);/, '⛔ al abrir no se le dice si le van a sonar los viajes');
+    assert.ok(!/setDebugCallback|debugMsg/.test(app), '⛔ vuelve el registro técnico pintado en pantalla («FCM: …»)');
+  });
+});
+
 describe('LA FICHA DEL CONDUCTOR · el medidor', () => {
   it('cuenta los viajes vivos sin marca y las marcas que apuntan a un viaje terminado', () => {
     const r = medir(

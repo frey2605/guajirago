@@ -52,6 +52,16 @@ const LNG = -72.9072;
     await p.getByText('Soy conductor').click();
     await p.waitForTimeout(4000);
 
+    // ── Sin permiso de avisos (el navegador del robot no lo da): se le dice en una ventanita (27-sep-2026) ──
+    const alEntrar = await r.texto();
+    await r.captura('al-entrar');
+    const ventanita = /Así no te van a sonar los viajes/.test(alEntrar);
+    console.log('SIN PERMISO DE AVISOS:', ventanita ? 'sale la ventanita' : 'NO avisa', /FCM:/.test(alEntrar) ? '· y pinta el registro técnico «FCM:»' : '');
+    if (!ventanita) fallos.push('sin permiso de avisos, la app no se lo dice al conductor');
+    if (/FCM:/.test(alEntrar)) fallos.push('la pantalla pinta el registro técnico «FCM: …»');
+    const entendido = p.getByRole('button', { name: 'Entendido' });
+    if (await entendido.count()) { await entendido.first().click(); await p.waitForTimeout(500); }
+
     // ── Disponible (si no lo está, se toca el interruptor) ──
     const estado = p.getByText(/Estoy disponible|No disponible/).first();
     const interruptor = estado.locator('xpath=following-sibling::div[1]');

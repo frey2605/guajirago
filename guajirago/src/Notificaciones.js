@@ -18,6 +18,20 @@ export const precargarAudio = () => {
   } catch (e) {}
 };
 
+// ¿Puede este celular avisarle al conductor de un viaje nuevo con la app cerrada? 'granted' (sí), 'denied'
+// (lo bloqueó), 'default' (no ha contestado) o 'no-soportado' (el navegador no sabe avisar).
+export const permisoDeAvisos = () => (typeof Notification === 'undefined' ? 'no-soportado' : Notification.permission);
+
+// La ventanita que se le enseña al conductor cuando NO le van a sonar los viajes (27-sep-2026). Antes la app
+// se callaba y solo pintaba «FCM: permiso=denied». Con permiso, no sale nada.
+export const avisoDeAvisos = (permiso) => {
+  if (permiso === 'granted') return null;
+  const titulo = 'Así no te van a sonar los viajes';
+  if (permiso === 'denied') return { icono: '🔕', titulo, texto: 'Bloqueaste los avisos de GuajiraGo en este celular. Para que te suenen los viajes nuevos aunque la app esté cerrada, actívalos en los ajustes del navegador: el candado junto a la dirección → Notificaciones → Permitir.' };
+  if (permiso === 'default') return { icono: '🔔', titulo, texto: 'Todavía no le diste permiso a GuajiraGo para avisarte. Cuando el celular te pregunte, toca «Permitir» para que te suenen los viajes nuevos aunque la app esté cerrada.' };
+  return { icono: '📵', titulo, texto: 'Este navegador no puede avisarte de viajes nuevos con la app cerrada. Mientras estés disponible, deja GuajiraGo abierta en la pantalla.' };
+};
+
 // Callback para mostrar el resultado en pantalla
 let _onDebug = null;
 export const setDebugCallback = (fn) => { _onDebug = fn; };

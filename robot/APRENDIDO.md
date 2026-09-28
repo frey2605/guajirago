@@ -96,9 +96,11 @@ empleado», «Correo para que inicie sesión», «Mínimo 6 caracteres», se toc
   `.env.pruebas` no dice guajirago-pruebas. `cambiar` toca solo los campos dados.
 - Comprobado con la versión VIEJA publicada un momento en pruebas: el recorrido sale 🔴 «el GPS BORRÓ
   la marca del viaje en curso». Con la buena, ✓. Al terminar deja la ficha como estaba.
-- Vistos de paso, sin tocar: en la pantalla sale el texto técnico «FCM: permiso=denied» (el aviso interno
-  de que no hay permiso de avisos, pintado tal cual); y sin saldo, el interruptor avisa con un `alert`
-  del navegador, no con una ventanita.
+- 🪤 **El navegador del robot no da permiso de avisos**: al entrar sale la ventanita «Así no te van a
+  sonar los viajes» (desde el 27-sep-2026; antes se pintaba el texto técnico «FCM: permiso=denied»).
+  El recorrido exige que salga y la cierra con «Entendido»: si no, tapa el interruptor.
+- Visto de paso, sin tocar: sin saldo, el interruptor avisa con un `alert` del navegador, no con una
+  ventanita.
 
 ## Lo que el robot dejó creado en pruebas
 
