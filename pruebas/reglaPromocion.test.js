@@ -145,7 +145,8 @@ describe('G12 · la lista de ofertas de la app usa la regla', () => {
 // ── EL PANEL: el botón «Asignar», sacado del archivo y ejecutado contra una base de mentira ──
 function elBotonAsignar() {
   const f = leer('guajirago-admin/src/Promociones.js');
-  assert.match(f, /import \{ motivoParaNoUsar \} from '\.\/reglaPromocion';/, 'el panel no importa la copia de la regla');
+  // G16: el panel también pide de ahí `etapaDeVigencia` (las pestañas Activas/Próximas/Vencidas).
+  assert.match(f, /import \{ motivoParaNoUsar(, etapaDeVigencia)? \} from '\.\/reglaPromocion';/, 'el panel no importa la copia de la regla');
   const desde = f.indexOf('const asignarPromoManual');
   assert.ok(desde >= 0, 'no está asignarPromoManual');
   const cuerpo = cuerpoDeLaFuncion(f, desde).texto;

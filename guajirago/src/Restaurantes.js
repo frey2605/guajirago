@@ -12,6 +12,7 @@ import { guardarRechazo } from './guardarRechazo';
 // «¿Quién sale en la app?» se contesta en UN solo sitio (SEGUNDA LEY): el mismo
 // que usa Turismo.js. Ahí vive también el interruptor `visibleEnEscaparate`.
 import { losDeComida } from './escaparate';
+import { etapaDeVigencia } from './reglaPromocion';
 import {
   collection,
   onSnapshot,
@@ -237,11 +238,11 @@ function Restaurantes({ nombre, onVolver, foto, onCerrarSesion, onIrPerfil, onIr
   const promosActivasHoy = () => {
     const proms = (restauranteActivo && restauranteActivo.promociones) || [];
     const dow = new Date().getDay();
-    const hoy = new Date().toISOString().slice(0, 10);
     return proms.filter((p) => {
       if (!p.activa) return false;
       if (p.programacion === 'dias') return (p.dias || []).includes(dow);
-      if (p.programacion === 'rango') return (!p.fechaInicio || hoy >= p.fechaInicio) && (!p.fechaFin || hoy <= p.fechaFin);
+      // G16: el DÍA de hoy en Colombia (antes era el día en UTC: desde las 7 de la noche ya contaba «mañana»).
+      if (p.programacion === 'rango') return etapaDeVigencia(p.fechaInicio, p.fechaFin, new Date()) === 'vigente';
       return true; // siempre
     });
   };

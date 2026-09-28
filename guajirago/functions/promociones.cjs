@@ -16,11 +16,33 @@
  * pruebas/reglaPromocion.test.js exige que el trozo entre las dos marcas de abajo sea IGUAL en los tres, y los
  * EJECUTA con los mismos casos. Se cambia aquí y se copia; si no, la tanda se pone roja.
  *
- * Lo que NO decide esta regla (y está anotado aparte): la vigencia se lee en la hora de la máquina que la corre
- * —el servidor está en UTC, el celular en Colombia— (G16). Aquí se dejó igual que estaba en los tres sitios.
+ * LA VIGENCIA, EN HORA DE COLOMBIA · gemelo G16 (28-sep-2026). Las fechas se guardan como un DÍA («2026-10-05»,
+ * lo que da un <input type="date">). Antes cada máquina las leía en SU hora: el servidor (UTC) daba la promoción
+ * por empezada a las 7 de la noche del día anterior y por acabada a las 7 de la noche del último día; el teléfono,
+ * de 00:00 a 23:59 de Colombia. En esas horas la app ofrecía una promoción y el canje decía «ya no está
+ * disponible». Ahora `etapaDeVigencia` compara el DÍA de hoy en Colombia (`hoyEnColombia`, de cobros.cjs: no hay
+ * otro) con el día guardado, y da lo mismo en cualquier máquina. La usan también los anuncios (Anuncio.js y
+ * Superadmin.js) y las promos de restaurante (Restaurantes.js): una sola respuesta a «¿esta fecha está vigente hoy?».
+ * La app y el panel no pueden importar cobros.cjs: su copia de `hoyEnColombia` va fuera de las marcas, y
+ * pruebas/vigenciaHoy.test.js exige que sea la misma función y la ejecuta.
  */
+const { hoyEnColombia } = require('./cobros.cjs');
 
 // ── LA REGLA (se copia igual en la app y en el panel) ──
+
+/**
+ * ¿En qué punto está hoy (en Colombia) un rango de días AAAA-MM-DD? 'antes' (aún no empieza), 'vigente' o 'despues'
+ * (ya se acabó). Los dos extremos cuentan enteros: del primer día a las 00:00 al último a las 23:59, hora de Colombia.
+ * Un extremo vacío no limita. Uno que no es AAAA-MM-DD no se puede leer: no se da por vigente ('despues').
+ */
+function etapaDeVigencia(fechaInicio, fechaFin, ahora) {
+  const hoy = hoyEnColombia(ahora);
+  const esDia = (f) => /^\d{4}-\d{2}-\d{2}$/.test(String(f));
+  if ((fechaInicio && !esDia(fechaInicio)) || (fechaFin && !esDia(fechaFin))) return 'despues';
+  if (fechaInicio && hoy < fechaInicio) return 'antes';
+  if (fechaFin && hoy > fechaFin) return 'despues';
+  return 'vigente';
+}
 
 /** Cuántos viajes completados pide la promoción antes de poder usarla. 0 = ninguno. */
 function viajesMinimosDe(promo) {
@@ -34,10 +56,8 @@ function viajesMinimosDe(promo) {
  */
 function motivoPorLaPromocion(promo, esConductor, ahora) {
   if (!promo || !promo.activa) return { codigo: 'inactiva' };
-  // Inicio desde el arranque del día (00:00) y fin hasta el final del día (23:59:59)
-  if (new Date(promo.fechaInicio + 'T00:00:00') > ahora || new Date(promo.fechaFin + 'T23:59:59') < ahora) {
-    return { codigo: 'fuera-de-fecha' };
-  }
+  // G16: del primer día a las 00:00 al último a las 23:59, en hora de COLOMBIA (no en la de la máquina).
+  if (etapaDeVigencia(promo.fechaInicio, promo.fechaFin, ahora) !== 'vigente') return { codigo: 'fuera-de-fecha' };
   if (promo.aplicaA === 'pasajeros' && esConductor) return { codigo: 'otro-tipo', aplicaA: 'pasajeros' };
   if (promo.aplicaA === 'conductores' && !esConductor) return { codigo: 'otro-tipo', aplicaA: 'conductores' };
   return null;
@@ -74,4 +94,6 @@ function textoParaQuienLaUsa(motivo) {
 
 // ── FIN DE LA REGLA ──
 
-module.exports = { viajesMinimosDe, motivoPorLaPromocion, motivoParaNoUsar, textoParaQuienLaUsa };
+module.exports = {
+  etapaDeVigencia, hoyEnColombia, viajesMinimosDe, motivoPorLaPromocion, motivoParaNoUsar, textoParaQuienLaUsa,
+};

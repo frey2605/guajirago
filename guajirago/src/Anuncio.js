@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { db } from './firebase';
 import { collection, getDocs } from 'firebase/firestore';
+import { etapaDeVigencia } from './reglaPromocion';
 
 function Anuncio({ tipoUsuario }) {
   const [anuncio, setAnuncio] = useState(null);
@@ -22,15 +23,8 @@ function Anuncio({ tipoUsuario }) {
           if (destino === 'pasajeros' && tipoUsuario === 'conductor') return false;
           if (destino === 'conductores' && tipoUsuario === 'pasajero') return false;
 
-          // Filtrar por fechas (obligatorias)
-          if (a.fechaInicio) {
-            const inicio = new Date(a.fechaInicio + 'T00:00:00');
-            if (hoy < inicio) return false;
-          }
-          if (a.fechaFin) {
-            const fin = new Date(a.fechaFin + 'T23:59:59');
-            if (hoy > fin) return false;
-          }
+          // Filtrar por fechas (obligatorias). G16: el DÍA de hoy en Colombia, con la misma regla de las promociones.
+          if (etapaDeVigencia(a.fechaInicio, a.fechaFin, hoy) !== 'vigente') return false;
 
           // Filtrar por número de veces (si está activado). Se cuenta por dispositivo.
           if (a.limitarVeces && a.maxVeces > 0) {

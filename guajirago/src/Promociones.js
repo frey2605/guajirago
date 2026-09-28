@@ -6,6 +6,7 @@ import { getFunctions, httpsCallable } from 'firebase/functions';
 import Logo from './Logo';
 import { motivoPorLaPromocion } from './reglaPromocion';
 import { cop } from './moneda';
+import { fechaDeCalendario } from './fechaCalendario';
 
 function CelebracionPromo({ codigo, textoValor, onCerrar }) {
   const confeti = Array.from({ length: 30 }, (_, i) => i);
@@ -190,7 +191,7 @@ function Promociones({ onVolver }) {
                   ) : (
                     <p style={{ color: '#6B7280', fontSize: '11px', margin: 0 }}>Se aplica automáticamente</p>
                   )}
-                  <p style={{ color: '#6B7280', fontSize: '11px', margin: '10px 0 0' }}>Válida hasta {new Date(p.fechaFin).toLocaleDateString('es-CO')}</p>
+                  <p style={{ color: '#6B7280', fontSize: '11px', margin: '10px 0 0' }}>Válida hasta {fechaDeCalendario(p.fechaFin)}</p>
                 </div>
               );
             })}

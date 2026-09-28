@@ -9,8 +9,8 @@
  * Ahora hay UNA pieza, `fechaDeCalendario` en guajirago/src/fechaCalendario.js, con copia
  * idéntica en aliados (otro repo: no puede importarla).
  *
- *   1. La pieza se EJECUTA (la de la app y la de aliados) en varias zonas horarias.
- *   2. Las dos copias son iguales byte a byte.
+ *   1. La pieza se EJECUTA (la de la app, la de aliados y la del panel) en varias zonas horarias.
+ *   2. Las copias son iguales byte a byte. (La del panel llegó con G16: pinta las fechas de las promociones.)
  *   3. Las DOS pantallas se ejecutan: se saca de cada archivo la función que pinta
  *      `r.fecha` —con el MISMO lector que usa scripts/medir-fecha-reserva.cjs, no una
  *      copia— y se corre con los 365 días de 2026 en hora de Colombia.
@@ -26,6 +26,7 @@ const { elPintorDe, diaDelTexto, PANTALLAS } = require('../scripts/medir-fecha-r
 
 const APP = 'guajirago/src/fechaCalendario.js';
 const ALIADOS = 'guajirago-aliados/src/fechaCalendario.js';
+const PANEL = 'guajirago-admin/src/fechaCalendario.js';
 const LARGO = { weekday: 'long', day: 'numeric', month: 'long' };
 
 // Cambia la zona horaria de este proceso mientras corre `fn` (node --test corre cada archivo aparte).
@@ -39,7 +40,7 @@ function enZona(tz, fn) {
 const delDisco = (ruta) => leer(ruta);
 
 describe('G11 · la fecha de calendario se pinta con UNA pieza', () => {
-  for (const ruta of [APP, ALIADOS]) {
+  for (const ruta of [APP, ALIADOS, PANEL]) {
     it('la pieza da el día guardado en cualquier zona horaria (' + ruta.split('/')[0] + ')', () => {
       const { fechaDeCalendario } = cargarDeLaApp(ruta);
       for (const tz of ['America/Bogota', 'UTC', 'Pacific/Kiritimati', 'Pacific/Pago_Pago']) {
@@ -62,6 +63,8 @@ describe('G11 · la fecha de calendario se pinta con UNA pieza', () => {
   it('la copia de aliados es la de la app, byte a byte', () => {
     assert.strictEqual(leer(ALIADOS), leer(APP),
       'se separaron: se cambian LOS DOS (guajirago/src y guajirago-aliados/src fechaCalendario.js)');
+    assert.strictEqual(leer(PANEL), leer(APP),
+      'se separaron: la copia del panel (guajirago-admin/src/fechaCalendario.js) tiene que ser la de la app');
   });
 
   it('en Colombia, el cliente y la agencia ven el día que se guardó, los 365 días de 2026', () => {

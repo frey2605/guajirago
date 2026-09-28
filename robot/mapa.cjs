@@ -88,6 +88,15 @@ const RECORRIDOS = [
       'guajirago/src/Promociones.js', 'guajirago/src/reglaPromocion.js'],
   },
   {
+    nombre: 'vigencia-promo',
+    que: 'una promoción que dura solo HOY sale vigente en la app y en «Activas» del panel, y las dos pintan el día de hoy, no el de ayer (G16; crea una promoción de mentira en pruebas y la apaga)',
+    archivo: 'vigencia-promo.cjs',
+    // Anuncio.js, Restaurantes.js (promos de restaurante) y Superadmin.js usan la misma regla, y la hora que importa
+    // (las 7 de la noche) no se puede mover en el navegador: los EJECUTA pruebas/vigenciaHoy.test.js en cuatro zonas.
+    vigila: ['guajirago/src/Promociones.js', 'guajirago/src/reglaPromocion.js', 'guajirago/src/fechaCalendario.js',
+      'guajirago-admin/src/Promociones.js', 'guajirago-admin/src/reglaPromocion.js', 'guajirago-admin/src/fechaCalendario.js'],
+  },
+  {
     nombre: 'candado-recarga',
     que: 'el candado de la ley del botón no se traba en el navegador: un código de recarga inventado dice «no existe» y el botón vuelve a quedar tocable, dos veces',
     archivo: 'candado-recarga.cjs',

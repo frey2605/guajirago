@@ -15,9 +15,11 @@
  * Si llega algo que no es AAAA-MM-DD, se enseña tal cual (nunca «Invalid Date»).
  * El formato (largo o corto) lo decide cada pantalla con `opciones`, como toLocaleDateString.
  *
- * ALIADOS ES OTRO REPOSITORIO y no puede importar este archivo: tiene su copia IDÉNTICA en
- * guajirago-aliados/src/fechaCalendario.js. pruebas/fechaCalendario.test.js ejecuta las dos
- * y exige que sean iguales byte a byte.
+ * ALIADOS y EL PANEL SON OTROS REPOSITORIOS y no pueden importar este archivo: tienen su copia
+ * IDÉNTICA en guajirago-aliados/src/fechaCalendario.js y guajirago-admin/src/fechaCalendario.js.
+ * pruebas/fechaCalendario.test.js ejecuta las tres y exige que sean iguales byte a byte.
+ * G16 (28-sep-2026): las fechas de las promociones («Válida hasta» en la app, el rango en el
+ * panel) también se pintan con esta pieza; antes salían un día antes, igual que la reserva.
  */
 export const fechaDeCalendario = (v, opciones) => {
   if (!v) return '';
