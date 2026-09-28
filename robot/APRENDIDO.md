@@ -203,6 +203,20 @@ la placa de `conductores/{uid}` (la escribe su GPS con la misma placa que va en 
 - Con lo publicado ANTES de G11 sale 🔴 «la agencia ve "dom, 4 de oct"» con la reserva guardada «2026-10-05» (lunes).
 - La tarjeta pinta el día en un `<p>` con 📅, dos renglones debajo del 👤 con el nombre del cliente.
 
+### promo-asignar (G12, 28-sep-2026)
+- Panel: el módulo de Promociones es el 🎁 del menú de abajo (solo superadmin). A la izquierda, «Vencidas»/«Activas».
+  La tarjeta se encuentra por su nombre; el botón es «🎁 Asignar». La ventana busca a la persona por DOCUMENTO
+  (`input[placeholder="Número de documento"]`) y habilita «Asignar» cuando la encuentra.
+- 🔑 **Las cuentas de prueba nacen SIN documento**, así que «Asignar» no las encuentra. El recorrido le pone al
+  pasajero de prueba el documento fijo `ROBOT-PASAJERO` (solo en pruebas) la primera vez.
+- Las promociones de mentira las crea `entrarALaBase('admin@gg.test')` con `cambiar` (crea si no existe). No se borran
+  (lápidas): al final se ponen `activa: false`, pase lo que pase (van en un `finally`).
+- App: Menú → «Promociones», campo `input[placeholder="Escribe el código"]`, botón «Aplicar». El motivo del servidor sale
+  como `<p>` rojo (no ventanita) y lleva pegado « [400]».
+- El 403 de la consola sale igual que en los demás recorridos; el 400 es la respuesta del servidor que rechaza el código.
+- Lo que se ve de paso: las fechas de las tarjetas del panel salen UN DÍA ANTES (2026-01-01 → «31/12/2025») y la app
+  dice «Válida hasta 30/12/2099» de una promoción que acaba el 31: el mismo fallo de G11, en Promociones.
+
 ## Lo que el robot dejó creado en pruebas
 
 - 27-sep-2026: «Robot Taxi De Prueba» (robot.taxi.1790508222079@gg.test) y
@@ -211,3 +225,6 @@ la placa de `conductores/{uid}` (la escribe su GPS con la misma placa que va en 
   cancelado por el pasajero con «Otro motivo» (el primero: ZV3QbClY4rj2kZgUILGO).
 - 28-sep-2026 en adelante: una reserva de turismo `reservasTurismo/robot-g11-<hora>` a la agencia de prueba por cada
   corrida de `fecha-reserva.cjs`, cliente «Robot G11 <hora>», ya cancelada (la primera: robot-g11-1790579356242).
+- 28-sep-2026 en adelante: dos promociones `promociones/ROBOT-G12V-<hora>` (vencida) y `ROBOT-G12N-<hora>` (pide 99
+  viajes) por cada corrida de `promo-asignar.cjs`, ya apagadas (las primeras: ROBOT-G12V-315512 y ROBOT-G12N-315512).
+  Y al pasajero de prueba se le puso el documento `ROBOT-PASAJERO`.

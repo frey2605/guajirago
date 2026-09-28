@@ -81,6 +81,13 @@ const RECORRIDOS = [
     vigila: ['guajirago-aliados/src/ReservasTurismo.js', 'guajirago-aliados/src/fechaCalendario.js'],
   },
   {
+    nombre: 'promo-asignar',
+    que: 'el panel no asigna una promoción vencida (ventanita) y el servidor no deja canjear una que pide viajes previos a quien no los tiene (G12; crea dos promociones de mentira en pruebas y las apaga)',
+    archivo: 'promo-asignar.cjs',
+    vigila: ['guajirago-admin/src/Promociones.js', 'guajirago-admin/src/reglaPromocion.js',
+      'guajirago/src/Promociones.js', 'guajirago/src/reglaPromocion.js'],
+  },
+  {
     nombre: 'candado-recarga',
     que: 'el candado de la ley del botón no se traba en el navegador: un código de recarga inventado dice «no existe» y el botón vuelve a quedar tocable, dos veces',
     archivo: 'candado-recarga.cjs',
