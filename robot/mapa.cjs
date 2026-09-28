@@ -113,6 +113,14 @@ const RECORRIDOS = [
     vigila: ['guajirago/src/MenuLateral.js', 'guajirago/src/App.js', 'guajirago/src/AppConductor.js'],
   },
   {
+    nombre: 'precio-viaje',
+    que: 'un teléfono en inglés pide un taxi y el viaje guarda el precio con cop() («$ 10.000»), no con su idioma (G13; deja un viaje cancelado en pruebas)',
+    archivo: 'precio-viaje.cjs',
+    // La nueva oferta del pasajero (Solicitar.js) y la oferta del conductor (AppConductor.js) usan el mismo cop(), pero
+    // probarlas pide un conductor ofertando en vivo: NO las cubre este recorrido. Las cubre pruebas/tarifaTexto.test.js.
+    vigila: ['guajirago/src/viajeNuevo.js', 'guajirago/src/moneda.js'],
+  },
+  {
     nombre: 'placa-fresca',
     que: 'el admin corrige la placa del taxista en su ficha y, con la copia del teléfono puesta, la app enseña y manda la placa nueva (mira la base de pruebas) (G09)',
     archivo: 'placa-fresca.cjs',

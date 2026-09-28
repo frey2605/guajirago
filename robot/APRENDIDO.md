@@ -217,6 +217,16 @@ la placa de `conductores/{uid}` (la escribe su GPS con la misma placa que va en 
 - Lo que se ve de paso: las fechas de las tarjetas del panel salen UN DÍA ANTES (2026-01-01 → «31/12/2025») y la app
   dice «Válida hasta 30/12/2099» de una promoción que acaba el 31: el mismo fallo de G11, en Promociones.
 
+### precio-viaje (G13, 28-sep-2026)
+- 🔑 **Un teléfono en otro idioma se simula en `antesDeCargar`**: el motor no deja escoger el idioma del navegador, así
+  que se cambia `Number.prototype.toLocaleString` para que, sin idioma, escriba como `en-US`. El recorrido comprueba
+  primero que de verdad escribe «10,000»; si no, no firma nada.
+- El precio se lee en la BASE (el `tarifa` del viaje que la app nombró al escribir), no en la pantalla: la pantalla de
+  espera pinta la tarifa con su propio formateo (eso es G14).
+- `cop()` escribe «$» + ESPACIO FIJO (U+00A0) + «10.000»; un `includes('$ 10')` con espacio normal no lo encuentra.
+- Pedir y cancelar es el mismo camino de `cancelar-viaje.cjs` (Taxi, GPS de mentira, «Otro motivo»).
+- La oferta del conductor y la nueva oferta del pasajero no se prueban aquí: piden un conductor ofertando en vivo.
+
 ## Lo que el robot dejó creado en pruebas
 
 - 27-sep-2026: «Robot Taxi De Prueba» (robot.taxi.1790508222079@gg.test) y
@@ -228,3 +238,5 @@ la placa de `conductores/{uid}` (la escribe su GPS con la misma placa que va en 
 - 28-sep-2026 en adelante: dos promociones `promociones/ROBOT-G12V-<hora>` (vencida) y `ROBOT-G12N-<hora>` (pide 99
   viajes) por cada corrida de `promo-asignar.cjs`, ya apagadas (las primeras: ROBOT-G12V-315512 y ROBOT-G12N-315512).
   Y al pasajero de prueba se le puso el documento `ROBOT-PASAJERO`.
+- 28-sep-2026 en adelante: un viaje de Taxi de pasajero@gg.test por cada corrida de `precio-viaje.cjs`, ya cancelado
+  por el pasajero con «Otro motivo» (el primero: qxSxf8ofamCWGFng3Xzu).
