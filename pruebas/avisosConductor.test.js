@@ -171,7 +171,7 @@ describe('REGLA 9 · los botones del viaje del conductor ya no fallan en silenci
     // Las que YA estaban mudas antes y quedaron fuera del alcance, dichas por su ancla.
     const FUERA = [
       "'contraofertas', miId), { vigente: false }",     // retirar mis ofertas
-      "{ activo: false, nombre: nombre || '' }",         // apagarse
+      "{ activo: false, nombre: nombre || '', ubicacion: deleteField() }", // apagarse (desde el 27-sep con merge, G02)
     ];
     const mudas = [];
     for (const m of t.matchAll(/(?:setDoc|updateDoc|addDoc|deleteDoc)\s*\(/g)) {

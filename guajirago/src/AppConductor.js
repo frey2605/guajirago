@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { db, auth } from './firebase';
-import { collection, query, where, limit, onSnapshot, doc, updateDoc, setDoc, getDoc, getDocs, addDoc, orderBy } from 'firebase/firestore';
+import { collection, query, where, limit, onSnapshot, doc, updateDoc, setDoc, getDoc, getDocs, addDoc, orderBy, deleteField } from 'firebase/firestore';
 import { registrarTokenFCM, alertarNuevoViaje, activarAudioiOS, precargarAudio, setDebugCallback } from './Notificaciones';
 import { signOut } from 'firebase/auth';
 import { getFunctions, httpsCallable } from 'firebase/functions';
@@ -933,7 +933,9 @@ const cargarSaldo = useCallback(async (uid) => {
           placa: placa || '', vehiculo: vehiculo || '',
           ubicacion: nueva, activo: true,
           ...(tokenFCM ? { fcmToken: tokenFCM } : {}),
-        });
+        // merge (27-sep-2026, G02): sin él, cada lectura del GPS reescribía la ficha ENTERA y borraba
+        // lo que pone el servidor al confirmarlo (enViajeId, ocupado) y el token si esta vez no salió.
+        }, { merge: true });
       } catch (e) {}
     };
 
@@ -977,7 +979,8 @@ const cargarSaldo = useCallback(async (uid) => {
     if (activo || fase) return;
     const user = auth.currentUser;
     if (!user) return;
-    setDoc(doc(db, 'conductores', user.uid), { activo: false, nombre: nombre || '' }).catch(() => {});
+    // Con merge, como el GPS (G02); la ubicación sí se quita, como antes: fuera de turno no se guarda dónde está.
+    setDoc(doc(db, 'conductores', user.uid), { activo: false, nombre: nombre || '', ubicacion: deleteField() }, { merge: true }).catch(() => {});
   }, [activo, fase, nombre]);
 
   useEffect(() => {
