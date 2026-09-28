@@ -40,3 +40,32 @@ export function segundosDeEspera(config) {
   const n = Number(config && config.tiempoEsperaConductor);
   return Number.isFinite(n) && n > 0 ? Math.floor(n) : CONFIG_COMPARTIDA.tiempoEsperaConductor;
 }
+
+/**
+ * G27 (28-sep-2026): EL PLAZO DE LA BÚSQUEDA DEL CELULAR — un solo sitio para las DOS pantallas.
+ * Estaba escrito a mano nueve veces: en `Solicitar.js` el 60000 de ampliar y el 120000 de agotar (dos veces cada uno:
+ * al pedir y al «Seguir buscando»), el 120 del reloj (dos), el 240 con que nacía el reloj y el 120 de la barra; y en
+ * `AppConductor.js` la ventana de 2 * 60 * 1000 con que el conductor deja de ver una solicitud vieja. Cambiar uno sin
+ * los otros dejaba al pasajero buscando con un reloj y al conductor mirando con otro.
+ * 🔑 NO es el plazo del SERVIDOR (20 min, `MINUTOS.buscando` en functions/viajesColgados.cjs): ése es la red de
+ * seguridad para cuando el celular se apagó, y es distinto A PROPÓSITO.
+ */
+export const BUSQUEDA = {
+  segundosParaAmpliar: 60, // al minuto sin nadie, el radio pasa a `radioBusquedaAmpliado`
+  segundos: 120,           // a los 2 min el celular da la búsqueda por agotada y la vence
+};
+
+/**
+ * G27: LO QUE ESCRIBE EL CELULAR CUANDO SE LE ACABA LA BÚSQUEDA. Antes era `{ estado: 'vencido' }` a secas: el viaje no
+ * decía cuándo, quién ni por qué, y no había forma de distinguirlo de uno que cerró el servidor. Ahora deja los MISMOS
+ * tres campos que `expirarViajesColgados` (functions/index.js), con `expiradoPor: 'app-pasajero'` en vez de `'sistema'`.
+ * La fecha es la del teléfono (como `nuevaOferta`): sirve de rastro, no decide nada.
+ */
+export function marcaDelVencido(ahoraIso) {
+  return {
+    estado: 'vencido',
+    fechaExpiracion: ahoraIso,
+    expiradoPor: 'app-pasajero',
+    motivoExpiracion: 'llevaba ' + Math.round(BUSQUEDA.segundos / 60) + ' min buscando conductor y nadie lo tomó',
+  };
+}

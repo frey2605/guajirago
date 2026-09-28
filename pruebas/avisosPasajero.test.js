@@ -171,7 +171,7 @@ describe('REGLA 9 · los botones del pasajero ya no fallan en silencio', () => {
     // dispara el reloj) y la creación del viaje, que va dentro del candado de «pedir el viaje».
     const FUERA = [
       'radioBusqueda: configApp.radioBusquedaAmpliado',   // el temporizador que amplía el radio
-      "estado: 'vencido'",                                 // el temporizador que vence la búsqueda
+      'marcaDelVencido(',                                  // el temporizador que vence la búsqueda (G27)
       'pasajeroFcmToken',                                   // el token, sin bloquear la creación del viaje
     ];
     const t = soloCodigo(leer(APP));

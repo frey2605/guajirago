@@ -9,7 +9,7 @@ import Llamada from './Llamada';
 import { alertarNuevoViaje, precargarAudio, activarAudioiOS, obtenerTokenFCM } from './Notificaciones';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { CONFIG_TARIFAS_DEFECTO, calcularTarifaMinima } from './tarifas';
-import { CONFIG_COMPARTIDA, segundosDeEspera } from './configApp';
+import { CONFIG_COMPARTIDA, segundosDeEspera, BUSQUEDA, marcaDelVencido } from './configApp';
 import { cop } from './moneda';
 import { aplicarDescuento, armarDescuentoInfo, tarifaParaPasajero } from './descuentos';
 import { generarCodigoSeguridad, guardarCodigoDeViaje, cargarCodigoDeViaje } from './codigoSeguridad';
@@ -564,7 +564,7 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
   }, [avisoAccion]);
   const [llamandoConductor, setLlamandoConductor] = useState(false);
   const [llamadaEntrante, setLlamadaEntrante] = useState(false);
-  const [tiempoBusqueda, setTiempoBusqueda] = useState(240);
+  const [tiempoBusqueda, setTiempoBusqueda] = useState(BUSQUEDA.segundos);
   const contadorBusquedaRef = useRef(null);
   const radioRef = useRef(null);
   const [destinoCoords, setDestinoCoords] = useState(null);
@@ -1103,17 +1103,17 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
       'seguir', 'Seguimos buscando.', 'volver a buscar conductor');
     if (!r || !r.ok) return;
     setBuscandoAgotado(false);
-    setTiempoBusqueda(120);
+    setTiempoBusqueda(BUSQUEDA.segundos);
     if (radioRef.current) { clearTimeout(radioRef.current.ampliar); clearTimeout(radioRef.current.agotar); }
     radioRef.current = {
       ampliar: setTimeout(() => {
         updateDoc(doc(db, 'viajes', viajeId), { radioBusqueda: configApp.radioBusquedaAmpliado }).catch(() => {});
-      }, 60000),
+      }, BUSQUEDA.segundosParaAmpliar * 1000),
       agotar: setTimeout(() => {
         setBuscandoAgotado(true);
-        // Si se acaba otra vez, volver a marcarlo vencido
-        updateDoc(doc(db, 'viajes', viajeId), { estado: 'vencido' }).catch(() => {});
-      }, 120000),
+        // Si se acaba otra vez, volver a marcarlo vencido (G27: con su fecha, quién y por qué)
+        updateDoc(doc(db, 'viajes', viajeId), marcaDelVencido(new Date().toISOString())).catch(() => {});
+      }, BUSQUEDA.segundos * 1000),
     };
     clearInterval(contadorBusquedaRef.current);
     contadorBusquedaRef.current = setInterval(() => {
@@ -1252,19 +1252,20 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
       setContraofertas([]);
       contaofertasIdsRef.current.clear();
       setBuscandoAgotado(false);
-      setTiempoBusqueda(120);
+      setTiempoBusqueda(BUSQUEDA.segundos);
       setPantalla('esperando');
 
-      // Temporizadores de radio: al 1 min amplía a 7km, a los 2 min marca agotado
+      // Temporizadores de radio: al 1 min amplía a 7km, a los 2 min marca agotado (los plazos: BUSQUEDA, G27)
       radioRef.current = {
         ampliar: setTimeout(() => {
           updateDoc(doc(db, 'viajes', docRef.id), { radioBusqueda: configApp.radioBusquedaAmpliado }).catch(() => {});
-        }, 60000),
+        }, BUSQUEDA.segundosParaAmpliar * 1000),
         agotar: setTimeout(() => {
           setBuscandoAgotado(true);
-          // El tiempo se acabó: marcar el viaje como vencido para que desaparezca de TODOS los conductores
-          updateDoc(doc(db, 'viajes', docRef.id), { estado: 'vencido' }).catch(() => {});
-        }, 120000),
+          // El tiempo se acabó: marcar el viaje como vencido para que desaparezca de TODOS los conductores.
+          // G27: con su fecha, quién y por qué, como lo deja el servidor.
+          updateDoc(doc(db, 'viajes', docRef.id), marcaDelVencido(new Date().toISOString())).catch(() => {});
+        }, BUSQUEDA.segundos * 1000),
       };
       // Contador visible (cuenta regresiva de 4:00 a 0:00)
       clearInterval(contadorBusquedaRef.current);
@@ -1664,7 +1665,7 @@ const PanelEmergencia = () => (
         {!buscandoAgotado && (
           <div style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px' }}>
             <div style={{ flex: 1, height: '8px', background: '#ECECEF', borderRadius: '4px', overflow: 'hidden' }}>
-              <div style={{ height: '100%', width: `${(tiempoBusqueda / 120) * 100}%`, background: tiempoBusqueda > 60 ? '#2ECC71' : tiempoBusqueda > 30 ? '#FFCF4D' : '#FF4444', borderRadius: '4px', transition: 'width 1s linear, background 0.5s' }} />
+              <div style={{ height: '100%', width: `${(tiempoBusqueda / BUSQUEDA.segundos) * 100}%`, background: tiempoBusqueda > 60 ? '#2ECC71' : tiempoBusqueda > 30 ? '#FFCF4D' : '#FF4444', borderRadius: '4px', transition: 'width 1s linear, background 0.5s' }} />
             </div>
             <span style={{ color: tiempoBusqueda > 60 ? '#2ECC71' : tiempoBusqueda > 30 ? '#FFCF4D' : '#FF4444', fontSize: '15px', fontWeight: '900', fontVariantNumeric: 'tabular-nums', minWidth: '42px', textAlign: 'right' }}>{Math.floor(tiempoBusqueda / 60)}:{String(tiempoBusqueda % 60).padStart(2, '0')}</span>
           </div>

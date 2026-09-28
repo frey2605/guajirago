@@ -6,7 +6,7 @@ import { getFunctions, httpsCallable } from 'firebase/functions';
 import { COMISIONES_DEFECTO, comisionSegunTipoDeViaje, comisionParaActivarse } from './comisiones';
 import { porQueNoLeToca } from './leTocaElViaje';
 import { CONFIG_TARIFAS_DEFECTO, calcularTarifaMinima } from './tarifas';
-import { CONFIG_COMPARTIDA, segundosDeEspera } from './configApp';
+import { CONFIG_COMPARTIDA, segundosDeEspera, BUSQUEDA } from './configApp';
 import { cop } from './moneda';
 import { ESTADOS_MERCADO, ESTADOS_TERMINADOS, ESTADOS_QUE_CIERRA_EL_SERVIDOR, avisoDelCierre, comoTermino, meAceptaronEsteViaje } from './estadosViaje';
 import { consultaDeGanancias, resumenDeGanancias } from './gananciasConductor';
@@ -943,7 +943,8 @@ const cargarSaldo = useCallback(async (uid) => {
 
   useEffect(() => {
     if (!activo) { setSolicitudes([]); solicitudesIdsRef.current.clear(); return; }
-    const VENTANA_MS = 2 * 60 * 1000;
+    // G27: el MISMO plazo con que el celular del pasajero da su búsqueda por agotada (configApp.js), no uno aparte.
+    const VENTANA_MS = BUSQUEDA.segundos * 1000;
     // SEGUNDA LEY — la lista vive en estadosViaje.js, y una prueba la ata a
     // firestore.rules para que no puedan separarse en silencio.
     const q = query(collection(db, 'viajes'), where('estado', 'in', ESTADOS_MERCADO));
