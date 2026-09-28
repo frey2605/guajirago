@@ -49,7 +49,7 @@ const RECORRIDOS = [
     nombre: 'conductor-en-turno',
     que: 'el conductor se pone disponible y el GPS escribe su posición sin borrarle el viaje en curso (mira la base de pruebas)',
     archivo: 'conductor-en-turno.cjs',
-    vigila: ['guajirago/src/AppConductor.js', 'guajirago/src/Notificaciones.js'],
+    vigila: ['guajirago/src/AppConductor.js', 'guajirago/src/Notificaciones.js', 'guajirago/src/pedirGps.js'],
   },
   {
     nombre: 'radio-panel',
@@ -63,7 +63,8 @@ const RECORRIDOS = [
     archivo: 'ubicacion-emergencia.cjs',
     // Solicitar.js (el 🚨 del mapa) usa la misma función, pero probarlo pide un viaje en curso con conductor: NO lo
     // cubre este recorrido, y por eso no se nombra aquí (ver APRENDIDO.md).
-    vigila: ['guajirago/src/Seguridad.js', 'guajirago/src/ubicacionDeAhora.js', 'guajirago/src/mensajeEmergencia.js'],
+    vigila: ['guajirago/src/Seguridad.js', 'guajirago/src/ubicacionDeAhora.js', 'guajirago/src/mensajeEmergencia.js',
+      'guajirago/src/pedirGps.js'],
   },
   {
     nombre: 'contacto-emergencia',

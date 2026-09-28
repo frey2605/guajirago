@@ -3470,29 +3470,32 @@ describe('EL VIAJE NO NACE EN LA PLAZA · sin GPS no se pide a ciegas', () => {
       //  🔴 EL ORDEN DE LOS DOS INTENTOS DEL GPS (23-sep-2026). El fallo que el
       //  dueño midió con su teléfono dentro de su casa: el respaldo pedía algo
       //  MÁS DIFÍCIL que el intento que ya había fallado.
+      //  🔑 DESDE G28 (28-sep-2026) los tiempos viven en `pedirGps.js`: estos escapes se meten en ESA pieza
+      //  (tercer elemento `true`) y el medidor la corre con el sabotaje dentro. La pantalla queda intacta.
       ['vuelve el orden de antes: primero el aproximado, y de respaldo el satélite',
         (s) => s.replace(/\{ enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 \}/,
           '{ enableHighAccuracy: false, timeout: 8000, maximumAge: 0 }')
           .replace(/\{ enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 \}/,
-            '{ enableHighAccuracy: true, timeout: 20000 }')],
+            '{ enableHighAccuracy: true, timeout: 20000 }'), true],
       //  Y el disfraz del mismo fallo: pedir satélite LAS DOS VECES. El respaldo
       //  no pide «más» que el primero —pide lo mismo—, así que la fila del orden
       //  lo deja pasar; el que lo caza es el pasajero bajo techo, ejecutado.
       //  Sin el aparato que niega el SATÉLITE (y no el turno) esto pasaba.
       ['los dos intentos piden satélite, que bajo techo no hay',
         (s) => s.replace(/\{ enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 \}/,
-          '{ enableHighAccuracy: true, timeout: 10000, maximumAge: 300000 }')],
+          '{ enableHighAccuracy: true, timeout: 10000, maximumAge: 300000 }'), true],
       ['vuelve el `maximumAge: 0`: una posición buena de hace un momento se tira',
-        (s) => s.replace(/maximumAge: 60000/, 'maximumAge: 0')],
+        (s) => s.replace(/maximumAge: 60000/, 'maximumAge: 0'), true],
       ['el respaldo desaparece y solo queda un intento',
-        (s) => s.replace(
-          /\(\) => navigator\.geolocation\.getCurrentPosition\([\s\S]*?maximumAge: 300000 \}\s*\)/,
-          '() => setUbicacionPasajero(centroRiohacha)')],
+        (s) => s.replace(/\s*\{ enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 \},/, ''), true],
+      //  Y el mismo escape desde la PANTALLA: pide con el juego del botón, que lleva un solo intento.
+      ['la pantalla pide el GPS con el juego del botón (un solo intento, sin respaldo)',
+        (s) => s.replace(/pedirGps\(navigator, 'pantalla',/, "pedirGps(navigator, 'boton',")],
       //  Y la forma fácil de poner verde todo lo de arriba: esperar más hasta que
       //  el aparato acabe contestando. Eso empeora justo lo que se vino a
       //  mejorar, así que tiene que caer por NOROMPER, no por FALLOS.
       ['se alarga la espera hasta que el aparato ceda (el pasajero, callado)',
-        (s) => s.replace(/timeout: 10000, maximumAge: 300000/, 'timeout: 45000, maximumAge: 300000')],
+        (s) => s.replace(/timeout: 10000, maximumAge: 300000/, 'timeout: 45000, maximumAge: 300000'), true],
       //  La guardia «sin punto no se crea» SIN su salida: avisa, pero sigue de largo y crea el viaje. El medidor
       //  cortaba el trozo al final de la guardia y no lo veía (hueco viejo, destapado por un sabotaje el 26-sep-2026).
       ['la guardia sin punto avisa pero no corta: el viaje se crea igual',
@@ -3509,15 +3512,18 @@ describe('EL VIAJE NO NACE EN LA PLAZA · sin GPS no se pide a ciegas', () => {
       + 'Quitar escapes la pone verde por mirar menos, no por estar mejor.');
 
     const saltados = [];
-    for (const [nombre, romper] of ESCAPES) {
-      const rota = romper(real);
+    //  G28: un escape con `enLaPieza` se mete en `pedirGps.js`, no en la pantalla.
+    const realGps = leer('guajirago/src/pedirGps.js');
+    for (const [nombre, romper, enLaPieza] of ESCAPES) {
+      const base = enLaPieza ? realGps : real;
+      const rota = romper(base);
       // 🔴 SI EL PARCHE NO ENCONTRÓ NADA, ESTA PRUEBA SE ESTARÍA APROBANDO SOLA.
       //  Una pantalla que no se llegó a romper sale limpia, y el lector diría
       //  «bien» con toda la razón — verde por no haber mirado nada. Así que se
       //  apunta y se falla al final con el nombre, en vez de dejarlo pasar.
-      if (rota === real) { saltados.push(nombre); continue; }
+      if (rota === base) { saltados.push(nombre); continue; }
       // eslint-disable-next-line no-await-in-loop
-      const v = await elVeredicto(rota);
+      const v = enLaPieza ? await elVeredicto(null, rota) : await elVeredicto(rota);
       const seQueja = v.FALLOS.some(([, hay]) => hay) || v.NOROMPER.some(([, ok]) => !ok);
       assert.ok(seQueja,
         'con este escape metido en la pantalla —«' + nombre + '»— el medidor '
@@ -3630,18 +3636,26 @@ describe('EL RESPALDO DEL GPS · el de repuesto no puede pedir más que el que f
         (t) => t.replace(/maximumAge: 60000/, 'maximumAge: 0')],
       ['se alarga la espera hasta que el aparato ceda',
         (t) => t.replace(/timeout: 10000, maximumAge: 300000/, 'timeout: 45000, maximumAge: 300000')],
+      //  Éste va en la PANTALLA, no en la pieza (tercer elemento `false`): pedir con el juego del botón, que
+      //  lleva un solo intento y ningún respaldo.
+      ['la pantalla pide con el juego del botón (un solo intento)',
+        (t) => t.replace(/pedirGps\(navigator, 'pantalla',/, "pedirGps(navigator, 'boton',"), false],
     ];
 
+    //  🔑 DESDE G28 (28-sep-2026) los tiempos no están en las pantallas sino en `pedirGps.js`: los escapes se
+    //  meten en ESA pieza (salvo los marcados `false`) y la regla juzga cada pantalla corriéndola con la pieza rota.
+    const realGps = leer('guajirago/src/pedirGps.js');
     const saltados = [];
     for (const [quien, archivo, ancla] of PANTALLAS) {
       const real = leer(archivo);
-      for (const [nombre, romper] of ESCAPES) {
-        const rota = romper(real);
+      for (const [nombre, romper, enLaPieza = true] of ESCAPES) {
+        const base = enLaPieza ? realGps : real;
+        const rotaBase = romper(base);
         //  🔴 UN PARCHE QUE NO ENCUENTRA DÓNDE MORDER SE ESTARÍA APROBANDO SOLO.
         //   La pantalla sale limpia, la regla dice «bien» con toda la razón, y
         //   el verde no vale nada. Se apunta y se falla al final con su nombre.
-        if (rota === real) { saltados.push(quien + ' · ' + nombre); continue; }
-        const r = elRespaldoDelGps(rota, ancla);
+        if (rotaBase === base) { saltados.push(quien + ' · ' + nombre); continue; }
+        const r = enLaPieza ? elRespaldoDelGps(real, ancla, rotaBase) : elRespaldoDelGps(rotaBase, ancla);
         const seQueja = !!r.falla || !r.elPrimeroPideElBueno || !r.ningunRespaldoPideMas
           || !r.todosAceptanGuardada || !r.bajoTechoLlega || r.silencioTotal > 28000;
         assert.ok(seQueja,

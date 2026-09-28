@@ -209,6 +209,19 @@ const fuente = fs.existsSync(path.join(RAIZ, PANTALLA))
  */
 let codigo = soloCodigo(fuente);
 
+/**
+ * LA PIEZA COMÚN DEL GPS (`guajirago/src/pedirGps.js`, G28 · 28-sep-2026).
+ *
+ * La pantalla ya no pide el GPS a mano: llama a `pedirGps`, y los tiempos viven
+ * en esa pieza. Así que los trozos de la pantalla que se corren aquí reciben la
+ * pieza DE VERDAD —cargada del disco—, no una de mentira: una de mentira
+ * contestaría lo que yo le dijera, que es el medidor inventándose lo que mide.
+ * Y, como `codigo`, se puede cambiar: el amarre le da piezas con un sabotaje
+ * metido y exige que el veredicto se queje.
+ */
+let fuenteGps = null;
+const laPiezaDelGps = () => cargarDeLaApp('guajirago/src/pedirGps.js', fuenteGps == null ? undefined : fuenteGps).pedirGps;
+
 /** El `addListener('<que>', ...)` del mapa: su cuerpo, listo para correr. */
 function elOyente(que) {
   // SE BUSCA EL QUE SE PIDE, NO EL PRIMERO. La pantalla tiene varios
@@ -411,8 +424,8 @@ function elBotonVerdeMarca() {
       },
     } : {};
     // eslint-disable-next-line no-new-func
-    new Function('navigator', 'loEligioRef', 'mapaRef', 'setUbicUsada', 'onNoSePudo', 'e', cuerpo)(
-      navigatorFalso, ref, mapaFalso, () => {}, (porque) => dicho.push(porque),
+    new Function('navigator', 'pedirGps', 'loEligioRef', 'mapaRef', 'setUbicUsada', 'onNoSePudo', 'e', cuerpo)(
+      navigatorFalso, laPiezaDelGps(), ref, mapaFalso, () => {}, (porque) => dicho.push(porque),
       { stopPropagation: () => {} });
     // Hablar no es llamar a la función: un `onNoSePudo()` sin nada dentro, o con
     // un texto vacío, deja al pasajero igual de atascado que el silencio. Así
@@ -532,9 +545,9 @@ function elGpsDeLaPantalla(contesta) {
   };
   try {
     // eslint-disable-next-line no-new-func
-    new Function('navigator', 'setUbicacionPasajero', 'setUbicacionEsDelGps', 'centroRiohacha',
+    new Function('navigator', 'pedirGps', 'setUbicacionPasajero', 'setUbicacionEsDelGps', 'centroRiohacha',
       cuerpo)(
-      navigatorFalso, (u) => { puesto.ubicacion = u; },
+      navigatorFalso, laPiezaDelGps(), (u) => { puesto.ubicacion = u; },
       (v) => { puesto.esDelGps = v; }, centroRiohacha);
   } catch (e) {
     return { falla: 'el efecto del GPS reventó al correrlo: ' + e.message };
@@ -582,7 +595,7 @@ function elRespaldoEsMasFacil() {
   //  botón «Usar mi ubicación», que lleva UN intento a propósito—. Sin ancla se
   //  cogía «la primera del archivo» y se juzgaba al botón con la vara de la
   //  pantalla. Salió al medir, no al leer.
-  return elRespaldoDelGps(codigo, 'if (!navigator.geolocation) return;');
+  return elRespaldoDelGps(codigo, 'if (!navigator.geolocation) return;', fuenteGps);
 }
 
 /**
@@ -1199,13 +1212,16 @@ const ESCENARIOS = [
  * sitios con regex casi calcadas y los dos se separaron el mismo día — el guion
  * en verde y el amarre en rojo, sobre el mismo código.
  */
-async function elVeredicto(fuenteDePrueba) {
+async function elVeredicto(fuenteDePrueba, gpsDePrueba) {
   const antes = codigo;
+  const gpsAntes = fuenteGps;
   if (fuenteDePrueba != null) codigo = soloCodigo(fuenteDePrueba);
+  if (gpsDePrueba != null) fuenteGps = gpsDePrueba;
   try {
     return await elVeredictoDe();
   } finally {
     codigo = antes;
+    fuenteGps = gpsAntes;
   }
 }
 

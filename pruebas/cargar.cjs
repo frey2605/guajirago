@@ -32,8 +32,8 @@ function leer(rutaRelativa) {
   return fs.readFileSync(ruta, 'utf8');
 }
 
-function cargarDeLaApp(rutaRelativa) {
-  const fuente = leer(rutaRelativa);
+// G28 (28-sep-2026): `fuente` se puede pasar —una pieza con un sabotaje metido, o la de otro commit—; sin ella, el disco.
+function cargarDeLaApp(rutaRelativa, fuente = leer(rutaRelativa)) {
   const nombres = [...fuente.matchAll(/^export\s+(?:const|function)\s+([A-Za-z0-9_]+)/gm)].map((m) => m[1]);
   assert.ok(nombres.length > 0, 'no se encontró nada exportado en ' + rutaRelativa);
   // G13 (28-sep-2026): una pieza pura puede pedir OTRA pieza pura de su misma carpeta
@@ -338,10 +338,17 @@ function catchQueProtege(codigo, pos) {
  * NO LEE: EJECUTA. La cadena de `getCurrentPosition` se saca del archivo y se
  * corre con un aparato de mentira, así que da igual cómo esté escrita, anidada
  * o reordenada. Perseguir formas de escribir no acaba nunca; ejecutar, sí.
+ *
+ * 🔑 DESDE G28 (28-sep-2026) las pantallas no piden el GPS a mano: llaman a la
+ * pieza común `guajirago/src/pedirGps.js`, que es donde viven los tiempos. La
+ * regla es la MISMA; lo que cambia es qué llamada se saca del archivo: la
+ * primera de las dos formas que aparezca desde el ancla, y la de la pieza se
+ * corre con la pieza DE VERDAD (o con `fuenteGps`, para sabotearla o carearla).
  */
-function intentosDelGps(codigoFuente, contesta, desde) {
+function intentosDelGps(codigoFuente, contesta, desde, fuenteGps) {
   const seguro = sinTextos(codigoFuente);
-  const marca = 'navigator.geolocation.getCurrentPosition(';
+  const aMano = 'navigator.geolocation.getCurrentPosition(';
+  const conPieza = 'pedirGps(';
   // 🔴 HAY QUE DECIR DÓNDE MIRAR, y no es un capricho: un archivo puede tener
   //  varias peticiones de GPS con trabajos distintos. `Solicitar.js` tiene DOS
   //  —la de la pantalla, que sí lleva respaldo, y la del botón «Usar mi
@@ -353,8 +360,20 @@ function intentosDelGps(codigoFuente, contesta, desde) {
   //  tres veces, y aquí se cazó solo porque la medición se corrió.
   const ancla = desde == null ? 0 : seguro.indexOf(desde);
   if (ancla < 0) return { falla: 'no encuentro el ancla «' + desde + '»' };
-  const i = seguro.indexOf(marca, ancla);
-  if (i < 0) return { falla: 'no encuentro ninguna petición de GPS' };
+  const cual = [aMano, conPieza]
+    .map((m) => [m, seguro.indexOf(m, ancla)])
+    .filter(([, p]) => p >= 0)
+    .sort((a, b) => a[1] - b[1])[0];
+  if (!cual) return { falla: 'no encuentro ninguna petición de GPS' };
+  const [marca, i] = cual;
+  let pedirGps = () => { throw new Error('la pieza del GPS no se cargó'); };
+  if (marca === conPieza) {
+    try {
+      ({ pedirGps } = cargarDeLaApp('guajirago/src/pedirGps.js', fuenteGps == null ? undefined : fuenteGps));
+    } catch (e) {
+      return { falla: 'la pieza del GPS (pedirGps.js) no carga: ' + e.message };
+    }
+  }
   // La llamada entera, con sus anidadas dentro: contador de paréntesis sobre el
   // texto SIN cadenas, para que un paréntesis dentro de un texto no descuadre.
   let j = i + marca.length;
@@ -399,7 +418,7 @@ function intentosDelGps(codigoFuente, contesta, desde) {
     llego = false;
     try {
       // eslint-disable-next-line no-new-func
-      new Function('navigator', ...libres, cadena)(navigatorFalso, ...libres.map(() => () => {}));
+      new Function('navigator', 'pedirGps', ...libres, cadena)(navigatorFalso, pedirGps, ...libres.map(() => () => {}));
       return { intentos, llego };
     } catch (e) {
       const falta = /^(\w+) is not defined$/.exec(e.message || '');
@@ -422,13 +441,13 @@ function intentosDelGps(codigoFuente, contesta, desde) {
  *  · todos aceptan una posición que el aparato YA TIENE (`maximumAge > 0`);
  *  · y, bajo techo, la ubicación LLEGA.
  */
-function elRespaldoDelGps(codigoFuente, desde) {
-  const r = intentosDelGps(codigoFuente, false, desde);
+function elRespaldoDelGps(codigoFuente, desde, fuenteGps) {
+  const r = intentosDelGps(codigoFuente, false, desde, fuenteGps);
   if (r.falla) return { falla: r.falla };
   const i = r.intentos;
   if (i.length < 2) return { falla: 'solo se intenta ' + i.length + ' vez el GPS' };
   const alta = (o) => o.enableHighAccuracy === true;
-  const techo = intentosDelGps(codigoFuente, 'bajoTecho', desde);
+  const techo = intentosDelGps(codigoFuente, 'bajoTecho', desde, fuenteGps);
   return {
     elPrimeroPideElBueno: alta(i[0]),
     ningunRespaldoPideMas: i.slice(1).every((o) => !alta(o) || alta(i[0])),

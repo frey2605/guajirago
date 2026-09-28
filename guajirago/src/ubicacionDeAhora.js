@@ -57,10 +57,15 @@
  *   · Nunca falla: siempre contesta, aunque sea con `{ punto: null }`. El
  *     mensaje dice entonces que no pudo conseguirla.
  *
- * Sin imports y sin React, para que `pruebas/cargar.cjs` la cargue y la EJECUTE
+ * Sin React y sin más import que otra pieza pura (`pedirGps.js`), para que `pruebas/cargar.cjs` la cargue y la EJECUTE
  * tal cual está en el disco. `navigator` se puede pasar para las pruebas; en la
  * app es el del navegador.
+ *
+ * Desde G28 (28-sep-2026) los dos intentos y sus tiempos no se escriben aquí:
+ * son el juego `emergencia` de `pedirGps.js`, donde viven los de toda la app.
  */
+import { pedirGps } from './pedirGps';
+
 export const TOPE_UBICACION_MS = 4000;
 
 /**
@@ -89,14 +94,8 @@ export function ubicacionDeAhora(respaldos = [], tope = TOPE_UBICACION_MS, navig
     reloj = setTimeout(respaldo, tope);
     if (!navigator || !navigator.geolocation) { respaldo(); return; }
     try {
-      navigator.geolocation.getCurrentPosition(delAparato,
-        () => navigator.geolocation.getCurrentPosition(
-          delAparato,
-          respaldo,
-          { enableHighAccuracy: false, timeout: 1500, maximumAge: 30000 }
-        ),
-        { enableHighAccuracy: true, timeout: 2500, maximumAge: 5000 }
-      );
+      // Los intentos y sus tiempos, del juego `emergencia` de `pedirGps.js` (G28).
+      pedirGps(navigator, 'emergencia', delAparato, respaldo);
     } catch (e) {
       // Un navegador que revienta al pedir el GPS no puede dejar el mensaje sin salir.
       respaldo();

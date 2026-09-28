@@ -35,6 +35,8 @@ import { useAccion } from './useAccion';
 import AvisoModal from './AvisoModal';
 import MenuLateral from './MenuLateral';
 import { obtenerTokenFCM } from './Notificaciones';
+// Pedirle el GPS al teléfono, con sus tiempos en un solo sitio (G28).
+import { pedirGps } from './pedirGps';
 
 // ============================================================
 // GuajiraGo - Módulo de Restaurantes (lado del cliente)
@@ -207,7 +209,7 @@ function Restaurantes({ nombre, onVolver, foto, onCerrarSesion, onIrPerfil, onIr
   const usarMiUbicacion = () => {
     if (!navigator.geolocation) { setAvisoUbic('Tu dispositivo no permite obtener la ubicación. Escribe la dirección a mano.'); return; }
     setUbicando(true);
-    navigator.geolocation.getCurrentPosition(
+    pedirGps(navigator, 'boton',
       (pos) => {
         const { latitude, longitude } = pos.coords;
         if (window.google && window.google.maps) {
@@ -223,7 +225,6 @@ function Restaurantes({ nombre, onVolver, foto, onCerrarSesion, onIrPerfil, onIr
         }
       },
       () => { setUbicando(false); setAvisoUbic('No pudimos obtener tu ubicación. Activa el GPS y da permiso, o escribe la dirección a mano.'); },
-      { enableHighAccuracy: true, timeout: 10000 }
     );
   };
 

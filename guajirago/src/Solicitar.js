@@ -31,6 +31,8 @@ import { armarMensajeDeEmergencia } from './mensajeEmergencia';
 // La ubicación del mensaje de emergencia, pedida EN EL MOMENTO DEL TOQUE. MISMA
 // función que el botón de Ajustes (G05, 27-sep-2026).
 import { ubicacionDeAhora } from './ubicacionDeAhora';
+// Pedirle el GPS al teléfono, con sus tiempos en un solo sitio (G28).
+import { pedirGps } from './pedirGps';
 // El número del contacto de emergencia: la MISMA regla que el registro y Seguridad (G10).
 import { celularDiezCifras } from './telefonoValido';
 
@@ -362,7 +364,7 @@ function MapaRecogida({ ubicacionInicial, onCambioPunto, onNoSePudo }) {
       onNoSePudo('El mapa todavía no está listo.');
       return;
     }
-    navigator.geolocation.getCurrentPosition(
+    pedirGps(navigator, 'boton',
       (pos) => {
         // Se prende ANTES de mover el mapa: mover dispara el `idle`, y cuando
         // ese `idle` llegue la marca ya tiene que estar puesta. Esto es una
@@ -373,7 +375,6 @@ function MapaRecogida({ ubicacionInicial, onCambioPunto, onNoSePudo }) {
         setUbicUsada(true);
       },
       () => onNoSePudo('Tu celular no dio la ubicación.'),
-      { enableHighAccuracy: true, timeout: 10000 }
     );
   };
 
@@ -675,14 +676,12 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
     // wifi puede estar desviada 100 o 300 metros, y el conductor iría a esa
     // zona. Se acepta porque lo que había antes cuando fallaban los dos era la
     // PLAZA o nada, y 300 metros es mucho mejor que eso.
-    navigator.geolocation.getCurrentPosition(
+    //
+    // Los intentos y sus tiempos viven en `pedirGps.js` (juego `pantalla`), no
+    // aquí: estaban escritos a mano en seis sitios (G28, 28-sep-2026).
+    pedirGps(navigator, 'pantalla',
       delAparato,
-      () => navigator.geolocation.getCurrentPosition(
-        delAparato,
-        () => setUbicacionPasajero(centroRiohacha),
-        { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 }
-      ),
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
+      () => setUbicacionPasajero(centroRiohacha),
     );
   }, []);
 

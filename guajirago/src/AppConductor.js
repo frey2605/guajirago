@@ -32,6 +32,8 @@ import Configuracion from './Configuracion';
 import Promociones from './Promociones';
 import MenuLateral from './MenuLateral';
 import Logo from './Logo';
+// Pedirle el GPS al teléfono, con sus tiempos en un solo sitio (G28).
+import { pedirGps, seguirGps } from './pedirGps';
 
 // Valores por defecto (respaldo). Se reemplazan por los de config/global cuando cargan.
 const CONFIG_APP_DEFECTO = {
@@ -919,18 +921,18 @@ const cargarSaldo = useCallback(async (uid) => {
     // `maximumAge` deja valer una posición que el aparato YA tiene. Antes decía
     // 0 —«no me sirve nada guardado»—, y un conductor que acaba de usar el mapa
     // tiraba una posición buena de hace medio minuto para pedirla otra vez.
-    navigator.geolocation.getCurrentPosition(guardarUbicacion, () => {
-      navigator.geolocation.getCurrentPosition(guardarUbicacion, () => {}, { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 });
-    }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 });
+    //
+    // Los intentos y sus tiempos viven en `pedirGps.js` (G28, 28-sep-2026).
+    pedirGps(navigator, 'pantalla', guardarUbicacion, () => {});
 
-    let intervalo;
-    try {
-      intervalo = navigator.geolocation.watchPosition(guardarUbicacion, (err) => {
-        intervalo = navigator.geolocation.watchPosition(guardarUbicacion, () => {}, { enableHighAccuracy: false, maximumAge: 5000, timeout: 20000 });
-      }, { enableHighAccuracy: true, maximumAge: 3000, timeout: 15000 });
-    } catch (e) {}
+    // 🔴 EL SEGUIMIENTO DEJABA SEGUIMIENTOS SUELTOS (G28). Cada vez que el
+    // satélite fallaba se abría OTRO de respaldo sin cerrar el anterior, y al
+    // salir del turno solo se cerraba el último: los sueltos seguían escribiendo
+    // la ficha, con `activo: true`, de un conductor que ya se había ido.
+    // `seguirGps` abre UN respaldo y devuelve con qué pararlo TODO.
+    const pararSeguimiento = seguirGps(navigator, 'seguimiento', guardarUbicacion);
 
-    return () => { if (intervalo) navigator.geolocation.clearWatch(intervalo); };
+    return () => pararSeguimiento();
   }, [activo, fase, nombre, telefono, placa, vehiculo]);
 
   useEffect(() => {
