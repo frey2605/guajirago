@@ -29,6 +29,7 @@
 | `node robot/me-aceptaron.cjs` | el pasajero acepta a los 12 min de pedir (confirmarConductor en pruebas) y la app del conductor dice «¡Trato hecho!» y va a recoger (G24) |
 | `node robot/espera-conductor.cjs` | con 300 s en el panel de pruebas, el taxista aprieta «Llegué al punto» y su reloj y el del pasajero arrancan los dos de 5:00 (G26) |
 | `node robot/vencer-busqueda.cjs` | el pasajero pide un taxi, se acaba el plazo de 2 min: «No encontramos conductor» y el viaje queda vencido con fecha, quién y por qué (G27) |
+| `node robot/limite-favoritos.cjs` | con el tope de favoritos en 2 en el panel de pruebas, la Ayuda y la ventanita «Llegaste al límite» dicen 2 lugares y no se guarda un tercero (G35) |
 
 ## Pantallas: cómo se manejan (27-sep-2026)
 
@@ -405,6 +406,15 @@ la placa de `conductores/{uid}` (la escribe su GPS con la misma placa que va en 
 - 🔑 Lo que de verdad arregló G33 (el aviso «¡Pedido entregado!» cuando el negocio apaga esa etapa) no se ve en una
   pantalla: es un aviso del servidor. Lo ejecuta pruebas/estadosPedido.test.js con las 16 formas del flujo, y en la
   nube de pruebas se miró el registro de `notificarClienteDelPedido`.
+
+### limite-favoritos (G35, 28-sep-2026)
+- Camino a la Ayuda: nada más entrar como pasajero@gg.test, «Menú» → «Ayuda y soporte»; el buscador es
+  `input[placeholder="Busca tu pregunta..."]` y la pregunta se abre tocando su texto. «Volver» regresa a módulos.
+- Camino a la ventanita: Taxi → escribir solo el DESTINO (`¿A dónde vas? (Riohacha)`) y `Escape`; el botón de guardar es
+  el texto «➕» (exacto). El origen lo llena el GPS de mentira.
+- 🔑 El tope se pone en 2 A PROPÓSITO, distinto del respaldo de configApp.js (3): si alguna pantalla no leyera el panel
+  diría 3 y el recorrido lo pillaría. En pruebas config/global tenía 3 y el pasajero 0 favoritos: se devuelven al final.
+  Con el mismo `403` de siempre en la consola, que no es de esto.
 
 ## Lo que el robot dejó creado en pruebas
 

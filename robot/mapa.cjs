@@ -252,6 +252,12 @@ const RECORRIDOS = [
     // pruebas/estadosPedido.test.js: la pantalla del cliente se ve igual que antes de G33.
     vigila: ['guajirago-aliados/src/ConfigFlujos.js', 'guajirago-aliados/src/flujoPedidos.js', 'guajirago/src/estadosPedido.js'],
   },
+  {
+    nombre: 'limite-favoritos',
+    que: 'con el tope de favoritos en 2 en config/global de pruebas y el pasajero con 2 guardados, la Ayuda dice «hasta 2 lugares favoritos» y ➕ abre «Llegaste al límite · Solo puedes guardar 2 lugares» sin guardar un tercero (G35; deja config y favoritos como estaban)',
+    archivo: 'limite-favoritos.cjs',
+    vigila: ['guajirago/src/AyudaSoporte.js', 'guajirago/src/configApp.js', 'guajirago/src/Solicitar.js'],
+  },
 ];
 
 // Los archivos de pantalla: los que, si cambian, el robot debería poder probar. Todo lo que esté en
