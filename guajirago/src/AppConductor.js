@@ -8,7 +8,7 @@ import { porQueNoLeToca } from './leTocaElViaje';
 import { CONFIG_TARIFAS_DEFECTO, calcularTarifaMinima } from './tarifas';
 import { CONFIG_COMPARTIDA } from './configApp';
 import { cop } from './moneda';
-import { ESTADOS_MERCADO, ESTADOS_TERMINADOS, ESTADOS_QUE_CIERRA_EL_SERVIDOR, avisoDelCierre, comoTermino } from './estadosViaje';
+import { ESTADOS_MERCADO, ESTADOS_TERMINADOS, ESTADOS_QUE_CIERRA_EL_SERVIDOR, avisoDelCierre, comoTermino, meAceptaronEsteViaje } from './estadosViaje';
 import { consultaDeGanancias, resumenDeGanancias } from './gananciasConductor';
 // Los datos que comparten las pantallas salen de archivos únicos (SEGUNDA LEY).
 import { centroRiohacha } from './riohacha';
@@ -675,16 +675,6 @@ function AppConductor({ nombre, telefono, placa, vehiculo, tipoVehiculo, onCerra
   useEffect(() => { celebrandoRef.current = celebrando; }, [celebrando]);
   useEffect(() => { faseRef.current = fase; }, [fase]);
 
-  const limpiarVigilantesMenos = useCallback((idViajeMantener) => {
-    Object.entries(unsubsViajesRef.current).forEach(([id, cerrar]) => {
-      if (id !== idViajeMantener) {
-        try { cerrar(); } catch(e) {}
-        delete unsubsViajesRef.current[id];
-      }
-    });
-    setViajesEscuchando(prev => prev.filter(id => id === idViajeMantener));
-  }, []);
-
   const limpiarTodosVigilantes = useCallback(() => {
     Object.values(unsubsViajesRef.current).forEach(fn => { try { fn(); } catch(e) {} });
     unsubsViajesRef.current = {};
@@ -720,6 +710,27 @@ function AppConductor({ nombre, telefono, placa, vehiculo, tipoVehiculo, onCerra
     });
   }, []);
 
+  // G24 (28-sep-2026): LA ÚNICA reacción a «me aceptaron el viaje». La llaman los dos vigilantes —el de la oferta
+  // (`agregarViajeEscuchando`) y el general (todos mis viajes)—, que antes llevaban cada uno su copia y su regla, con
+  // una ventana en que no lo veía ninguno. La regla es `meAceptaronEsteViaje` (estadosViaje.js). El primero que llega
+  // celebra; el otro encuentra el candado puesto y no repite.
+  const alQueMeAceptaron = useCallback((data) => {
+    if (celebrandoRef.current || faseRef.current) return;
+    const miId = auth.currentUser?.uid;
+    limpiarTodosVigilantes();
+    limpiarViajesOtrosConductor(miId, data.id);
+    invalidarMisOtrasOfertas(miId, data.id);
+    setCelebrando(true);
+    celebrandoRef.current = true;
+    // La comisión y el marcar "ocupado" ya los aplica la Cloud Function confirmarConductor (atómico, sin doble cobro).
+    setTimeout(() => {
+      setCelebrando(false);
+      celebrandoRef.current = false;
+      iniciarFase1(data);
+    }, 3000);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [limpiarTodosVigilantes, limpiarViajesOtrosConductor, invalidarMisOtrasOfertas]);
+
   const agregarViajeEscuchando = useCallback((idViaje) => {
     if (idViaje) misOfertasRef.current.add(idViaje); // registro que oferté en este viaje
     if (unsubsViajesRef.current[idViaje]) return;
@@ -742,20 +753,8 @@ function AppConductor({ nombre, telefono, placa, vehiculo, tipoVehiculo, onCerra
       // El pasajero aceptó (contraoferta o directo): este viaje es mío → celebrar aunque el estado llegue junto con los datos.
       // Sin `confirmado`: estado retirado el 12-sep-2026. Nadie lo escribía en
       // `viajes`; el `confirmado` que SÍ existe es de PEDIDOS, que es otra cosa.
-      if (data.estado === 'aceptado' && data.conductorId === miId && !celebrandoRef.current && !faseRef.current) {
-        const dataCopy = { id: idViaje, ...data };
-        limpiarVigilantesMenos(idViaje);
-        limpiarViajesOtrosConductor(miId, idViaje);
-        invalidarMisOtrasOfertas(miId, idViaje);
-        setCelebrando(true);
-        celebrandoRef.current = true;
-        // La comisión y el marcar "ocupado" ya los aplica la Cloud Function confirmarConductor (atómico, sin doble cobro).
-        setTimeout(() => {
-          setCelebrando(false);
-          celebrandoRef.current = false;
-          iniciarFase1(dataCopy);
-          cerrarEsteVigilante();
-        }, 3000);
+      if (meAceptaronEsteViaje(data, miId)) {
+        alQueMeAceptaron({ id: idViaje, ...data });
         return;
       }
 
@@ -789,7 +788,7 @@ function AppConductor({ nombre, telefono, placa, vehiculo, tipoVehiculo, onCerra
       if (unsubsViajesRef.current[idViaje]) cerrarEsteVigilante();
     }, 180000);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [limpiarVigilantesMenos, limpiarViajesOtrosConductor, invalidarMisOtrasOfertas]);
+  }, [alQueMeAceptaron]);
 
   // NUEVO: vigilante global. Escucha TODOS los viajes del conductor a la vez y detecta cuando un pasajero acepta,
   // sin importar cuántas contraofertas haya enviado (arregla que la 2ª contraoferta no le llegara la respuesta).
@@ -798,33 +797,14 @@ function AppConductor({ nombre, telefono, placa, vehiculo, tipoVehiculo, onCerra
     if (!miId) return;
     const q = query(collection(db, 'viajes'), where('conductorId', '==', miId));
     const unsub = onSnapshot(q, (snap) => {
-      if (celebrandoRef.current || faseRef.current) return; // ya está celebrando o en viaje: no hacer nada
-      const d = snap.docs.find(docu => {
-        const dt = docu.data();
-        const e = dt.estado;
-        if (e !== 'aceptado') return false;
-        if (dt.fase === 'en_viaje') return false; // ya arrancó, no re-celebrar
-        const t = new Date(dt.nuevaOferta || dt.fechaSolicitud).getTime();
-        if (isNaN(t)) return true;
-        return (Date.now() - t) < 10 * 60 * 1000; // solo aceptaciones recientes
-      });
-      if (!d) return;
-      const data = { id: d.id, ...d.data() };
-      limpiarTodosVigilantes();
-      limpiarViajesOtrosConductor(miId, data.id);
-      invalidarMisOtrasOfertas(miId, data.id);
-      setCelebrando(true);
-      celebrandoRef.current = true;
-      // La comisión y el marcar "ocupado" los aplica la Cloud Function confirmarConductor (atómico).
-      setTimeout(() => {
-        setCelebrando(false);
-        celebrandoRef.current = false;
-        iniciarFase1(data);
-      }, 3000);
+      // G24: la misma regla y la misma reacción que el vigilante de la oferta. Antes llevaba su copia, que solo creía
+      // los viajes de menos de 10 min medidos con el reloj del teléfono: entre los 10 y los 20 no lo veía nadie.
+      const d = snap.docs.find((docu) => meAceptaronEsteViaje(docu.data(), miId));
+      if (d) alQueMeAceptaron({ id: d.id, ...d.data() });
     });
     return () => unsub();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [limpiarTodosVigilantes, limpiarViajesOtrosConductor, invalidarMisOtrasOfertas, tipoVehiculo]);
+  }, [alQueMeAceptaron, tipoVehiculo]);
 
   // G07 (28-sep-2026): ésta es la única salida del conductor —el menú, Configuración y «Eliminar cuenta» llaman
   // aquí—. Primero se apaga con la sesión viva y después sale por la salida de la app (App.js, handleCerrarSesion),

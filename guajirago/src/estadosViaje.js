@@ -169,6 +169,24 @@ export function huellaDelViaje(viaje) {
   }
 }
 
+/**
+ * ¿ME ACEPTARON ESTE VIAJE? — G24 (28-sep-2026): la ÚNICA regla con la que la app del conductor decide que el pasajero
+ * le aceptó la oferta.
+ *
+ * `AppConductor.js` se entera por dos vigilantes: el de la oferta (`agregarViajeEscuchando`, vive 3 min) y el general
+ * (todos los viajes del conductor). Cada uno llevaba su regla: el general solo creía los de menos de 10 min contados
+ * con el RELOJ DEL TELÉFONO desde `nuevaOferta || fechaSolicitud`, y el servidor deja aceptar hasta 20
+ * (`MINUTOS.buscando`). Si el pasajero aceptaba pasados 3 min de la oferta y 10 de la búsqueda, no lo veía NINGUNO,
+ * con la comisión ya cobrada. Medido con `scripts/medir-me-aceptaron.cjs`.
+ *
+ * Aquí no se mira ninguna hora: un viaje `aceptado` vive hasta que lo cierra el servidor (`expirado` a los 60 min sin
+ * recoger, y G20 se lo dice al conductor). Lo único que no se vuelve a celebrar es el que ya va `en_viaje`.
+ */
+export function meAceptaronEsteViaje(viaje, miId) {
+  const v = viaje || {};
+  return !!miId && v.estado === 'aceptado' && v.conductorId === miId && v.fase !== 'en_viaje';
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // EL HISTORIAL: CÓMO TERMINÓ CADA VIAJE, EN PALABRAS Y CON SU COLOR — G21 (28-sep-2026)
 // ═══════════════════════════════════════════════════════════════════════════
