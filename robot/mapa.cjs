@@ -65,6 +65,15 @@ const RECORRIDOS = [
     // cubre este recorrido, y por eso no se nombra aquí (ver APRENDIDO.md).
     vigila: ['guajirago/src/Seguridad.js', 'guajirago/src/ubicacionDeAhora.js', 'guajirago/src/mensajeEmergencia.js'],
   },
+  {
+    nombre: 'candado-recarga',
+    que: 'el candado de la ley del botón no se traba en el navegador: un código de recarga inventado dice «no existe» y el botón vuelve a quedar tocable, dos veces',
+    archivo: 'candado-recarga.cjs',
+    // El candado es el MISMO archivo en las tres apps; se prueba en transporte (Créditos), la que tiene un botón que
+    // pasa por él y se puede tocar sin cambiar nada en la base.
+    vigila: ['guajirago/src/candado.js', 'guajirago/src/useAccion.js', 'guajirago/src/Creditos.js',
+      'guajirago-admin/src/candado.js', 'guajirago-aliados/src/candado.js'],
+  },
 ];
 
 // Los archivos de pantalla: los que, si cambian, el robot debería poder probar. Todo lo que esté en

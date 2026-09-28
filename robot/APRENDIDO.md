@@ -137,6 +137,16 @@ ya estaba guardado («Contacto de Prueba», 3000000001); si sale «Sin número»
 - El 🚨 del mapa (Solicitar.js) usa la misma función, pero probarlo pide un viaje en curso con conductor: este
   recorrido NO lo cubre.
 
+**El candado de la ley del botón, en Créditos (27/28-sep-2026, `candado-recarga.cjs`).** Cuenta taxi@gg.test →
+«Ya tengo cuenta» → entrar → «Menú» → «Mis créditos» → campo «ESCRIBE TU CÓDIGO» → botón «Recargar».
+- 🔑 **Un código INVENTADO es el botón perfecto para probar el candado**: pasa por `useAccion`, el servidor contesta
+  «Ese código no existe. Verifícalo» (functions/not-found) y no cambia ningún saldo. La ventanita se cierra con
+  «Entendido».
+- 🔴 Con lo publicado el 27-sep (reloj `{ poner: setTimeout }`): el primer toque rompe con «Illegal invocation», el
+  botón se queda en «Recargando…», no sale ventanita, y ya no hay botón «Recargar» para el segundo toque. Curioso: el
+  registro del rechazo SÍ sale en la consola («[rechazo] useAccion (canjear el código) · functions/not-found»): la
+  acción corrió y se tradujo, pero la carrera contra el tope ya había reventado antes de decirlo.
+
 ## Lo que el robot dejó creado en pruebas
 
 - 27-sep-2026: «Robot Taxi De Prueba» (robot.taxi.1790508222079@gg.test) y

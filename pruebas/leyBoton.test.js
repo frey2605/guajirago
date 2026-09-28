@@ -155,6 +155,65 @@ describe('LA LEY DEL BOTÓN · el candado, ejecutado', () => {
   });
 });
 
+// EL RELOJ DE VERDAD, COMO EN EL NAVEGADOR (27-sep-2026). Todas las pruebas de arriba le pasan su propio reloj al
+// candado, así que ninguna corría el de verdad: y el de verdad reventaba. El candado guardaba `{ poner: setTimeout }`
+// y llamaba `reloj.poner(…)`; en el navegador, setTimeout llamado con otro `this` lanza «Illegal invocation», el botón
+// hacía su acción UNA vez, se quedaba en «…» para siempre y los toques siguientes no hacían nada. En Node no revienta,
+// así que aquí se carga candado.js con un setTimeout/clearTimeout que se porta como el del navegador.
+// Un setTimeout/clearTimeout que se porta como el del navegador: llamado suelto va; llamado con otro `this`, revienta.
+function comoNavegador(real, nombre, quejas) {
+  return function (a, b) {
+    'use strict';
+    if (this !== undefined && this !== globalThis) { quejas.push(nombre); throw new TypeError('Illegal invocation'); }
+    return real(a, b);
+  };
+}
+function candadoComoEnElNavegador() {
+  const fuente = leer('guajirago/src/candado.js');
+  const nombres = [...fuente.matchAll(/^export\s+(?:const|function)\s+([A-Za-z0-9_]+)/gm)].map((m) => m[1]);
+  const quejas = [];
+  // eslint-disable-next-line no-new-func
+  const C2 = new Function('setTimeout', 'clearTimeout', fuente.replace(/^export\s+/gm, '') + '\nreturn { ' + nombres.join(', ') + ' };')(
+    comoNavegador(setTimeout, 'setTimeout', quejas), comoNavegador(clearTimeout, 'clearTimeout', quejas));
+  return { C2, quejas };
+}
+
+describe('LA LEY DEL BOTÓN · el candado con su reloj de VERDAD, como en el navegador', () => {
+  it('el setTimeout de mentira de esta prueba sí revienta como el del navegador (si no, la prueba no mira nada)', () => {
+    const quejas = [];
+    const f = comoNavegador(setTimeout, 'setTimeout', quejas);
+    assert.throws(() => ({ poner: f }).poner(() => {}, 1), /Illegal invocation/);
+    clearTimeout(f(() => {}, 1));
+    assert.deepStrictEqual(quejas, ['setTimeout']);
+  });
+
+  it('sin reloj de las pruebas, una acción termina, dice la verdad y el candado queda LIBRE para el segundo toque', { timeout: 3000 }, async () => {
+    const { C2, quejas } = candadoComoEnElNavegador();
+    const cambios = [];
+    const avisos = [];
+    const c = C2.crearCandado({ alCambiar: (x) => cambios.push(x), alAviso: (x) => avisos.push(x), traducir: RZ.motivoDeRechazo });
+    let r1;
+    try { r1 = await c.correr(async () => { throw Object.assign(new Error('x'), { code: 'functions/not-found', message: 'Ese código no existe. Verifícalo' }); }, 'recargar', 'Listo.', 'canjear el código'); } catch (e) { r1 = e; }
+    assert.deepStrictEqual(quejas, [], '⛔ el candado llamó ' + quejas.join(' y ') + ' con otro `this`: en el navegador eso es «Illegal invocation» y el botón se queda trabado');
+    assert.ok(r1 && r1.ok === false, '⛔ el primer toque no terminó con su verdad: ' + (r1 && r1.message));
+    assert.strictEqual(avisos.length, 1, '⛔ el primer toque no dijo cómo terminó');
+    assert.strictEqual(c.ocupado, false, '⛔ el candado se quedó cerrado');
+    assert.strictEqual(cambios[cambios.length - 1], false, '⛔ el botón se quedó en su palabra de «trabajando»');
+    const r2 = await c.correr(async () => 7, 'recargar', 'Listo.');
+    assert.ok(r2 && r2.ok === true && r2.valor === 7, '⛔ el segundo toque no hizo nada');
+  });
+
+  it('sin reloj de las pruebas, si la acción no contesta, el tope de verdad abre el candado', { timeout: 3000 }, async () => {
+    const { C2, quejas } = candadoComoEnElNavegador();
+    const avisos = [];
+    const c = C2.crearCandado({ alAviso: (x) => avisos.push(x), tope: 30 });
+    const r = await c.correr(() => new Promise(() => {}), 'recargar', 'Listo.');
+    assert.deepStrictEqual(quejas, []);
+    assert.ok(r.sinConfirmar, '⛔ el tope de verdad no se disparó');
+    assert.strictEqual(c.ocupado, false);
+  });
+});
+
 describe('LA LEY DEL BOTÓN · una sola pieza en las tres apps', () => {
   for (const app of ['guajirago-admin', 'guajirago-aliados']) {
     it(app + ' lleva el candado y su gancho byte a byte como transporte', () => {

@@ -27,7 +27,11 @@ const TRADUCIR_POR_DEFECTO = (e, accion) => ({ clave: 'otro', titulo: 'No se pud
 
 // alCambiar(cual | false): cuál acción está corriendo. alAviso({ ok, titulo, texto, icono, cual }): la verdad del
 // final, lista para la ventanita. reloj: se cambia en las pruebas para no esperar 20 segundos de verdad.
-export function crearCandado({ alCambiar = () => {}, alAviso = () => {}, tope = TOPE_MS, reloj = { poner: setTimeout, quitar: clearTimeout }, traducir = TRADUCIR_POR_DEFECTO } = {}) {
+// 🔴 El reloj de verdad llama a setTimeout/clearTimeout SUELTOS, nunca como `reloj.poner(…)`: en el navegador,
+// setTimeout llamado como método de otro objeto revienta con «Illegal invocation» (en Node no), y eso dejaba el botón
+// trabado para siempre desde el 26-sep-2026 hasta el 27-sep-2026. Lo vigila pruebas/leyBoton.test.js.
+const RELOJ = { poner: (fn, ms) => setTimeout(fn, ms), quitar: (id) => clearTimeout(id) };
+export function crearCandado({ alCambiar = () => {}, alAviso = () => {}, tope = TOPE_MS, reloj = RELOJ, traducir = TRADUCIR_POR_DEFECTO } = {}) {
   let cerrado = false;
   let vuelta = 0; // cuál fue la última acción: un aviso tardío solo corrige el suyo
   return {
