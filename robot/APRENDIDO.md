@@ -294,6 +294,16 @@ la placa de `conductores/{uid}` (la escribe su GPS con la misma placa que va en 
 - Lo que NO puede probar: el lado del conductor, que pide un viaje confirmado por `confirmarConductor`; ese lo
   EJECUTA `pruebas/viajeCerrado.test.js`.
 
+### historial-viajes (G21, 28-sep-2026)
+- Las dos «Mis viajes» del pasajero se abren igual: «Menú → Mis viajes». Recién entrado, la pantalla es la de MÓDULOS
+  y ese menú abre `MisViajes.js`; tras «Transporte y movilidad → Soy pasajero», el mismo menú abre la de `Home.js`.
+- Si la consulta ordenada falla (índice `pasajeroId` + `fechaSolicitud` sin construir) la pantalla dice «Aún no tienes
+  viajes» y NO avisa de nada: por eso el recorrido lo trata como fallo. El índice se publica ANTES que la app y se
+  espera a que el servidor lo diga READY (la primera espera se cortó sola porque la sesión dio un fallo pasajero y el
+  `grep -q CREATING` lo leyó como «ya no está creando»: se espera la línea READY, no la ausencia de CREATING).
+- No escribe nada: se apoya en los viajes `expirado` que deja `viaje-cerrado.cjs` (salen «Quedó sin terminar»).
+- El portero avisó de sellos INVALID en esta tanda; los recorridos pasaron igual. No se investigó aquí.
+
 ## Lo que el robot dejó creado en pruebas
 
 - 27-sep-2026: «Robot Taxi De Prueba» (robot.taxi.1790508222079@gg.test) y
