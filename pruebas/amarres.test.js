@@ -254,10 +254,8 @@ describe('AMARRES · los estados del PEDIDO de restaurante entre la app del clie
     const { ORDEN_ESTADOS } = cargarDeLaApp('guajirago-aliados/src/flujoPedidos.js');
     const CONOCIDOS = ['nuevo', ...ORDEN_ESTADOS];
 
-    const cliente = leer('guajirago/src/Restaurantes.js');
-    const bloque = cliente.match(/const ESTADOS = \[[\s\S]*?\];/);
-    assert.ok(bloque, 'la app del cliente ya no tiene su línea de tiempo ESTADOS en Restaurantes.js');
-    const delCliente = [...bloque[0].matchAll(/id: '([a-z_]+)'/g)].map((m) => m[1]);
+    // G33: la línea de tiempo del cliente vive en estadosPedido.js (Restaurantes.js la importa); se EJECUTA.
+    const delCliente = cargarDeLaApp('guajirago/src/estadosPedido.js').PASOS_DEL_CLIENTE.map((p) => p.id);
     assert.ok(delCliente.length >= 4, 'la línea de tiempo del cliente quedó rara: ' + delCliente.join(', '));
 
     for (const e of delCliente) {

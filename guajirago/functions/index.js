@@ -49,6 +49,8 @@ const { cop } = require('./moneda.cjs');
 const { CREDITO_BIENVENIDA_PASAJERO, PROMO_BIENVENIDA, armarDescuentoPendiente, porQueNoLaBienvenida, aparatoSano } = require('./descuentoPendiente.cjs');
 // G32: el sobre de cada aviso al celular y el envío salen de UNA pieza, que siempre mira si el aviso llegó y lo anota.
 const { sobreDelAviso, sobreSencillo, mandarAviso } = require('./avisos.cjs');
+// G33: qué aviso le toca al cliente cuando su pedido cambia, por PASO DEL CLIENTE (copia atada de la app).
+const { avisoDelCambio } = require('./estadosPedido.cjs');
 
 // Distancia en km entre dos coordenadas (Haversine)
 function distanciaKm(lat1, lng1, lat2, lng2) {
@@ -209,17 +211,9 @@ exports.notificarNuevoPedido = onDocumentCreated("pedidos/{id}",
 // EL MISMO TRATO que el de arriba: el cuerpo suelto, y ya una sola puerta.
 async function avisarAlClienteDelCambio(antes, despues) {
   if (!despues || !despues.clienteFcmToken) return null;
-  if (antes.estado === despues.estado) return null;
-
-  const restNombre = despues.restauranteNombre || "El restaurante";
-  const mensajes = {
-    confirmado: { title: "✅ Pedido confirmado", body: restNombre + " confirmó tu pedido" + (despues.tiempoEstimado ? " · listo en ~" + despues.tiempoEstimado + " min" : "") },
-    preparando: { title: "👨‍🍳 Preparando tu pedido", body: "Ya están cocinando lo tuyo en " + restNombre },
-    en_camino: { title: "🛵 Tu pedido va en camino", body: "El domiciliario salió con tu pedido" },
-    entregado: { title: "🎉 ¡Pedido entregado!", body: "¡Buen provecho! Gracias por pedir con GuajiraGo" },
-    cancelado: { title: "❌ Pedido cancelado", body: "Tu pedido en " + restNombre + " fue cancelado" + (despues.motivoRechazo ? ": " + despues.motivoRechazo : "") },
-  };
-  const m = mensajes[despues.estado];
+  // G33: se avisa cuando cambia el PASO del cliente, no el estado del negocio: así «cerrado» avisa «entregado» aunque
+  // el negocio tenga apagada esa etapa, y «entregado → cerrado» no lo repite.
+  const m = avisoDelCambio(antes, despues);
   if (!m) return null;
 
   try {

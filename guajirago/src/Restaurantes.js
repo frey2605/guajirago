@@ -38,6 +38,8 @@ import { obtenerTokenFCM } from './Notificaciones';
 // Pedirle el GPS al teléfono, con sus tiempos en un solo sitio (G28).
 import { pedirGps } from './pedirGps';
 import { direccionDePunto, textoDeCoordenadas } from './direccionDePunto';
+// G33: qué paso ve el cliente según el estado que puso el negocio, en una sola tabla.
+import { PASOS_DEL_CLIENTE, indiceDelPaso, yaLlegoAlCliente, terminadoParaElCliente, etiquetaParaElCliente } from './estadosPedido';
 
 // G30: Google no dio el nombre de la calle. Lo dice la ventanita de la ubicación, con su propio título.
 const SIN_NOMBRE_DE_CALLE = 'Encontramos tu ubicación, pero no el nombre de la calle. Dejamos tus coordenadas en la dirección: agrégale la calle, el barrio o una referencia para que el domiciliario te encuentre.';
@@ -54,7 +56,6 @@ const SIN_NOMBRE_DE_CALLE = 'Encontramos tu ubicación, pero no el nombre de la 
 const LS_MIS_PEDIDOS = 'misPedidosGuajira';
 const leerMisPedidosIds = () => { try { return JSON.parse(localStorage.getItem(LS_MIS_PEDIDOS) || '[]'); } catch (e) { return []; } };
 const guardarMiPedidoId = (id) => { try { const arr = leerMisPedidosIds().filter(x => x !== id); arr.unshift(id); localStorage.setItem(LS_MIS_PEDIDOS, JSON.stringify(arr.slice(0, 40))); } catch (e) {} };
-const ESTADO_LABEL_CLIENTE = { nuevo: 'Recibido', confirmado: 'Confirmado', preparando: 'Preparando', empacado: 'Preparando', en_camino: 'En camino', entregado: 'Entregado', cerrado: 'Entregado', cancelado: 'Cancelado' };
 
 // Botón de volver del módulo de restaurantes (azul, claro)
 const backBtn = { display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#EAF2FF', border: '1px solid #1C8EF9', borderRadius: '12px', padding: '9px 16px', color: '#1C8EF9', fontSize: '14px', fontWeight: 'bold', cursor: 'pointer' };
@@ -514,13 +515,7 @@ function Restaurantes({ nombre, onVolver, foto, onCerrarSesion, onIrPerfil, onIr
   // PANTALLA: pedido confirmado
   // ============================================================
   if (pantalla === 'seguimiento') {
-    const ESTADOS = [
-      { id: 'nuevo', label: 'Recibido', icono: '📩' },
-      { id: 'confirmado', label: 'Confirmado', icono: '✅' },
-      { id: 'preparando', label: 'Preparando', icono: '👨‍🍳' },
-      { id: 'en_camino', label: 'En camino', icono: '🏍️' },
-      { id: 'entregado', label: 'Entregado', icono: '🎉' },
-    ];
+    const ESTADOS = PASOS_DEL_CLIENTE;
 
     if (!pedidoActivo) {
       return (
@@ -532,9 +527,8 @@ function Restaurantes({ nombre, onVolver, foto, onCerrarSesion, onIrPerfil, onIr
 
     const cancelado = pedidoActivo.estado === 'cancelado';
     // El restaurante maneja etapas internas (empacado, cerrado) que el cliente
-    // ve resumidas en estos 5 pasos.
-    const ESTADO_A_PASO = { nuevo: 0, confirmado: 1, preparando: 2, empacado: 2, en_camino: 3, entregado: 4, cerrado: 4 };
-    const indiceActual = ESTADO_A_PASO[pedidoActivo.estado] !== undefined ? ESTADO_A_PASO[pedidoActivo.estado] : -1;
+    // ve resumidas en estos 5 pasos (estadosPedido.js).
+    const indiceActual = indiceDelPaso(pedidoActivo.estado);
     const mensajes = pedidoActivo.mensajesPedido || [];
 
     return (
@@ -584,7 +578,7 @@ function Restaurantes({ nombre, onVolver, foto, onCerrarSesion, onIrPerfil, onIr
                   </p>
                 </div>
               ))}
-              {pedidoActivo.tiempoEstimado && !['entregado', 'cerrado', 'cancelado'].includes(pedidoActivo.estado) && (
+              {pedidoActivo.tiempoEstimado && !terminadoParaElCliente(pedidoActivo.estado) && (
                 <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid #ECECEF', textAlign: 'center' }}>
                   <p style={{ color: '#FF7A2F', fontSize: '14px', fontWeight: '900', margin: '0' }}>
                     ⏱️ Listo en ~{pedidoActivo.tiempoEstimado} min
@@ -626,7 +620,7 @@ function Restaurantes({ nombre, onVolver, foto, onCerrarSesion, onIrPerfil, onIr
           </div>
 
           {/* Calificar el pedido (cuando ya fue entregado) */}
-          {['entregado', 'cerrado'].includes(pedidoActivo.estado) && (
+          {yaLlegoAlCliente(pedidoActivo.estado) && (
             <div style={{ background: 'linear-gradient(135deg, #FFFFFF, #ECECEF)', borderRadius: '16px', padding: '18px', marginBottom: '20px', border: '1px solid #ECECEF', textAlign: 'center' }}>
               {(pedidoActivo.calificado || califEntro) ? (
                 <p style={{ color: '#2ECC71', fontWeight: '900', fontSize: '14px', margin: 0 }}>⭐ ¡Gracias por calificar!</p>
@@ -1110,7 +1104,7 @@ function Restaurantes({ nombre, onVolver, foto, onCerrarSesion, onIrPerfil, onIr
               const porRest = p.canceladoPor === 'restaurante' || (!p.canceladoPor && p.motivoRechazo);
               const est = p.estado === 'cancelado'
                 ? (porRest ? 'Cancelado por el restaurante' : 'Cancelado por mí')
-                : (ESTADO_LABEL_CLIENTE[p.estado] || p.estado);
+                : etiquetaParaElCliente(p.estado);
               const cancelado = p.estado === 'cancelado';
               return (
                 <div
@@ -1123,7 +1117,7 @@ function Restaurantes({ nombre, onVolver, foto, onCerrarSesion, onIrPerfil, onIr
                     <span style={{ background: cancelado ? '#FF4444' : 'linear-gradient(135deg, #FFCF4D, #FF7A2F)', color: '#FFFFFF', fontSize: '12px', fontWeight: '900', borderRadius: '20px', padding: '4px 12px', whiteSpace: 'nowrap' }}>{est}</span>
                   </div>
                   <p style={{ color: '#6B7280', fontSize: '12px', margin: '0' }}>Pedido #{(p.id || '').slice(-5).toUpperCase()} · {cop(p.total || 0)}</p>
-                  {p.tiempoEstimado && !['entregado', 'cerrado', 'cancelado'].includes(p.estado) && (
+                  {p.tiempoEstimado && !terminadoParaElCliente(p.estado) && (
                     <p style={{ color: '#FF7A2F', fontSize: '12px', fontWeight: 'bold', margin: '4px 0 0' }}>⏱️ Listo en ~{p.tiempoEstimado} min</p>
                   )}
                 </div>
