@@ -185,6 +185,13 @@ la placa de `conductores/{uid}` (la escribe su GPS con la misma placa que va en 
 - Al final se devuelven la placa de la ficha y la de la hoja, y `activo`, a lo que había. Los 403 de la consola salen
   aquí también (como en `conductor-en-turno` y `salir-por-el-menu`): no son la señal.
 
+### contacto-emergencia (G10, 28-sep-2026)
+- Seguridad enseña el número guardado en un `<span>` cuando no se edita; el segundo «Editar» es el del número y su
+  campo es `input[placeholder="Ej: 3001234567"]`. El aviso de Seguridad es un `<p>` rojo en la pantalla (no ventanita).
+- Para saber qué quedó en la base sin leerla: `p.reload()` y volver a Menú → Seguridad; lo que enseña es lo guardado.
+- pasajero@gg.test trae el contacto sembrado 3000000001: el recorrido NO escribe nada (el número malo no pasa). Los dos
+  403 de la consola salen igual que en los demás recorridos: no son la señal.
+
 ## Lo que el robot dejó creado en pruebas
 
 - 27-sep-2026: «Robot Taxi De Prueba» (robot.taxi.1790508222079@gg.test) y
