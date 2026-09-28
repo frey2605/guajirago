@@ -4,7 +4,8 @@ import { collection, query, where, limit, onSnapshot, doc, updateDoc, setDoc, ge
 import { registrarTokenFCM, alertarNuevoViaje, activarAudioiOS, precargarAudio, permisoDeAvisos, avisoDeAvisos } from './Notificaciones';
 import { signOut } from 'firebase/auth';
 import { getFunctions, httpsCallable } from 'firebase/functions';
-import { COMISIONES_DEFECTO, comisionSegunTipoDeViaje, comisionParaActivarse, tiposDeViajeQueVe } from './comisiones';
+import { COMISIONES_DEFECTO, comisionSegunTipoDeViaje, comisionParaActivarse } from './comisiones';
+import { porQueNoLeToca } from './leTocaElViaje';
 import { CONFIG_TARIFAS_DEFECTO, calcularTarifaMinima } from './tarifas';
 import { CONFIG_COMPARTIDA } from './configApp';
 import { ESTADOS_MERCADO, ESTADOS_TERMINADOS } from './estadosViaje';
@@ -994,16 +995,11 @@ const cargarSaldo = useCallback(async (uid) => {
         .map(d => ({ id: d.id, ...d.data() }))
         .filter(v => {
           if (!v.nuevaOferta && !v.fechaSolicitud) return false;
-          // Filtro por tipo: el conductor ve solicitudes de su tipo de vehículo.
-          // Los mototaxistas ADEMÁS ven los mandados de mensajería.
-          // La lista sale de comisiones.js (tiposDeViajeQueVe): la misma que usa el interruptor para saber qué puede tomar.
-          if (tipoVehiculo && v.tipo && !tiposDeViajeQueVe(tipoVehiculo).includes(v.tipo)) return false;
-          // Filtro por distancia: solo mostrar si el pasajero está dentro del radio de búsqueda actual
-          if (ubicacionRef.current && v.pasajeroLat && v.pasajeroLng) {
-            const radio = v.radioBusqueda || 7;
-            const dist = calcularDistanciaKm(ubicacionRef.current.lat, ubicacionRef.current.lng, v.pasajeroLat, v.pasajeroLng);
-            if (dist > radio) return false;
-          }
+          // ¿Le toca? Tipo de vehículo (los mototaxistas ADEMÁS ven los mandados) y radio del viaje: leTocaElViaje.js,
+          // la MISMA regla con la que el servidor decide a quién le suena el aviso (G04, atada por prueba).
+          const km = (ubicacionRef.current && v.pasajeroLat && v.pasajeroLng)
+            ? calcularDistanciaKm(ubicacionRef.current.lat, ubicacionRef.current.lng, v.pasajeroLat, v.pasajeroLng) : undefined;
+          if (porQueNoLeToca(v, tipoVehiculo, km)) return false;
           const ts = tsDe(v);
           const edad = ahora - ts;
           if (edad < 0 || edad > VENTANA_MS) return false;

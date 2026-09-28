@@ -233,8 +233,11 @@ describe('AMARRES · la comisión: el servidor, la app del conductor y el panel 
       'aceptarOEnviar ya no compara el saldo con la comisión del tipo del VIAJE');
     assert.match(fuente, /!activo && saldoCreditos !== null && saldoCreditos < comisionParaActivarse\(tipoVehiculo, configApp\)\)/,
       'el interruptor de activarse ya no usa comisionParaActivarse');
-    assert.match(fuente, /if \(tipoVehiculo && v\.tipo && !tiposDeViajeQueVe\(tipoVehiculo\)\.includes\(v\.tipo\)\) return false;/,
-      'la lista de solicitudes ya no filtra con tiposDeViajeQueVe (la misma lista que usa el interruptor)');
+    // Desde G04 la lista filtra con leTocaElViaje.js, que a su vez usa tiposDeViajeQueVe de comisiones.js.
+    assert.match(fuente, /if \(porQueNoLeToca\(v, tipoVehiculo, km\)\) return false;/,
+      'la lista de solicitudes ya no filtra con porQueNoLeToca (leTocaElViaje.js)');
+    assert.match(leer('guajirago/src/leTocaElViaje.js'), /^import \{ tiposDeViajeQueVe \} from '\.\/comisiones';/m,
+      'la regla de la lista ya no saca los tipos de comisiones.js (la misma lista que usa el interruptor)');
     assert.ok(!/comisionSegunTipo\(/.test(fuente), 'volvió la calculadora vieja que decidía con el vehículo del conductor');
   });
 });

@@ -168,7 +168,8 @@ describe('EL SERVIDOR NO AVISA A QUIEN NO DA SEÑAL · 12 horas (decisión del d
     assert.match(cuerpo, /if \(porQueNoSeLeAvisa\(d, doc\.updateTime \? doc\.updateTime\.toMillis\(\) : undefined, Date\.now\(\)\)\) return;/,
       '⛔ el servidor elige a quién avisar sin mirar si está en servicio');
     assert.ok(!/ubicacion\.timestamp|\.timestamp\b/.test(cuerpo), '⛔ la hora sale del celular');
-    assert.match(cuerpo, /distanciaKm\(pLat, pLng, u\.lat, u\.lng\) > \(radioKm \|\| 3\)/, 'la distancia sigue como estaba');
+    // El radio ya no se decide aquí: lo decide leTocaElViaje.cjs (G04, pruebas/leTocaElViaje.test.js). La distancia sí.
+    assert.match(cuerpo, /distanciaKm\(pLat, pLng, u\.lat, u\.lng\)/, 'la distancia ya no sale de distanciaKm');
   });
 
   it('el medidor cuenta con la MISMA regla', () => {

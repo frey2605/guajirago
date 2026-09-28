@@ -38,6 +38,8 @@ const { porQueNoSeLeAvisa } = require('./avisables.cjs');
 const { descuentoSobreTarifaAceptada } = require('./descuentos.cjs');
 // G03: la comisión se cobra según el tipo del VIAJE (la app y el panel tienen copias, atadas por prueba).
 const { comisionSegunTipoDeViaje } = require('./comisiones.cjs');
+// G04: ¿le toca este viaje a este conductor? (tipo de vehículo + radio; la lista del conductor tiene la copia, atada por prueba).
+const { porQueNoLeToca } = require('./leTocaElViaje.cjs');
 
 // Distancia en km entre dos coordenadas (Haversine)
 function distanciaKm(lat1, lng1, lat2, lng2) {
@@ -49,19 +51,29 @@ function distanciaKm(lat1, lng1, lat2, lng2) {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-// Tokens FCM de conductores EN SERVICIO (avisables.cjs) DENTRO del radio (km) del pasajero.
-// Un conductor sin ubicación conocida se incluye igual (su app filtra la distancia).
-async function tokensConductoresCerca(pLat, pLng, radioKm) {
-  const snap = await admin.firestore().collection("conductores").where("activo", "==", true).get();
-  const tokens = [];
+// Tokens FCM de conductores EN SERVICIO (avisables.cjs) a los que LES TOCA el viaje (leTocaElViaje.cjs: su tipo de
+// vehículo y el radio del viaje; la misma regla que su lista). Un conductor sin ubicación conocida no se descarta por
+// distancia (su app la filtra). G04 (27-sep-2026): antes se avisaba solo por distancia, sin mirar el tipo.
+async function tokensConductoresCerca(viaje) {
+  const db = admin.firestore();
+  const snap = await db.collection("conductores").where("activo", "==", true).get();
+  const enServicio = [];
   snap.forEach((doc) => {
     const d = doc.data();
     if (porQueNoSeLeAvisa(d, doc.updateTime ? doc.updateTime.toMillis() : undefined, Date.now())) return;
+    enServicio.push({ id: doc.id, d });
+  });
+  if (enServicio.length === 0) return [];
+  // El tipo de vehículo vive en la ficha del usuario (usuarios/{uid}), no en conductores/{uid}.
+  const fichas = await db.getAll(...enServicio.map((c) => db.collection("usuarios").doc(c.id)));
+  const pLat = viaje.pasajeroLat, pLng = viaje.pasajeroLng;
+  const tokens = [];
+  enServicio.forEach(({ d }, i) => {
+    const tipoVehiculo = (fichas[i] && fichas[i].exists ? fichas[i].data() : {}).tipoVehiculo;
     const u = d.ubicacion;
-    if (typeof pLat === "number" && typeof pLng === "number" &&
-        u && typeof u.lat === "number" && typeof u.lng === "number") {
-      if (distanciaKm(pLat, pLng, u.lat, u.lng) > (radioKm || 3)) return; // fuera del radio
-    }
+    const km = (typeof pLat === "number" && typeof pLng === "number" &&
+        u && typeof u.lat === "number" && typeof u.lng === "number") ? distanciaKm(pLat, pLng, u.lat, u.lng) : undefined;
+    if (porQueNoLeToca(viaje, tipoVehiculo, km)) return;
     tokens.push(d.fcmToken);
   });
   return tokens;
@@ -71,7 +83,7 @@ exports.notificarNuevoViaje = onDocumentCreated("viajes/{viajeId}", async (event
   const viaje = event.data.data();
   if (!viaje || viaje.estado !== "esperando") return null;
   try {
-    const tokens = await tokensConductoresCerca(viaje.pasajeroLat, viaje.pasajeroLng, viaje.radioBusqueda || 3);
+    const tokens = await tokensConductoresCerca(viaje);
     console.log("notificarNuevoViaje: conductores en radio con token:", tokens.length);
     if (tokens.length === 0) return null;
     await admin.messaging().sendEachForMulticast({
@@ -96,7 +108,7 @@ exports.notificarNuevaOferta = onDocumentUpdated("viajes/{viajeId}", async (even
   if (!despues || despues.estado !== "esperando") return null;
   if (antes.tarifaValor === despues.tarifaValor) return null;
   try {
-    const tokens = await tokensConductoresCerca(despues.pasajeroLat, despues.pasajeroLng, despues.radioBusqueda || 3);
+    const tokens = await tokensConductoresCerca(despues);
     if (tokens.length === 0) return null;
     await admin.messaging().sendEachForMulticast({
       notification: {
