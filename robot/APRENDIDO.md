@@ -367,6 +367,24 @@ la placa de `conductores/{uid}` (la escribe su GPS con la misma placa que va en 
   buscando conductor y nadie lo tomó»`. Que entre prueba también que las reglas dejan al pasajero escribir esos
   campos en su viaje (no hay lista cerrada de campos para el dueño del viaje).
 
+### ruta-conductor (G29, 28-sep-2026)
+- Mismo arranque que `espera-conductor` (dos apps, pedir por pantalla, oferta por la base, `confirmarConductor`), pero
+  cada app con SU GPS de mentira: el taxista en la plaza y el pasajero 1,3 km al sur. Al sur del mapa es donde está la
+  tarjeta: es el caso que muerde. Y el punto de recogida del viaje se escribe (`pasajeroLat`/`pasajeroLng`) antes de la
+  oferta, porque la dirección escrita a mano la puede encontrar Google en otro sitio.
+- 🔑 Google Maps SÍ carga en `guajirago-pruebas.web.app` (la ruta sale pintada). El `403` que sale en la consola de las
+  dos apps ya salía antes del arreglo: no es del mapa.
+- Los marcadores de Google se encuentran como un `div` sin hijos cuyo texto es SOLO el emoji (🚗/🏍️ o 📍).
+- 🪤 La tarjeta NO se puede buscar como «lo que va pegado abajo»: Google también pinta capas `absolute` con `bottom: 0`
+  a todo lo ancho, y la «tarjeta» salía empezando en y=0. Las de la app llevan `zIndex: 10` en su estilo; las de
+  Google no.
+- 🔑 Lo que enseñó (y ninguna lectura del código veía): el mapa del pasajero, que «sí dejaba sitio», TAMPOCO lo hacía.
+  El `DirectionsRenderer` sin `preserveViewport` re-encuadra él solo, sin margen, y pisa el `fitBounds`: con el código
+  de antes las DOS apps salían idénticas (🚗 y=121 · 📍 y=692, pantalla de 860) y el 📍 quedaba debajo de la tarjeta
+  (taxista: empieza en 566; pasajero: en 451, la suya mide ~409 por el código de seguridad). Con el arreglo: taxista
+  🚗 165 · 📍 451; pasajero 🚗 108 · 📍 394.
+- Cuesta UNA comisión de los créditos de prueba del taxista en cada corrida.
+
 ## Lo que el robot dejó creado en pruebas
 
 - 27-sep-2026: «Robot Taxi De Prueba» (robot.taxi.1790508222079@gg.test) y
@@ -399,3 +417,5 @@ la placa de `conductores/{uid}` (la escribe su GPS con la misma placa que va en 
   por el taxista, con «Llegué al punto» y ya `cancelado_conductor` (el primero: LPAelN1GEn69u32GPCcK).
 - 28-sep-2026 en adelante: un viaje de Taxi de pasajero@gg.test por cada corrida de `vencer-busqueda.cjs`, ya
   `vencido` por «app-pasajero» y sin conductor (el primero: AMXhA9Ea3CoD6VEK9AiC).
+- 28-sep-2026 en adelante: un viaje de Taxi de pasajero@gg.test por cada corrida de `ruta-conductor.cjs`, aceptado
+  por el taxista y ya `cancelado_conductor` (el primero: foMJSjN38ljk9fUWVraa).
