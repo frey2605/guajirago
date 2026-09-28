@@ -28,3 +28,15 @@ export const CONFIG_COMPARTIDA = {
   tiempoEsperaConductor: 240, // segundos que el conductor espera al pasajero
   duracionContraoferta: 20,   // segundos de vida de una contraoferta en pantalla
 };
+
+/**
+ * G26 (28-sep-2026): CUÁNTOS SEGUNDOS ESPERA EL CONDUCTOR AL PASAJERO — una sola cuenta para las DOS pantallas.
+ * Hasta hoy el conductor leía `config/global` (`configApp.tiempoEsperaConductor || 240`) y el pasajero tenía un 240
+ * fijo: si el dueño cambiaba el tiempo en el panel, el conductor veía un reloj y el pasajero otro. Ahora las dos
+ * llaman a esta función con su `configApp`. Si el número no sirve (no cargó, el panel guardó 0 con la casilla vacía,
+ * llegó como texto raro) se usa el respaldo de arriba, no un número escrito en la pantalla.
+ */
+export function segundosDeEspera(config) {
+  const n = Number(config && config.tiempoEsperaConductor);
+  return Number.isFinite(n) && n > 0 ? Math.floor(n) : CONFIG_COMPARTIDA.tiempoEsperaConductor;
+}

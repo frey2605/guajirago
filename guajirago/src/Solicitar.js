@@ -9,7 +9,7 @@ import Llamada from './Llamada';
 import { alertarNuevoViaje, precargarAudio, activarAudioiOS, obtenerTokenFCM } from './Notificaciones';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { CONFIG_TARIFAS_DEFECTO, calcularTarifaMinima } from './tarifas';
-import { CONFIG_COMPARTIDA } from './configApp';
+import { CONFIG_COMPARTIDA, segundosDeEspera } from './configApp';
 import { cop } from './moneda';
 import { aplicarDescuento, armarDescuentoInfo, tarifaParaPasajero } from './descuentos';
 import { generarCodigoSeguridad, guardarCodigoDeViaje, cargarCodigoDeViaje } from './codigoSeguridad';
@@ -501,6 +501,10 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
   const [viaje, setViaje] = useState(null);
   const [error, setError] = useState('');
   const [configApp, setConfigApp] = useState(CONFIG_APP_DEFECTO);
+  // G26: el oyente del viaje vive en un efecto que NO se vuelve a armar cuando carga config/global, así que lee la
+  // config por aquí; si la leyera directo se quedaría con el respaldo del primer dibujo.
+  const configAppRef = useRef(configApp);
+  configAppRef.current = configApp;
   const TARIFA_MINIMA = calcularTarifaMinima(tipo, configApp);
   const [tarifa, setTarifa] = useState(calcularTarifaMinima(tipo, CONFIG_APP_DEFECTO));
   const [ubicacionPasajero, setUbicacionPasajero] = useState(centroRiohacha);
@@ -540,7 +544,7 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
   const [mostrarLlego, setMostrarLlego] = useState(false);
   const [mostrarCancelacion, setMostrarCancelacion] = useState(false);
   const [mostrarEmergencia, setMostrarEmergencia] = useState(false);
-  const [contador, setContador] = useState(240);
+  const [contador, setContador] = useState(segundosDeEspera(CONFIG_APP_DEFECTO));
   const [buscandoAgotado, setBuscandoAgotado] = useState(false);
   const [confirmacionPendiente, setConfirmacionPendiente] = useState(null);
   const [contactoEmergencia, setContactoEmergencia] = useState('');
@@ -811,7 +815,7 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
       if (data.conductorEnPunto && !conductorEnPunto) {
         setConductorEnPunto(true);
         setMostrarLlego(true);
-        setContador(240);
+        setContador(segundosDeEspera(configAppRef.current)); // G26: la misma cuenta que el reloj del conductor
         contadorRef.current = setInterval(() => {
           setContador(prev => { if (prev <= 1) { clearInterval(contadorRef.current); return 0; } return prev - 1; });
         }, 1000);

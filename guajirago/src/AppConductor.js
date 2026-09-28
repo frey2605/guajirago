@@ -6,7 +6,7 @@ import { getFunctions, httpsCallable } from 'firebase/functions';
 import { COMISIONES_DEFECTO, comisionSegunTipoDeViaje, comisionParaActivarse } from './comisiones';
 import { porQueNoLeToca } from './leTocaElViaje';
 import { CONFIG_TARIFAS_DEFECTO, calcularTarifaMinima } from './tarifas';
-import { CONFIG_COMPARTIDA } from './configApp';
+import { CONFIG_COMPARTIDA, segundosDeEspera } from './configApp';
 import { cop } from './moneda';
 import { ESTADOS_MERCADO, ESTADOS_TERMINADOS, ESTADOS_QUE_CIERRA_EL_SERVIDOR, avisoDelCierre, comoTermino, meAceptaronEsteViaje } from './estadosViaje';
 import { consultaDeGanancias, resumenDeGanancias } from './gananciasConductor';
@@ -513,7 +513,7 @@ function AppConductor({ nombre, telefono, placa, vehiculo, tipoVehiculo, onCerra
   const [codigoIngresado, setCodigoIngresado] = useState('');
   const [errorCodigo, setErrorCodigo] = useState('');
   const [destinoCoords, setDestinoCoords] = useState(null);
-  const [contador, setContador] = useState(240);
+  const [contador, setContador] = useState(segundosDeEspera(CONFIG_APP_DEFECTO));
   const [verHistorial, setVerHistorial] = useState(false);
   const [verCreditos, setVerCreditos] = useState(false);
   const [verPerfil, setVerPerfil] = useState(false);
@@ -1061,7 +1061,7 @@ const cargarSaldo = useCallback(async (uid) => {
     if (!r || !r.ok) return;
     setRespuestaPasajero(null);
     setFase('en_punto');
-    setContador(configApp.tiempoEsperaConductor || 240);
+    setContador(segundosDeEspera(configApp)); // G26: la misma cuenta que el reloj del pasajero (configApp.js)
     geocodificarDestino(viajeActual.destino);
     contadorRef.current = setInterval(() => {
       setContador(prev => {
@@ -1154,7 +1154,7 @@ const cargarSaldo = useCallback(async (uid) => {
     setFase(null); faseRef.current = null;
     setViajeActual(null); setTiempoLlegada(null); setDistancia(null);
     setRespuestaPasajero(null); setMensajeGrande(null); ultimoMensajeRef.current = null;
-    setUbicacionPasajero(null); setDestinoCoords(null); setActivo(true); setContador(240);
+    setUbicacionPasajero(null); setDestinoCoords(null); setActivo(true); setContador(segundosDeEspera(configApp));
   };
 
   const [mostrarCodigoDescuento, setMostrarCodigoDescuento] = useState(false);
@@ -1195,7 +1195,7 @@ const cargarSaldo = useCallback(async (uid) => {
     setFase(null); faseRef.current = null;
     setViajeActual(null); setTiempoLlegada(null); setDistancia(null);
     setRespuestaPasajero(null); setMensajeGrande(null); ultimoMensajeRef.current = null;
-    setUbicacionPasajero(null); setDestinoCoords(null); setActivo(true); setContador(240);
+    setUbicacionPasajero(null); setDestinoCoords(null); setActivo(true); setContador(segundosDeEspera(configApp));
     setMostrarCodigoDescuento(false); setCodigoDescuentoIngresado(''); setErrorCodigoDescuento('');
   };
 
