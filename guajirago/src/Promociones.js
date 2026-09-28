@@ -4,6 +4,7 @@ import { db, auth } from './firebase';
 import { collection, getDocs, doc, getDoc } from 'firebase/firestore';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import Logo from './Logo';
+import { motivoPorLaPromocion } from './reglaPromocion';
 
 function CelebracionPromo({ codigo, textoValor, onCerrar }) {
   const confeti = Array.from({ length: 30 }, (_, i) => i);
@@ -71,14 +72,10 @@ function Promociones({ onVolver }) {
       }
       const snap = await getDocs(collection(db, 'promociones'));
       const ahora = new Date();
-      const lista = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(p => {
-        if (!p.activa) return false;
-        // Inicio desde el arranque del día (00:00) y fin hasta el final del día (23:59:59)
-        if (new Date(p.fechaInicio + 'T00:00:00') > ahora || new Date(p.fechaFin + 'T23:59:59') < ahora) return false;
-        if (p.aplicaA === 'pasajeros' && tipo === 'conductor') return false;
-        if (p.aplicaA === 'conductores' && tipo !== 'conductor') return false;
-        return true;
-      });
+      // G12: encendida, en sus fechas y para este tipo de cuenta — la MISMA regla del
+      // servidor (reglaPromocion.js es copia de functions/promociones.cjs, atada por prueba).
+      const lista = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+        .filter(p => !motivoPorLaPromocion(p, tipo === 'conductor', ahora));
       lista.sort((a, b) => (b.fechaCreacion || '').localeCompare(a.fechaCreacion || ''));
       setPromos(lista);
     } catch (e) { console.error(e); }

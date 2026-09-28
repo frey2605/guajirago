@@ -38,6 +38,8 @@ const { porQueNoSeLeAvisa } = require('./avisables.cjs');
 const { descuentoSobreTarifaAceptada } = require('./descuentos.cjs');
 // G03: la comisión se cobra según el tipo del VIAJE (la app y el panel tienen copias, atadas por prueba).
 const { comisionSegunTipoDeViaje } = require('./comisiones.cjs');
+// G12: ¿puede esta persona usar esta promoción? UNA regla (la app y el panel tienen copias, atadas por prueba).
+const { viajesMinimosDe, motivoParaNoUsar, textoParaQuienLaUsa } = require('./promociones.cjs');
 // G04: ¿le toca este viaje a este conductor? (tipo de vehículo + radio; la lista del conductor tiene la copia, atada por prueba).
 const { porQueNoLeToca } = require('./leTocaElViaje.cjs');
 
@@ -688,22 +690,11 @@ exports.reclamarPromocion = onCall(async (request) => {
       const snapPromo = await t.get(refPromo);
       if (!snapPromo.exists) throw new HttpsError("not-found", "Ese código no existe. Verifícalo");
       const promo = snapPromo.data() || {};
-      const ahora = new Date();
-      if (!promo.activa) throw new HttpsError("failed-precondition", "Esta promoción ya no está disponible");
-      if (new Date(promo.fechaInicio + "T00:00:00") > ahora || new Date(promo.fechaFin + "T23:59:59") < ahora) {
-        throw new HttpsError("failed-precondition", "Esta promoción ya no está disponible");
-      }
 
       // El tipo de cuenta se lee de la FICHA, no de lo que diga el teléfono:
       // antes el celular mandaba su propio 'tipoUsuario' para pasar este filtro.
       const snapUsuario = await t.get(refUsuario);
       const esConductor = snapUsuario.exists && snapUsuario.data().tipo === "conductor";
-      if (promo.aplicaA === "pasajeros" && esConductor) {
-        throw new HttpsError("failed-precondition", "Esta promoción no aplica para tu tipo de cuenta");
-      }
-      if (promo.aplicaA === "conductores" && !esConductor) {
-        throw new HttpsError("failed-precondition", "Esta promoción no aplica para tu tipo de cuenta");
-      }
 
       // El tope por persona SÍ funciona, aunque el contador se escriba lejos de
       // aquí: quien lo sube es AppConductor.js:1096, cuando el conductor
@@ -712,8 +703,25 @@ exports.reclamarPromocion = onCall(async (request) => {
       // descuentos usados, no los reclamados — que es lo correcto.
       const snapUso = await t.get(refUso);
       const usosPrevios = snapUso.exists ? (snapUso.data().veces || 0) : 0;
-      if (promo.limiteUsosPorPersona && usosPrevios >= promo.limiteUsosPorPersona) {
-        throw new HttpsError("resource-exhausted", "Ya usaste esta promoción el máximo de veces permitido");
+
+      // G12 (28-sep-2026): los «viajes previos» los miraba SOLO el panel. Con el
+      // código, un pasajero nuevo canjeaba aquí una promoción que pedía N viajes.
+      // Se cuentan como el panel: viajes 'finalizado' de esta persona, como
+      // conductor si lo es y si no como pasajero. Solo si la promoción los pide.
+      let viajesCompletados = 0;
+      if (viajesMinimosDe(promo) > 0) {
+        const campoViaje = esConductor ? "conductorId" : "pasajeroId";
+        const snapViajes = await t.get(db.collection("viajes")
+          .where(campoViaje, "==", request.auth.uid).where("estado", "==", "finalizado"));
+        viajesCompletados = snapViajes.size;
+      }
+
+      // La decisión sale de UNA regla (promociones.cjs), la misma que copian la
+      // app y el panel. Aquí solo se traduce a la respuesta del servidor.
+      const motivo = motivoParaNoUsar(promo, { esConductor, usosPrevios, viajesCompletados }, new Date());
+      if (motivo) {
+        throw new HttpsError(motivo.codigo === "limite" ? "resource-exhausted" : "failed-precondition",
+          textoParaQuienLaUsa(motivo));
       }
 
       const codigoVerificacion = String(Math.floor(1000 + Math.random() * 9000));

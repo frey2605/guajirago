@@ -421,6 +421,31 @@ describe('REGLA 7 · reclamarPromocion', () => {
     await llamarA('reclamarPromocion', 'elcond', { codigo: 'VIVA' });
     assert.strictEqual(await saldoDe('elcond'), SALDO_INICIAL, 'el reclamo movio el saldo');
   });
+
+  // ── G12 (28-sep-2026): LOS «VIAJES PREVIOS» LOS EXIGE TAMBIÉN EL SERVIDOR ──
+  //  Antes solo los miraba el panel: con el código, un pasajero NUEVO canjeaba
+  //  aquí una promoción que pedía viajes, y el descuento lo paga GuajiraGo.
+  //  Solo cuentan los viajes 'finalizado' de esa persona.
+  test('G12 · un pasajero SIN los viajes previos no canjea la promoción que los pide', async () => {
+    await sembrar('promociones/DOSVIAJES', {
+      activa: { booleanValue: true }, fechaInicio: txt(AYER), fechaFin: txt(MANANA),
+      tipoBeneficio: txt('credito'), valorBeneficio: num(8000), aplicaA: txt('pasajeros'),
+      viajesMinimosRequeridos: num(2),
+    });
+    await sembrar('usuarios/nuevoG12', { tipo: txt('') });
+    await sembrar('viajes/g12-uno', { pasajeroId: txt('nuevoG12'), estado: txt('finalizado') });
+    await sembrar('viajes/g12-cancelado', { pasajeroId: txt('nuevoG12'), estado: txt('cancelado') });
+    const r = await llamarA('reclamarPromocion', 'nuevoG12', { codigo: 'DOSVIAJES' });
+    assert.strictEqual(r.cuerpo?.error?.status, 'FAILED_PRECONDITION', 'el servidor dejó canjear sin los viajes previos');
+    assert.match(String(r.cuerpo?.error?.message), /2 viajes completados\. Llevas 1/,
+      'el motivo no dice cuántos pide y cuántos lleva (el cancelado NO cuenta)');
+    assert.strictEqual((await leer('usuarios/nuevoG12')).descuentoPendiente, undefined, 'quedó un descuento sin cumplir');
+
+    // Y con el segundo viaje completado, SÍ.
+    await sembrar('viajes/g12-dos', { pasajeroId: txt('nuevoG12'), estado: txt('finalizado') });
+    const r2 = await llamarA('reclamarPromocion', 'nuevoG12', { codigo: 'DOSVIAJES' });
+    assert.strictEqual(r2.cuerpo?.result?.valor, 8000, 'con los viajes cumplidos no le dio la promoción');
+  });
 });
 
 describe('REGLA 7 · creditosDeBienvenida', () => {
