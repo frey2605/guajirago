@@ -42,6 +42,25 @@ export function segundosDeEspera(config) {
 }
 
 /**
+ * G35 (28-sep-2026): CUÁNTOS LUGARES FAVORITOS PUEDE GUARDAR EL PASAJERO — una sola cuenta para la comprobación y los
+ * dos textos. Hasta hoy `guardarFavorito` (Solicitar.js) sí leía `config/global.maximoFavoritos`, pero la ventanita
+ * «Llegaste al límite» y la pregunta de Ayuda (AyudaSoporte.js) decían siempre «3». Medido ese día: producción tiene 2,
+ * así que al que llegaba al tope se le decía «Solo puedes guardar 3 lugares» teniendo 2. Si el número no sirve (no
+ * cargó, el panel guardó 0 con la casilla vacía —y con 0 no se podía guardar NINGUNO—, llegó como texto raro) se usa el
+ * respaldo de arriba.
+ */
+export function maximoDeFavoritos(config) {
+  const n = Number(config && config.maximoFavoritos);
+  return Number.isFinite(n) && n > 0 ? Math.floor(n) : CONFIG_COMPARTIDA.maximoFavoritos;
+}
+
+/** G35: el mismo número, dicho en palabras para los textos: «1 lugar», «2 lugares». */
+export function lugaresFavoritos(config) {
+  const n = maximoDeFavoritos(config);
+  return n + (n === 1 ? ' lugar' : ' lugares');
+}
+
+/**
  * G27 (28-sep-2026): EL PLAZO DE LA BÚSQUEDA DEL CELULAR — un solo sitio para las DOS pantallas.
  * Estaba escrito a mano nueve veces: en `Solicitar.js` el 60000 de ampliar y el 120000 de agotar (dos veces cada uno:
  * al pedir y al «Seguir buscando»), el 120 del reloj (dos), el 240 con que nacía el reloj y el 120 de la barra; y en

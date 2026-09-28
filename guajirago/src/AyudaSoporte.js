@@ -1,9 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from './firebase';
 import Logo from './Logo';
+import { CONFIG_COMPARTIDA, lugaresFavoritos } from './configApp';
 
 const CORREO_SOPORTE = 'soporte@guajirago.com.co';
 
-const PREGUNTAS = [
+// G35: la lista se arma con el tope de favoritos de config/global (lo pone el dueño en el panel), en palabras
+// («2 lugares»), para que la respuesta diga lo mismo que la ventanita «Llegaste al límite» de Solicitar.js.
+const preguntasCon = (lugaresGuardables) => [
   { pregunta: '¿Cómo solicito un taxi o mototaxi?', respuesta: 'Abre GuajiraGo y en la pantalla principal escoge si quieres un Taxi o un Mototaxi. Luego escribe tu punto de origen (dónde estás) y tu destino (a dónde vas). La app te mostrará una tarifa mínima sugerida, que puedes subir si quieres conseguir conductor más rápido. Cuando estés listo, toca "Solicitar" y tu pedido se enviará a todos los conductores cercanos disponibles. En pocos segundos empezarás a recibir respuestas. No tienes que esperar en una sola pantalla: si un conductor acepta tu tarifa o te envía una contraoferta, la app te avisará al instante.' },
   { pregunta: '¿Cómo funciona la negociación de tarifa?', respuesta: 'GuajiraGo usa un sistema justo donde tú decides cuánto quieres pagar. Cuando solicitas un viaje, propones una tarifa inicial. Los conductores cercanos pueden aceptar esa tarifa tal cual, o enviarte una contraoferta con un precio diferente. Verás todas las contraofertas que lleguen, cada una con el nombre del conductor, su foto, placa y vehículo, además de un tiempo límite para responder. Tú eliges la que más te convenga. Si nadie acepta tu oferta inicial, puedes subirla con el botón de "+" para hacerla más atractiva. Este sistema te da el control total sobre lo que pagas.' },
   { pregunta: '¿Qué es el código de seguridad?', respuesta: 'Es una medida de protección para garantizar que subas al vehículo correcto. Cuando solicitas un viaje, GuajiraGo genera automáticamente un código de 4 dígitos basado en tu fecha de nacimiento (día y mes). Este código aparece en tu pantalla cuando el conductor llega a recogerte. Antes de iniciar el viaje, el conductor te pedirá ese código y deberá ingresarlo en su app. Si el código es correcto, el viaje inicia. Esto evita confusiones y asegura que estás subiendo con el conductor que realmente aceptó tu viaje, no con otra persona. Nunca le des tu código a alguien que no sea tu conductor asignado.' },
@@ -23,7 +28,7 @@ const PREGUNTAS = [
   { pregunta: '¿Qué hago si tengo un problema con un viaje o con un cobro?', respuesta: 'Si tuviste algún inconveniente con un viaje, un cobro de créditos, o cualquier otra situación, puedes comunicarte con nuestro equipo de soporte. Escríbenos al correo soporte@guajirago.com.co explicando tu caso con el mayor detalle posible: incluye la fecha del viaje, el nombre del conductor o pasajero involucrado, y una descripción de lo que pasó. Nuestro equipo revisará tu caso y te dará una respuesta lo antes posible. Tu opinión y tus reportes nos ayudan a mejorar el servicio y a mantener GuajiraGo seguro y confiable para toda la comunidad de Riohacha.' },
   { pregunta: '¿Puedo ser pasajero y conductor al mismo tiempo?', respuesta: 'Sí, con una sola cuenta de GuajiraGo puedes usar ambos roles. Si un día necesitas pedir un viaje como pasajero y otro día quieres trabajar como conductor, puedes cambiar de rol fácilmente desde el menú de la app. Tus datos, tu historial y tus créditos se mantienen en la misma cuenta. Esto es ideal para conductores que también usan el servicio cuando no están trabajando, o para personas que quieren generar ingresos extra manejando en sus tiempos libres.' },
   { pregunta: '¿Cómo califica el pasajero al conductor?', respuesta: 'Al finalizar cada viaje, GuajiraGo muestra automáticamente una pantalla de calificación. Ahí puedes calificar a tu conductor con estrellas (de 1 a 5) según tu experiencia, y dejar un comentario opcional sobre el servicio. Esta calificación es muy importante porque ayuda a mantener la calidad del servicio y permite que otros pasajeros sepan con quién van a viajar. Los conductores también pueden calificar a los pasajeros. Te animamos a calificar con honestidad después de cada viaje, ya que esto mejora la experiencia de toda la comunidad de GuajiraGo.' },
-  { pregunta: '¿Puedo guardar mis direcciones favoritas?', respuesta: 'Sí, GuajiraGo te permite guardar hasta 3 lugares favoritos para que no tengas que escribir las direcciones que más usas una y otra vez. Cuando escribas un destino, aparecerá el botón "Guardar este lugar". Al guardarlo, ese lugar quedará disponible como acceso rápido cada vez que vayas a solicitar un viaje. Es perfecto para guardar lugares como tu casa, tu trabajo o la casa de un familiar. Si quieres cambiar uno de tus favoritos, primero borra el que ya no uses tocando la "✕" y luego guarda el nuevo.' },
+  { pregunta: '¿Puedo guardar mis direcciones favoritas?', respuesta: `Sí, GuajiraGo te permite guardar hasta ${lugaresGuardables} favoritos para que no tengas que escribir las direcciones que más usas una y otra vez. Cuando escribas un destino, aparecerá el botón "Guardar este lugar". Al guardarlo, ese lugar quedará disponible como acceso rápido cada vez que vayas a solicitar un viaje. Es perfecto para guardar lugares como tu casa, tu trabajo o la casa de un familiar. Si quieres cambiar uno de tus favoritos, primero borra el que ya no uses tocando la "✕" y luego guarda el nuevo.` },
   { pregunta: '¿Por qué el mapa no carga?', respuesta: 'Si el mapa no aparece o se queda en blanco, generalmente es por uno de estos motivos. Primero, verifica que tienes conexión a internet estable. Segundo, asegúrate de haberle dado permiso a la app para acceder a tu ubicación, ya que el mapa la necesita para mostrarte dónde estás. Si le negaste el permiso, ve a la configuración de tu celular y actívalo para GuajiraGo. Tercero, intenta cerrar completamente la app y volver a abrirla. Si el problema persiste, reinicia tu celular. La mayoría de problemas del mapa se solucionan revisando la conexión y los permisos de ubicación.' },
   { pregunta: '¿Cómo sé que el conductor es de confianza?', respuesta: 'Todos los conductores de GuajiraGo pasan por un proceso de registro donde deben subir su foto personal, una foto de su cédula y los datos completos de su vehículo. Cuando un conductor acepta tu viaje, puedes ver su nombre, foto, placa, color y modelo del vehículo antes de subirte. Además, el código de seguridad de 4 dígitos garantiza que solo subas con el conductor correcto. También puedes ver las calificaciones que otros pasajeros le han dado. Y como medida adicional, siempre puedes compartir los datos del conductor con tu contacto de confianza usando el botón de emergencia. Tu seguridad está respaldada por varias capas de protección.' },
   { pregunta: '¿Qué pasa si el conductor cancela el viaje?', respuesta: 'Si un conductor cancela tu viaje después de haberlo aceptado, recibirás una notificación inmediata en tu pantalla indicándote que el viaje fue cancelado y la razón que dio el conductor. No te preocupes, no se te cobra nada por una cancelación del conductor. Simplemente podrás volver a solicitar un nuevo viaje de inmediato y la app buscará otro conductor disponible para ti. Las cancelaciones de conductores son poco frecuentes, pero pueden ocurrir por motivos como problemas mecánicos o distancia excesiva.' },
@@ -43,6 +48,16 @@ function normalizar(texto) {
 function AyudaSoporte({ onVolver }) {
   const [busqueda, setBusqueda] = useState('');
   const [abierta, setAbierta] = useState(null);
+  // G35: el tope de favoritos sale de config/global con la misma pieza que usa Solicitar.js. Mientras carga, o si no
+  // carga, vale el respaldo de configApp.js — el MISMO que usa Solicitar.js cuando tampoco le carga, así que las dos
+  // siguen diciendo lo mismo. No es un rechazo de nada que el usuario hiciera: es el texto de una respuesta.
+  const [configApp, setConfigApp] = useState(CONFIG_COMPARTIDA);
+  useEffect(() => {
+    getDoc(doc(db, 'config', 'global'))
+      .then((snap) => { if (snap.exists()) setConfigApp({ ...CONFIG_COMPARTIDA, ...snap.data() }); })
+      .catch(() => { /* se queda el respaldo de configApp.js, igual que en Solicitar.js */ });
+  }, []);
+  const PREGUNTAS = preguntasCon(lugaresFavoritos(configApp));
 
   const q = normalizar(busqueda.trim());
   const filtradas = PREGUNTAS.filter(p =>

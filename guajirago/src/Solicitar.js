@@ -9,7 +9,7 @@ import Llamada from './Llamada';
 import { alertarNuevoViaje, precargarAudio, activarAudioiOS, prepararTokenDeAvisos } from './Notificaciones';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { CONFIG_TARIFAS_DEFECTO, calcularTarifaMinima } from './tarifas';
-import { CONFIG_COMPARTIDA, segundosDeEspera, BUSQUEDA, marcaDelVencido } from './configApp';
+import { CONFIG_COMPARTIDA, segundosDeEspera, BUSQUEDA, marcaDelVencido, maximoDeFavoritos, lugaresFavoritos } from './configApp';
 import { cop } from './moneda';
 import { aplicarDescuento, armarDescuentoInfo, tarifaParaPasajero } from './descuentos';
 import { generarCodigoSeguridad, guardarCodigoDeViaje, cargarCodigoDeViaje } from './codigoSeguridad';
@@ -983,7 +983,7 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
     if (!destino) return;
     const user = auth.currentUser;
     if (!user) return;
-    if (favoritos.length >= configApp.maximoFavoritos) { setAvisoLimite(true); return; }
+    if (favoritos.length >= maximoDeFavoritos(configApp)) { setAvisoLimite(true); return; }
     if (favoritos.find(f => f.direccion === destino)) { setError('Ese lugar ya está guardado'); return; }
     const nuevo = { nombre: destino.length > 18 ? destino.slice(0, 18) + '…' : destino, direccion: destino, icono: '⭐' };
     const nuevos = [...favoritos, nuevo];
@@ -1694,7 +1694,7 @@ const PanelEmergencia = () => (
             <span onClick={() => setAvisoLimite(false)} style={{ position: 'absolute', top: '16px', right: '20px', color: '#6B7280', fontSize: '26px', cursor: 'pointer', lineHeight: '1' }}>✕</span>
             <div style={{ fontSize: '54px', marginBottom: '12px' }}>📍</div>
             <h2 style={{ color: '#1A1A1E', fontSize: '20px', fontWeight: '900', margin: '0 0 10px' }}>Llegaste al límite</h2>
-            <p style={{ color: '#6B7280', fontSize: '14px', margin: '0 0 24px', lineHeight: '1.5' }}>Solo puedes guardar 3 lugares. Borra uno para poder agregar otro.</p>
+            <p style={{ color: '#6B7280', fontSize: '14px', margin: '0 0 24px', lineHeight: '1.5' }}>Solo puedes guardar {lugaresFavoritos(configApp)}. Borra uno para poder agregar otro.</p>
             <button onClick={() => setAvisoLimite(false)} style={{ width: '100%', padding: '16px', background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F)', border: 'none', borderRadius: '14px', color: '#1A1A1E', fontSize: '16px', fontWeight: '900', cursor: 'pointer' }}>Entendido</button>
           </div>
         </div>
