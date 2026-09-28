@@ -29,6 +29,8 @@ import { armarMensajeDeEmergencia } from './mensajeEmergencia';
 // La ubicación del mensaje de emergencia, pedida EN EL MOMENTO DEL TOQUE. MISMA
 // función que el botón de Ajustes (G05, 27-sep-2026).
 import { ubicacionDeAhora } from './ubicacionDeAhora';
+// El número del contacto de emergencia: la MISMA regla que el registro y Seguridad (G10).
+import { celularDiezCifras } from './telefonoValido';
 
 /**
  * EL AVISO DE «NO SÉ DÓNDE RECOGERTE» — ESCRITO UNA SOLA VEZ.
@@ -1001,15 +1003,21 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
       fallo: viaje ? null : 'viaje',
     });
 
-    const numero = contactoEmergencia.replace(/\D/g, '');
-    const numeroFinal = numero ? (numero.startsWith('57') ? numero : '57' + numero) : '';
+    // 🔴 G10: el número sale de la MISMA regla que valida el registro y Seguridad
+    // (telefonoValido.js). Antes se le pegaba un 57 a lo que hubiera: «300 123 45»
+    // abría wa.me/5730012345, un número que no existe, y «abc» abría wa.me/57.
+    const diez = celularDiezCifras(contactoEmergencia);
+    const numeroFinal = diez ? '57' + diez : '';
     // SIN NÚMERO, SE DICE. Antes abría WhatsApp sin destinatario y el pasajero
     // se encontraba eligiendo un contacto a mano, en una emergencia, sin saber
     // por qué. El mensaje va igual —se abre el selector— pero avisado.
     if (!numeroFinal) {
+      const porQue = String(contactoEmergencia).trim()
+        ? 'El número de tu contacto de confianza no está completo (debe tener 10 cifras), así que WhatsApp te va a pedir que '
+        : 'No pude leer tu contacto de confianza, así que WhatsApp te va a pedir que ';
       setAviso({
         titulo: 'No tengo a quién mandarlo',
-        texto: 'No pude leer tu contacto de confianza, así que WhatsApp te va a pedir que '
+        texto: porQue
           + 'elijas a quién. El mensaje ya va escrito. Guarda un contacto en Seguridad para '
           + 'que la próxima vez salga solo.',
       });

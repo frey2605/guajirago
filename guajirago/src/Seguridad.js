@@ -13,6 +13,8 @@ import { armarMensajeDeEmergencia } from './mensajeEmergencia';
 // La ubicación, pedida EN EL MOMENTO DEL TOQUE y no al abrir la pantalla. MISMA
 // función que el 🚨 del mapa (G05, 27-sep-2026): lee el porqué en ubicacionDeAhora.js.
 import { ubicacionDeAhora } from './ubicacionDeAhora';
+// ¿El número del contacto sirve? La MISMA regla que el registro (G10): telefonoValido.js.
+import { telefonoSirve, celularDiezCifras } from './telefonoValido';
 
 function Seguridad({ onVolver }) {
   const [contactoNombre, setContactoNombre] = useState('');
@@ -51,6 +53,7 @@ function Seguridad({ onVolver }) {
   const guardar = async () => {
     if (!contactoNombre.trim()) { setError('Escribe el nombre del contacto'); return; }
     if (!contactoNumero.trim()) { setError('Escribe el número del contacto'); return; }
+    if (!telefonoSirve(contactoNumero)) { setError('El número del contacto debe tener 10 cifras, por ejemplo 300 123 4567'); return; }
     setGuardando(true); setError(''); setMensaje('');
     try {
       const user = auth.currentUser;
@@ -121,11 +124,16 @@ function Seguridad({ onVolver }) {
       desde: 'ajustes', ubicacion: punto, ubicacionDe: de, viaje: viajeActivo, fallo,
     });
 
-    const numero = contactoNumero.replace(/\D/g, '');
-    const numeroFinal = numero.startsWith('57') ? numero : '57' + numero;
+    // 🔴 G10: antes se le pegaba un 57 a lo que hubiera, y «300 123 45» abría un número que no existe. Si el guardado
+    // no sirve, WhatsApp se abre SIN destinatario (el mensaje ya va escrito) y se dice por qué.
+    const diez = celularDiezCifras(contactoNumero);
+    if (!diez) setError('El número de tu contacto no está completo (debe tener 10 cifras): WhatsApp te va a pedir a quién mandarlo. Corrígelo arriba y guárdalo.');
+    const url = diez
+      ? `https://wa.me/57${diez}?text=${encodeURIComponent(texto)}`
+      : `https://wa.me/?text=${encodeURIComponent(texto)}`;
     // Si el navegador no deja abrir WhatsApp (pasó rato desde el toque), se dice. (Sin el candado de la ley del botón
     // a propósito: el robot midió el 27-sep-2026 que `candado.js` revienta en el navegador y se queda cerrado.)
-    const ventana = window.open(`https://wa.me/${numeroFinal}?text=${encodeURIComponent(texto)}`, '_blank');
+    const ventana = window.open(url, '_blank');
     if (!ventana) setError('Tu teléfono no dejó abrir WhatsApp. Vuelve a tocar el botón: el mensaje sale de una vez.');
   };
 

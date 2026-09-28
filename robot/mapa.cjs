@@ -66,6 +66,13 @@ const RECORRIDOS = [
     vigila: ['guajirago/src/Seguridad.js', 'guajirago/src/ubicacionDeAhora.js', 'guajirago/src/mensajeEmergencia.js'],
   },
   {
+    nombre: 'contacto-emergencia',
+    que: 'Seguridad no guarda un contacto de emergencia que no sirve («300 123 45») y dice por qué (G10)',
+    archivo: 'contacto-emergencia.cjs',
+    // Login.js también usa la regla, pero probarlo pide crear una cuenta nueva: lo cubre registrar-conductor.
+    vigila: ['guajirago/src/Seguridad.js', 'guajirago/src/telefonoValido.js'],
+  },
+  {
     nombre: 'candado-recarga',
     que: 'el candado de la ley del botón no se traba en el navegador: un código de recarga inventado dice «no existe» y el botón vuelve a quedar tocable, dos veces',
     archivo: 'candado-recarga.cjs',

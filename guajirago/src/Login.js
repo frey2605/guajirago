@@ -9,6 +9,7 @@ import TerminosCondiciones from './TerminosCondiciones';
 import PoliticaPrivacidad from './PoliticaPrivacidad';
 import Logo from './Logo';
 import { telefonoDe } from './telefonoUsuario';
+import { telefonoSirve } from './telefonoValido';
 
 const VALOR_CREDITO_BIENVENIDA = 8000; // Crédito fijo de bienvenida para pasajeros nuevos
 
@@ -96,7 +97,8 @@ function Login({ onEntrar }) {
     if (!nombre || !email || !emailConfirm || !celular || !diaNac || !mesNac || !anioNac || !password || !passwordConfirm) { setError('Por favor completa todos los campos'); return; }
     if (!contactoNombre.trim()) { setError('Escribe el nombre de tu contacto de emergencia'); return; }
     if (!contactoNumero.trim()) { setError('Escribe el número de tu contacto de emergencia'); return; }
-    if (contactoNumero.replace(/\D/g, '').length !== 10) { setError('El número del contacto de emergencia debe tener 10 dígitos'); return; }
+    // ¿Sirve? La MISMA regla que Seguridad al cambiarlo (G10): telefonoValido.js.
+    if (!telefonoSirve(contactoNumero)) { setError('El número del contacto de emergencia debe tener 10 dígitos'); return; }
     if (email.trim().toLowerCase() !== emailConfirm.trim().toLowerCase()) { setError('Los correos no coinciden'); return; }
     if (password !== passwordConfirm) { setError('Las contraseñas no coinciden'); return; }
     if (password.length < 6) { setError('La contraseña debe tener mínimo 6 caracteres'); return; }
