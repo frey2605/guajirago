@@ -44,10 +44,56 @@ async function entrarComoRestaurante(pagina) {
   await pagina.waitForTimeout(7000);
 }
 
+/**
+ * El proyecto y la llave de la BASE de pruebas, sacados de guajirago/.env.pruebas (la misma fuente con que se
+ * compila la app de pruebas). 🔴 Si el archivo no dice guajirago-pruebas, se niega: el robot jamás toca producción.
+ */
+function baseDePruebas(textoEnv) {
+  const { leerEnv } = require('../scripts/medir-ambientes.cjs');
+  const env = leerEnv(textoEnv);
+  const proyecto = env.REACT_APP_FIREBASE_PROJECT_ID;
+  if (proyecto !== 'guajirago-pruebas') throw new Error('El robot solo entra a la base de PRUEBAS, y esto es «' + proyecto + '».');
+  if (!env.REACT_APP_FIREBASE_API_KEY) throw new Error('Falta la llave de la base de pruebas en .env.pruebas.');
+  return { proyecto, llave: env.REACT_APP_FIREBASE_API_KEY };
+}
+
+/**
+ * Entra a la base de PRUEBAS como una cuenta de prueba (con su clave, como la app) y deja leer y cambiar
+ * documentos con los mismos permisos que tendría esa persona: las reglas de la base deciden, no el robot.
+ * Los valores se leen y se escriben con las piezas de scripts/nube.cjs (una sola forma de hacerlo).
+ */
+async function entrarALaBase(correo) {
+  const fs = require('fs');
+  const N = require('../scripts/nube.cjs');
+  const { proyecto, llave } = baseDePruebas(fs.readFileSync(path.join(__dirname, '..', 'guajirago', '.env.pruebas'), 'utf8'));
+  const r = await fetch('https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=' + llave, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: correo, password: motor().leerClave(ARCHIVO_CLAVE), returnSecureToken: true }),
+  });
+  const s = await r.json();
+  if (!s.idToken) throw new Error('No pude entrar a la base de pruebas como ' + correo + ': ' + ((s.error || {}).message || r.status));
+  const base = 'https://firestore.googleapis.com/v1/projects/' + proyecto + '/databases/(default)/documents/';
+  const pedir = async (ruta, opciones = {}) => {
+    const x = await fetch(base + ruta, { ...opciones, headers: { Authorization: 'Bearer ' + s.idToken, 'Content-Type': 'application/json' } });
+    const j = await x.json();
+    if (!x.ok) throw new Error('La base de pruebas rechazó ' + ruta + ': ' + ((j.error || {}).message || x.status));
+    return j;
+  };
+  return {
+    uid: s.localId,
+    leer: async (ruta) => N.doc(await pedir(ruta)),
+    // Cambia SOLO los campos dados (como un merge): nunca reescribe el documento entero.
+    cambiar: (ruta, campos) => pedir(ruta + '?' + Object.keys(campos).map((k) => 'updateMask.fieldPaths=' + encodeURIComponent(k)).join('&'),
+      { method: 'PATCH', body: JSON.stringify({ fields: N.aCampos(campos) }) }),
+  };
+}
+
 module.exports = {
   SITIOS,
   MOTOR,
   entrarComoRestaurante,
+  baseDePruebas,
+  entrarALaBase,
   abrir: (sitio, opciones = {}) => motor().abrir(sitio, { ...opciones, sitios: SITIOS, proyecto: 'guajirago' }),
   esDePruebas: (url) => motor().esPermitido(url, SITIOS),
   claveDePruebas: () => motor().leerClave(ARCHIVO_CLAVE),

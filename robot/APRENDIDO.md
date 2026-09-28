@@ -85,6 +85,21 @@ empleado», «Correo para que inicie sesión», «Mínimo 6 caracteres», se toc
 - Las capturas de página entera enseñan el cartel de PRUEBAS a media imagen (es fijo arriba); no es
   falla de la app.
 
+**Conductor en turno (27-sep-2026).** «Ya tengo cuenta» → «Correo electrónico» y «Contraseña» →
+«Entrar a GuajiraGo» → «Transporte y movilidad» → «Soy conductor». Cuenta: taxi@gg.test. Arriba dice
+«🟢 Estoy disponible» o «⚪ No disponible»; el interruptor es el `div` que va justo DESPUÉS de ese texto.
+- 🪤 **El GPS se finge antes de cargar** (`antesDeCargar` cambia `navigator.geolocation`). Como el motor
+  no le pasa datos, el guion va como TEXTO con la coordenada dentro: así cada vuelta usa un punto
+  distinto y se sabe que la posición de la ficha es de ESTA vuelta.
+- 🔑 **Lo que no se ve en pantalla se mira en la base de pruebas**: `entrarALaBase(correo)` de
+  `robot/comun.cjs` entra con la cuenta de prueba (las reglas deciden, como en la app) y se niega si
+  `.env.pruebas` no dice guajirago-pruebas. `cambiar` toca solo los campos dados.
+- Comprobado con la versión VIEJA publicada un momento en pruebas: el recorrido sale 🔴 «el GPS BORRÓ
+  la marca del viaje en curso». Con la buena, ✓. Al terminar deja la ficha como estaba.
+- Vistos de paso, sin tocar: en la pantalla sale el texto técnico «FCM: permiso=denied» (el aviso interno
+  de que no hay permiso de avisos, pintado tal cual); y sin saldo, el interruptor avisa con un `alert`
+  del navegador, no con una ventanita.
+
 ## Lo que el robot dejó creado en pruebas
 
 - 27-sep-2026: «Robot Taxi De Prueba» (robot.taxi.1790508222079@gg.test) y

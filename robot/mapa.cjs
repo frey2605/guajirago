@@ -45,6 +45,12 @@ const RECORRIDOS = [
     vigila: ['guajirago-aliados/src/firebase.js', 'guajirago-aliados/src/index.js',
       'guajirago-aliados/src/AvisoSinSenal.js', 'guajirago-aliados/src/sinSenal.js', 'guajirago-aliados/src/AvisoModal.js'],
   },
+  {
+    nombre: 'conductor-en-turno',
+    que: 'el conductor se pone disponible y el GPS escribe su posición sin borrarle el viaje en curso (mira la base de pruebas)',
+    archivo: 'conductor-en-turno.cjs',
+    vigila: ['guajirago/src/AppConductor.js', 'guajirago/src/Notificaciones.js'],
+  },
 ];
 
 // Los archivos de pantalla: los que, si cambian, el robot debería poder probar. Todo lo que esté en

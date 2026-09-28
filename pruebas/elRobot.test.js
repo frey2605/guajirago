@@ -17,6 +17,30 @@ const RAIZ = path.join(__dirname, '..');
 const PRODUCCION = ['https://guajirago.web.app/', 'https://guajirago-admin.web.app/', 'https://guajirago-aliados.web.app/',
   'https://guajirago.firebaseapp.com/'];
 
+describe('EL ROBOT · la base de datos, solo la de pruebas', () => {
+  it('la puerta a la base sale de .env.pruebas y dice guajirago-pruebas', () => {
+    const b = R.baseDePruebas(fs.readFileSync(path.join(RAIZ, 'guajirago', '.env.pruebas'), 'utf8'));
+    assert.strictEqual(b.proyecto, 'guajirago-pruebas');
+    assert.ok(b.llave.length > 20);
+  });
+
+  it('con otro proyecto —producción, parecidos o ninguno— se niega', () => {
+    const prod = fs.readFileSync(path.join(RAIZ, 'guajirago', '.env.produccion'), 'utf8');
+    assert.throws(() => R.baseDePruebas(prod), /solo entra a la base de PRUEBAS/, '⛔ el robot entraría a la base de producción');
+    for (const p of ['guajirago', 'guajirago-pruebas2', 'GUAJIRAGO-PRUEBAS', '']) {
+      assert.throws(() => R.baseDePruebas('REACT_APP_FIREBASE_PROJECT_ID=' + p + '\nREACT_APP_FIREBASE_API_KEY=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'), /PRUEBAS/, '⛔ aceptaría «' + p + '»');
+    }
+  });
+
+  it('entrarALaBase usa esa puerta y cambia solo los campos dados (updateMask), nunca el documento entero', () => {
+    const t = fs.readFileSync(path.join(RAIZ, 'robot', 'comun.cjs'), 'utf8');
+    const cuerpo = t.slice(t.indexOf('async function entrarALaBase'), t.indexOf('module.exports'));
+    assert.match(cuerpo, /baseDePruebas\(fs\.readFileSync\(path\.join\(__dirname, '\.\.', 'guajirago', '\.env\.pruebas'\)/);
+    assert.ok(!/guajirago\/databases|projects\/guajirago\//.test(cuerpo), '⛔ el proyecto va escrito a mano');
+    assert.match(cuerpo, /updateMask\.fieldPaths=/, '⛔ cambiar() reescribiría el documento entero');
+  });
+});
+
 describe('EL ROBOT · solo pruebas', () => {
   it('sus sitios son los tres de guajirago-pruebas, y ninguno de producción', () => {
     assert.deepStrictEqual(Object.keys(R.SITIOS).sort(), ['aliados', 'panel', 'transporte']);
