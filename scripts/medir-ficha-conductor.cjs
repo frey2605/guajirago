@@ -18,9 +18,11 @@ const N = require('./nube.cjs');
 const { cargarDeLaApp } = require('../pruebas/cargar.cjs');
 
 const { ESTADOS_TERMINADOS } = cargarDeLaApp('guajirago/src/estadosViaje.js');
+// La regla de «¿está en servicio?» es la MISMA que usa el servidor para avisar (no se copia).
+const { porQueNoSeLeAvisa, HORAS_SIN_SENAL } = require('../guajirago/functions/avisables.cjs');
 
 /** Función pura: de las fichas y los viajes, qué se ve en cada una. */
-function medir(fichas, viajes) {
+function medir(fichas, viajes, ahoraMs = Date.now()) {
   const porId = new Map(viajes.map((v) => [v.id, v]));
   const vivos = viajes.filter((v) => v.estado === 'aceptado' && v.conductorId);
   const fichaDe = new Map(fichas.map((f) => [f.id, f]));
@@ -36,12 +38,16 @@ function medir(fichas, viajes) {
     marcasViejas: conViaje
       .filter((f) => { const v = porId.get(f.enViajeId); return !v || ESTADOS_TERMINADOS.includes(v.estado); })
       .map((f) => f.id + ' → ' + f.enViajeId + ' (' + ((porId.get(f.enViajeId) || {}).estado || 'no existe') + ')'),
-    campos: [...new Set(fichas.flatMap((f) => Object.keys(f).filter((k) => k !== 'id')))].sort(),
+    // A quién le llegaría hoy el aviso de un viaje (sin mirar distancia), y a quién no por no dar señal.
+    enServicio: fichas.filter((f) => !porQueNoSeLeAvisa(f, f._actualizadaMs, ahoraMs)).map((f) => f.id),
+    sinSenal: fichas.filter((f) => /sin señal/.test(porQueNoSeLeAvisa(f, f._actualizadaMs, ahoraMs) || '')).map((f) => f.id),
+    campos: [...new Set(fichas.flatMap((f) => Object.keys(f).filter((k) => k !== 'id' && k !== '_actualizadaMs')))].sort(),
   };
 }
 
 async function main() {
-  const fichas = (await N.traer('conductores')).map(N.doc);
+  // _actualizadaMs: la hora del SERVIDOR de la última escritura de cada ficha.
+  const fichas = (await N.traer('conductores')).map((d) => ({ ...N.doc(d), _actualizadaMs: Date.parse(d.updateTime) }));
   const viajes = (await N.traer('viajes')).map(N.doc);
   const r = medir(fichas, viajes);
   console.log('Fichas de conductor: ' + r.fichas + ' · activos: ' + r.activos);
@@ -49,6 +55,7 @@ async function main() {
   console.log('  activos SIN token de avisos: ' + r.activosSinToken.length + (r.activosSinToken.length ? ' → ' + r.activosSinToken.join(', ') : ''));
   console.log('  viajes aceptados cuyo conductor NO tiene la marca del viaje: ' + r.vivosSinMarca.length + (r.vivosSinMarca.length ? ' → ' + r.vivosSinMarca.join(', ') : ''));
   console.log('  marcas que apuntan a un viaje terminado o que no existe: ' + r.marcasViejas.length + (r.marcasViejas.length ? '\n    · ' + r.marcasViejas.join('\n    · ') : ''));
+  console.log('  se les avisaría de un viaje (en servicio): ' + r.enServicio.length + ' · activos con token pero SIN señal hace más de ' + HORAS_SIN_SENAL + ' h (ya no se les avisa): ' + r.sinSenal.length);
   console.log('  campos que aparecen: ' + r.campos.join(', '));
 }
 

@@ -32,6 +32,8 @@ const { queHacerCon, loQueSeEscribe, hoyEnColombia } = require('./cobros.cjs');
 // el emulador.
 const { queHacerConElViaje } = require('./viajesColgados.cjs');
 const { esFecha } = require('./suscripcion.js');
+// ¿Está en servicio el conductor? (activo, con token y con señal en las últimas 12 h) — ver avisables.cjs.
+const { porQueNoSeLeAvisa } = require('./avisables.cjs');
 
 // Distancia en km entre dos coordenadas (Haversine)
 function distanciaKm(lat1, lng1, lat2, lng2) {
@@ -43,14 +45,14 @@ function distanciaKm(lat1, lng1, lat2, lng2) {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-// Tokens FCM de conductores activos DENTRO del radio (km) del pasajero.
+// Tokens FCM de conductores EN SERVICIO (avisables.cjs) DENTRO del radio (km) del pasajero.
 // Un conductor sin ubicación conocida se incluye igual (su app filtra la distancia).
 async function tokensConductoresCerca(pLat, pLng, radioKm) {
   const snap = await admin.firestore().collection("conductores").where("activo", "==", true).get();
   const tokens = [];
   snap.forEach((doc) => {
     const d = doc.data();
-    if (!d.fcmToken) return;
+    if (porQueNoSeLeAvisa(d, doc.updateTime ? doc.updateTime.toMillis() : undefined, Date.now())) return;
     const u = d.ubicacion;
     if (typeof pLat === "number" && typeof pLng === "number" &&
         u && typeof u.lat === "number" && typeof u.lng === "number") {

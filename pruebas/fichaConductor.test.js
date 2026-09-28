@@ -141,6 +141,51 @@ describe('SIN PERMISO DE AVISOS · se le dice al conductor (27-sep-2026)', () =>
   });
 });
 
+describe('EL SERVIDOR NO AVISA A QUIEN NO DA SEÑAL · 12 horas (decisión del dueño, 27-sep-2026)', () => {
+  const { porQueNoSeLeAvisa, HORAS_SIN_SENAL } = require('../guajirago/functions/avisables.cjs');
+  const H = 3600 * 1000;
+  const AHORA = Date.parse('2026-09-27T20:00:00Z');
+  const bien = { activo: true, fcmToken: 't' };
+
+  it('en servicio: activo, con token y con señal en las últimas 12 horas', () => {
+    assert.strictEqual(HORAS_SIN_SENAL, 12);
+    assert.strictEqual(porQueNoSeLeAvisa(bien, AHORA - 1000, AHORA), null);
+    assert.strictEqual(porQueNoSeLeAvisa(bien, AHORA - 12 * H, AHORA), null, 'justo 12 h todavía cuenta');
+  });
+
+  it('sin señal hace más de 12 h, sin hora, apagado o sin token: no se le avisa', () => {
+    assert.match(porQueNoSeLeAvisa(bien, AHORA - 12 * H - 1, AHORA), /sin señal/);
+    assert.match(porQueNoSeLeAvisa(bien, undefined, AHORA), /sin señal/, '⛔ sin hora del servidor no se puede saber: no se avisa');
+    assert.match(porQueNoSeLeAvisa({ ...bien, activo: false }, AHORA, AHORA), /no está activo/);
+    assert.match(porQueNoSeLeAvisa({ activo: true }, AHORA, AHORA), /sin token/);
+  });
+
+  it('el servidor usa ESTA regla, con la hora del SERVIDOR de la ficha (no la del celular)', () => {
+    const idx = leer('guajirago/functions/index.js').replace(/\r\n/g, '\n');
+    assert.match(idx, /const \{ porQueNoSeLeAvisa \} = require\('\.\/avisables\.cjs'\);/);
+    const i = idx.indexOf('async function tokensConductoresCerca');
+    const cuerpo = idx.slice(i, idx.indexOf('\n}', i));
+    assert.match(cuerpo, /if \(porQueNoSeLeAvisa\(d, doc\.updateTime \? doc\.updateTime\.toMillis\(\) : undefined, Date\.now\(\)\)\) return;/,
+      '⛔ el servidor elige a quién avisar sin mirar si está en servicio');
+    assert.ok(!/ubicacion\.timestamp|\.timestamp\b/.test(cuerpo), '⛔ la hora sale del celular');
+    assert.match(cuerpo, /distanciaKm\(pLat, pLng, u\.lat, u\.lng\) > \(radioKm \|\| 3\)/, 'la distancia sigue como estaba');
+  });
+
+  it('el medidor cuenta con la MISMA regla', () => {
+    const r = medir(
+      [
+        { id: 'c1', activo: true, fcmToken: 't', _actualizadaMs: AHORA - H },
+        { id: 'c2', activo: true, fcmToken: 't', _actualizadaMs: AHORA - 13 * H },
+        { id: 'c3', activo: false, fcmToken: 't', _actualizadaMs: AHORA },
+      ],
+      [], AHORA,
+    );
+    assert.deepStrictEqual(r.enServicio, ['c1']);
+    assert.deepStrictEqual(r.sinSenal, ['c2']);
+    assert.ok(!r.campos.includes('_actualizadaMs'));
+  });
+});
+
 describe('LA FICHA DEL CONDUCTOR · el medidor', () => {
   it('cuenta los viajes vivos sin marca y las marcas que apuntan a un viaje terminado', () => {
     const r = medir(
