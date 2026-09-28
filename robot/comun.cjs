@@ -62,10 +62,21 @@ function baseDePruebas(textoEnv) {
  * documentos con los mismos permisos que tendría esa persona: las reglas de la base deciden, no el robot.
  * Los valores se leen y se escriben con las piezas de scripts/nube.cjs (una sola forma de hacerlo).
  */
+// El CUADERNO de llamadas directas: cada llamada que el robot hace a la base sin pasar por la app (y por eso
+// sin sello de App Check) se anota aquí, con su hora y su servicio. robot/portero.cjs lo lee para no confundir
+// al robot con alguien que habla con la base a escondidas (27-sep-2026).
+const CUADERNO = path.join(os.tmpdir(), 'robot-guajirago', 'llamadas-directas.log');
+function anotarLlamada(servicio) {
+  const fs = require('fs');
+  fs.mkdirSync(path.dirname(CUADERNO), { recursive: true });
+  fs.appendFileSync(CUADERNO, new Date().toISOString() + ' ' + servicio + '\n');
+}
+
 async function entrarALaBase(correo) {
   const fs = require('fs');
   const N = require('../scripts/nube.cjs');
   const { proyecto, llave } = baseDePruebas(fs.readFileSync(path.join(__dirname, '..', 'guajirago', '.env.pruebas'), 'utf8'));
+  anotarLlamada('identitytoolkit');
   const r = await fetch('https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=' + llave, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email: correo, password: motor().leerClave(ARCHIVO_CLAVE), returnSecureToken: true }),
@@ -74,6 +85,7 @@ async function entrarALaBase(correo) {
   if (!s.idToken) throw new Error('No pude entrar a la base de pruebas como ' + correo + ': ' + ((s.error || {}).message || r.status));
   const base = 'https://firestore.googleapis.com/v1/projects/' + proyecto + '/databases/(default)/documents/';
   const pedir = async (ruta, opciones = {}) => {
+    anotarLlamada('firestore');
     const x = await fetch(base + ruta, { ...opciones, headers: { Authorization: 'Bearer ' + s.idToken, 'Content-Type': 'application/json' } });
     const j = await x.json();
     if (!x.ok) throw new Error('La base de pruebas rechazó ' + ruta + ': ' + ((j.error || {}).message || x.status));
@@ -94,6 +106,7 @@ module.exports = {
   entrarComoRestaurante,
   baseDePruebas,
   entrarALaBase,
+  CUADERNO,
   abrir: (sitio, opciones = {}) => motor().abrir(sitio, { ...opciones, sitios: SITIOS, proyecto: 'guajirago' }),
   esDePruebas: (url) => motor().esPermitido(url, SITIOS),
   claveDePruebas: () => motor().leerClave(ARCHIVO_CLAVE),

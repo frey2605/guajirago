@@ -102,6 +102,17 @@ empleado», «Correo para que inicie sesión», «Mínimo 6 caracteres», se toc
 - Visto de paso, sin tocar: sin saldo, el interruptor avisa con un `alert` del navegador, no con una
   ventanita.
 
+**El portero y el sello (27-sep-2026).**
+- 🔑 Las llamadas DIRECTAS del robot a la base (`entrarALaBase`) no llevan sello y llegan como «sin
+  origen». Se anotan en el cuaderno `llamadas-directas.log` (carpeta temporal del PC, `robot-guajirago`) y
+  el portero las descuenta: solo es alarma lo que sobra, o un sello INVÁLIDO.
+- 🔴 **Desde ~01:20 UTC del 28-sep el navegador del robot recibe sellos INVÁLIDOS** en todas sus
+  llamadas; hasta las 01:13 eran todos buenos. Medido cada 5 minutos contra las horas de las corridas:
+  los inválidos caen SOLO cuando corre el robot. El paquete publicado era idéntico byte a byte, así que no
+  fue el código. Sospecha, no medida: el sistema anti-robots de Google empezó a marcarlo tras muchas
+  corridas. Lo que NO se sabe: si a un celular de verdad le pasa igual — eso decide si se puede cerrar la
+  puerta de App Check.
+
 ## Lo que el robot dejó creado en pruebas
 
 - 27-sep-2026: «Robot Taxi De Prueba» (robot.taxi.1790508222079@gg.test) y

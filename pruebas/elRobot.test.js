@@ -41,6 +41,37 @@ describe('EL ROBOT · la base de datos, solo la de pruebas', () => {
   });
 });
 
+describe('EL PORTERO · distingue al robot de quien habla sin sello (27-sep-2026)', () => {
+  const P = require('../robot/portero.cjs');
+  const desde = Date.parse('2026-09-27T20:00:00Z');
+
+  it('el cuaderno cuenta solo las llamadas del robot dentro de la ventana, por servicio', () => {
+    const cuaderno = ['2026-09-27T19:59:59.000Z firestore', '2026-09-27T20:00:00.000Z firestore', '2026-09-27T20:10:00.000Z firestore',
+      '2026-09-27T20:10:01.000Z identitytoolkit', 'basura', ''].join('\r\n');
+    assert.deepStrictEqual(P.directasDelRobot(cuaderno, desde), { firestore: 2, identitytoolkit: 1 });
+    assert.deepStrictEqual(P.directasDelRobot('', desde), {});
+  });
+
+  it('las «sin origen» que anotó el robot no son alarma; las que sobran y los sellos inválidos, sí', () => {
+    const soloRobot = P.juzgar({ firestore: { VALID: 9, [P.SIN_ORIGEN]: 4 } }, { firestore: 4 });
+    assert.deepStrictEqual(soloRobot.alarmas, []);
+    assert.strictEqual(soloRobot.delRobot.length, 1);
+    const sobran = P.juzgar({ firestore: { [P.SIN_ORIGEN]: 6 } }, { firestore: 4 });
+    assert.match(sobran.alarmas.join(), /2 llamadas sin origen que el robot NO hizo/);
+    const invalidas = P.juzgar({ identitytoolkit: { INVALID: 3 } }, { identitytoolkit: 99 });
+    assert.match(invalidas.alarmas.join(), /3 llamadas con sello INVALID/, '⛔ el cuaderno del robot tapa sellos inválidos');
+    assert.match(P.juzgar({ firestore: { MISSING: 1 } }, {}).alarmas.join(), /sello MISSING/);
+    assert.deepStrictEqual(P.juzgar({ firestore: { VALID: 5 } }, {}).alarmas, []);
+  });
+
+  it('cada llamada directa del robot a la base se anota en el cuaderno, antes de hacerla', () => {
+    const t = fs.readFileSync(path.join(RAIZ, 'robot', 'comun.cjs'), 'utf8').replace(/\r\n/g, '\n');
+    assert.match(t, /anotarLlamada\('identitytoolkit'\);\n  const r = await fetch\('https:\/\/identitytoolkit/, '⛔ la entrada a la base no se anota');
+    assert.match(t, /const pedir = async \(ruta, opciones = \{\}\) => \{\n    anotarLlamada\('firestore'\);\n    const x = await fetch\(/, '⛔ las lecturas y cambios no se anotan');
+    assert.strictEqual((t.match(/await fetch\(/g) || []).length, 2, '⛔ hay una llamada nueva a la base que no pasa por el cuaderno');
+  });
+});
+
 describe('EL ROBOT · solo pruebas', () => {
   it('sus sitios son los tres de guajirago-pruebas, y ninguno de producción', () => {
     assert.deepStrictEqual(Object.keys(R.SITIOS).sort(), ['aliados', 'panel', 'transporte']);
