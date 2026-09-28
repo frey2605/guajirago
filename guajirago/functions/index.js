@@ -34,6 +34,8 @@ const { queHacerConElViaje } = require('./viajesColgados.cjs');
 const { esFecha } = require('./suscripcion.js');
 // ¿Está en servicio el conductor? (activo, con token y con señal en las últimas 12 h) — ver avisables.cjs.
 const { porQueNoSeLeAvisa } = require('./avisables.cjs');
+// G01: el descuento se rehace sobre la tarifa aceptada (copia de guajirago/src/descuentos.js, atada por prueba).
+const { descuentoSobreTarifaAceptada } = require('./descuentos.cjs');
 
 // Distancia en km entre dos coordenadas (Haversine)
 function distanciaKm(lat1, lng1, lat2, lng2) {
@@ -335,6 +337,11 @@ exports.confirmarConductor = onCall(async (request) => {
         : tipo === "Mensajería" ? (cfg.comisionDomicilio ?? 1000)
           : (cfg.comisionTaxi ?? 800);
       const creditosActuales = (usuarioSnap.exists ? usuarioSnap.data().creditos : 0) || 0;
+      // G01 — la tarifa que se cobra la fija ESTA línea (la oferta aceptada). La ficha del descuento se armó en el
+      // celular con la oferta de antes, así que se rehace aquí, en la misma operación, sobre la tarifa aceptada:
+      // así el pasajero, el conductor y el abono del descuento dicen la misma cifra. Las pantallas solo la leen.
+      const tarifaValorAceptada = of.montoValor || viaje.tarifaValor;
+      const descuentoInfo = descuentoSobreTarifaAceptada(viaje.descuentoInfo, tarifaValorAceptada);
 
       t.update(viajeRef, {
         estado: "aceptado",
@@ -346,9 +353,10 @@ exports.confirmarConductor = onCall(async (request) => {
         conductorFoto: of.conductorFoto || null,
         conductorColor: of.conductorColor || "",
         tarifa: of.monto || viaje.tarifa,
-        tarifaValor: of.montoValor || viaje.tarifaValor,
+        tarifaValor: tarifaValorAceptada,
         fechaAceptacion: new Date().toISOString(),
         comisionCobrada: comision,
+        ...(descuentoInfo ? { descuentoInfo } : {}),
       });
       t.set(condRef, { enViajeId: viajeId, ocupado: true }, { merge: true });
       t.set(usuarioRef, { creditos: creditosActuales - comision }, { merge: true });

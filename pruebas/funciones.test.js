@@ -668,3 +668,79 @@ describe('REGLA 7 · consumirDescuentoViaje', () => {
     assert.strictEqual(v?.descuentoInfo?.mapValue?.fields?.consumido?.booleanValue, true);
   });
 });
+
+// ── G01 · EL DESCUENTO SE CALCULA SOBRE LA TARIFA ACEPTADA ──────────────────
+// El caso del hallazgo, encendiendo las dos funciones de verdad: el pasajero ofrece $10.000 con un crédito de $8.000
+// (la ficha nace diciendo «paga $2.000»), el conductor contraoferta $15.000 y el pasajero la acepta. Antes el viaje
+// quedaba en $15.000 con la ficha diciendo $2.000: el pasajero pagaba $2.000, se abonaban $8.000 y faltaban $5.000.
+describe('G01 · confirmarConductor rehace el descuento sobre la tarifa aceptada', () => {
+  const ficha = (campos) => ({ mapValue: { fields: campos } });
+  const numDe = (f) => Number(f?.integerValue ?? f?.doubleValue);
+
+  beforeEach(async () => {
+    await sembrar('config/global', { comisionTaxi: num(COMISION_TAXI) });
+    await sembrar('conductores/condG', { ocupado: { booleanValue: false } });
+    await sembrar('usuarios/condG', { creditos: num(SALDO_INICIAL), tipo: txt('conductor') });
+    await sembrar('viajes/vg1', {
+      pasajeroId: txt('pasaG'), estado: txt('esperando'), tipo: txt('Taxi'),
+      tarifa: txt('$10.000'), tarifaValor: num(10000),
+      descuentoInfo: ficha({
+        tarifaOriginal: num(10000), tarifaPasajeroPaga: num(2000), descuentoAplicado: num(8000),
+        promoId: txt('BIENVENIDA'), tipoBeneficio: txt('credito'), valorBeneficio: num(8000),
+        codigoVerificacion: txt('4455'), consumido: { booleanValue: false },
+      }),
+    });
+    await sembrar('viajes/vg1/contraofertas/condG', {
+      monto: txt('$15.000'), montoValor: num(15000), conductorNombre: txt('Gabo'), tipoOferta: txt('contraoferta'),
+    });
+  });
+
+  test('contraoferta $15.000 con crédito $8.000: el pasajero paga $7.000, el conductor cobra $15.000 y se abonan $8.000', async () => {
+    const r = await llamar('pasaG', { viajeId: 'vg1', conductorId: 'condG' });
+    assert.strictEqual(r.http, 200, JSON.stringify(r.cuerpo));
+    assert.strictEqual(r.cuerpo.result.ok, true);
+    const v = await leer('viajes/vg1');
+    const f = v.descuentoInfo.mapValue.fields;
+    assert.strictEqual(numDe(v.tarifaValor), 15000);
+    assert.strictEqual(numDe(f.tarifaOriginal), 15000, 'la ficha sigue hecha sobre la oferta vieja');
+    assert.strictEqual(numDe(f.tarifaPasajeroPaga), 7000, 'la pantalla del pasajero diría otra cifra que la del conductor');
+    assert.strictEqual(numDe(f.descuentoAplicado), 8000);
+    assert.strictEqual(f.codigoVerificacion.stringValue, '4455', 'el código del descuento no puede cambiar');
+    assert.strictEqual(f.consumido.booleanValue, false);
+
+    // Y el abono al terminar sale de ESA ficha: 7.000 del pasajero + 8.000 de GuajiraGo = los 15.000 del conductor.
+    const saldoTrasComision = await saldoDe('condG');
+    const c = await llamarA('consumirDescuentoViaje', 'condG', { viajeId: 'vg1', codigo: '4455' });
+    assert.strictEqual(c.cuerpo?.result?.monto, 8000, JSON.stringify(c.cuerpo));
+    assert.strictEqual(await saldoDe('condG'), saldoTrasComision + 8000);
+  });
+
+  test('un porcentaje se aplica sobre la tarifa aceptada', async () => {
+    await sembrar('viajes/vg1', {
+      pasajeroId: txt('pasaG'), estado: txt('esperando'), tipo: txt('Taxi'),
+      tarifa: txt('$10.000'), tarifaValor: num(10000),
+      descuentoInfo: ficha({
+        tarifaOriginal: num(10000), tarifaPasajeroPaga: num(9000), descuentoAplicado: num(1000),
+        promoId: txt('P10'), tipoBeneficio: txt('descuento'), valorBeneficio: num(10),
+        codigoVerificacion: txt('1111'), consumido: { booleanValue: false },
+      }),
+    });
+    const r = await llamar('pasaG', { viajeId: 'vg1', conductorId: 'condG' });
+    assert.strictEqual(r.cuerpo?.result?.ok, true, JSON.stringify(r.cuerpo));
+    const f = (await leer('viajes/vg1')).descuentoInfo.mapValue.fields;
+    assert.strictEqual(numDe(f.tarifaPasajeroPaga), 13500);
+    assert.strictEqual(numDe(f.descuentoAplicado), 1500);
+  });
+
+  test('un viaje SIN descuento sigue sin ficha: no se le inventa una', async () => {
+    await sembrar('viajes/vg1', {
+      pasajeroId: txt('pasaG'), estado: txt('esperando'), tipo: txt('Taxi'),
+      tarifa: txt('$10.000'), tarifaValor: num(10000),
+    });
+    const r = await llamar('pasaG', { viajeId: 'vg1', conductorId: 'condG' });
+    assert.strictEqual(r.cuerpo?.result?.ok, true, JSON.stringify(r.cuerpo));
+    const v = await leer('viajes/vg1');
+    assert.strictEqual(numDe(v.tarifaValor), 15000);
+    assert.ok(!('descuentoInfo' in v), 'apareció una ficha de descuento en un viaje que no tenía');
+  });
+});

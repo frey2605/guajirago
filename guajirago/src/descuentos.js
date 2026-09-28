@@ -20,8 +20,16 @@
  * pruebas de pruebas/descuentos.test.js usan ESOS números reales.
  *
  * QUIÉN LEE ESTO DESPUÉS: AppConductor.js NO recalcula nada — lee los números ya
- * guardados en descuentoInfo (descuentoAplicado, codigoVerificacion) y eso está
- * bien: la cuenta se hace UNA vez, al crear el viaje, y queda escrita.
+ * guardados en descuentoInfo (descuentoAplicado, codigoVerificacion).
+ *
+ * 🔴 LA CUENTA SE HACE DOS VECES, y la que manda es la segunda (gemelo G01,
+ * 27-sep-2026): aquí, al crear el viaje, con la oferta del pasajero; y otra vez
+ * en el servidor, en `confirmarConductor`, sobre la tarifa ACEPTADA (que puede
+ * ser una contraoferta o la oferta subida). Antes solo se hacía la primera, y con
+ * una contraoferta el pasajero, el conductor y el abono decían cifras distintas.
+ * El servidor no puede importar este archivo: usa su copia,
+ * guajirago/functions/descuentos.cjs, y pruebas/descuentoAceptado.test.js ejecuta
+ * las dos con los mismos casos. Si cambias la cuenta aquí, cámbiala allá.
  */
 
 /**
