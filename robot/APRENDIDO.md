@@ -27,6 +27,7 @@
 | `node robot/radio-panel.cjs` | 👑 Superadmin: con el radio de búsqueda borrado (queda en 0) no guarda, lo dice, y config/global no cambia |
 | `node robot/portero.cjs [horas]` | cuántas llamadas llegaron a pruebas con el sello de App Check (solo lectura) |
 | `node robot/me-aceptaron.cjs` | el pasajero acepta a los 12 min de pedir (confirmarConductor en pruebas) y la app del conductor dice «¡Trato hecho!» y va a recoger (G24) |
+| `node robot/espera-conductor.cjs` | con 300 s en el panel de pruebas, el taxista aprieta «Llegué al punto» y su reloj y el del pasajero arrancan los dos de 5:00 (G26) |
 
 ## Pantallas: cómo se manejan (27-sep-2026)
 
@@ -342,6 +343,19 @@ la placa de `conductores/{uid}` (la escribe su GPS con la misma placa que va en 
 - Lo que NO mira: el tablero (App.js) y las cajas de Mensajería; esas cuentas las EJECUTA
   `pruebas/estadosPanel.test.js` viaje por viaje.
 
+### espera-conductor (G26, 28-sep-2026)
+- 🔑 **Dos apps a la vez sí se puede**: `abrir('transporte', …)` dos veces da dos navegadores aparte, uno con el taxista
+  y otro con el pasajero, y los dos ven el mismo viaje en vivo.
+- El viaje lo pide el PASAJERO por la pantalla (como en `viaje-cerrado`, sacando el id de lo que la app manda a
+  Firestore), el taxista deja la oferta por la base y el pasajero la acepta con `confirmarConductor` (como en
+  `me-aceptaron`). Después, en la app del taxista: botón `📍 Llegué al punto`.
+- Los relojes se leen del texto: el del taxista va detrás de «Esperando al pasajero...» y el del pasajero detrás de
+  «Sal pronto o el conductor puede cancelar», con forma `m:ss`. A los 4 s de apretar se leen 297 y 297.
+- El caso que muerde es poner en config/global de PRUEBAS un número distinto de 240 (el superadmin de prueba puede):
+  300. Con el código de antes publicado en pruebas salió 🔴 taxista 297 · pasajero 237; con el arreglo, 297 · 297.
+  Al final se devuelve el número de antes (quedó en 240).
+- Cuesta UNA comisión de los créditos de prueba del taxista en cada corrida, como `me-aceptaron`.
+
 ## Lo que el robot dejó creado en pruebas
 
 - 27-sep-2026: «Robot Taxi De Prueba» (robot.taxi.1790508222079@gg.test) y
@@ -370,3 +384,5 @@ la placa de `conductores/{uid}` (la escribe su GPS con la misma placa que va en 
   `me-aceptaron.cjs`, aceptado por el taxista y ya `cancelado_conductor` (el primero: robotG241790613250747).
 - 28-sep-2026 en adelante: UN solo viaje `viajes/robot-estados-panel-g25` de pasajero@gg.test, `expirado`, sin
   conductor; cada corrida de `estados-panel.cjs` lo reusa (lo pasa un momento a `finalizado` y lo devuelve).
+- 28-sep-2026 en adelante: un viaje de Taxi de pasajero@gg.test por cada corrida de `espera-conductor.cjs`, aceptado
+  por el taxista, con «Llegué al punto» y ya `cancelado_conductor` (el primero: LPAelN1GEn69u32GPCcK).

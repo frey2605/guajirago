@@ -198,6 +198,12 @@ const RECORRIDOS = [
     vigila: ['guajirago/src/AppConductor.js', 'guajirago/src/estadosViaje.js'],
   },
   {
+    nombre: 'espera-conductor',
+    que: 'con 300 s en config/global de pruebas, el taxista aprieta «📍 Llegué al punto» y su reloj «Esperando al pasajero...» y el del pasajero «Sal pronto…» arrancan los dos de 5:00 (G26)',
+    archivo: 'espera-conductor.cjs',
+    vigila: ['guajirago/src/configApp.js', 'guajirago/src/AppConductor.js', 'guajirago/src/Solicitar.js'],
+  },
+  {
     nombre: 'historial-viajes',
     que: 'las dos pantallas «Mis viajes» del pasajero (menú de módulos y menú de transporte) enseñan también los viajes que no se completaron, en palabras (G21; solo mira)',
     archivo: 'historial-viajes.cjs',
