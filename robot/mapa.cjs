@@ -204,6 +204,14 @@ const RECORRIDOS = [
     vigila: ['guajirago/src/configApp.js', 'guajirago/src/AppConductor.js', 'guajirago/src/Solicitar.js'],
   },
   {
+    nombre: 'vencer-busqueda',
+    que: 'el pasajero pide un taxi y deja que se acabe el plazo del celular (2 min): ve «No encontramos conductor» sin la ventanita del cierre, y el viaje queda `vencido` con fecha, quién (app-pasajero) y por qué (G27; tarda ~3 min)',
+    archivo: 'vencer-busqueda.cjs',
+    // La ventana del conductor (AppConductor.js, VENTANA_MS) usa el mismo plazo, pero verla pide un taxista esperando
+    // 2 min una solicitud: la EJECUTA pruebas/vencidoBusqueda.test.js, y por eso AppConductor.js no se nombra aquí.
+    vigila: ['guajirago/src/configApp.js', 'guajirago/src/Solicitar.js'],
+  },
+  {
     nombre: 'historial-viajes',
     que: 'las dos pantallas «Mis viajes» del pasajero (menú de módulos y menú de transporte) enseñan también los viajes que no se completaron, en palabras (G21; solo mira)',
     archivo: 'historial-viajes.cjs',

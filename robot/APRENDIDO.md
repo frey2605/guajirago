@@ -28,6 +28,7 @@
 | `node robot/portero.cjs [horas]` | cuántas llamadas llegaron a pruebas con el sello de App Check (solo lectura) |
 | `node robot/me-aceptaron.cjs` | el pasajero acepta a los 12 min de pedir (confirmarConductor en pruebas) y la app del conductor dice «¡Trato hecho!» y va a recoger (G24) |
 | `node robot/espera-conductor.cjs` | con 300 s en el panel de pruebas, el taxista aprieta «Llegué al punto» y su reloj y el del pasajero arrancan los dos de 5:00 (G26) |
+| `node robot/vencer-busqueda.cjs` | el pasajero pide un taxi, se acaba el plazo de 2 min: «No encontramos conductor» y el viaje queda vencido con fecha, quién y por qué (G27) |
 
 ## Pantallas: cómo se manejan (27-sep-2026)
 
@@ -356,6 +357,16 @@ la placa de `conductores/{uid}` (la escribe su GPS con la misma placa que va en 
   Al final se devuelve el número de antes (quedó en 240).
 - Cuesta UNA comisión de los créditos de prueba del taxista en cada corrida, como `me-aceptaron`.
 
+### vencer-busqueda (G27, 28-sep-2026)
+- No hay que tocar nada: se pide el taxi y se ESPERA el plazo entero (BUSQUEDA.segundos de configApp.js, que el
+  recorrido lee de la pieza, no lo copia) más 8 s de margen. Tarda ~3 min.
+- A los 4 s de pedir el reloj ya va en 1:58. Al acabarse sale «No encontramos conductor» con «🔄 Seguir buscando» y
+  la tarjeta de subir la oferta; NO sale «Este viaje ya se cerró» (esa ventanita es solo para lo que cierra el
+  servidor en fase1/fase2).
+- En la base: `vencido` · `expiradoPor: app-pasajero` · `fechaExpiracion` · `motivoExpiracion: «llevaba 2 min
+  buscando conductor y nadie lo tomó»`. Que entre prueba también que las reglas dejan al pasajero escribir esos
+  campos en su viaje (no hay lista cerrada de campos para el dueño del viaje).
+
 ## Lo que el robot dejó creado en pruebas
 
 - 27-sep-2026: «Robot Taxi De Prueba» (robot.taxi.1790508222079@gg.test) y
@@ -386,3 +397,5 @@ la placa de `conductores/{uid}` (la escribe su GPS con la misma placa que va en 
   conductor; cada corrida de `estados-panel.cjs` lo reusa (lo pasa un momento a `finalizado` y lo devuelve).
 - 28-sep-2026 en adelante: un viaje de Taxi de pasajero@gg.test por cada corrida de `espera-conductor.cjs`, aceptado
   por el taxista, con «Llegué al punto» y ya `cancelado_conductor` (el primero: LPAelN1GEn69u32GPCcK).
+- 28-sep-2026 en adelante: un viaje de Taxi de pasajero@gg.test por cada corrida de `vencer-busqueda.cjs`, ya
+  `vencido` por «app-pasajero» y sin conductor (el primero: AMXhA9Ea3CoD6VEK9AiC).
