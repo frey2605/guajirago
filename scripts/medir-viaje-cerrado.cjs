@@ -71,13 +71,14 @@ const VIGILANTES = {
     archivo: 'guajirago/src/Solicitar.js',
     ancla: "const unsub = onSnapshot(doc(db, 'viajes', viajeId), (snap) => {",
     asincrono: false,
-    ayudantes: ['const elServidorCerroElViaje = (data) => {'],
+    // G22: desde el 28-sep-2026 los dos vigilantes del pasajero llaman a UNA reacción, `reaccionarAlViaje`.
+    ayudantes: ['const elServidorCerroElViaje = (data) => {', 'const reaccionarAlViaje = (data) => {'],
   },
   pasajeroRespaldo: {
     archivo: 'guajirago/src/Solicitar.js',
     ancla: 'intervaloRespaldoRef.current = setInterval(async () => {',
     asincrono: true,
-    ayudantes: ['const elServidorCerroElViaje = (data) => {'],
+    ayudantes: ['const elServidorCerroElViaje = (data) => {', 'const reaccionarAlViaje = (data) => {'],
   },
 };
 
@@ -87,8 +88,10 @@ const VIGILANTES = {
  * @param viaje    el documento del viaje (lo que devolvería Firestore)
  * @param pantalla la pantalla en la que está la persona ('fase1', 'fase2', 'recogiendo', 'en_viaje'...)
  * @param fuentes  { archivo: código } para correr OTRO código que el del disco (el careo y la prueba lo usan)
+ * @param extras   valores del ámbito que se le dan a mano además de los de siempre (G22: un ref compartido entre dos
+ *                 corridas, para ver qué hace el respaldo con un viaje que el vigilante en vivo ya vio)
  */
-async function correrVigilante(nombre, viaje, pantalla, fuentes = {}) {
+async function correrVigilante(nombre, viaje, pantalla, fuentes = {}, extras = {}) {
   const v = VIGILANTES[nombre];
   const codigo = soloCodigo(fuentes[v.archivo] != null ? fuentes[v.archivo] : leer(v.archivo));
   const cuerpo = cuerpoEn(codigo, v.ancla, v.archivo);
@@ -115,6 +118,7 @@ async function correrVigilante(nombre, viaje, pantalla, fuentes = {}) {
     setTimeout: espia(llamadas, 'setTimeout'), clearTimeout: espia(llamadas, 'clearTimeout'),
     clearInterval: espia(llamadas, 'clearInterval'), setInterval: espia(llamadas, 'setInterval'),
     console: { log: () => {}, error: () => {} },
+    ...extras,
   };
   const { ambito, llamadas: otras } = ambitoDeMentira(fijos);
   // eslint-disable-next-line no-new-func

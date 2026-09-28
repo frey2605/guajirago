@@ -139,6 +139,36 @@ export function avisoDelCierre(viaje, quien) {
   return { icono: '⏱️', titulo: 'Este viaje ya se cerró', texto: porque + ahora };
 }
 
+/**
+ * LA HUELLA DE UN VIAJE — G22 (28-sep-2026): un texto que es igual para dos lecturas del MISMO documento.
+ *
+ * La pantalla del pasajero (`Solicitar.js`) mira su viaje por dos sitios: el vigilante en vivo y un respaldo que lo
+ * vuelve a leer cada 5 s. Los dos reaccionan con la MISMA función (`reaccionarAlViaje`), y el respaldo solo la llama
+ * si trae un viaje distinto del último que se vio: o sea, si el vivo se calló. Sin esto repetía cada 5 s lo que el
+ * vivo ya había hecho.
+ *
+ * Las claves se ORDENAN: Firestore no promete devolver los campos en el mismo orden dos veces. Si algo no se puede
+ * convertir, la huella sale única: el respaldo reacciona (mejor repetir que quedarse callado).
+ */
+export function huellaDelViaje(viaje) {
+  const ordenado = (v, hondo) => {
+    if (hondo > 8) throw new Error('demasiado hondo');
+    if (Array.isArray(v)) return v.map((x) => ordenado(x, hondo + 1));
+    if (v && typeof v === 'object') {
+      if (typeof v.toMillis === 'function') return { ms: v.toMillis() };
+      const o = {};
+      for (const k of Object.keys(v).sort()) o[k] = ordenado(v[k], hondo + 1);
+      return o;
+    }
+    return v;
+  };
+  try {
+    return JSON.stringify(ordenado(viaje == null ? null : viaje, 0));
+  } catch (e) {
+    return 'sin-huella-' + Date.now() + '-' + Math.random();
+  }
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // EL HISTORIAL: CÓMO TERMINÓ CADA VIAJE, EN PALABRAS Y CON SU COLOR — G21 (28-sep-2026)
 // ═══════════════════════════════════════════════════════════════════════════

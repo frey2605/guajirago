@@ -1120,11 +1120,11 @@ describe('AMARRES · el panel y la app dicen lo mismo', () => {
     // pero VIVO como estado de PEDIDO, así que las pantallas de restaurantes y
     // de aliados no entran aquí — allí es correcto y necesario.
     //
-    // `Solicitar.js` NO está en la lista todavía, y es a propósito: le quedan
-    // los bloques muertos de `confirmando` y `contraoferta` (~175 renglones que
-    // no se pueden ejecutar), y limpiarlos es su propio trabajo. El día que se
-    // haga, se añade aquí y esto lo vigila también.
+    // `Solicitar.js` entró el 28-sep-2026 (G22): sus vigilantes del viaje ya no
+    // reaccionan a `confirmando` ni a `contraoferta`. (Le queda la ventanita de
+    // confirmar que solo abría `confirmando`, pero ésa no compara ningún estado.)
     const PANTALLAS_DE_VIAJES = [
+      'guajirago/src/Solicitar.js',
       'guajirago/src/AppConductor.js',
       'guajirago/src/Seguridad.js',
       'guajirago/src/MisViajes.js',

@@ -14,7 +14,7 @@ import { cop } from './moneda';
 import { aplicarDescuento, armarDescuentoInfo, tarifaParaPasajero } from './descuentos';
 import { generarCodigoSeguridad, guardarCodigoDeViaje, cargarCodigoDeViaje } from './codigoSeguridad';
 import { armarViajeNuevo } from './viajeNuevo';
-import { ESTADOS_QUE_CIERRA_EL_SERVIDOR, avisoDelCierre } from './estadosViaje';
+import { ESTADOS_QUE_CIERRA_EL_SERVIDOR, avisoDelCierre, huellaDelViaje } from './estadosViaje';
 // Los datos que comparten las pantallas salen de archivos únicos (SEGUNDA LEY).
 import { centroRiohacha, BOUNDS_RIOHACHA } from './riohacha';
 import { RESPUESTAS_RAPIDAS, RAZONES_CANCELACION_PASAJERO } from './textosViaje';
@@ -574,7 +574,7 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
   const pantallaRef = useRef(pantalla);
   const intervaloRespaldoRef = useRef(null);
   const contaofertasIdsRef = useRef(new Set()); // IDs ya vistos para no duplicar
-  const confirmacionMostradaRef = useRef(false);
+  const ultimaHuellaRef = useRef(null); // G22: el último viaje que vio la pantalla (lo usa el respaldo de 5 s)
   const [mensajesChat, setMensajesChat] = useState([]);
   const [textoChat, setTextoChat] = useState('');
   const [mostrarChat, setMostrarChat] = useState(false);
@@ -742,32 +742,17 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
   useEffect(() => {
     if (!viajeId) return;
 
+    // G22 (28-sep-2026): el RESPALDO de cada 5 s, para los teléfonos (Safari) en que el vigilante en vivo tarda. Ya
+    // no lleva su propia copia de las reacciones —se había separado: no conocía `aceptado` y respaldaba `confirmando`,
+    // un estado retirado—: reacciona con la MISMA función que el vivo, `reaccionarAlViaje` (abajo). Y solo si trae un
+    // viaje distinto del último que se vio, o sea si el vivo se calló; si no, repetía cada 5 s lo que el vivo ya hizo.
     intervaloRespaldoRef.current = setInterval(async () => {
       try {
         const snap = await getDoc(doc(db, 'viajes', viajeId));
         if (!snap.exists()) return;
         const data = snap.data();
-        if (data.estado === 'finalizado' && pantallaRef.current === 'fase2') setMostrarCalificacion(true);
-        if (data.estado === 'cancelado_conductor' && pantallaRef.current !== 'cancelado_conductor') {
-          clearInterval(contadorRef.current);
-          setPantalla('cancelado_conductor');
-        }
-        if (elServidorCerroElViaje(data)) return;
-        if (data.conductorEnPunto && pantallaRef.current === 'fase1') setViaje(data);
-        // Respaldo: detectar si un conductor aceptó (para Safari que tarda en el listener)
-        if (data.estado === 'confirmando' && data.conductorId && pantallaRef.current === 'esperando' && !celebrando && !confirmacionMostradaRef.current) {
-          confirmacionMostradaRef.current = true;
-          if (radioRef.current) { clearTimeout(radioRef.current.ampliar); clearTimeout(radioRef.current.agotar); }
-          clearInterval(contadorBusquedaRef.current);
-          setConfirmacionPendiente(prev => prev || {
-            conductorId: data.conductorId,
-            conductorNombre: data.conductorNombre,
-            conductorPlaca: data.conductorPlaca,
-            conductorVehiculo: data.conductorVehiculo,
-            conductorTelefono: data.conductorTelefono,
-            tarifa: data.tarifa,
-          });
-        }
+        if (huellaDelViaje(data) === ultimaHuellaRef.current) return;
+        reaccionarAlViaje(data);
       } catch (e) {}
     }, 5000);
 
@@ -775,9 +760,10 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
     // el código no está en memoria: se trae del cajón privado del viaje.
     cargarCodigoDeViaje(viajeId).then((c) => { if (c) setCodigoSeguridad(c); });
 
-    const unsub = onSnapshot(doc(db, 'viajes', viajeId), (snap) => {
-      if (!snap.exists()) return;
-      const data = snap.data();
+    // LA ÚNICA manera de reaccionar a cada paso del viaje (G22): la usan el vigilante en vivo y el respaldo de arriba.
+    // No reacciona a ningún estado RETIRADO (`ESTADOS_RETIRADOS` en estadosViaje.js): no los escribe nadie.
+    const reaccionarAlViaje = (data) => {
+      ultimaHuellaRef.current = huellaDelViaje(data);
       setViaje(data);
 
       // El conductor marcó el descuento como consumido: el pasajero borra su propio código de bienvenida/promo
@@ -805,47 +791,8 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
 
       if (elServidorCerroElViaje(data)) return;
 
-      // Contraoferta de un conductor: agregar a la lista si no está ya
-      if (data.estado === 'contraoferta' && data.conductorId) {
-        const key = data.conductorId + '_' + (data.contraofertaValor || '');
-        if (!contaofertasIdsRef.current.has(key)) {
-          contaofertasIdsRef.current.add(key);
-          alertarNuevoViaje();
-          setContraofertas(prev => {
-            // Evitar duplicados por conductorId
-            if (prev.find(c => c.conductorId === data.conductorId && c.contraofertaValor === data.contraofertaValor)) return prev;
-            return [...prev, {
-              conductorId: data.conductorId,
-              conductorNombre: data.conductorNombre,
-              conductorPlaca: data.conductorPlaca,
-              conductorVehiculo: data.conductorVehiculo,
-              conductorTelefono: data.conductorTelefono,
-              conductorFoto: data.conductorFoto || null,
-              contraoferta: data.contraoferta,
-              contraofertaValor: data.contraofertaValor,
-            }];
-          });
-        }
-        // Si hay contraofertas y estamos en 'esperando', mantenemos esa pantalla
-        return;
-      }
-
-      // El conductor aceptó el viaje directo: mostrar confirmación al pasajero (no aceptar automático)
-      if (data.estado === 'confirmando' && data.conductorId && pantallaRef.current === 'esperando' && !celebrando && !confirmacionMostradaRef.current) {
-        confirmacionMostradaRef.current = true;
-        if (radioRef.current) { clearTimeout(radioRef.current.ampliar); clearTimeout(radioRef.current.agotar); }
-        clearInterval(contadorBusquedaRef.current);
-        alertarNuevoViaje();
-        setConfirmacionPendiente({
-          conductorId: data.conductorId,
-          conductorNombre: data.conductorNombre,
-          conductorPlaca: data.conductorPlaca,
-          conductorVehiculo: data.conductorVehiculo,
-          conductorTelefono: data.conductorTelefono,
-          tarifa: data.tarifa,
-        });
-        return;
-      }
+      // (Aquí había dos reacciones a estados RETIRADOS —`contraoferta` y `confirmando`—, del flujo de antes de
+      // `confirmarConductor`. Las ofertas llegan por la subcolección `contraofertas`, en el vigilante de más abajo.)
 
       if (data.estado === 'aceptado' && pantallaRef.current !== 'fase1' && pantallaRef.current !== 'fase2' && !celebrando) {
         if (radioRef.current) { clearTimeout(radioRef.current.ampliar); clearTimeout(radioRef.current.agotar); }
@@ -882,6 +829,11 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
         // El viaje volvió a esperando (contraoferta rechazada o expirada), limpiar contraofertas de ese conductor
         // No limpiamos toda la lista porque pueden haber otras contraofertas válidas aún
       }
+    };
+
+    const unsub = onSnapshot(doc(db, 'viajes', viajeId), (snap) => {
+      if (!snap.exists()) return;
+      reaccionarAlViaje(snap.data());
     });
 
     return () => { unsub(); clearInterval(intervaloRespaldoRef.current); };
