@@ -110,7 +110,7 @@ async function correrVigilante(nombre, viaje, pantalla, fuentes = {}) {
     celebrando: false, celebrandoRef: { current: false }, conductorEnPunto: false, descuentoPendiente: null,
     confirmacionMostradaRef: { current: false }, contaofertasIdsRef: { current: new Set() },
     descartadosRef: { current: {} }, contadorRef: { current: 7 }, contadorBusquedaRef: { current: 8 },
-    radioRef: { current: null },
+    radioRef: { current: null }, intervaloRespaldoRef: { current: 9 },
     // Lo que tiene efecto fuera: se espía, nunca se corre de verdad.
     setTimeout: espia(llamadas, 'setTimeout'), clearTimeout: espia(llamadas, 'clearTimeout'),
     clearInterval: espia(llamadas, 'clearInterval'), setInterval: espia(llamadas, 'setInterval'),

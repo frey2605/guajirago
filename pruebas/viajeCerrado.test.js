@@ -123,6 +123,14 @@ describe('G20 · las pantallas, corridas de verdad', () => {
     assert.ok(queHizo('conductorEnCurso', ll).seEntera);
   });
 
+  it('el pasajero, al salir, apaga el respaldo de 5 s (si no, la ventanita vuelve a abrirse sola cada 5 s)', async () => {
+    for (const vig of ['pasajeroEnVivo', 'pasajeroRespaldo']) {
+      const ll = await correrVigilante(vig, { estado: 'expirado' }, 'fase1');
+      assert.ok(ll.some((l) => l[0] === 'clearInterval' && l[1] === 9), vig + ': no apagó el respaldo de 5 s');
+      assert.ok(ll.some((l) => l[0] === 'clearInterval' && l[1] === 7), vig + ': no soltó el contador');
+    }
+  });
+
   it('el pasajero sale del viaje: su pantalla dice el porqué, lleva «Volver al inicio» y la ventanita', () => {
     const t = soloCodigo(leer('guajirago/src/Solicitar.js')).replace(/\r\n/g, '\n');
     const i = t.indexOf('if (viajeCerrado) {');

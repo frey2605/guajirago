@@ -282,6 +282,18 @@ la placa de `conductores/{uid}` (la escribe su GPS con la misma placa que va en 
 - Lo que NO puede probar: las sumas (Conductores, Pasajeros, Mensajería, el historial y Ganancias del conductor), que
   piden viajes finalizados; esas las EJECUTA `pruebas/valorViaje.test.js`.
 
+### viaje-cerrado (G20, 28-sep-2026)
+- Un viaje EN CURSO del pasajero se consigue sin conductor: las reglas le dejan al pasajero cambiar el `estado` de SU
+  viaje (no el `conductorId`), así que el robot lo pone `aceptado` desde la base y la pantalla pasa a «🚗 CONDUCTOR EN
+  CAMINO» tras la celebración de 3 s. Luego lo pone `expirado` con `expiradoPor: 'sistema'` y su `motivoExpiracion`,
+  como lo escribe `expirarViajesColgados`.
+- La primera corrida CAZÓ UN FALLO que las pruebas de Node no veían: la ventanita salía bien, pero «Entendido» no la
+  cerraba, porque el respaldo de cada 5 s de `Solicitar.js` volvía a leer el viaje cerrado y la abría otra vez. Se
+  arregló apagando ese respaldo al salir (`clearInterval(intervaloRespaldoRef.current)` en `elServidorCerroElViaje`).
+  La lección: las pruebas corren UNA pasada del vigilante; lo que pasa en la segunda solo lo ve quien se queda mirando.
+- Lo que NO puede probar: el lado del conductor, que pide un viaje confirmado por `confirmarConductor`; ese lo
+  EJECUTA `pruebas/viajeCerrado.test.js`.
+
 ## Lo que el robot dejó creado en pruebas
 
 - 27-sep-2026: «Robot Taxi De Prueba» (robot.taxi.1790508222079@gg.test) y
@@ -304,3 +316,5 @@ la placa de `conductores/{uid}` (la escribe su GPS con la misma placa que va en 
   robot.pasajero.1790596960121@gg.test).
 - 28-sep-2026 en adelante: UN solo viaje `viajes/robot-valor-viaje-g19` de pasajero@gg.test, cancelado, con
   tarifaValor 10.000 y contraofertaValor 11.000; cada corrida de `valor-viaje-panel.cjs` lo reusa (no se amontonan).
+- 28-sep-2026 en adelante: un viaje de Taxi de pasajero@gg.test por cada corrida de `viaje-cerrado.cjs`, ya `expirado`
+  por «el sistema» y sin conductor (el primero: qo4yNd13wlwWQs3We2D1).

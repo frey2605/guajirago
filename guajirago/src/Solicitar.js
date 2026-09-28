@@ -730,6 +730,9 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
     if (!ESTADOS_QUE_CIERRA_EL_SERVIDOR.includes(data.estado)) return false;
     if (pantallaRef.current !== 'fase1' && pantallaRef.current !== 'fase2') return false;
     clearInterval(contadorRef.current);
+    // Y se apaga el respaldo de cada 5 s: el viaje ya acabó, y si siguiera leyéndolo volvería a abrir la ventanita
+    // cada 5 s aunque el pasajero la cierre (lo cazó el robot `viaje-cerrado`).
+    clearInterval(intervaloRespaldoRef.current);
     const cierre = avisoDelCierre(data, 'pasajero');
     setViajeCerrado(cierre);
     setAviso(cierre);

@@ -175,6 +175,14 @@ const RECORRIDOS = [
     // esas las EJECUTA pruebas/valorViaje.test.js.
     vigila: ['guajirago-admin/src/Viajes.js', 'guajirago-admin/src/valorViaje.js'],
   },
+  {
+    nombre: 'viaje-cerrado',
+    que: 'el servidor cierra (expirado) el viaje en curso del pasajero: le sale la ventanita «Este viaje ya se cerró» con el porqué, «Entendido» la cierra y «Volver al inicio» lo lleva al inicio (G20)',
+    archivo: 'viaje-cerrado.cjs',
+    // El lado del conductor (AppConductor.js) pide un viaje confirmado por confirmarConductor: este recorrido NO lo
+    // cubre, y por eso AppConductor.js no se nombra aquí; lo EJECUTA pruebas/viajeCerrado.test.js.
+    vigila: ['guajirago/src/estadosViaje.js', 'guajirago/src/Solicitar.js'],
+  },
 ];
 
 // Los archivos de pantalla: los que, si cambian, el robot debería poder probar. Todo lo que esté en
