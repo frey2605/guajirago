@@ -88,6 +88,14 @@ const RECORRIDOS = [
       'guajirago/src/Promociones.js', 'guajirago/src/reglaPromocion.js'],
   },
   {
+    nombre: 'uso-promo',
+    que: 'asignar en el panel una promoción de crédito suma sus pesos al «Invertido» (1 uso, $1.000), y una de porcentaje no se asigna ni suma (G17; crea dos promociones de mentira en pruebas, devuelve el saldo y las apaga)',
+    archivo: 'uso-promo.cjs',
+    // La analítica del servidor (consumirDescuentoViaje) pide un viaje con código verificado por el conductor: la
+    // EJECUTA pruebas/reglaPromocion.test.js y la corre de verdad pruebas/funciones.test.js con el emulador.
+    vigila: ['guajirago-admin/src/Promociones.js', 'guajirago-admin/src/reglaPromocion.js', 'guajirago/functions/promociones.cjs'],
+  },
+  {
     nombre: 'vigencia-promo',
     que: 'una promoción que dura solo HOY sale vigente en la app y en «Activas» del panel, y las dos pintan el día de hoy, no el de ayer (G16; crea una promoción de mentira en pruebas y la apaga)',
     archivo: 'vigencia-promo.cjs',

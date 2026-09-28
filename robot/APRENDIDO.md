@@ -255,6 +255,16 @@ la placa de `conductores/{uid}` (la escribe su GPS con la misma placa que va en 
   los anuncios (Anuncio.js), las promos de restaurante (Restaurantes.js) y el Superadmin, los EJECUTA
   `pruebas/vigenciaHoy.test.js` en cuatro zonas horarias. Por eso Anuncio.js y Restaurantes.js salen «SIN RECORRIDO».
 
+### uso-promo (G17, 28-sep-2026)
+- Las dos promociones nacen con `limiteUsosPorPersona: null` (ilimitado): así el robot se puede correr las veces que
+  haga falta con el mismo pasajero sin chocar con el tope.
+- Después de «¡Promoción asignada…!» hay que tocar «Cerrar» y esperar ~2,5 s: el panel vuelve a leer las promociones
+  (`cargarPromos`) y solo entonces la tarjeta dice «1 usos» y «Invertido: $ 1.000».
+- El «Invertido» se lee de la tarjeta y se cambia el espacio duro de `cop()` por uno normal antes de comparar.
+- La asignación SÍ le sube $1.000 al pasajero de prueba: el robot se lo devuelve al final, pase lo que pase.
+- Lo que NO puede probar: la otra mitad (el servidor apuntando el uso al cobrar el descuento de un viaje), porque pide
+  un viaje entero con el código verificado por el conductor. Esa la ejecuta `pruebas/reglaPromocion.test.js`.
+
 ## Lo que el robot dejó creado en pruebas
 
 - 27-sep-2026: «Robot Taxi De Prueba» (robot.taxi.1790508222079@gg.test) y
@@ -270,3 +280,5 @@ la placa de `conductores/{uid}` (la escribe su GPS con la misma placa que va en 
   por el pasajero con «Otro motivo» (el primero: qxSxf8ofamCWGFng3Xzu).
 - 28-sep-2026 en adelante: una promoción `promociones/ROBOT-G16-<hora>` de un solo día por cada corrida de
   `vigencia-promo.cjs`, ya apagada.
+- 28-sep-2026 en adelante: dos promociones `promociones/ROBOT-G17C-<hora>` (crédito, con 1 uso) y `ROBOT-G17P-<hora>`
+  (porcentaje) por cada corrida de `uso-promo.cjs`, ya apagadas; el saldo del pasajero se devuelve.
