@@ -73,6 +73,14 @@ const RECORRIDOS = [
     vigila: ['guajirago/src/Seguridad.js', 'guajirago/src/telefonoValido.js'],
   },
   {
+    nombre: 'fecha-reserva',
+    que: 'la agencia ve la reserva de turismo el mismo día que la pidió el cliente, no el anterior (G11; escribe una reserva de mentira en la base de pruebas y la cancela)',
+    archivo: 'fecha-reserva.cjs',
+    // guajirago/src/Turismo.js también usa la pieza («Mis reservas» del cliente), pero verla pide reservar desde la
+    // app: la cubre la prueba de Node (pruebas/fechaCalendario.test.js), que corre las dos pantallas.
+    vigila: ['guajirago-aliados/src/ReservasTurismo.js', 'guajirago-aliados/src/fechaCalendario.js'],
+  },
+  {
     nombre: 'candado-recarga',
     que: 'el candado de la ley del botón no se traba en el navegador: un código de recarga inventado dice «no existe» y el botón vuelve a quedar tocable, dos veces',
     archivo: 'candado-recarga.cjs',

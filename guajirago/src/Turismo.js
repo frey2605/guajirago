@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { auth, db } from './firebase';
 // El formateador de pesos vive en moneda.js: un solo sitio (SEGUNDA LEY).
 import { cop } from './moneda';
+// El día de la reserva se pinta con la pieza de fechaCalendario.js, la misma que usa aliados (G11).
+import { fechaDeCalendario } from './fechaCalendario';
 import { collection, query, where, getDocs, getDoc, addDoc, doc } from 'firebase/firestore';
 import Logo from './Logo';
 import MenuLateral from './MenuLateral';
@@ -122,7 +124,7 @@ function Turismo({ nombre, foto, onVolver, onCerrarSesion, onIrPerfil, onIrGanan
   const soloDigitos = (v) => v.replace(/[^0-9]/g, '').slice(0, 10);
   const estadoTxt = (e) => ({ nueva: '⏳ Esperando confirmación', confirmada: '✅ Confirmada', realizada: '🏁 Realizada', cancelada: '❌ Cancelada' }[e] || e);
   const estadoColor = (e) => ({ nueva: NARANJA, confirmada: VERDE, realizada: AZUL, cancelada: '#E33' }[e] || '#666');
-  const fechaTxt = (v) => { if (!v) return ''; const d = new Date(v + 'T00:00:00'); return isNaN(d) ? String(v) : d.toLocaleDateString('es-CO', { weekday: 'long', day: 'numeric', month: 'long' }); };
+  const fechaTxt = (v) => fechaDeCalendario(v, { weekday: 'long', day: 'numeric', month: 'long' });
 
   const campoBase = { width: '100%', boxSizing: 'border-box', padding: '13px', background: '#FFFFFF', border: '1px solid #ECECEF', borderRadius: '12px', color: '#1A1A1E', fontSize: '14px', marginBottom: '10px', outline: 'none' };
 

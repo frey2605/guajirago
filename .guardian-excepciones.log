@@ -1293,3 +1293,4 @@ EL COMMIT 80213d8 TAMBIEN LO LLEVA MAL en su mensaje («un hallazgo aparte: el
 2026-09-28T05:51:39.860Z	scripts/medir-telefono-ficha.cjs	NEGADO: fuera de la promesa "G07: una sola forma de salir; el menu y Eliminar cuenta apagan al conductor ANTES de cerrar la sesion"
 2026-09-28T06:18:44.257Z	scripts/medir-copia-local-g09.cjs	NEGADO: fuera de la promesa "G08: una sola regla para el telefono de la ficha (telefono, y si no hay, celular) y toda escritura pone los dos iguales"
 2026-09-28T06:40:08.226Z	scripts/medir-contacto-emergencia.cjs	NEGADO: fuera de la promesa "G09: la app relee la ficha usuarios/{uid} al abrir aunque haya copia local; la copia solo sirve para arrancar rapido"
+2026-09-28T07:02:53.532Z	scripts/medir-fecha-reserva.cjs	NEGADO: fuera de la promesa "G10: el contacto de emergencia se valida con UNA sola regla (telefonoValido.js) en el registro y en Seguridad, y el panico no abre un numero roto"

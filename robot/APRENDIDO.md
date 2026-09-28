@@ -192,9 +192,22 @@ la placa de `conductores/{uid}` (la escribe su GPS con la misma placa que va en 
 - pasajero@gg.test trae el contacto sembrado 3000000001: el recorrido NO escribe nada (el número malo no pasa). Los dos
   403 de la consola salen igual que en los demás recorridos: no son la señal.
 
+### fecha-reserva (G11, 28-sep-2026)
+- Aliados como la AGENCIA: `entrarComoRestaurante(p, 'agencia@gg.test')` (la misma pieza, con otro correo). Su negocio
+  es `prueba-agencia`. «Reservas» está a la vista al entrar (si no, detrás de «☰ Menú»); abre en «Nuevas».
+- 🔑 **La reserva de mentira se escribe con `entrarALaBase('pasajero@gg.test')`**: las reglas dejan crearla si
+  `clienteId` es el propio pasajero. `cambiar` (PATCH con máscara) CREA el documento si no existe. No se puede borrar
+  (reglas: `delete: if false`), así que al final el pasajero la pone `cancelada`.
+- 🔑 **El fallo depende de la zona horaria**: el recorrido lee la del navegador y exige `America/Bogota` (la del PC).
+  En una máquina con hora UTC, el código viejo pintaría bien y el robot no vería nada.
+- Con lo publicado ANTES de G11 sale 🔴 «la agencia ve "dom, 4 de oct"» con la reserva guardada «2026-10-05» (lunes).
+- La tarjeta pinta el día en un `<p>` con 📅, dos renglones debajo del 👤 con el nombre del cliente.
+
 ## Lo que el robot dejó creado en pruebas
 
 - 27-sep-2026: «Robot Taxi De Prueba» (robot.taxi.1790508222079@gg.test) y
   «Robot Mototaxi De Prueba» (robot.mototaxi.1790509022569@gg.test), con fotos de mentira.
 - 28-sep-2026 en adelante: un viaje de Taxi de pasajero@gg.test por cada corrida de `cancelar-viaje.cjs`, ya
   cancelado por el pasajero con «Otro motivo» (el primero: ZV3QbClY4rj2kZgUILGO).
+- 28-sep-2026 en adelante: una reserva de turismo `reservasTurismo/robot-g11-<hora>` a la agencia de prueba por cada
+  corrida de `fecha-reserva.cjs`, cliente «Robot G11 <hora>», ya cancelada (la primera: robot-g11-1790579356242).
