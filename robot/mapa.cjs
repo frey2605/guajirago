@@ -51,6 +51,12 @@ const RECORRIDOS = [
     archivo: 'conductor-en-turno.cjs',
     vigila: ['guajirago/src/AppConductor.js', 'guajirago/src/Notificaciones.js'],
   },
+  {
+    nombre: 'radio-panel',
+    que: 'el panel no deja guardar el radio de búsqueda en 0 y lo dice (mira la base de pruebas)',
+    archivo: 'radio-panel.cjs',
+    vigila: ['guajirago-admin/src/Superadmin.js'],
+  },
 ];
 
 // Los archivos de pantalla: los que, si cambian, el robot debería poder probar. Todo lo que esté en

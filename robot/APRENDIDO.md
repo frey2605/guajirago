@@ -24,6 +24,7 @@
 | `node robot/mirar.cjs transporte\|panel\|aliados` | qué hay en una pantalla (lo primero ante una nueva) |
 | `node robot/registrar-conductor.cjs Taxi\|Mototaxi` | crear cuenta → Soy conductor → con una foto de menos se para y dice cuál; con todas entra |
 | `node robot/revisar-panel.cjs "Robot Taxi De Prueba"` | el panel enseña los 6 documentos del conductor, cargados |
+| `node robot/radio-panel.cjs` | 👑 Superadmin: con el radio de búsqueda borrado (queda en 0) no guarda, lo dice, y config/global no cambia |
 | `node robot/portero.cjs [horas]` | cuántas llamadas llegaron a pruebas con el sello de App Check (solo lectura) |
 
 ## Pantallas: cómo se manejan (27-sep-2026)
@@ -52,6 +53,12 @@ Enter no entra). 🪤 El menú está ABAJO y son solo íconos: Conductores es el
 «Nombre del conductor» → botón «🔍 Buscar». 🪤 Los nombres salen en MAYÚSCULAS. La ficha trae el
 cuadro «📂 Documentos (N de 6)»; el `alt` de cada foto es el nombre de la lista (sin la variante
 del mototaxi: la variante sale en el texto de abajo, no en el `alt`).
+
+**Panel · Superadmin (27-sep-2026, G04).** 👑 en el menú de abajo abre «Configuración global». Los campos
+no tienen `name` ni `placeholder`: se encuentran por su etiqueta, el `<p>` en mayúsculas («RADIO DE BÚSQUEDA
+INICIAL») y el `input` dentro del `div` hermano (xpath `following-sibling::div//input`). Vaciar el campo lo
+deja en 0 (el panel convierte lo vacío a 0). El aviso del guardado sale en rojo ENCIMA del botón «Guardar
+cambios», no en ventanita.
 
 **Aliados (crear un empleado).** 🪤 La portada pregunta «¿QUÉ TIPO DE NEGOCIO TIENES?»: para entrar se
 toca «Ya tengo cuenta · Ingresar». Campos «Correo» y «Contrasena» (sin tilde), botón «Entrar» (exacto).
