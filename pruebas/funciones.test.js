@@ -768,4 +768,17 @@ describe('G01 · confirmarConductor rehace el descuento sobre la tarifa aceptada
     assert.strictEqual(numDe(v.tarifaValor), 15000);
     assert.ok(!('descuentoInfo' in v), 'apareció una ficha de descuento en un viaje que no tenía');
   });
+
+  // G13 (28-sep-2026): el servidor copiaba al viaje el TEXTO de la oferta tal como lo armó el teléfono del conductor,
+  // con el idioma de ese teléfono. Ahora lo arma él desde el NÚMERO aceptado, con el formateador único.
+  test('G13 · la oferta de un teléfono en inglés («$15,000») deja en el viaje el texto de cop(), no el del teléfono', async () => {
+    await sembrar('viajes/vg1/contraofertas/condG', {
+      monto: txt('$15,000'), montoValor: num(15000), conductorNombre: txt('Gabo'), tipoOferta: txt('contraoferta'),
+    });
+    const r = await llamar('pasaG', { viajeId: 'vg1', conductorId: 'condG' });
+    assert.strictEqual(r.cuerpo?.result?.ok, true, JSON.stringify(r.cuerpo));
+    const v = await leer('viajes/vg1');
+    assert.strictEqual(v.tarifa.stringValue, '$ 15.000', 'el viaje guardó el texto del teléfono: «' + v.tarifa.stringValue + '»');
+    assert.strictEqual(numDe(v.tarifaValor), 15000);
+  });
 });

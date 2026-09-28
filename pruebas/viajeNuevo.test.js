@@ -44,7 +44,7 @@ describe('SEGUNDA LEY · el documento del viaje se arma en un solo sitio', () =>
       origen: 'Calle 15',
       destino: 'Aeropuerto',
       estado: 'esperando',
-      tarifa: `$${(10000).toLocaleString()}`,  // la que se ENSEÑA
+      tarifa: '$ 10.000',                 // la que se ENSEÑA: cop(), igual en cualquier teléfono (G13)
       tarifaValor: 10000,                      // la que se CALCULA (AppConductor)
       fechaSolicitud: '2026-08-23T15:00:00.000Z',
       radioBusqueda: 3,
@@ -58,7 +58,7 @@ describe('SEGUNDA LEY · el documento del viaje se arma en un solo sitio', () =>
     }, RELOJ);
     // El conductor ve y recibe la tarifa completa...
     assert.strictEqual(conDescuento.tarifaValor, 10000);
-    assert.strictEqual(conDescuento.tarifa, `$${(10000).toLocaleString()}`);
+    assert.strictEqual(conDescuento.tarifa, '$ 10.000');
     // ...y lo que el pasajero paga de menos viaja en su propia ficha.
     assert.strictEqual(conDescuento.descuentoInfo.tarifaPasajeroPaga, 2000);
   });

@@ -7,6 +7,7 @@ import { COMISIONES_DEFECTO, comisionSegunTipoDeViaje, comisionParaActivarse } f
 import { porQueNoLeToca } from './leTocaElViaje';
 import { CONFIG_TARIFAS_DEFECTO, calcularTarifaMinima } from './tarifas';
 import { CONFIG_COMPARTIDA } from './configApp';
+import { cop } from './moneda';
 import { ESTADOS_MERCADO, ESTADOS_TERMINADOS } from './estadosViaje';
 // Los datos que comparten las pantallas salen de archivos únicos (SEGUNDA LEY).
 import { centroRiohacha } from './riohacha';
@@ -423,7 +424,7 @@ function TarjetaSolicitud({ solicitud, nombre, telefono, placa, vehiculo, tipoVe
       conductorFoto: fotoConductor || null,
       conductorColor: colorConductor || '',
       tipoOferta: esContra ? 'contraoferta' : 'acepta',
-      monto: `$${monto.toLocaleString()}`,
+      monto: cop(monto), // G13: el formateador único, no el idioma del teléfono
       montoValor: monto,
       creado: new Date().toISOString(),
       vigente: true,

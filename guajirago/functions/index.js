@@ -42,6 +42,8 @@ const { comisionSegunTipoDeViaje } = require('./comisiones.cjs');
 const { viajesMinimosDe, motivoParaNoUsar, textoParaQuienLaUsa } = require('./promociones.cjs');
 // G04: ¿le toca este viaje a este conductor? (tipo de vehículo + radio; la lista del conductor tiene la copia, atada por prueba).
 const { porQueNoLeToca } = require('./leTocaElViaje.cjs');
+// G13: el texto del precio del viaje sale de UN formateador (copia de guajirago/src/moneda.js, atada por prueba).
+const { cop } = require('./moneda.cjs');
 
 // Distancia en km entre dos coordenadas (Haversine)
 function distanciaKm(lat1, lng1, lat2, lng2) {
@@ -365,7 +367,8 @@ exports.confirmarConductor = onCall(async (request) => {
         conductorVehiculo: of.conductorVehiculo || "",
         conductorFoto: of.conductorFoto || null,
         conductorColor: of.conductorColor || "",
-        tarifa: of.monto || viaje.tarifa,
+        // G13: el texto sale del NÚMERO aceptado con el formateador único, no del texto que armó el teléfono.
+        tarifa: Number.isFinite(tarifaValorAceptada) ? cop(tarifaValorAceptada) : (of.monto || viaje.tarifa),
         tarifaValor: tarifaValorAceptada,
         fechaAceptacion: new Date().toISOString(),
         comisionCobrada: comision,

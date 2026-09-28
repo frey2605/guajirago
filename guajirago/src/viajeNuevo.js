@@ -32,6 +32,7 @@
  * El parámetro `ahora` existe para poder probar la fecha con un reloj fijo;
  * nadie más lo pasa.
  */
+import { cop } from './moneda';
 
 /** Arma el documento con que nace TODO viaje (taxi, mototaxi o mandado). */
 export function armarViajeNuevo({ user, nombrePasajero, coords, tipo, origen, destino, tarifa, datosDescuento, radioBusqueda, extras }, ahora = new Date()) {
@@ -41,7 +42,8 @@ export function armarViajeNuevo({ user, nombrePasajero, coords, tipo, origen, de
     tieneCodigo: true,
     pasajeroLat: coords.lat, pasajeroLng: coords.lng,
     tipo, origen, destino, estado: 'esperando',
-    tarifa: `$${tarifa.toLocaleString()}`, tarifaValor: tarifa,
+    // G13: el texto sale del formateador único (moneda.js), nunca del idioma del teléfono.
+    tarifa: cop(tarifa), tarifaValor: tarifa,
     ...(datosDescuento ? { descuentoInfo: datosDescuento } : {}),
     fechaSolicitud: ahora.toISOString(),
     radioBusqueda,

@@ -12,7 +12,9 @@
  *                         import/export, que Node no puede mezclar con require)
  *                         y devuelve lo que exporta, EJECUTÁNDOLO tal cual está
  *                         en el disco. Solo sirve para archivos SIN imports
- *                         (datos y cuentas puras); para los que hablan con la
+ *                         (datos y cuentas puras), o que solo importan otra
+ *                         pieza pura de su carpeta (`from './x'`, desde G13);
+ *                         para los que hablan con la
  *                         base de datos, codigoSeguridad.test.js tiene su
  *                         propio cargador con base falsa.
  */
@@ -34,9 +36,23 @@ function cargarDeLaApp(rutaRelativa) {
   const fuente = leer(rutaRelativa);
   const nombres = [...fuente.matchAll(/^export\s+(?:const|function)\s+([A-Za-z0-9_]+)/gm)].map((m) => m[1]);
   assert.ok(nombres.length > 0, 'no se encontró nada exportado en ' + rutaRelativa);
-  const sinExport = fuente.replace(/^export\s+/gm, '');
+  // G13 (28-sep-2026): una pieza pura puede pedir OTRA pieza pura de su misma carpeta
+  // (`import { cop } from './moneda';`, como viajeNuevo.js). Esa se carga igual, con este mismo
+  // cargador, y se le pasa ya hecha. Solo esa forma: otra cualquiera sigue reventando, como antes.
+  const piezas = {};
+  const sinImports = fuente.replace(/^import\s*\{([^}]*)\}\s*from\s*'(\.\/[^']+)';?[ \t]*\r?$/gm, (_, lista, ruta) => {
+    const archivo = path.posix.join(path.posix.dirname(rutaRelativa), ruta.endsWith('.js') ? ruta : ruta + '.js');
+    const pieza = cargarDeLaApp(archivo);
+    for (const n of lista.split(',').map((s) => s.trim()).filter(Boolean)) {
+      assert.ok(n in pieza, rutaRelativa + ' pide «' + n + '» a ' + archivo + ', y ese archivo no lo exporta');
+      piezas[n] = pieza[n];
+    }
+    return '';
+  });
+  const sinExport = sinImports.replace(/^export\s+/gm, '');
+  const claves = Object.keys(piezas);
   // eslint-disable-next-line no-new-func
-  return new Function(sinExport + '\nreturn { ' + nombres.join(', ') + ' };')();
+  return new Function(...claves, sinExport + '\nreturn { ' + nombres.join(', ') + ' };')(...claves.map((k) => piezas[k]));
 }
 
 /**

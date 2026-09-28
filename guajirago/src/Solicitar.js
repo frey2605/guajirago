@@ -10,6 +10,7 @@ import { alertarNuevoViaje, precargarAudio, activarAudioiOS, obtenerTokenFCM } f
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { CONFIG_TARIFAS_DEFECTO, calcularTarifaMinima } from './tarifas';
 import { CONFIG_COMPARTIDA } from './configApp';
+import { cop } from './moneda';
 import { aplicarDescuento, armarDescuentoInfo, tarifaParaPasajero } from './descuentos';
 import { generarCodigoSeguridad, guardarCodigoDeViaje, cargarCodigoDeViaje } from './codigoSeguridad';
 import { armarViajeNuevo } from './viajeNuevo';
@@ -1105,7 +1106,7 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
     // Antes: `catch(e) {}` — si la oferta nueva no entraba, el pasajero creía que los conductores veían más plata.
     await correr(async () => {
       await updateDoc(doc(db, 'viajes', viajeId), {
-        tarifa: '$' + nuevaTarifa.toLocaleString(),
+        tarifa: cop(nuevaTarifa), // G13: el formateador único, no el idioma del teléfono
         tarifaValor: nuevaTarifa,
         nuevaOferta: new Date().toISOString(),
         estado: 'esperando',
