@@ -8,6 +8,7 @@ import { getFunctions, httpsCallable } from 'firebase/functions';
 import TerminosCondiciones from './TerminosCondiciones';
 import PoliticaPrivacidad from './PoliticaPrivacidad';
 import Logo from './Logo';
+import { telefonoDe } from './telefonoUsuario';
 
 const VALOR_CREDITO_BIENVENIDA = 8000; // Crédito fijo de bienvenida para pasajeros nuevos
 
@@ -190,7 +191,7 @@ function Login({ onEntrar }) {
       const docSnap = await getDoc(doc(db, 'usuarios', resultado.user.uid));
       if (docSnap.exists()) {
         const datos = docSnap.data();
-        onEntrar(datos.tipo || '', datos.nombre, datos.celular || datos.telefono || '', datos.placa || '', datos.vehiculo || '');
+        onEntrar(datos.tipo || '', datos.nombre, telefonoDe(datos), datos.placa || '', datos.vehiculo || '');
       } else { onEntrar('', '', '', '', ''); }
     } catch (err) {
       if (err.code === 'auth/invalid-credential') setError('Correo o contraseña incorrectos');

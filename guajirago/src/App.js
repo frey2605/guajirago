@@ -26,6 +26,7 @@ import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 // REGLA 7: los créditos de bienvenida los da el servidor, no este teléfono.
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { DOCUMENTOS_CONDUCTOR, documentoQueFalta, nombreDelDocumento, iconoDelDocumento, iconoDelVehiculo } from './documentosConductor';
+import { telefonoDe } from './telefonoUsuario';
 const MARCAS_VEHICULO = [
   'AKT', 'Auteco', 'Bajaj', 'BMW', 'BYD', 'Chery', 'Chevrolet',
   'Citroen', 'Ford', 'Foton', 'Hero', 'Honda', 'Hyundai', 'JAC',
@@ -478,7 +479,7 @@ function App() {
     if (local && local.tipo) {
       setTipoUsuario(local.tipo);
       setNombreUsuario(local.nombre || '');
-      setTelefonoUsuario(local.telefono || local.celular || '');
+      setTelefonoUsuario(telefonoDe(local));
       setPlacaUsuario(local.placa || '');
       setVehiculoUsuario(local.vehiculo || '');
       setTipoVehiculoUsuario(local.tipoVehiculo || '');
@@ -500,7 +501,7 @@ function App() {
           if (snap.exists()) {
             const datos = snap.data();
             setNombreUsuario(datos.nombre || '');
-            setTelefonoUsuario(datos.telefono || datos.celular || '');
+            setTelefonoUsuario(telefonoDe(datos));
             setPlacaUsuario(datos.placa || '');
             setVehiculoUsuario(datos.vehiculo || '');
             setTipoVehiculoUsuario(datos.tipoVehiculo || '');

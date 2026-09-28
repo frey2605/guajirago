@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { auth, db, storage } from './firebase';
 import Logo from './Logo';
+import { telefonoDe } from './telefonoUsuario';
 import { doc, getDoc, setDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
@@ -31,7 +32,7 @@ function MiPerfil({ onVolver }) {
           const d = snap.data();
           setDatos(d);
           setNombre(d.nombre || '');
-          setTelefono(d.telefono || d.celular || '');
+          setTelefono(telefonoDe(d));
           setFoto(d.fotoConductor || d.foto || null);
         }
 
