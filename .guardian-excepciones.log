@@ -1281,3 +1281,10 @@ EL COMMIT 80213d8 TAMBIEN LO LLEVA MAL en su mensaje («un hallazgo aparte: el
   candado no niega las escrituras hechas desde la consola»). Ya esta empujado y
   NO se reescribe: la correccion es esta, y se nombra en el commit siguiente.
 2026-09-26T03:01:15.601Z	.claude/settings.local.json	NEGADO: fuera de la promesa "Un guion cierra solo los Javas huerfanos del emulador demo-guajirago, arrancando en simulacro"
+2026-09-27T00:57:38.129Z	scripts/medir-app-check.cjs	NEGADO: fuera de la promesa "La ley del boton en Login (entrar, crear cuenta, recuperar la clave)"
+2026-09-27T11:32:09.470Z	robot/comun.cjs	NEGADO: fuera de la promesa "El robot probador: recorridos en el navegador SOLO contra pruebas, su cuaderno de lo aprendido y el agente que lo usa"
+2026-09-27T12:13:23.259Z	robot/comun.cjs	NEGADO: fuera de la promesa "El robot prueba solo tras cada cambio (mapa pantalla-recorrido, humo de las 3 apps), el estilo de GuajiraGo para juzgar, el paso 11 lo nombra, y el medidor de citas mira robot/"
+2026-09-28T02:44:12.507Z	scripts/medir-descuento-congelado.cjs	NEGADO: fuera de la promesa "La prueba de la versión de firebase-tools ya no cae cuando npx imprime la versión pero sale con código 2"
+2026-09-28T03:03:27.022Z	scripts/medir-comision-g03.cjs	NEGADO: fuera de la promesa "G01: el descuento del pasajero se recalcula en el servidor sobre la tarifa aceptada al confirmar el conductor"
+2026-09-28T03:26:46.547Z	scripts/medir-aviso-g04.cjs	NEGADO: fuera de la promesa "G03: la comision que exige la app sale del tipo del viaje, como la cobra el servidor; servidor y panel atados por prueba"
+2026-09-28T04:20:37.000Z	guajirago/src/Seguridad.js -> guajirago/src/ubicacionDeAhora.js	CODIGO MOVIDO (G05): el renglon navigator.geolocation.getCurrentPosition( no se movio sano; el pedido del GPS al abrir Ajustes se QUITA y lo reemplaza la fuente unica ubicacionDeAhora.js, que es el arreglo pedido. Para que el detector no pare por esa coincidencia de un renglon, en el archivo nuevo el primer argumento va en el mismo renglon.

@@ -267,11 +267,23 @@ const TRAMPAS = [
   ['una función importada de otro archivo de la app que guarda',
     cambiar('</div>;', `<button onClick={() => guardarRechazo(x)}>Rechazar</button></div>;`).replace(`import { useAccion }`, `import { guardarRechazo } from './guardarRechazo';\nimport { useAccion }`),
     (r) => r.sinCandado.length === 1, new Set(['guardarRechazo'])],
+  // Un SEGUNDO candado en la misma pantalla, con otros nombres (G05, 27-sep-2026: el 🚨 del mapa lleva el suyo).
+  ['con un segundo candado renombrado, su palabra que no coincide con su acción sigue sin salir',
+    cambiar('  return <div>', `  const { correr: correrB, texto: palabraB } = useAccion();\n  const mandar = () => correrB(() => addDoc(col, {}), 'mandar', 'Mandado.');\n  return <div>`)
+      .replace('</div>;', `<button disabled={!!ocupado} onClick={mandar}>{palabraB('enviar', 'Enviando…', 'Mandar')}</button></div>;`),
+    (r) => r.faltas.some((f) => /«enviar» no sale nunca/.test(f))],
 ];
+// Y al revés: el segundo candado bien usado NO se acusa. Antes el vigilante solo conocía `correr` y decía que su
+// palabra «no sale nunca», o daba su botón por SIN candado.
+const CON_DOS_CANDADOS = cambiar('  return <div>', `  const { correr: correrB, texto: palabraB } = useAccion();\n  const mandar = () => correrB(() => addDoc(col, {}), 'mandar', 'Mandado.');\n  return <div>`)
+  .replace('</div>;', `<button disabled={!!ocupado} onClick={mandar}>{palabraB('mandar', 'Enviando…', 'Mandar')}</button></div>;`);
 
 describe('LA LEY DEL BOTÓN · el vigilante caza cada trampa', () => {
   it('la pantalla bien hecha pasa limpia (si no, el vigilante acusaría a los que cumplen)', () => {
     assert.deepStrictEqual(V.revisarArchivo(BIEN), { sinCandado: [], aMano: [], faltas: [] });
+  });
+  it('una pantalla con DOS candados bien usados también pasa limpia', () => {
+    assert.deepStrictEqual(V.revisarArchivo(CON_DOS_CANDADOS), { sinCandado: [], aMano: [], faltas: [] });
   });
   for (const [nombre, fuente, cazada, escritores] of TRAMPAS) {
     it('trampa: ' + nombre, () => {

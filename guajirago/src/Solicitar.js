@@ -25,6 +25,9 @@ import { useAccion } from './useAccion';
 // El texto del mensaje de emergencia. MISMO archivo que el botón de Ajustes:
 // un proceso, un sitio (SEGUNDA LEY). Vive aparte para poder PROBARLO.
 import { armarMensajeDeEmergencia } from './mensajeEmergencia';
+// La ubicación del mensaje de emergencia, pedida EN EL MOMENTO DEL TOQUE. MISMA
+// función que el botón de Ajustes (G05, 27-sep-2026).
+import { ubicacionDeAhora } from './ubicacionDeAhora';
 
 /**
  * EL AVISO DE «NO SÉ DÓNDE RECOGERTE» — ESCRITO UNA SOLA VEZ.
@@ -573,6 +576,13 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
   useEffect(() => {
     if (avisoAccion && !avisoAccion.ok) setAviso(avisoAccion);
   }, [avisoAccion]);
+  // 🚨 EL BOTÓN DE EMERGENCIA LLEVA SU PROPIO CANDADO (G05, 27-sep-2026). El candado de arriba es UNO para toda la
+  // pantalla: si un mensaje del chat se quedara colgado sin señal, el 🚨 devolvería `null` y no haría nada. Con el suyo,
+  // el doble toque sigue sin mandar dos mensajes y el botón dice «Buscando tu ubicación…» mientras espera el GPS.
+  const { correr: correrEmergencia, texto: palabraEmergencia, aviso: avisoEmergencia } = useAccion();
+  useEffect(() => {
+    if (avisoEmergencia && !avisoEmergencia.ok) setAviso(avisoEmergencia);
+  }, [avisoEmergencia]);
   const [llamandoConductor, setLlamandoConductor] = useState(false);
   const [llamadaEntrante, setLlamadaEntrante] = useState(false);
   const [tiempoBusqueda, setTiempoBusqueda] = useState(240);
@@ -976,7 +986,7 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
     window.location.href = 'tel:123';
   };
 
-  const compartirSeguridad = () => {
+  const compartirSeguridad = () => correrEmergencia(async () => {
     // EL TEXTO SE ARMA EN `mensajeEmergencia.js`, que es el MISMO archivo que
     // usa el botón de Ajustes (SEGUNDA LEY: un proceso, un sitio). Antes estaba
     // escrito a mano aquí, y los dos ya decían cosas distintas: el de Ajustes
@@ -994,9 +1004,25 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
     // viajes seguidos se mandaba la foto del conductor del anterior.
     // Si `viaje` todavía no ha llegado, se dice: estando en el mapa hay viaje
     // seguro, así que no tenerlo es «no lo pude conseguir», no «no hay».
+    //
+    // 🔴 LA UBICACIÓN SE PIDE AHORA, AL TOCAR (G05, 27-sep-2026). Antes se
+    // mandaba `ubicacionPasajero`, que es la de CUANDO SE ABRIÓ LA PANTALLA —
+    // normalmente donde lo recogieron—: apretado a los 20 minutos, el familiar
+    // recibía el punto de recogida como «Mi ubicación». Ahora la pide
+    // `ubicacionDeAhora.js` (la misma del botón de Ajustes) con un tope de 4 s,
+    // y si el GPS no contesta usa, en este orden: dónde va el CARRO —solo en
+    // `fase2`, cuando el pasajero va dentro; en `fase1` el carro viene hacia él y
+    // NO es su sitio— y la del pasajero de cuando abrió la pantalla. El mensaje
+    // dice cuál de las dos es. La del pasajero sigue yendo SOLO si es del GPS:
+    // el relleno del centro de Riohacha no es el sitio de nadie.
+    const { punto, de } = await ubicacionDeAhora([
+      { punto: pantalla === 'fase2' ? ubicacionConductor : null, de: 'carro' },
+      { punto: ubicacionEsDelGps ? ubicacionPasajero : null, de: 'ultima' },
+    ]);
     const texto = armarMensajeDeEmergencia({
       desde: 'enViaje',
-      ubicacion: ubicacionEsDelGps ? ubicacionPasajero : null,
+      ubicacion: punto,
+      ubicacionDe: de,
       viaje,
       fallo: viaje ? null : 'viaje',
     });
@@ -1022,8 +1048,15 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
     // quedaba escrito de adorno, que es peor que no ponerlo. Lo cazó la segunda
     // opinión del 12-sep-2026. Así lo hace el botón de Ajustes desde el
     // principio, y es una diferencia menos entre los dos.
-    window.open(url, '_blank');
-  };
+    //
+    // Y SI EL NAVEGADOR NO DEJA ABRIRLO, SE DICE (G05). Ahora hay una espera
+    // antes de abrir (el GPS, hasta 4 s), y un navegador puede bloquear la
+    // ventana si pasa mucho rato desde el toque. Un mensaje de emergencia que
+    // no sale no puede quedarse callado: el candado lo pinta en la ventanita.
+    const ventana = window.open(url, '_blank');
+    if (!ventana) return { ok: false, error: 'Tu teléfono no dejó abrir WhatsApp. Vuelve a tocar «Compartir»: el mensaje sale de una vez.' };
+    return true;
+  }, 'emergencia', 'El mensaje quedó listo en WhatsApp.', 'abrir WhatsApp');
 
   const cancelarViaje = async (razon) => {
     clearInterval(contadorRef.current);
@@ -1386,10 +1419,10 @@ const PanelEmergencia = () => (
             </div>
           </div>
 
-          <div onClick={() => { compartirSeguridad(); setMostrarEmergencia(false); }} style={{ background: '#FFFFFF', borderRadius: '18px', padding: '20px', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '14px', cursor: 'pointer', border: '1px solid #25D366' }}>
+          <div onClick={async () => { await compartirSeguridad(); setMostrarEmergencia(false); }} style={{ background: '#FFFFFF', borderRadius: '18px', padding: '20px', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '14px', cursor: 'pointer', border: '1px solid #25D366' }}>
             <span style={{ fontSize: '34px' }}>📤</span>
             <div>
-              <p style={{ color: '#1A1A1E', fontWeight: '900', fontSize: '15px', margin: '0', lineHeight: '1.3' }}>Compartir ubicación, ruta e identidad del conductor</p>
+              <p style={{ color: '#1A1A1E', fontWeight: '900', fontSize: '15px', margin: '0', lineHeight: '1.3' }}>{palabraEmergencia('emergencia', 'Buscando tu ubicación…', 'Compartir ubicación, ruta e identidad del conductor')}</p>
               <p style={{ color: '#25D366', fontSize: '12px', margin: '5px 0 0' }}>Enviar por WhatsApp</p>
             </div>
           </div>

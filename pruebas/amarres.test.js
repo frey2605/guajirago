@@ -2735,6 +2735,15 @@ describe('EL BOTÓN DEL MAPA · no se inventa dónde estás', () => {
     assert.ok(cuerpo, 'no pude leer el cuerpo de `compartirSeguridad`.');
     return cuerpo.texto;
   };
+  //  🔴 DESDE EL 27-sep-2026 (G05) la ubicación del mensaje la pide `ubicacionDeAhora` AL TOCAR, y la que tiene la
+  //  pantalla (`ubicacionPasajero`, la de cuando se abrió) va solo como RESPALDO. El filtro contra el relleno del
+  //  centro de Riohacha se sigue exigiendo, pero donde vive ahora: en cada sitio donde la función nombra
+  //  `ubicacionPasajero`, que tiene que ir como `<marca> ? ubicacionPasajero : null`. Se cuentan los usos y los
+  //  filtros: un uso sin filtrar al lado de uno filtrado es justo el escape.
+  const elFiltroDelRelleno = (cuerpo) => ({
+    usos: (sinTextos(cuerpo).match(/\bubicacionPasajero\b/g) || []).length,
+    filtros: [...sinTextos(cuerpo).matchAll(/(\w+)\s*\?\s*(ubicacionPasajero\b[^:?]*?)\s*:\s*([^,}\n]+)/g)],
+  });
 
   it('EL QUE MUERDE · el texto lo arma el archivo probado, no la pantalla', () => {
     const { t } = leerla();
@@ -2775,22 +2784,31 @@ describe('EL BOTÓN DEL MAPA · no se inventa dónde estás', () => {
     //  pasaba el «acaba en null» y mandaba la plaza igual. Lo cazó la segunda
     //  opinión. Y el nombre de la marca se SACA del código en vez de exigirlo
     //  literal, así que renombrarla ya no da un rojo falso.
-    const elFiltro = /^(\w+)\s*\?([\s\S]+?):([\s\S]+)$/.exec(campos.ubicacion.trim());
-    assert.ok(elFiltro,
-      'la ubicación llega al mensaje como «' + campos.ubicacion + '», que no es un '
-      + '«<marca> ? <la ubicación> : null». Sin ese filtro se manda `ubicacionPasajero` a '
-      + 'pelo — y esa variable arranca en el CENTRO DE RIOHACHA y vuelve al centro si el GPS '
-      + 'falla, así que el mensaje de emergencia mandaría la plaza como «mi ubicación», con '
-      + 'enlace de mapa y todo. La familia iría allí.');
+    //  G05 · LA UBICACIÓN ES LA DE AHORA: lo que le llega al mensaje sale de `await ubicacionDeAhora(...)`, pedida
+    //  al tocar. `ubicacion: ubicacionPasajero` —la de cuando se abrió la pantalla— es el fallo que había.
+    const laUbic = campos.ubicacion.trim();
+    assert.match(sinTextos(cuerpo),
+      new RegExp('(?:const|let)\\s*\\{[^}]*\\b' + laUbic + '\\b[^}]*\\}\\s*=\\s*await\\s+ubicacionDeAhora\\s*\\('),
+      'la ubicación llega al mensaje como «' + laUbic + '», y eso no sale de `await ubicacionDeAhora(...)`. '
+      + 'Si se manda lo que la pantalla tenía guardado, es la ubicación de CUANDO SE ABRIÓ —normalmente donde lo '
+      + 'recogieron—, y apretado a los 20 minutos el familiar va a buscarlo allí (G05).');
+    const { usos, filtros } = elFiltroDelRelleno(cuerpo);
+    assert.ok(filtros.length >= 1,
+      'la función ya no pasa la ubicación de la pantalla como respaldo filtrado «<marca> ? ubicacionPasajero : null». '
+      + 'Sin ese filtro se puede mandar `ubicacionPasajero` a pelo — y esa variable arranca en el CENTRO DE RIOHACHA y '
+      + 'vuelve al centro si el GPS falla, así que el mensaje de emergencia mandaría la plaza, con enlace de mapa y '
+      + 'todo. La familia iría allí.');
+    assert.strictEqual(usos, filtros.length,
+      '`ubicacionPasajero` aparece ' + usos + ' veces en la función y solo ' + filtros.length + ' van filtradas por '
+      + 'la marca del GPS. La que va a pelo puede ser el relleno del centro de Riohacha.');
+    const elFiltro = filtros[0];
     const marca = elFiltro[1];
-    assert.strictEqual(elFiltro[3].trim(), 'null',
-      'cuando la marca «' + marca + '» dice que NO es del GPS, al mensaje le llega «'
-      + elFiltro[3].trim() + '» en vez de `null` pelado. Cualquier otra cosa vuelve a mandar '
-      + 'un punto inventado: tiene que ser `null` para que el mensaje diga «No pude obtener '
-      + 'mi ubicación exacta».');
-    assert.ok(!/centroRiohacha/.test(elFiltro[2]),
-      'lo que se manda cuando la marca dice que SÍ es del GPS lleva `centroRiohacha` dentro. '
-      + 'Ése es el relleno del mapa: no es el sitio de nadie.');
+    filtros.forEach((f) => assert.strictEqual(f[3].trim(), 'null',
+      'cuando la marca «' + f[1] + '» dice que NO es del GPS, llega «' + f[3].trim() + '» en vez de `null` pelado. '
+      + 'Cualquier otra cosa vuelve a mandar un punto inventado.'));
+    assert.ok(!/centroRiohacha/.test(cuerpo),
+      'la función del botón nombra `centroRiohacha`. Ése es el relleno del mapa: no es el sitio de nadie.');
+    assert.ok(marca, 'no pude leer la marca del GPS.');
 
     // Y EL VIAJE, DEL DOCUMENTO QUE ESCUCHA LA PANTALLA. No de
     // `datosConductor`, que se llena una vez y nunca se vacía: con dos viajes
@@ -2824,8 +2842,10 @@ describe('EL BOTÓN DEL MAPA · no se inventa dónde estás', () => {
     // Exigirlo literal daba rojo falso al renombrar una variable, y un rojo
     // falso se acaba «arreglando» borrando la prueba.
     const cuerpo = laFuncion(t);
-    const { campos } = laLlamadaDelMensaje(cuerpo, sinTextos(cuerpo), PANTALLA);
-    const marca = /^(\w+)\s*\?/.exec(campos.ubicacion.trim())[1];
+    // (Desde G05 la marca se lee del respaldo filtrado, no de la llamada: ver `elFiltroDelRelleno`.)
+    const { filtros } = elFiltroDelRelleno(cuerpo);
+    assert.ok(filtros.length >= 1, 'no encuentro en `compartirSeguridad` el filtro «<marca> ? ubicacionPasajero : null».');
+    const marca = filtros[0][1];
 
     // Se declara, y una sola vez. Y EL NOMBRE DE SU FUNCIÓN SE LEE DEL PROPIO
     // `useState`, no se adivina poniéndole «set» delante y una mayúscula:

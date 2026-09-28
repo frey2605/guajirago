@@ -10,6 +10,13 @@ import { elViajeEnCurso } from './estadosViaje';
 // probar (mismo trato que avisoCalificacion.js). Ahí está escrito por qué el
 // mensaje tiene que DECIR lo que no pudo conseguir — REGLA 9.
 import { armarMensajeDeEmergencia } from './mensajeEmergencia';
+// La ubicación, pedida EN EL MOMENTO DEL TOQUE y no al abrir la pantalla. MISMA
+// función que el 🚨 del mapa (G05, 27-sep-2026): lee el porqué en ubicacionDeAhora.js.
+import { ubicacionDeAhora } from './ubicacionDeAhora';
+// El candado del botón (LA LEY DEL BOTÓN): un toque, «Buscando tu ubicación…» mientras espera el GPS, y la verdad
+// al final en una ventanita.
+import { useAccion } from './useAccion';
+import AvisoModal from './AvisoModal';
 
 function Seguridad({ onVolver }) {
   const [contactoNombre, setContactoNombre] = useState('');
@@ -20,7 +27,8 @@ function Seguridad({ onVolver }) {
   const [guardando, setGuardando] = useState(false);
   const [mensaje, setMensaje] = useState('');
   const [error, setError] = useState('');
-  const [ubicacion, setUbicacion] = useState(null);
+  // Solo se pinta la ventanita si algo FALLA: lo que sale bien se ve solo (se abre WhatsApp).
+  const { correr, texto: palabra, aviso, cerrarAviso } = useAccion();
 
   useEffect(() => {
     const cargar = async () => {
@@ -42,14 +50,8 @@ function Seguridad({ onVolver }) {
       }
     };
     cargar();
-
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => setUbicacion({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-        () => {},
-        { enableHighAccuracy: false, timeout: 8000 }
-      );
-    }
+    // 🔴 AQUÍ SE PEDÍA LA UBICACIÓN, una sola vez al abrir, con poca precisión y sin segundo intento (G05). El
+    // mensaje mandaba ESA, aunque se apretara el botón mucho después y en otro sitio. Ahora se pide al tocar.
   }, []);
 
   const guardar = async () => {
@@ -73,12 +75,17 @@ function Seguridad({ onVolver }) {
     setGuardando(false);
   };
 
-  const compartirUbicacion = async () => {
+  const compartirUbicacion = () => correr(async () => {
     if (!contactoNumero.trim()) {
       setError('Primero guarda un contacto de confianza');
       return;
     }
     setError('');
+
+    // LA UBICACIÓN SE PIDE YA, AL TOCAR, y a la vez que se busca el viaje: así las dos esperas no se suman. Tope de
+    // 4 s; si el GPS no contesta, el mensaje sale igual diciendo que no la pudo conseguir (aquí no hay otra
+    // ubicación a mano que mandar: esta pantalla no sigue ningún carro).
+    const ubicacionPedida = ubicacionDeAhora();
 
     // BUSCAR EL VIAJE EN CURSO, para meterle al mensaje la ruta y el conductor.
     //
@@ -115,14 +122,18 @@ function Seguridad({ onVolver }) {
     // EL TEXTO SE ARMA APARTE (mensajeEmergencia.js) para poder probarlo: dentro
     // de este componente no hay forma de escribir una prueba que mire lo que de
     // verdad sale.
+    const { punto, de } = await ubicacionPedida;
     const texto = armarMensajeDeEmergencia({
-      desde: 'ajustes', ubicacion, viaje: viajeActivo, fallo,
+      desde: 'ajustes', ubicacion: punto, ubicacionDe: de, viaje: viajeActivo, fallo,
     });
 
     const numero = contactoNumero.replace(/\D/g, '');
     const numeroFinal = numero.startsWith('57') ? numero : '57' + numero;
-    window.open(`https://wa.me/${numeroFinal}?text=${encodeURIComponent(texto)}`, '_blank');
-  };
+    // Si el navegador no deja abrir WhatsApp (pasó rato desde el toque), se dice en la ventanita del candado.
+    const ventana = window.open(`https://wa.me/${numeroFinal}?text=${encodeURIComponent(texto)}`, '_blank');
+    if (!ventana) return { ok: false, error: 'Tu teléfono no dejó abrir WhatsApp. Vuelve a tocar el botón: el mensaje sale de una vez.' };
+    return true;
+  }, 'compartir', 'El mensaje quedó listo en WhatsApp.', 'abrir WhatsApp');
 
   const llamarEmergencia = () => {
     window.location.href = 'tel:123';
@@ -191,7 +202,7 @@ function Seguridad({ onVolver }) {
         <div onClick={compartirUbicacion} style={{ background: '#FFFFFF', borderRadius: '20px', padding: '20px', display: 'flex', alignItems: 'center', gap: '16px', cursor: 'pointer', border: '1px solid #25D366', marginTop: '8px' }}>
           <span style={{ fontSize: '32px' }}>📤</span>
           <div>
-            <p style={{ color: '#1A1A1E', fontWeight: '900', fontSize: '15px', margin: '0', lineHeight: '1.3' }}>Compartir ubicación, ruta e identidad del conductor</p>
+            <p style={{ color: '#1A1A1E', fontWeight: '900', fontSize: '15px', margin: '0', lineHeight: '1.3' }}>{palabra('compartir', 'Buscando tu ubicación…', 'Compartir ubicación, ruta e identidad del conductor')}</p>
             <p style={{ color: '#6B7280', fontSize: '12px', margin: '6px 0 0', lineHeight: '1.4' }}>Nombre, foto, placa, color, marca y modelo</p>
             <p style={{ color: '#25D366', fontSize: '13px', margin: '6px 0 0' }}>
               {contactoNombre ? `Enviar por WhatsApp a ${contactoNombre}` : 'Guarda un contacto primero'}
@@ -200,6 +211,7 @@ function Seguridad({ onVolver }) {
         </div>
 
       </div>
+      {aviso && !aviso.ok && <AvisoModal aviso={aviso} onCerrar={cerrarAviso} />}
     </div>
   );
 }

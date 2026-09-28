@@ -201,6 +201,32 @@ describe('EL MENSAJE DE EMERGENCIA', () => {
         assert.ok(!/maps\.google\.com/.test(t), 'salió un enlace de mapa sin coordenadas.');
       }
     });
+
+    // ── G05 (27-sep-2026) · «MI UBICACIÓN» SOLO SI ES LA DE AHORA ────────────
+    //  La ubicación sale de `ubicacionDeAhora.js`. Si el GPS no contestó a
+    //  tiempo, lo que llega es un respaldo, y el mensaje tiene que decir cuál:
+    //  un punto viejo llamado «Mi ubicación» manda al familiar al sitio equivocado.
+    it('EL QUE MUERDE · con la de AHORA (o sin decir de dónde) dice «Mi ubicación», como siempre', () => {
+      for (const de of [undefined, 'ahora']) {
+        const t = armarMensajeDeEmergencia({ desde: 'enViaje', ubicacion: AQUI, ubicacionDe: de, viaje: UN_VIAJE, fallo: null });
+        assert.match(t, /📍 \*Mi ubicación:\* https:\/\/maps\.google\.com\/\?q=11\.5424,-72\.9019/);
+      }
+    });
+
+    it('EL QUE MUERDE · con un RESPALDO no dice «Mi ubicación»: dice cuál es, y el enlace va igual', () => {
+      const carro = armarMensajeDeEmergencia({ desde: 'enViaje', ubicacion: AQUI, ubicacionDe: 'carro', viaje: UN_VIAJE, fallo: null });
+      assert.match(carro, /Donde va el carro en que voy/);
+      const ultima = armarMensajeDeEmergencia({ desde: 'enViaje', ubicacion: AQUI, ubicacionDe: 'ultima', viaje: UN_VIAJE, fallo: null });
+      assert.match(ultima, /Mi última ubicación conocida/);
+      // Un valor desconocido se dice como «última conocida»: el lado prudente.
+      const rara = armarMensajeDeEmergencia({ desde: 'ajustes', ubicacion: AQUI, ubicacionDe: 'xyz', viaje: null, fallo: null });
+      assert.match(rara, /Mi última ubicación conocida/);
+      for (const t of [carro, ultima, rara]) {
+        assert.ok(!/Mi ubicación:/.test(t), 'un respaldo salió llamado «Mi ubicación»: el familiar lo tomaría por el sitio de ahora.');
+        assert.match(t, /no pude/, 'el respaldo no dice que la de ahora no se pudo conseguir.');
+        assert.match(t, /maps\.google\.com\/\?q=11\.5424,-72\.9019/, 'el respaldo perdió el enlace del mapa.');
+      }
+    });
   });
 
   // ── EL VIAJE, cuando sí se pudo leer ────────────────────────────────────

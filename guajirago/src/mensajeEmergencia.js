@@ -121,9 +121,13 @@ export const ENCABEZADOS = {
  *                   OJO a la diferencia con `viaje: null`, que significa «se
  *                   comprobó y no hay ninguno». Son dos cosas distintas y el
  *                   mensaje las dice distinto: ésa es la razón de este archivo.
+ * @param ubicacionDe  (opcional) de dónde salió `ubicacion`, como lo contesta
+ *                   `ubicacionDeAhora.js`: 'ahora' (o nada) = el GPS en este
+ *                   momento; 'carro' = donde va el carro; otro = la última
+ *                   conocida. Cambia CÓMO SE LLAMA el punto, no el punto.
  * @returns  el texto, listo para mandar
  */
-export function armarMensajeDeEmergencia({ desde, ubicacion, viaje, fallo }) {
+export function armarMensajeDeEmergencia({ desde, ubicacion, ubicacionDe, viaje, fallo }) {
   // Si el nombre del botón llega mal, se usa el de EMERGENCIA. Se tira hacia el
   // lado urgente a propósito: un encabezado más alarmante de lo que toca es un
   // susto; quedarse sin mensaje en una emergencia es otra cosa. Que los dos
@@ -139,7 +143,21 @@ export function armarMensajeDeEmergencia({ desde, ubicacion, viaje, fallo }) {
   // también echa fuera Infinity, y sigue dejando pasar el 0 (que es un sitio
   // de verdad, aunque quede en el golfo de Guinea).
   if (ubicacion && Number.isFinite(ubicacion.lat) && Number.isFinite(ubicacion.lng)) {
-    texto += `\n\n📍 *Mi ubicación:* https://maps.google.com/?q=${ubicacion.lat},${ubicacion.lng}`;
+    // 🔴 «MI UBICACIÓN» SOLO SI ES LA DE AHORA (27-sep-2026, G05). La ubicación
+    // sale de `ubicacionDeAhora.js`, y si el GPS no contestó a tiempo lo que
+    // llega es un RESPALDO: dónde va el carro, o la última conocida. Llamarlo
+    // «Mi ubicación» sería mandar un punto viejo como si fuera el de ahora, y el
+    // familiar iría allí. Sin `ubicacionDe` (o con 'ahora') se escribe lo de
+    // siempre; cualquier otro valor se dice como «última conocida», que es el
+    // lado prudente.
+    const enlace = `https://maps.google.com/?q=${ubicacion.lat},${ubicacion.lng}`;
+    if (ubicacionDe === undefined || ubicacionDe === 'ahora') {
+      texto += `\n\n📍 *Mi ubicación:* ${enlace}`;
+    } else if (ubicacionDe === 'carro') {
+      texto += `\n\n📍 *Donde va el carro en que voy* (no pude sacar mi ubicación en este momento): ${enlace}`;
+    } else {
+      texto += `\n\n📍 *Mi última ubicación conocida* (no pude actualizarla en este momento): ${enlace}`;
+    }
   } else {
     texto += '\n\n📍 No pude obtener mi ubicación exacta en este momento.';
   }
