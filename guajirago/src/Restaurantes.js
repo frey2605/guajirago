@@ -37,6 +37,10 @@ import MenuLateral from './MenuLateral';
 import { obtenerTokenFCM } from './Notificaciones';
 // Pedirle el GPS al teléfono, con sus tiempos en un solo sitio (G28).
 import { pedirGps } from './pedirGps';
+import { direccionDePunto, textoDeCoordenadas } from './direccionDePunto';
+
+// G30: Google no dio el nombre de la calle. Lo dice la ventanita de la ubicación, con su propio título.
+const SIN_NOMBRE_DE_CALLE = 'Encontramos tu ubicación, pero no el nombre de la calle. Dejamos tus coordenadas en la dirección: agrégale la calle, el barrio o una referencia para que el domiciliario te encuentre.';
 
 // ============================================================
 // GuajiraGo - Módulo de Restaurantes (lado del cliente)
@@ -212,17 +216,17 @@ function Restaurantes({ nombre, onVolver, foto, onCerrarSesion, onIrPerfil, onIr
     pedirGps(navigator, 'boton',
       (pos) => {
         const { latitude, longitude } = pos.coords;
-        if (window.google && window.google.maps) {
-          const geocoder = new window.google.maps.Geocoder();
-          geocoder.geocode({ location: { lat: latitude, lng: longitude } }, (results, status) => {
-            if (status === 'OK' && results && results[0]) setDireccion(results[0].formatted_address);
-            else setDireccion(`${latitude.toFixed(6)}, ${longitude.toFixed(6)}`);
-            setUbicando(false);
-          });
-        } else {
-          setDireccion(`${latitude.toFixed(6)}, ${longitude.toFixed(6)}`);
+        // G30: la dirección sale de la pieza común. Si Google no la da, se dejan las coordenadas (es lo único que
+        // tendría el domiciliario) y ya NO en silencio: la ventanita dice que falta la calle.
+        const geocodificador = window.google && window.google.maps ? new window.google.maps.Geocoder() : null;
+        direccionDePunto(geocodificador, latitude, longitude, (r) => {
+          if (r.ok) setDireccion(r.direccion);
+          else {
+            setDireccion(textoDeCoordenadas(latitude, longitude));
+            setAvisoUbic(SIN_NOMBRE_DE_CALLE);
+          }
           setUbicando(false);
-        }
+        });
       },
       () => { setUbicando(false); setAvisoUbic('No pudimos obtener tu ubicación. Activa el GPS y da permiso, o escribe la dirección a mano.'); },
     );
@@ -1012,7 +1016,7 @@ function Restaurantes({ nombre, onVolver, foto, onCerrarSesion, onIrPerfil, onIr
           <div onClick={() => setAvisoUbic('')} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', zIndex: 10000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
             <div onClick={(e) => e.stopPropagation()} style={{ background: '#FFFFFF', borderRadius: '20px', padding: '28px 24px', width: '100%', maxWidth: '340px', textAlign: 'center' }}>
               <div style={{ fontSize: '46px', marginBottom: '8px' }}>📍</div>
-              <p style={{ color: '#1A1A1E', fontSize: '17px', fontWeight: '900', margin: '0 0 8px' }}>Ubicación no disponible</p>
+              <p style={{ color: '#1A1A1E', fontSize: '17px', fontWeight: '900', margin: '0 0 8px' }}>{avisoUbic === SIN_NOMBRE_DE_CALLE ? 'Falta el nombre de la calle' : 'Ubicación no disponible'}</p>
               <p style={{ color: '#6B7280', fontSize: '14px', margin: '0 0 20px' }}>{avisoUbic}</p>
               <button onClick={() => setAvisoUbic('')} style={{ width: '100%', padding: '14px', background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F)', border: 'none', borderRadius: '12px', color: '#FFF', fontSize: '15px', fontWeight: '900', cursor: 'pointer' }}>Entendido</button>
             </div>

@@ -297,11 +297,15 @@ function correrResolver(punto, loEligioRef, onCambioPunto, direccion) {
         : cb(null, 'ZERO_RESULTS')),
     },
   };
+  // G30 (28-sep-2026): la pantalla le pide la dirección a la pieza común
+  // `direccionDePunto.js`. Se le da la pieza DE VERDAD, cargada del disco —no
+  // una de mentira—, y es ella la que habla con el geocodificador de arriba.
+  const { direccionDePunto } = cargarDeLaApp('guajirago/src/direccionDePunto.js');
   try {
     // eslint-disable-next-line no-new-func
     const resolver = new Function('onCambioPunto', 'loEligioRef', 'ultimoPuntoRef',
-      'geocoderRef', 'console', 'return ((lat, lng) => {' + cuerpo + '});')(
-      onCambioPunto, loEligioRef, { current: null }, geocoderRef, { log: () => {} });
+      'geocoderRef', 'console', 'direccionDePunto', 'return ((lat, lng) => {' + cuerpo + '});')(
+      onCambioPunto, loEligioRef, { current: null }, geocoderRef, { log: () => {} }, direccionDePunto);
     resolver(punto.lat, punto.lng);
   } catch (e) {
     return '`resolverDireccion` reventó al correrla: ' + e.message;

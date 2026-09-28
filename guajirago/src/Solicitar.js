@@ -33,6 +33,7 @@ import { armarMensajeDeEmergencia } from './mensajeEmergencia';
 import { ubicacionDeAhora } from './ubicacionDeAhora';
 // Pedirle el GPS al teléfono, con sus tiempos en un solo sitio (G28).
 import { pedirGps } from './pedirGps';
+import { direccionDePunto } from './direccionDePunto';
 // El mapa con ruta es UNO para el conductor y el pasajero (G29).
 import MapaConRuta from './MapaConRuta';
 // El número del contacto de emergencia: la MISMA regla que el registro y Seguridad (G10).
@@ -232,17 +233,14 @@ function MapaRecogida({ ubicacionInicial, onCambioPunto, onNoSePudo }) {
     // en que este punto se calculó. Si el pasajero arrastra mientras el
     // geocodificador contesta, esa respuesta se descarta igual por la clave.
     const loEligio = loEligioRef.current;
-    if (!geocoderRef.current) {
-      onCambioPunto({ lat, lng }, '', loEligio);
-      return;
-    }
-    geocoderRef.current.geocode({ location: { lat, lng } }, (results, status) => {
+    // G30: la dirección del punto sale de la pieza común (direccionDePunto.js). Sin Google cargado, contesta un fallo.
+    direccionDePunto(geocoderRef.current, lat, lng, (r) => {
       if (ultimoPuntoRef.current !== clave) return; // llegó tarde, el usuario ya movió el mapa
-      if (status === 'OK' && results && results[0]) {
-        onCambioPunto({ lat, lng }, results[0].formatted_address, loEligio);
+      if (r.ok) {
+        onCambioPunto({ lat, lng }, r.direccion, loEligio);
       } else {
         // Diagnóstico para F12: si aquí sale REQUEST_DENIED, falta habilitar la Geocoding API en el key de Maps.
-        console.log('Geocodificación inversa status:', status);
+        console.log('Geocodificación inversa status:', r.motivo);
         onCambioPunto({ lat, lng }, '', loEligio); // si falla, dejamos el campo de recogida como está (no metemos texto raro)
       }
     });
