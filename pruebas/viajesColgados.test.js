@@ -253,5 +253,11 @@ describe('LA CALCULADORA DE VIAJES COLGADOS', () => {
       'la app del conductor escribe estas fases: ' + vivas.join(', ') + '\n'
       + '   y la calculadora cuenta como «hay alguien ahí»: ' + [...RODANDO].sort().join(', ') + '\n'
       + '   Si se separan, un viaje en la fase nueva se cierra con el pasajero dentro.');
+    // G25 (28-sep-2026): y la lista de fases que la app DECLARA (`FASES_GUARDADAS`, estadosViaje.js) dice lo mismo:
+    // era la otra mitad del gemelo (estadosViaje.js ↔ viajesColgados.cjs) y nadie las comparaba.
+    const { cargarDeLaApp } = require('./cargar.cjs');
+    const { FASES_GUARDADAS } = cargarDeLaApp('guajirago/src/estadosViaje.js');
+    assert.deepStrictEqual([...RODANDO].sort(), FASES_GUARDADAS.filter((f) => f !== 'finalizado').sort(),
+      'FASES_GUARDADAS de la app (sin finalizado) y RODANDO del servidor se separaron');
   });
 });

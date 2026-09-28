@@ -176,6 +176,14 @@ const RECORRIDOS = [
     vigila: ['guajirago-admin/src/Viajes.js', 'guajirago-admin/src/valorViaje.js'],
   },
   {
+    nombre: 'estados-panel',
+    que: 'el buscador de 🛣️ Viajes del panel ofrece todos los estados («Con conductor», «Nadie lo tomó», «Quedó sin terminar») y encuentra un viaje expirado (G25; usa un solo viaje de mentira en pruebas)',
+    archivo: 'estados-panel.cjs',
+    // El tablero (App.js), la ficha del pasajero (Pasajeros.js) y las cajas de Mensajería usan la misma copia; esas
+    // cuentas las EJECUTA pruebas/estadosPanel.test.js viaje por viaje, y por eso no se nombran aquí.
+    vigila: ['guajirago-admin/src/Viajes.js', 'guajirago-admin/src/estadosViaje.js'],
+  },
+  {
     nombre: 'viaje-cerrado',
     que: 'el servidor cierra (expirado) el viaje en curso del pasajero: le sale la ventanita «Este viaje ya se cerró» con el porqué, «Entendido» la cierra y «Volver al inicio» lo lleva al inicio (G20)',
     archivo: 'viaje-cerrado.cjs',

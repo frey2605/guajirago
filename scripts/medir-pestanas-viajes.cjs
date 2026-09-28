@@ -50,7 +50,15 @@ function lasPestanas() {
 
   // «en curso» es una consulta a Firestore: where('estado','in',[...])
   const q = /where\('estado',\s*'in',\s*\[([^\]]+)\]/.exec(t);
-  const enCurso = q ? q[1].replace(/['"\s]/g, '').split(',').filter(Boolean) : null;
+  // G25 (28-sep-2026): las listas del panel salen de su copia atada (./estadosViaje.js). Si la pantalla nombra una
+  // lista de ahí, se lee la de la copia EJECUTADA.
+  const deLaCopia = (nombre) => {
+    if (!new RegExp("import\\s*\\{[^}]*\\b" + nombre + "\\b[^}]*\\}\\s*from\\s*'\\./estadosViaje'").test(t)) return null;
+    const copia = require('../pruebas/cargar.cjs').cargarDeLaApp('guajirago-admin/src/estadosViaje.js');
+    return Array.isArray(copia[nombre]) ? copia[nombre] : null;
+  };
+  const qCopia = /where\('estado',\s*'in',\s*([A-Z_]+)\)/.exec(t);
+  const enCurso = q ? q[1].replace(/['"\s]/g, '').split(',').filter(Boolean) : qCopia ? deLaCopia(qCopia[1]) : null;
 
   // Las otras dos son filtros sobre la lista ya cargada. Se sacan los estados
   // que compara cada uno.
@@ -76,6 +84,8 @@ function lasPestanas() {
       if (ayudante) {
         const laLista = new RegExp('const\\s+' + ayudante[1] + '\\s*=\\s*\\[([^\\]]*)\\]').exec(t);
         if (laLista) return laLista[1].replace(/['"\s]/g, '').split(',').filter(Boolean);
+        const importada = deLaCopia(ayudante[1]);
+        if (importada) return importada;
       }
       // Delega, pero no se pudo seguir: mejor decirlo que inventar una lista.
       return null;

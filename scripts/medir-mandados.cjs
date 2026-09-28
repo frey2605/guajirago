@@ -61,6 +61,12 @@ function lasCajas() {
     const m = new RegExp('const\\s+' + nombre + '\\s*=\\s*\\(\\w+\\)\\s*=>\\s*\\[([^\\]]*)\\]')
       .exec(t);
     if (m) return m[1].replace(/['"\s]/g, '').split(',').filter(Boolean);
+    // G25 (28-sep-2026): la lista sale de la copia atada del panel (./estadosViaje.js): se lee la EJECUTADA.
+    const deCopia = new RegExp('const\\s+' + nombre + '\\s*=\\s*\\(\\w+\\)\\s*=>\\s*([A-Z_]+)\\.includes').exec(t);
+    if (deCopia && new RegExp("import\\s*\\{[^}]*\\b" + deCopia[1] + "\\b[^}]*\\}\\s*from\\s*'\\./estadosViaje'").test(t)) {
+      const copia = require('../pruebas/cargar.cjs').cargarDeLaApp('guajirago-admin/src/estadosViaje.js');
+      if (Array.isArray(copia[deCopia[1]])) return copia[deCopia[1]];
+    }
     const uno = new RegExp('const\\s+' + nombre + "\\s*=\\s*\\(\\w+\\)\\s*=>\\s*\\w+\\s*===\\s*'([^']+)'")
       .exec(t);
     return uno ? [uno[1]] : null;

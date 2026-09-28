@@ -351,6 +351,18 @@ describe('AMARRES · el respaldo del panel y el de la app son el MISMO número a
   });
 });
 
+// G25 (28-sep-2026): las listas de estados del panel salen de SU copia atada (guajirago-admin/src/estadosViaje.js,
+// que pruebas/estadosPanel.test.js ata a la app). Los amarres de abajo exigen que la pantalla la IMPORTE y devuelven
+// la lista EJECUTADA de la copia: una lista escrita en la pantalla ya no vale.
+function deLaCopiaDelPanel(textoPantalla, nombre) {
+  const imp = /^import\s*\{([^}]*)\}\s*from\s*'\.\/estadosViaje';\s*$/m.exec(textoPantalla.replace(/\r\n/g, '\n'));
+  assert.ok(imp && imp[1].split(',').map((s) => s.trim()).includes(nombre),
+    'la pantalla usa `' + nombre + '` sin traerla de la copia del panel (./estadosViaje): esa lista no es la atada');
+  const copia = cargarDeLaApp('guajirago-admin/src/estadosViaje.js');
+  assert.ok(Array.isArray(copia[nombre]), 'la copia del panel no exporta la lista `' + nombre + '`');
+  return copia[nombre];
+}
+
 describe('AMARRES · el panel y la app dicen lo mismo', () => {
   it('la lista de VIAJES EN CURSO del panel es la MISMA que la de la app', () => {
     // El panel enseña "viajes activos" con una lista escrita a mano en
@@ -368,10 +380,11 @@ describe('AMARRES · el panel y la app dicen lo mismo', () => {
     // siempre sin que nadie lo escribiera nunca.
     const { ESTADOS_EN_CURSO } = cargarDeLaApp('guajirago/src/estadosViaje.js');
 
+    // G25 (28-sep-2026): la lista ya no se escribe en la pantalla; sale de la copia atada del panel.
     const panel = leer('guajirago-admin/src/Viajes.js');
-    const consulta = panel.match(/where\('estado',\s*'in',\s*\[([^\]]+)\]/);
-    assert.ok(consulta, 'el panel ya no consulta los viajes en curso con where(estado, in, [...])');
-    const delPanel = consulta[1].replace(/['"\s]/g, '').split(',').filter(Boolean);
+    const consulta = panel.match(/where\('estado',\s*'in',\s*([A-Z_]+)\)/);
+    assert.ok(consulta, 'el panel ya no consulta los viajes en curso con where(estado, in, LISTA_DE_LA_COPIA)');
+    const delPanel = deLaCopiaDelPanel(panel, consulta[1]);
 
     assert.deepStrictEqual(
       [...delPanel].sort(),
@@ -397,10 +410,11 @@ describe('AMARRES · el panel y la app dicen lo mismo', () => {
     const { ESTADOS_EN_CURSO } = cargarDeLaApp('guajirago/src/estadosViaje.js');
     const t = soloCodigo(leer('guajirago-admin/src/Mensajeria.js'));
 
-    const TODAS = /const\s+esEnCurso\s*=\s*\(\w+\)\s*=>\s*\[([^\]]*)\]\.includes/g;
+    // G25: la lista es una de la copia atada del panel (`const esEnCurso = (e) => ESTADOS_EN_CURSO.includes(e)`).
+    const TODAS = /const\s+esEnCurso\s*=\s*\(\w+\)\s*=>\s*([A-Z_]+)\.includes/g;
     const halladas = [...t.matchAll(TODAS)];
     assert.ok(halladas.length >= 1, 'guajirago-admin/src/Mensajeria.js ya no decide «en curso» '
-      + 'con una lista de estados (`const esEnCurso = (e) => [...].includes(e)`). Si se '
+      + 'con una lista de la copia del panel (`const esEnCurso = (e) => LISTA.includes(e)`). Si se '
       + 'cambió de forma, hay que mirar a mano que siga diciendo lo mismo que la app.');
     // 🔴 UNA SOLA VEZ. La primera versión cogía la primera que encontraba, y la
     // segunda opinión la burló dejando la buena arriba y metiendo OTRA
@@ -412,7 +426,7 @@ describe('AMARRES · el panel y la app dicen lo mismo', () => {
       + 'tapa a la de fuera, así que la pantalla puede estar contando con una lista que este '
       + 'amarre ni siquiera mira.');
     const enCurso = halladas[0];
-    const suya = enCurso[1].replace(/['"\s]/g, '').split(',').filter(Boolean);
+    const suya = deLaCopiaDelPanel(t, enCurso[1]);
 
     assert.deepStrictEqual([...suya].sort(), [...ESTADOS_EN_CURSO].sort(),
       'La lista de «en curso» del panel de MENSAJERÍA y la de la app se separaron.\n'
@@ -903,12 +917,9 @@ describe('AMARRES · el panel y la app dicen lo mismo', () => {
       = cargarDeLaApp('guajirago/src/estadosViaje.js');
     const t = soloCodigo(leer('guajirago-admin/src/Viajes.js'));
 
-    // La lista de «no completados», que usan la pestaña y la estadística.
-    const m = /const\s+NO_COMPLETADOS\s*=\s*\[([^\]]*)\]/.exec(t);
-    assert.ok(m, 'guajirago-admin/src/Viajes.js ya no tiene `NO_COMPLETADOS`. Esa lista es la '
-      + 'que recoge todo lo que no acabó bien; sin ella, los estados que no estén en ninguna '
-      + 'pestaña desaparecen del panel sin que nada avise.');
-    const noCompletados = m[1].replace(/['"\s]/g, '').split(',').filter(Boolean);
+    // La lista de «no completados», que usan la pestaña y la estadística. Desde G25 (28-sep-2026) la trae la
+    // copia atada del panel: se exige que la pantalla la importe y se usa la lista EJECUTADA de la copia.
+    const noCompletados = deLaCopiaDelPanel(t, 'NO_COMPLETADOS');
 
     const deberia = ESTADOS_TERMINADOS.filter((e) => e !== 'finalizado');
     assert.deepStrictEqual([...noCompletados].sort(), [...deberia].sort(),
@@ -920,10 +931,10 @@ describe('AMARRES · el panel y la app dicen lo mismo', () => {
     // Y AHORA LO QUE DE VERDAD IMPORTA: que entre las tres pestañas no se
     // quede ningún estado suelto. Se comprueba contra la lista entera de la
     // app, no contra una copia de aquí.
-    const enCurso = /where\('estado',\s*'in',\s*\[([^\]]+)\]/.exec(t);
-    assert.ok(enCurso, 'el panel ya no consulta los viajes en curso con where(estado, in, [...]).');
+    const enCurso = /where\('estado',\s*'in',\s*([A-Z_]+)\)/.exec(t);
+    assert.ok(enCurso, 'el panel ya no consulta los viajes en curso con where(estado, in, LISTA_DE_LA_COPIA).');
     const acogidos = new Set([
-      ...enCurso[1].replace(/['"\s]/g, '').split(',').filter(Boolean),
+      ...deLaCopiaDelPanel(t, enCurso[1]),
       'finalizado',
       ...noCompletados,
     ]);
@@ -954,9 +965,10 @@ describe('AMARRES · el panel y la app dicen lo mismo', () => {
     // Y QUE NO HAYA DOS. Una segunda `NO_COMPLETADOS` dentro de un bloque tapa
     // a la de fuera: vuelven las dos calculadoras, cada una con su número, y
     // las dos parecen ciertas. Probado por la segunda opinión: 80 en verde.
-    for (const nombre of ['NO_COMPLETADOS', elAyudante]) {
+    // (G25: `NO_COMPLETADOS` ya no se declara en la pantalla —viene de la copia—, así que ahí son CERO.)
+    for (const [nombre, deben] of [['NO_COMPLETADOS', 0], [elAyudante, 1]]) {
       const veces = (t.match(new RegExp('const\\s+' + nombre + '\\s*=', 'g')) || []).length;
-      assert.strictEqual(veces, 1,
+      assert.strictEqual(veces, deben,
         '«' + nombre + '» se declara ' + veces + ' veces en Viajes.js. La de dentro tapa a la '
         + 'de fuera, así que una parte de la pantalla cuenta con una lista y otra con otra.');
     }
@@ -1012,11 +1024,12 @@ describe('AMARRES · el panel y la app dicen lo mismo', () => {
     const { ESTADOS_TERMINADOS } = cargarDeLaApp('guajirago/src/estadosViaje.js');
     const t = soloCodigo(leer('guajirago-admin/src/Mensajeria.js'));
 
-    const m = /const\s+esCancelado\s*=\s*\(\w+\)\s*=>\s*\[([^\]]*)\]\.includes/.exec(t);
+    // G25: la lista es una de la copia atada del panel (`const esCancelado = (e) => NO_COMPLETADOS.includes(e)`).
+    const m = /const\s+esCancelado\s*=\s*\(\w+\)\s*=>\s*([A-Z_]+)\.includes/.exec(t);
     assert.ok(m, 'guajirago-admin/src/Mensajeria.js ya no decide «cancelado» con una lista '
-      + 'de estados. Si se cambió de forma, hay que mirar a mano que no se deje ninguno '
+      + 'de la copia del panel. Si se cambió de forma, hay que mirar a mano que no se deje ninguno '
       + 'fuera: los que no caben en ninguna caja se pintan como si el mandado siguiera vivo.');
-    const suya = m[1].replace(/['"\s]/g, '').split(',').filter(Boolean);
+    const suya = deLaCopiaDelPanel(t, m[1]);
 
     // TODOS los finales menos `finalizado`, que tiene su propia caja («Entregado»).
     const deberia = ESTADOS_TERMINADOS.filter((e) => e !== 'finalizado');
@@ -1070,10 +1083,12 @@ describe('AMARRES · el panel y la app dicen lo mismo', () => {
     //  pasaba: nombra `esperando` para excluirlo, y pinta de naranja todo lo
     //  demás. Es el cajón de sastre otra vez, puesto al principio en vez de al
     //  final. Mencionar un estado no es lo mismo que ser ese estado.
+    //  G25 (28-sep-2026): la pregunta positiva ya no es una lista a mano (`e === 'esperando'`, la CUARTA lista de
+    //  «en curso»): es `if (esEnCurso(e))`, la función que el amarre de «en curso» de arriba ata a la copia.
     for (const l of enNaranja) {
-      assert.match(l, /e\s*===\s*['"](esperando|aceptado)['"]/,
+      assert.match(l, /if\s*\(\s*esEnCurso\(\s*e\s*\)\s*\)/,
         'en `etiquetaEstado` hay un renglón que pinta de NARANJA —el color de «esto sigue '
-        + 'vivo»— sin ser un `e === \'esperando\'` o `e === \'aceptado\'`:\n     '
+        + 'vivo»— sin ser un `if (esEnCurso(e))`:\n     '
         + l.trim().slice(0, 100) + '\n'
         + '   Ése es el cajón de sastre que tuvo 5 de 12 mandados muertos disfrazados de '
         + 'vivos durante meses. Lo desconocido se dice, no se pinta de naranja.');
@@ -2109,7 +2124,10 @@ describe('LA RUTINA DE VIAJES COLGADOS · obedece a la calculadora', () => {
     const lista = cuerpo.match(/for\s*\(\s*const\s+estado\s+of\s*\[([^\]]*)\]/);
     assert.ok(lista, 'la rutina ya no recorre una lista de estados: mírala entera.');
     const estados = lista[1].replace(/["'\s]/g, '').split(',').filter(Boolean).sort();
-    assert.deepStrictEqual(estados, ['aceptado', 'esperando'],
+    // G25 (28-sep-2026): contra la FUENTE (`ESTADOS_EN_CURSO` de la app), no contra una lista escrita aquí: si mañana
+    // entra un estado vivo nuevo y la rutina no lo mira, sus viajes no los cierra nadie.
+    const { ESTADOS_EN_CURSO: vivos } = cargarDeLaApp('guajirago/src/estadosViaje.js');
+    assert.deepStrictEqual(estados, [...vivos].sort(),
       'la rutina consulta estos estados: ' + estados.join(', ') + '\n'
       + '   y tienen que ser los dos: `esperando` (búsquedas colgadas) y `aceptado`\n'
       + '   (viajes que nadie cerró). Si se cae `aceptado`, se apaga el motivo entero\n'
