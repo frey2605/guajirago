@@ -3535,9 +3535,14 @@ describe('LOS PUERTOS DEL EMULADOR · propios donde hace falta, y escritos en un
     // 15: no podía fallar nunca (ronda 2 de segunda opinión). Va con `--yes` y no `--no-install`:
     // sin global, `--no-install` se niega aunque la copia esté en el caché (medido el 25-sep). Dentro
     // de `npm test` no baja nada: la tanda ya la bajó al arrancar con la misma orden.
+    // 🪤 (27-sep-2026) Con los emuladores corriendo, npx a veces IMPRIME la versión y aun así sale con código 2
+    // sin decir nada: esta prueba caía una de cada varias tandas. Lo que se juzga es la versión que imprime,
+    // así que se toma lo que imprimió; si no imprime una versión, sí cae, y con lo que dijo.
     const f = fabrica();
-    const salida = require('node:child_process').execSync('npx --yes firebase-tools@' + f.mayor + ' --version',
-      { cwd: RAIZ, encoding: 'utf8', timeout: 3 * 60 * 1000 }).trim().split(/\r?\n/).pop();
+    const r = require('node:child_process').spawnSync('npx --yes firebase-tools@' + f.mayor + ' --version',
+      { cwd: RAIZ, encoding: 'utf8', timeout: 3 * 60 * 1000, shell: true });
+    const salida = String(r.stdout || '').trim().split(/\r?\n/).pop();
+    assert.match(salida, /^\d+\.\d+\.\d+$/, 'npx no dijo qué versión corre (salió ' + r.status + '): ' + String(r.stderr || r.error || '').slice(0, 300));
     assert.strictEqual(f.version, salida,
       'la tanda corre firebase-tools ' + salida + ' y los de fábrica se leyeron de la ' + f.version + ' (' + f.origen + ')');
   });
