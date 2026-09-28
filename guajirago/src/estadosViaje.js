@@ -99,6 +99,46 @@ export const ESTADOS_MERCADO = ['esperando'];
 export const ESTADOS_EN_CURSO = [...ESTADOS_MERCADO, 'aceptado'];
 export const ESTADOS_TERMINADOS = ['finalizado', 'cancelado', 'cancelado_conductor', 'vencido', 'expirado'];
 
+// ═══════════════════════════════════════════════════════════════════════════
+// LOS FINALES QUE PONE EL SERVIDOR, Y LO QUE SE LE DICE A QUIEN IBA EN EL VIAJE — G20 (28-sep-2026)
+// ═══════════════════════════════════════════════════════════════════════════
+//  La rutina `expirarViajesColgados` (functions/index.js, la decisión en functions/viajesColgados.cjs) cierra los
+//  viajes que nadie cerró: `vencido` (nadie lo tomó) o `expirado` (lo tomaron y se quedó a medias), y escribe el
+//  porqué en `motivoExpiracion`. Hasta hoy ni el conductor ni el pasajero se enteraban: medido con
+//  `scripts/medir-viaje-cerrado.cjs`, 17 casos en que la pantalla seguía en el viaje; en producción el servidor ha
+//  cerrado 8 viajes, los 8 con conductor dentro (4 con el pasajero montado).
+//
+//  Son los dos únicos finales que no escribe NINGUNA de las dos personas del viaje, así que son los que su pantalla
+//  tiene que enterarse por sí sola. `pruebas/viajeCerrado.test.js` los ata a lo que de verdad puede devolver
+//  `queHacerConElViaje`: si la rutina aprende un final nuevo, la prueba se pone roja.
+export const ESTADOS_QUE_CIERRA_EL_SERVIDOR = ['vencido', 'expirado'];
+
+/**
+ * LA VENTANITA DEL CIERRE: qué se le dice a quien tenía el viaje abierto cuando el servidor lo cerró.
+ *
+ * @param viaje  el documento del viaje, tal cual
+ * @param quien  'conductor' o 'pasajero' (cambia solo la última frase: qué puede hacer ahora)
+ * @returns  `{ icono, titulo, texto }` para `AvisoModal`, o `null` si ese final no lo puso el servidor
+ *
+ * El porqué sale de `motivoExpiracion`, el campo que ya escribe el servidor (no `razonCancelacion`, que es de las
+ * cancelaciones de las personas). Los 8 viajes que hay cerrados son de antes de que el servidor lo escribiera, así
+ * que sin él se dice lo que se sabe por el estado, sin inventar minutos.
+ */
+export function avisoDelCierre(viaje, quien) {
+  const v = viaje || {};
+  if (!ESTADOS_QUE_CIERRA_EL_SERVIDOR.includes(v.estado)) return null;
+  const motivo = typeof v.motivoExpiracion === 'string' ? v.motivoExpiracion.trim() : '';
+  const porque = motivo
+    ? 'El sistema lo cerró: ' + motivo + '.'
+    : (v.estado === 'vencido'
+      ? 'Nadie lo tomó a tiempo y el sistema lo cerró.'
+      : 'Pasó demasiado tiempo sin que se terminara y el sistema lo cerró.');
+  const ahora = quien === 'conductor'
+    ? ' Ya quedaste libre para recibir viajes nuevos.'
+    : ' Si todavía lo necesitas, pide uno nuevo.';
+  return { icono: '⏱️', titulo: 'Este viaje ya se cerró', texto: porque + ahora };
+}
+
 // Las fases que SÍ se guardan en el viaje (`AppConductor.js:980` y `:1006`).
 // `recogiendo` no está: no se guarda nunca.
 export const FASES_GUARDADAS = ['en_punto', 'en_viaje', 'finalizado'];

@@ -14,6 +14,7 @@ import { cop } from './moneda';
 import { aplicarDescuento, armarDescuentoInfo, tarifaParaPasajero } from './descuentos';
 import { generarCodigoSeguridad, guardarCodigoDeViaje, cargarCodigoDeViaje } from './codigoSeguridad';
 import { armarViajeNuevo } from './viajeNuevo';
+import { ESTADOS_QUE_CIERRA_EL_SERVIDOR, avisoDelCierre } from './estadosViaje';
 // Los datos que comparten las pantallas salen de archivos únicos (SEGUNDA LEY).
 import { centroRiohacha, BOUNDS_RIOHACHA } from './riohacha';
 import { RESPUESTAS_RAPIDAS, RAZONES_CANCELACION_PASAJERO } from './textosViaje';
@@ -720,6 +721,21 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
     if (lat != null && lng != null) setUbicacionRecogida({ lat, lng });
   }, [viaje?.pasajeroLat, viaje?.pasajeroLng]);
 
+  // G20: si el SERVIDOR cerró el viaje (vencido o expirado) mientras el pasajero lo tenía en curso, sale del viaje y
+  // le queda la ventanita que dice por qué (con «Volver al inicio» debajo). Antes seguía viendo a su conductor en camino
+  // de un viaje que ya no existía. Lo usan LOS DOS vigilantes de abajo (el vivo y el respaldo de cada 5 s): una sola
+  // vez escrito. Solo en fase1/fase2: mientras busca, el `vencido` lo escribe su propio teléfono y tiene su pantalla.
+  const [viajeCerrado, setViajeCerrado] = useState(null);
+  const elServidorCerroElViaje = (data) => {
+    if (!ESTADOS_QUE_CIERRA_EL_SERVIDOR.includes(data.estado)) return false;
+    if (pantallaRef.current !== 'fase1' && pantallaRef.current !== 'fase2') return false;
+    clearInterval(contadorRef.current);
+    const cierre = avisoDelCierre(data, 'pasajero');
+    setViajeCerrado(cierre);
+    setAviso(cierre);
+    return true;
+  };
+
   useEffect(() => {
     if (!viajeId) return;
 
@@ -733,6 +749,7 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
           clearInterval(contadorRef.current);
           setPantalla('cancelado_conductor');
         }
+        if (elServidorCerroElViaje(data)) return;
         if (data.conductorEnPunto && pantallaRef.current === 'fase1') setViaje(data);
         // Respaldo: detectar si un conductor aceptó (para Safari que tarda en el listener)
         if (data.estado === 'confirmando' && data.conductorId && pantallaRef.current === 'esperando' && !celebrando && !confirmacionMostradaRef.current) {
@@ -782,6 +799,8 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
         setPantalla('cancelado_conductor');
         return;
       }
+
+      if (elServidorCerroElViaje(data)) return;
 
       // Contraoferta de un conductor: agregar a la lista si no está ya
       if (data.estado === 'contraoferta' && data.conductorId) {
@@ -1467,6 +1486,20 @@ const PanelEmergencia = () => (
           <button onClick={confirmarViaje} disabled={!!ocupado} style={{ flex: 2, padding: '16px', background: 'linear-gradient(135deg, #2ECC71, #27AE60)', border: 'none', borderRadius: '16px', color: '#FFFFFF', fontSize: '17px', fontWeight: '900', cursor: 'pointer' }}>{texto('confirmar', 'Confirmando…', '✅ Sí, confirmar')}</button>
         </div>
         <style>{`@keyframes pulso { from { transform: scale(1); } to { transform: scale(1.12); } }`}</style>
+        <AvisoModal aviso={aviso} onCerrar={() => setAviso(null)} />
+      </div>
+    );
+  }
+
+  // G20: el servidor cerró el viaje. El pasajero ya no ve el viaje: la ventanita (la de siempre, `aviso`) dice por
+  // qué, y debajo queda lo mismo escrito con el botón para volver al inicio.
+  if (viajeCerrado) {
+    return (
+      <div style={{ backgroundColor: '#FFFFFF', minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px 24px' }}>
+        <div style={{ fontSize: '80px', marginBottom: '24px' }}>{viajeCerrado.icono}</div>
+        <h2 style={{ color: '#1A1A1E', fontSize: '24px', fontWeight: '900', margin: '0 0 12px', textAlign: 'center' }}>{viajeCerrado.titulo}</h2>
+        <p style={{ color: '#6B7280', fontSize: '14px', margin: '0 0 32px', textAlign: 'center' }}>{viajeCerrado.texto}</p>
+        <button onClick={onVolver} style={{ width: '100%', padding: '18px', background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)', border: 'none', borderRadius: '16px', color: '#1A1A1E', fontSize: '18px', fontWeight: '900', cursor: 'pointer' }}>Volver al inicio</button>
         <AvisoModal aviso={aviso} onCerrar={() => setAviso(null)} />
       </div>
     );

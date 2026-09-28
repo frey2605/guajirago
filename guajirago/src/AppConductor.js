@@ -8,7 +8,7 @@ import { porQueNoLeToca } from './leTocaElViaje';
 import { CONFIG_TARIFAS_DEFECTO, calcularTarifaMinima } from './tarifas';
 import { CONFIG_COMPARTIDA } from './configApp';
 import { cop } from './moneda';
-import { ESTADOS_MERCADO, ESTADOS_TERMINADOS } from './estadosViaje';
+import { ESTADOS_MERCADO, ESTADOS_TERMINADOS, ESTADOS_QUE_CIERRA_EL_SERVIDOR, avisoDelCierre } from './estadosViaje';
 import { valorDelViaje } from './valorViaje';
 // Los datos que comparten las pantallas salen de archivos únicos (SEGUNDA LEY).
 import { centroRiohacha } from './riohacha';
@@ -767,7 +767,9 @@ function AppConductor({ nombre, telefono, placa, vehiculo, tipoVehiculo, onCerra
         return;
       }
 
-      if (data.estado === 'cancelado' || data.estado === 'cancelado_conductor') {
+      // G20: CUALQUIER final suelta el vigilante, no solo las dos cancelaciones. Con la lista corta, un viaje que el
+      // servidor cerraba (`vencido`, `expirado`) o que ya se terminó seguía vigilado hasta el tope de 3 minutos.
+      if (ESTADOS_TERMINADOS.includes(data.estado)) {
         cerrarEsteVigilante();
         return;
       }
@@ -1030,6 +1032,16 @@ const cargarSaldo = useCallback(async (uid) => {
           clearInterval(contadorRef.current);
           setFase('cancelado_pasajero');
           setViajeActual({ ...viajeActual, razonCancelacion: data.razonCancelacion });
+        }
+        // G20: si el SERVIDOR cerró el viaje (vencido o expirado), el conductor sale de él y una ventanita le dice por
+        // qué. Antes se quedaba en «voy a recoger» o «en viaje» de un viaje que ya no existía. Al conductor ya lo soltó
+        // el servidor (`onViajeCerrado`), así que aquí no se escribe nada: solo se deja de enseñar el viaje.
+        if (ESTADOS_QUE_CIERRA_EL_SERVIDOR.includes(data.estado)) {
+          clearInterval(contadorRef.current);
+          setAviso(avisoDelCierre(data, 'conductor'));
+          setMostrarCancelacion(false); setMostrarCodigo(false); setMostrarCodigoDescuento(false);
+          setFase(null); faseRef.current = null; setViajeActual(null); setUbicacionPasajero(null); setDestinoCoords(null); setActivo(true);
+          return;
         }
         if (data.fase === 'en_viaje' && fase !== 'en_viaje') {
           setFase('en_viaje');
