@@ -26,6 +26,7 @@
 | `node robot/revisar-panel.cjs "Robot Taxi De Prueba"` | el panel enseña los 6 documentos del conductor, cargados |
 | `node robot/radio-panel.cjs` | 👑 Superadmin: con el radio de búsqueda borrado (queda en 0) no guarda, lo dice, y config/global no cambia |
 | `node robot/portero.cjs [horas]` | cuántas llamadas llegaron a pruebas con el sello de App Check (solo lectura) |
+| `node robot/me-aceptaron.cjs` | el pasajero acepta a los 12 min de pedir (confirmarConductor en pruebas) y la app del conductor dice «¡Trato hecho!» y va a recoger (G24) |
 
 ## Pantallas: cómo se manejan (27-sep-2026)
 
@@ -315,6 +316,20 @@ la placa de `conductores/{uid}` (la escribe su GPS con la misma placa que va en 
 - Si la consulta fallara (índice `conductorId + estado + fechaSolicitud` o reglas), el historial lo escribe en la
   consola (`console.error`) y «Ganancias» se queda callada en $ 0: el recorrido mira la consola por eso.
 
+### me-aceptaron (G24, 28-sep-2026)
+- 🔑 **Un viaje ACEPTADO sí se puede fabricar desde afuera**, y como en la calle: el pasajero de prueba crea su viaje
+  (las reglas le dejan crearlo sin `conductorId`), el taxista deja su oferta en `viajes/{id}/contraofertas/{suUid}`, y
+  el PASAJERO llama a `confirmarConductor` (`db.llamar(nombre, datos)` de `comun.cjs`, anotado en el cuaderno como
+  `cloudfunctions`). Lo que dice arriba G23 («solo lo pone el servidor») sigue siendo cierto: lo pone el servidor, pero
+  el robot se lo puede pedir. El servidor de pruebas contestó `{"ok":true}`.
+- El taxista tiene que estar LIBRE antes (`enViajeId: null`): con una marca de otro viaje el servidor contesta «ocupado».
+- El caso que importa es la aceptación TARDÍA: la fecha de solicitud se escribe 12 min atrás (el servidor deja aceptar
+  hasta 20). Con el código de antes publicado en pruebas el robot salió 🔴 («no se enteró»: el servidor ya había
+  confirmado y la app del taxista seguía en la lista); con el arreglo, «¡Trato hecho!» y «YENDO A RECOGER» con el origen.
+- Cuesta UNA comisión de los créditos de prueba del taxista en cada corrida (la cobra el servidor; las reglas no dejan
+  devolverla). Al final el taxista cancela el viaje y su ficha vuelve a como estaba (enViajeId, ocupado, activo).
+- El 403 de la consola sale igual que en los demás recorridos.
+
 ## Lo que el robot dejó creado en pruebas
 
 - 27-sep-2026: «Robot Taxi De Prueba» (robot.taxi.1790508222079@gg.test) y
@@ -339,3 +354,5 @@ la placa de `conductores/{uid}` (la escribe su GPS con la misma placa que va en 
   tarifaValor 10.000 y contraofertaValor 11.000; cada corrida de `valor-viaje-panel.cjs` lo reusa (no se amontonan).
 - 28-sep-2026 en adelante: un viaje de Taxi de pasajero@gg.test por cada corrida de `viaje-cerrado.cjs`, ya `expirado`
   por «el sistema» y sin conductor (el primero: qo4yNd13wlwWQs3We2D1).
+- 28-sep-2026 en adelante: un viaje de Taxi `viajes/robotG24<hora>` de pasajero@gg.test por cada corrida de
+  `me-aceptaron.cjs`, aceptado por el taxista y ya `cancelado_conductor` (el primero: robotG241790613250747).

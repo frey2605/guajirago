@@ -98,6 +98,18 @@ async function entrarALaBase(correo) {
     // Cambia SOLO los campos dados (como un merge): nunca reescribe el documento entero.
     cambiar: (ruta, campos) => pedir(ruta + '?' + Object.keys(campos).map((k) => 'updateMask.fieldPaths=' + encodeURIComponent(k)).join('&'),
       { method: 'PATCH', body: JSON.stringify({ fields: N.aCampos(campos) }) }),
+    // Llama a una función del servidor (onCall) de la base de PRUEBAS como esta persona, igual que la app con
+    // httpsCallable. G24: un viaje aceptado solo lo escribe `confirmarConductor`, y la llama el pasajero.
+    llamar: async (nombre, datos) => {
+      anotarLlamada('cloudfunctions');
+      const x = await fetch('https://us-central1-' + proyecto + '.cloudfunctions.net/' + nombre, {
+        method: 'POST', headers: { Authorization: 'Bearer ' + s.idToken, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ data: datos }),
+      });
+      const j = await x.json().catch(() => ({}));
+      if (!x.ok || j.error) throw new Error('El servidor de pruebas rechazó ' + nombre + ': ' + ((j.error || {}).message || x.status));
+      return j.result;
+    },
   };
 }
 

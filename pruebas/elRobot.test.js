@@ -68,7 +68,9 @@ describe('EL PORTERO · distingue al robot de quien habla sin sello (27-sep-2026
     const t = fs.readFileSync(path.join(RAIZ, 'robot', 'comun.cjs'), 'utf8').replace(/\r\n/g, '\n');
     assert.match(t, /anotarLlamada\('identitytoolkit'\);\n  const r = await fetch\('https:\/\/identitytoolkit/, '⛔ la entrada a la base no se anota');
     assert.match(t, /const pedir = async \(ruta, opciones = \{\}\) => \{\n    anotarLlamada\('firestore'\);\n    const x = await fetch\(/, '⛔ las lecturas y cambios no se anotan');
-    assert.strictEqual((t.match(/await fetch\(/g) || []).length, 2, '⛔ hay una llamada nueva a la base que no pasa por el cuaderno');
+    // G24 (28-sep-2026): la tercera es la de las funciones del servidor (`llamar`), y también se anota.
+    assert.match(t, /llamar: async \(nombre, datos\) => \{\n      anotarLlamada\('cloudfunctions'\);\n      const x = await fetch\(/, '⛔ las llamadas a las funciones del servidor no se anotan');
+    assert.strictEqual((t.match(/await fetch\(/g) || []).length, 3, '⛔ hay una llamada nueva a la base que no pasa por el cuaderno');
   });
 });
 
