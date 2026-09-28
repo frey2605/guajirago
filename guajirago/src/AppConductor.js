@@ -10,8 +10,6 @@ import { CONFIG_COMPARTIDA, segundosDeEspera, BUSQUEDA } from './configApp';
 import { cop } from './moneda';
 import { ESTADOS_MERCADO, ESTADOS_TERMINADOS, ESTADOS_QUE_CIERRA_EL_SERVIDOR, avisoDelCierre, comoTermino, meAceptaronEsteViaje } from './estadosViaje';
 import { consultaDeGanancias, resumenDeGanancias } from './gananciasConductor';
-// Los datos que comparten las pantallas salen de archivos únicos (SEGUNDA LEY).
-import { centroRiohacha } from './riohacha';
 // REGLA 9 · qué se le dice al conductor cuando el servidor dice que no. Mismo
 // archivo que usan el panel y aliados, copia idéntica byte a byte.
 import { motivoDeRechazo, apuntarRechazo } from './avisoRechazo';
@@ -34,6 +32,8 @@ import MenuLateral from './MenuLateral';
 import Logo from './Logo';
 // Pedirle el GPS al teléfono, con sus tiempos en un solo sitio (G28).
 import { pedirGps, seguirGps } from './pedirGps';
+// El mapa con ruta es UNO para el conductor y el pasajero (G29).
+import MapaConRuta from './MapaConRuta';
 
 // Valores por defecto (respaldo). Se reemplazan por los de config/global cuando cargan.
 const CONFIG_APP_DEFECTO = {
@@ -124,88 +124,6 @@ function MensajeGrande({ mensaje, onCerrar }) {
       <button onClick={onCerrar} style={{ marginTop: '28px', padding: '16px 40px', background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F)', border: 'none', borderRadius: '16px', color: '#FFFFFF', fontSize: '16px', fontWeight: '900', cursor: 'pointer' }}>Entendido</button>
     </div>
   );
-}
-
-function MapaConductor({ ubicacionConductor, ubicacionDestino, colorRuta, tipo, onTiempo }) {
-  const mapRef = useRef(null);
-  const mapaRef = useRef(null);
-  const marcadorConductorRef = useRef(null);
-  const marcadorDestinoRef = useRef(null);
-  const rutaRef = useRef(null);
-  const ajustadoRef = useRef(false);
-
-  useEffect(() => {
-    if (!window.google || !mapRef.current || mapaRef.current) return;
-    mapaRef.current = new window.google.maps.Map(mapRef.current, {
-      center: ubicacionConductor || centroRiohacha,
-      zoom: 15,
-      styles: [], // mapa blanco (tema normal de Google)
-      zoomControl: true,
-      mapTypeControl: false,
-      streetViewControl: false,
-      fullscreenControl: false,
-      gestureHandling: 'greedy',
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(() => {
-    if (!mapaRef.current || !window.google || !ubicacionConductor) return;
-    if (marcadorConductorRef.current) {
-      marcadorConductorRef.current.setPosition(ubicacionConductor);
-    } else {
-      marcadorConductorRef.current = new window.google.maps.Marker({
-        position: ubicacionConductor,
-        map: mapaRef.current,
-        label: { text: tipo === 'Taxi' ? '🚗' : '🏍️', fontSize: '28px' },
-      });
-      mapaRef.current.setCenter(ubicacionConductor);
-    }
-  }, [ubicacionConductor, tipo]);
-
-  useEffect(() => {
-    if (!mapaRef.current || !window.google || !ubicacionDestino) return;
-    if (marcadorDestinoRef.current) {
-      marcadorDestinoRef.current.setPosition(ubicacionDestino);
-    } else {
-      marcadorDestinoRef.current = new window.google.maps.Marker({
-        position: ubicacionDestino,
-        map: mapaRef.current,
-        label: { text: '📍', fontSize: '24px' },
-      });
-    }
-  }, [ubicacionDestino]);
-
-  useEffect(() => {
-    if (!mapaRef.current || !window.google || !ubicacionConductor || !ubicacionDestino) return;
-    const directionsService = new window.google.maps.DirectionsService();
-    directionsService.route({
-      origin: ubicacionConductor,
-      destination: ubicacionDestino,
-      travelMode: window.google.maps.TravelMode.DRIVING,
-    }, (result, status) => {
-      if (status === 'OK') {
-        if (rutaRef.current) rutaRef.current.setMap(null);
-        rutaRef.current = new window.google.maps.DirectionsRenderer({
-          directions: result,
-          map: mapaRef.current,
-          suppressMarkers: true,
-          polylineOptions: { strokeColor: colorRuta || '#2ECC71', strokeWeight: 5 },
-        });
-        const leg = result.routes[0].legs[0];
-        if (onTiempo) onTiempo(leg.duration.text, leg.distance.text);
-        if (!ajustadoRef.current) {
-          ajustadoRef.current = true;
-          const bounds = new window.google.maps.LatLngBounds();
-          bounds.extend(ubicacionConductor);
-          bounds.extend(ubicacionDestino);
-          mapaRef.current.fitBounds(bounds, { padding: 80 });
-        }
-      }
-    });
-  }, [ubicacionConductor, ubicacionDestino, colorRuta, onTiempo]);
-
-  return <div ref={mapRef} style={{ width: '100%', height: '100vh' }} />;
 }
 
 function HistorialConductor({ onVolver }) {
@@ -497,6 +415,8 @@ function AppConductor({ nombre, telefono, placa, vehiculo, tipoVehiculo, onCerra
   const [viajesEscuchando, setViajesEscuchando] = useState([]);
   const [tiempoLlegada, setTiempoLlegada] = useState(null);
   const [distancia, setDistancia] = useState(null);
+  // La tarjeta de abajo del viaje: el mapa con ruta deja su alto libre al encuadrar (G29).
+  const tarjetaRef = useRef(null);
   const [respuestaPasajero, setRespuestaPasajero] = useState(null);
   const [mensajeGrande, setMensajeGrande] = useState(null);
   // REGLA 9 · el aviso de «no se pudo» tiene su PROPIA ventanita. Reusar la de
@@ -1402,11 +1322,13 @@ useEffect(() => {
             </div>
           </div>
         )}
-        <MapaConductor
-          ubicacionConductor={ubicacion}
-          ubicacionDestino={fase === 'en_punto' ? destinoCoords : ubicacionPasajero}
+        <MapaConRuta
+          desde={ubicacion}
+          hasta={fase === 'en_punto' ? destinoCoords : ubicacionPasajero}
           colorRuta={fase === 'en_punto' ? '#FF7A2F' : '#2ECC71'}
           tipo={viajeActual?.tipo}
+          centrarEn="desde"
+          tarjetaRef={tarjetaRef}
           onTiempo={(t, d) => { setTiempoLlegada(t); setDistancia(d); }}
         />
         <div style={{ position: 'absolute', top: '16px', left: '16px', right: '16px', zIndex: 10, background: 'rgba(255,255,255,0.95)', borderRadius: '16px', padding: '12px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -1421,7 +1343,7 @@ useEffect(() => {
             <p style={{ color: '#FFFFFF', fontSize: '14px', fontWeight: 'bold', margin: '0' }}>💬 Pasajero: "{respuestaPasajero}"</p>
           </div>
         )}
-        <div style={{ position: 'absolute', bottom: '0', left: '0', right: '0', zIndex: 10, background: 'rgba(255,255,255,0.97)', borderRadius: '24px 24px 0 0', padding: '20px' }}>
+        <div ref={tarjetaRef} style={{ position: 'absolute', bottom: '0', left: '0', right: '0', zIndex: 10, background: 'rgba(255,255,255,0.97)', borderRadius: '24px 24px 0 0', padding: '20px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
             <div><p style={{ color: '#6B7280', fontSize: '10px', margin: '0' }}>PASAJERO</p><p style={{ color: '#1A1A1E', fontSize: '14px', fontWeight: 'bold', margin: '4px 0 0' }}>{viajeActual?.pasajeroNombre || 'Pasajero'}</p></div>
             <div style={{ textAlign: 'right' }}><p style={{ color: '#6B7280', fontSize: '10px', margin: '0' }}>TARIFA</p><p style={{ color: '#2ECC71', fontSize: '20px', fontWeight: '900', margin: '4px 0 0' }}>{viajeActual?.tarifa}</p></div>
@@ -1503,12 +1425,12 @@ useEffect(() => {
             </div>
           </div>
         )}
-        <MapaConductor ubicacionConductor={ubicacion} ubicacionDestino={destinoCoords} colorRuta="#FF7A2F" tipo={viajeActual.tipo} onTiempo={(t, d) => { setTiempoLlegada(t); setDistancia(d); }} />
+        <MapaConRuta desde={ubicacion} hasta={destinoCoords} colorRuta="#FF7A2F" tipo={viajeActual.tipo} centrarEn="desde" tarjetaRef={tarjetaRef} onTiempo={(t, d) => { setTiempoLlegada(t); setDistancia(d); }} />
         <div style={{ position: 'absolute', top: '16px', left: '16px', right: '16px', zIndex: 10, background: 'rgba(255,255,255,0.95)', borderRadius: '16px', padding: '12px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div><p style={{ color: '#FF7A2F', fontSize: '11px', margin: '0', letterSpacing: '1px', fontWeight: 'bold' }}>🚀 VIAJE EN CURSO</p><p style={{ color: '#1A1A1E', fontSize: '15px', fontWeight: '900', margin: '2px 0 0' }}>🏁 {viajeActual.destino}</p></div>
           {tiempoLlegada && <div style={{ textAlign: 'right' }}><p style={{ color: '#FF7A2F', fontSize: '20px', fontWeight: '900', margin: '0' }}>⏱️ {tiempoLlegada}</p><p style={{ color: '#6B7280', fontSize: '11px', margin: '0' }}>{distancia}</p></div>}
         </div>
-        <div style={{ position: 'absolute', bottom: '0', left: '0', right: '0', zIndex: 10, background: 'rgba(255,255,255,0.97)', borderRadius: '24px 24px 0 0', padding: '20px' }}>
+        <div ref={tarjetaRef} style={{ position: 'absolute', bottom: '0', left: '0', right: '0', zIndex: 10, background: 'rgba(255,255,255,0.97)', borderRadius: '24px 24px 0 0', padding: '20px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
             <div><p style={{ color: '#6B7280', fontSize: '10px', margin: '0' }}>PASAJERO</p><p style={{ color: '#1A1A1E', fontSize: '14px', fontWeight: 'bold', margin: '4px 0 0' }}>{viajeActual.pasajeroNombre || 'Pasajero'}</p></div>
             <div style={{ textAlign: 'right' }}><p style={{ color: '#6B7280', fontSize: '10px', margin: '0' }}>TARIFA</p><p style={{ color: '#2ECC71', fontSize: '20px', fontWeight: '900', margin: '4px 0 0' }}>{viajeActual.tarifa}</p></div>

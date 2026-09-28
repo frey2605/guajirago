@@ -33,6 +33,8 @@ import { armarMensajeDeEmergencia } from './mensajeEmergencia';
 import { ubicacionDeAhora } from './ubicacionDeAhora';
 // Pedirle el GPS al teléfono, con sus tiempos en un solo sitio (G28).
 import { pedirGps } from './pedirGps';
+// El mapa con ruta es UNO para el conductor y el pasajero (G29).
+import MapaConRuta from './MapaConRuta';
 // El número del contacto de emergencia: la MISMA regla que el registro y Seguridad (G10).
 import { celularDiezCifras } from './telefonoValido';
 
@@ -415,69 +417,6 @@ function MapaRecogida({ ubicacionInicial, onCambioPunto, onNoSePudo }) {
   );
 }
 
-function MapaPasajero({ ubicacionPasajero, ubicacionConductor, tipo, onTiempo }) {
-  const mapRef = useRef(null);
-  const mapaRef = useRef(null);
-  const marcadorPasajeroRef = useRef(null);
-  const marcadorConductorRef = useRef(null);
-  const rutaRef = useRef(null);
-  const ajustadoRef = useRef(false);
-
-  useEffect(() => {
-    if (!window.google || !mapRef.current || mapaRef.current) return;
-    mapaRef.current = new window.google.maps.Map(mapRef.current, {
-      center: ubicacionPasajero || centroRiohacha,
-      zoom: 15,
-      styles: [], // mapa blanco (tema normal de Google)
-      zoomControl: true,
-      mapTypeControl: false,
-      streetViewControl: false,
-      fullscreenControl: false,
-      gestureHandling: 'greedy',
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(() => {
-    if (!mapaRef.current || !window.google || !ubicacionPasajero) return;
-    if (marcadorPasajeroRef.current) marcadorPasajeroRef.current.setPosition(ubicacionPasajero);
-    else marcadorPasajeroRef.current = new window.google.maps.Marker({ position: ubicacionPasajero, map: mapaRef.current, label: { text: '📍', fontSize: '24px' } });
-    // Centrar el mapa en el pasajero mientras no haya conductor (evita quedar en el centro por defecto)
-    if (!ubicacionConductor && !ajustadoRef.current) {
-      mapaRef.current.setCenter(ubicacionPasajero);
-    }
-  }, [ubicacionPasajero, ubicacionConductor]);
-
-  useEffect(() => {
-    if (!mapaRef.current || !window.google || !ubicacionConductor) return;
-    if (marcadorConductorRef.current) marcadorConductorRef.current.setPosition(ubicacionConductor);
-    else marcadorConductorRef.current = new window.google.maps.Marker({ position: ubicacionConductor, map: mapaRef.current, label: { text: tipo === 'Taxi' ? '🚗' : '🏍️', fontSize: '28px' } });
-  }, [ubicacionConductor, tipo]);
-
-  useEffect(() => {
-    if (!mapaRef.current || !window.google || !ubicacionConductor || !ubicacionPasajero) return;
-    const directionsService = new window.google.maps.DirectionsService();
-    directionsService.route({ origin: ubicacionConductor, destination: ubicacionPasajero, travelMode: window.google.maps.TravelMode.DRIVING }, (result, status) => {
-      if (status === 'OK') {
-        if (rutaRef.current) rutaRef.current.setMap(null);
-        rutaRef.current = new window.google.maps.DirectionsRenderer({ directions: result, map: mapaRef.current, suppressMarkers: true, polylineOptions: { strokeColor: '#FF7A2F', strokeWeight: 5 } });
-        const leg = result.routes[0].legs[0];
-        if (onTiempo) onTiempo(leg.duration.text, leg.distance.text);
-        if (!ajustadoRef.current) {
-          ajustadoRef.current = true;
-          const bounds = new window.google.maps.LatLngBounds();
-          bounds.extend(ubicacionConductor);
-          bounds.extend(ubicacionPasajero);
-          // Relleno grande abajo (tarjeta del conductor) y arriba (barra) para que la ruta quede en la zona visible
-          mapaRef.current.fitBounds(bounds, { top: 120, bottom: 380, left: 60, right: 60 });
-        }
-      }
-    });
-  }, [ubicacionConductor, ubicacionPasajero, onTiempo]);
-
-  return <div ref={mapRef} style={{ width: '100%', height: '100vh' }} />;
-}
-
 function Solicitar({ tipo, onVolver, destinoInicial }) {
   // UN SOLO ARCHIVO para las dos pantallas (SEGUNDA LEY). Eran gemelos: 94% de
   // renglones idénticos. Lo que de verdad cambiaba eran rótulos, un color y el
@@ -535,6 +474,8 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
   // la que mantiene vivo el caso bueno, y una versión de esta nota se la dejaba
   // fuera: hacía creer que el pin solo se enciende por decisión del pasajero.
   const pinActivoRef = useRef(false);
+  // La tarjeta de abajo mientras hay conductor: el mapa con ruta deja su alto libre al encuadrar (G29).
+  const tarjetaRef = useRef(null);
   const [ubicacionConductor, setUbicacionConductor] = useState(null);
   // NUEVO: punto real de recogida del viaje, para que el mapa del pasajero muestre lo mismo que ve el conductor (no el GPS)
   const [ubicacionRecogida, setUbicacionRecogida] = useState(null);
@@ -1483,7 +1424,7 @@ const PanelEmergencia = () => (
         {mostrarCancelacion && <ModalCancelacion razones={RAZONES_CANCELACION_PASAJERO} onConfirmar={cancelarViaje} onCerrar={() => setMostrarCancelacion(false)} ocupado={ocupado} />}
         {mostrarLlego && <ConductorLlego nombre={viaje?.conductorNombre} placa={viaje?.conductorPlaca} onCerrar={() => setMostrarLlego(false)} />}
         <PanelEmergencia />
-        <MapaPasajero ubicacionPasajero={ubicacionRecogida || ubicacionPasajero} ubicacionConductor={ubicacionConductor} tipo={tipo} />
+        <MapaConRuta desde={ubicacionConductor} hasta={ubicacionRecogida || ubicacionPasajero} tipo={tipo} tarjetaRef={tarjetaRef} />
         <div onClick={() => setMostrarEmergencia(true)} style={{ position: 'absolute', top: '86px', right: '16px', zIndex: 20, background: 'linear-gradient(135deg, #FF4444, #CC0000)', borderRadius: '14px', padding: '10px 14px', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', boxShadow: '0 4px 12px rgba(255,68,68,0.5)' }}>
           <span style={{ fontSize: '20px' }}>🚨</span>
           <span style={{ color: '#FFFFFF', fontSize: '14px', fontWeight: '900' }}>Emergencia</span>
@@ -1519,7 +1460,7 @@ const PanelEmergencia = () => (
           </div>
         )}
         {!conductorEnPunto && (
-          <div style={{ position: 'absolute', bottom: '0', left: '0', right: '0', zIndex: 10, background: 'rgba(255,255,255,0.97)', borderRadius: '24px 24px 0 0', padding: '20px' }}>
+          <div ref={tarjetaRef} style={{ position: 'absolute', bottom: '0', left: '0', right: '0', zIndex: 10, background: 'rgba(255,255,255,0.97)', borderRadius: '24px 24px 0 0', padding: '20px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                 <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px', overflow: 'hidden', border: '2px solid #2ECC71', flexShrink: 0 }}>
@@ -1582,7 +1523,7 @@ const PanelEmergencia = () => (
     return (
       <div style={{ backgroundColor: '#FFFFFF', minHeight: '100vh', position: 'relative' }}>
         <PanelEmergencia />
-        <MapaPasajero ubicacionPasajero={destinoCoords || ubicacionPasajero} ubicacionConductor={ubicacionConductor} tipo={tipo} onTiempo={(t, d) => { setTiempoLlegada(t); setDistancia(d); }} />
+        <MapaConRuta desde={ubicacionConductor} hasta={destinoCoords || ubicacionPasajero} tipo={tipo} tarjetaRef={tarjetaRef} onTiempo={(t, d) => { setTiempoLlegada(t); setDistancia(d); }} />
         <div onClick={() => setMostrarEmergencia(true)} style={{ position: 'absolute', top: '86px', right: '16px', zIndex: 20, background: 'linear-gradient(135deg, #FF4444, #CC0000)', borderRadius: '14px', padding: '10px 14px', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', boxShadow: '0 4px 12px rgba(255,68,68,0.5)' }}>
           <span style={{ fontSize: '20px' }}>🚨</span>
           <span style={{ color: '#FFFFFF', fontSize: '14px', fontWeight: '900' }}>Emergencia</span>
@@ -1594,7 +1535,7 @@ const PanelEmergencia = () => (
           </div>
           {tiempoLlegada && <div style={{ textAlign: 'right' }}><p style={{ color: '#FF7A2F', fontSize: '20px', fontWeight: '900', margin: '0' }}>⏱️ {tiempoLlegada}</p><p style={{ color: '#6B7280', fontSize: '11px', margin: '0' }}>{distancia}</p></div>}
         </div>
-        <div style={{ position: 'absolute', bottom: '0', left: '0', right: '0', zIndex: 10, background: 'rgba(255,255,255,0.97)', borderRadius: '24px 24px 0 0', padding: '20px' }}>
+        <div ref={tarjetaRef} style={{ position: 'absolute', bottom: '0', left: '0', right: '0', zIndex: 10, background: 'rgba(255,255,255,0.97)', borderRadius: '24px 24px 0 0', padding: '20px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
               <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '22px', overflow: 'hidden', border: '2px solid #FF7A2F', flexShrink: 0 }}>

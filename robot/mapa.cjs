@@ -228,6 +228,14 @@ const RECORRIDOS = [
     // prueba no tiene ninguno. La EJECUTA pruebas/gananciasHoy.test.js contra un Firestore de mentira.
     vigila: ['guajirago/src/Ganancias.js', 'guajirago/src/gananciasConductor.js'],
   },
+  {
+    nombre: 'ruta-conductor',
+    que: 'con el pasajero 1,3 km al sur del taxista, en las dos apps (taxista yendo a recoger y pasajero esperando) el 🚗 y el 📍 del mapa quedan entre la barra de arriba y la tarjeta de abajo (G29; deja un viaje cancelado y cuesta una comisión de prueba)',
+    archivo: 'ruta-conductor.cjs',
+    // Las pantallas «en viaje» de las dos apps usan el mismo mapa, pero llegar ahí pide el código de seguridad del
+    // pasajero: las EJECUTA pruebas/mapaRuta.test.js con un Google Maps de mentira.
+    vigila: ['guajirago/src/MapaConRuta.js', 'guajirago/src/AppConductor.js', 'guajirago/src/Solicitar.js'],
+  },
 ];
 
 // Los archivos de pantalla: los que, si cambian, el robot debería poder probar. Todo lo que esté en

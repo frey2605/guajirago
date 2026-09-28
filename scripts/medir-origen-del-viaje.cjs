@@ -862,7 +862,7 @@ async function correrElPedido({ punto, pin, ubicacion, esDelGps, origen, encuent
  * CORREN. Si alguno recentra el mapa, el mapa se recentra, esté escrito como
  * esté y sea uno o sean cuatro.
  *
- * Se mira solo dentro de `Solicitar`: `MapaPasajero` —el mapa de seguimiento,
+ * Se mira solo dentro de `Solicitar`: `MapaConRuta` —el mapa de seguimiento,
  * que es OTRO mapa— también depende de `ubicacionPasajero`, y colarlo aquí
  * sería medir otra pantalla.
  */
