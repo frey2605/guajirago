@@ -34,7 +34,7 @@ import Logo from './Logo';
 import { useAccion } from './useAccion';
 import AvisoModal from './AvisoModal';
 import MenuLateral from './MenuLateral';
-import { obtenerTokenFCM } from './Notificaciones';
+import { prepararTokenDeAvisos } from './Notificaciones';
 // Pedirle el GPS al teléfono, con sus tiempos en un solo sitio (G28).
 import { pedirGps } from './pedirGps';
 import { direccionDePunto, textoDeCoordenadas } from './direccionDePunto';
@@ -339,8 +339,9 @@ function Restaurantes({ nombre, onVolver, foto, onCerrarSesion, onIrPerfil, onIr
         return { ok: false, avisado: true };
       }
 
-      // Token para avisarle al cliente los cambios de estado (si acepta notificaciones)
-      const clienteFcmToken = await obtenerTokenFCM();
+      // Token para avisarle al cliente los cambios de estado (si acepta notificaciones). G34: el pedido ya no espera
+      // a que el cliente conteste el cartel de permiso; el token se le pega cuando llegue.
+      const pegarToken = prepararTokenDeAvisos('clienteFcmToken');
       const ref = await addDoc(collection(db, 'pedidos'), {
         restauranteId: restauranteActivo.id,
         // REGLA 9 - LA FIRMA: aqui se apunta QUIEN lo pide. Sin esta firma el
@@ -358,9 +359,9 @@ function Restaurantes({ nombre, onVolver, foto, onCerrarSesion, onIrPerfil, onIr
         metodoPago,
         estado: 'nuevo',
         tipo: 'domicilio',
-        clienteFcmToken: clienteFcmToken || null,
         creado: serverTimestamp(),
       });
+      pegarToken(ref);
       setNumeroPedido(ref.id.slice(-5).toUpperCase());
       guardarMiPedidoId(ref.id);
       // Registrar el uso de las promociones (por dispositivo y por teléfono)

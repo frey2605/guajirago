@@ -1,5 +1,5 @@
 import { db } from './firebase';
-import { doc, setDoc } from 'firebase/firestore';
+import { doc, setDoc, updateDoc } from 'firebase/firestore';
 import { getMessaging, getToken } from 'firebase/messaging';
 import { auth } from './firebase';
 // La llave pública Web Push del proyecto. Fase 0 (25-sep-2026): sale del ambiente (.env.produccion /
@@ -75,6 +75,21 @@ export const obtenerTokenFCM = async () => {
   } catch (e) {
     return null;
   }
+};
+
+// G34 (28-sep-2026): la ÚNICA forma de pegarle al documento que crea el cliente —el viaje, el pedido o la reserva— su
+// token de avisos. Se llama ANTES de crear el documento (el cartel de permiso sale con el toque todavía fresco) y
+// devuelve con qué pegarlo cuando el documento ya existe. Crear el documento NO espera al cartel: hasta hoy el pedido y
+// la reserva no nacían mientras el cliente no tocara «Permitir» o «Bloquear», y cada pantalla lo pegaba a su manera.
+// Sin permiso no se escribe nada; si la escritura falla, queda rastro en la consola y el documento sigue bueno (solo se
+// queda sin avisos, como sin permiso). El campo lo nombra quien llama porque cada colección lo lee una función distinta
+// del servidor: pasajeroFcmToken (notificarPasajeroOferta) y clienteFcmToken (notificarClienteDelPedido y
+// notificarClienteReserva). Devuelve una promesa con true si quedó pegado.
+export const prepararTokenDeAvisos = (campo) => {
+  const token = obtenerTokenFCM();
+  return (ref) => token
+    .then((t) => (t ? updateDoc(ref, { [campo]: t }).then(() => true) : false))
+    .catch((e) => { console.warn('No se pudo pegar el token de avisos (' + campo + '):', (e && e.message) || e); return false; });
 };
 
 export const alertarNuevoViaje = () => {

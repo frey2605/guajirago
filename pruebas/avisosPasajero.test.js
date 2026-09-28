@@ -172,7 +172,8 @@ describe('REGLA 9 · los botones del pasajero ya no fallan en silencio', () => {
     const FUERA = [
       'radioBusqueda: configApp.radioBusquedaAmpliado',   // el temporizador que amplía el radio
       'marcaDelVencido(',                                  // el temporizador que vence la búsqueda (G27)
-      'pasajeroFcmToken',                                   // el token, sin bloquear la creación del viaje
+      // (Aquí estuvo 'pasajeroFcmToken'. Desde G34 el token lo pega prepararTokenDeAvisos de Notificaciones.js, que
+      // deja rastro si falla: en esta pantalla ya no hay esa escritura, y dejarla libre solo tapaba una nueva.)
     ];
     const t = soloCodigo(leer(APP));
     const seguro = sinTextos(t);

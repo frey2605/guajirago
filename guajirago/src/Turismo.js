@@ -7,7 +7,7 @@ import { fechaDeCalendario } from './fechaCalendario';
 import { collection, query, where, getDocs, getDoc, addDoc, doc } from 'firebase/firestore';
 import Logo from './Logo';
 import MenuLateral from './MenuLateral';
-import { obtenerTokenFCM } from './Notificaciones';
+import { prepararTokenDeAvisos } from './Notificaciones';
 // «¿Quién sale en la app?» se contesta en UN solo sitio (SEGUNDA LEY): el mismo
 // que usa Restaurantes.js. Ahí vive también el interruptor `visibleEnEscaparate`.
 import { lasDeTurismo } from './escaparate';
@@ -78,7 +78,8 @@ function Turismo({ nombre, foto, onVolver, onCerrarSesion, onIrPerfil, onIrGanan
     if (telefono.replace(/\D/g, '').length !== 10) { setAviso('El teléfono debe tener 10 números'); return; }
     setEnviando(true);
     try {
-      const clienteFcmToken = await obtenerTokenFCM();
+      // G34: la reserva ya no espera a que el cliente conteste el cartel de permiso; el token se le pega cuando llegue.
+      const pegarToken = prepararTokenDeAvisos('clienteFcmToken');
       const ref = await addDoc(collection(db, 'reservasTurismo'), {
         agenciaId: agenciaActiva.id,
         // REGLA 9 - LA FIRMA: aqui se apunta QUIEN lo pide. Sin esta firma el
@@ -99,8 +100,8 @@ function Turismo({ nombre, foto, onVolver, onCerrarSesion, onIrPerfil, onIrGanan
         estado: 'nueva',
         notas: notas.trim(),
         creado: new Date().toISOString(),
-        ...(clienteFcmToken ? { clienteFcmToken } : {}),
       });
+      pegarToken(ref);
       guardarReserva(ref.id);
       setEnviando(false);
       setExito({ nombre: tourReserva.nombre });

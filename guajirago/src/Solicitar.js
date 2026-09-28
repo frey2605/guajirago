@@ -6,7 +6,7 @@ import Logo from './Logo';
 import { collection, addDoc, doc, onSnapshot, updateDoc, getDoc, query, orderBy } from 'firebase/firestore';
 import Calificacion from './Calificacion';
 import Llamada from './Llamada';
-import { alertarNuevoViaje, precargarAudio, activarAudioiOS, obtenerTokenFCM } from './Notificaciones';
+import { alertarNuevoViaje, precargarAudio, activarAudioiOS, prepararTokenDeAvisos } from './Notificaciones';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { CONFIG_TARIFAS_DEFECTO, calcularTarifaMinima } from './tarifas';
 import { CONFIG_COMPARTIDA, segundosDeEspera, BUSQUEDA, marcaDelVencido } from './configApp';
@@ -1155,6 +1155,8 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
     }
 
       const user = auth.currentUser;
+      // G34: el cartel de permiso de avisos sale YA, con el toque fresco; el token se pega al viaje cuando exista.
+      const pegarToken = prepararTokenDeAvisos('pasajeroFcmToken');
       // Traer el nombre del pasajero guardado en su registro
       let nombrePasajero = '';
       // REGLAS 5 y 11 — el código de seguridad era el DÍA y el MES de nacimiento de
@@ -1186,7 +1188,7 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
       setCodigoSeguridad(codigoSeguridad);
       guardarCodigoDeViaje(docRef.id, codigoSeguridad);
       // Token del pasajero SIN bloquear la creación del viaje (el permiso de notificación puede tardar).
-      obtenerTokenFCM().then((t) => { if (t) updateDoc(doc(db, 'viajes', docRef.id), { pasajeroFcmToken: t }).catch(() => {}); }).catch(() => {});
+      pegarToken(docRef);
       setContraofertas([]);
       contaofertasIdsRef.current.clear();
       setBuscandoAgotado(false);
