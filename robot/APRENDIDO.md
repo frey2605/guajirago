@@ -166,8 +166,11 @@ ya estaba guardado («Contacto de Prueba», 3000000001); si sale «Sin número»
 «Transporte y movilidad» → «Soy conductor» → (ventanita de avisos: «Entendido») → interruptor «Estoy disponible» →
 «Menú» (el botón «☰ Menú» de arriba a la izquierda; `getByText('Menú')`) → «Cerrar sesión» → vuelve a «Ya tengo cuenta».
 - 🔑 **Lo que se juzga está en la base, no en la pantalla**: la pantalla vuelve a la de entrar con el código viejo Y con
-  el nuevo. La diferencia es la ficha `conductores/{uid}`: con lo publicado antes de G07 queda `activo: true` (y la
-  ubicación guardada) y en la consola sale un 403 —la escritura de apagarse, rechazada porque ya no había sesión—.
+  el nuevo. La diferencia es la ficha `conductores/{uid}`: con lo publicado antes de G07 queda `activo: true`; con
+  G07, `activo: false`. El 403 de la consola sale en las DOS corridas (y en `conductor-en-turno`), así que NO es la
+  señal: no se sabe de qué petición es.
+- Visto de paso, sin tocar: al salir la ficha sigue con la ubicación guardada. El interruptor «No disponible» sí la
+  quita (`deleteField`); la salida solo pone `activo: false`.
 - Al final el recorrido deja `activo` como estaba antes de empezar.
 
 ## Lo que el robot dejó creado en pruebas
