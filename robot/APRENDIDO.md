@@ -385,6 +385,18 @@ la placa de `conductores/{uid}` (la escribe su GPS con la misma placa que va en 
   🚗 165 · 📍 451; pasajero 🚗 108 · 📍 394.
 - Cuesta UNA comisión de los créditos de prueba del taxista en cada corrida.
 
+### direccion-pedido (G30, 28-sep-2026)
+- Camino: pasajero → «Restaurantes» (texto exacto) → «Restaurante de Prueba» → el `+` de un plato es un texto «+»
+  (no un botón con nombre): `getByText('+', { exact: true }).last()` echa el «Jugo de corozo». Con algo en el carrito
+  aparece abajo el campo «📍 Dirección de entrega» y el botón «📍 Usar mi ubicación». No hace falta pedir nada: el
+  recorrido no toca la base.
+- 🔑 Para decidir qué contesta Google se cambia `window.google.maps.Geocoder` en cuanto Google carga (un `setInterval`
+  de 100 ms en `antesDeCargar`). Sirve porque la pantalla hace `new window.google.maps.Geocoder()` AL TOCAR el botón,
+  no al cargar. Si un día lo crea al cargar, el cambio llegaría tarde: por eso el recorrido comprueba `__geoCambiado`
+  y que se le preguntó UNA vez por el punto del GPS.
+- La ventanita de «Falta el nombre de la calle» es la misma de «Ubicación no disponible» (la del GPS negado), con otro
+  título. Con el `403` de siempre en la consola, que no es de esto.
+
 ## Lo que el robot dejó creado en pruebas
 
 - 27-sep-2026: «Robot Taxi De Prueba» (robot.taxi.1790508222079@gg.test) y

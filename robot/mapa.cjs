@@ -236,6 +236,14 @@ const RECORRIDOS = [
     // pasajero: las EJECUTA pruebas/mapaRuta.test.js con un Google Maps de mentira.
     vigila: ['guajirago/src/MapaConRuta.js', 'guajirago/src/AppConductor.js', 'guajirago/src/Solicitar.js'],
   },
+  {
+    nombre: 'direccion-pedido',
+    que: 'en el pedido de comida, «📍 Usar mi ubicación» escribe la calle que da Google; si Google no la da, deja las coordenadas y sale la ventanita «Falta el nombre de la calle» (G30; no crea pedidos)',
+    archivo: 'direccion-pedido.cjs',
+    // El mapa de recogida (Solicitar.js) también usa direccionDePunto.js: ese lo EJECUTAN
+    // scripts/medir-origen-del-viaje.cjs y pruebas/direccionDePunto.test.js con un Google de mentira.
+    vigila: ['guajirago/src/Restaurantes.js', 'guajirago/src/direccionDePunto.js'],
+  },
 ];
 
 // Los archivos de pantalla: los que, si cambian, el robot debería poder probar. Todo lo que esté en
