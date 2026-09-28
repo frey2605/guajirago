@@ -536,7 +536,10 @@ describe('SE VENDE · la plomería de la rutina de madrugada', () => {
     const av = soloCodigo(
       cuerpoDeLaFuncion(todo, todo.indexOf('async function avisarAlNegocio')).texto);
     assert.match(av, /catch\s*\(/, 'un fallo de envío tumbaría la rutina entera.');
-    assert.match(av, /failureCount/,
-      'no mira `failureCount`: un token vencido contaría como aviso entregado.');
+    // G32 (28-sep-2026): el envío sale de avisos.cjs (`mandarAviso`), que cuenta los que NO llegaron en `fallaron`.
+    // Que esa cuenta sea la verdad de Google lo EJECUTA pruebas/sobreDelAviso.test.js con un token vencido.
+    assert.match(av, /mandarAviso\(/, 'el aviso al dueño ya no sale por la pieza común de avisos (avisos.cjs).');
+    assert.match(av, /\.fallaron\s*>\s*0/,
+      'no mira `fallaron`: un token vencido contaría como aviso entregado.');
   });
 });

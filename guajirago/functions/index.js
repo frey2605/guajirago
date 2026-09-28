@@ -47,6 +47,8 @@ const { cop } = require('./moneda.cjs');
 // G18: el descuento pendiente y su código de 4 cifras se fabrican AQUÍ, con una sola receta (la bienvenida del
 // pasajero la fabricaba el teléfono). La receta del código está atada por prueba a la de la app (codigoSeguridad.js).
 const { CREDITO_BIENVENIDA_PASAJERO, PROMO_BIENVENIDA, armarDescuentoPendiente, porQueNoLaBienvenida, aparatoSano } = require('./descuentoPendiente.cjs');
+// G32: el sobre de cada aviso al celular y el envío salen de UNA pieza, que siempre mira si el aviso llegó y lo anota.
+const { sobreDelAviso, sobreSencillo, mandarAviso } = require('./avisos.cjs');
 
 // Distancia en km entre dos coordenadas (Haversine)
 function distanciaKm(lat1, lng1, lat2, lng2) {
@@ -93,15 +95,10 @@ exports.notificarNuevoViaje = onDocumentCreated("viajes/{viajeId}", async (event
     const tokens = await tokensConductoresCerca(viaje);
     console.log("notificarNuevoViaje: conductores en radio con token:", tokens.length);
     if (tokens.length === 0) return null;
-    await admin.messaging().sendEachForMulticast({
-      notification: {
-        title: "🚖 Nuevo viaje disponible",
-        body: (viaje.tipo || "Taxi") + " — " + (viaje.tarifa || "$0"),
-      },
-      android: { priority: "high", notification: { sound: "default", channelId: "viajes" } },
-      apns: { payload: { aps: { sound: "default", badge: 1, contentAvailable: true } }, headers: { "apns-priority": "10" } },
-      tokens,
-    });
+    await mandarAviso(admin.messaging(), tokens,
+      sobreDelAviso("🚖 Nuevo viaje disponible", (viaje.tipo || "Taxi") + " — " + (viaje.tarifa || "$0"),
+        { canal: "viajes", despertar: true }),
+      "notificarNuevoViaje");
     return null;
   } catch (e) {
     console.error("Error notificarNuevoViaje:", e.message);
@@ -117,15 +114,10 @@ exports.notificarNuevaOferta = onDocumentUpdated("viajes/{viajeId}", async (even
   try {
     const tokens = await tokensConductoresCerca(despues);
     if (tokens.length === 0) return null;
-    await admin.messaging().sendEachForMulticast({
-      notification: {
-        title: "⬆️ El pasajero subió su oferta",
-        body: (despues.tipo || "Taxi") + " — " + (despues.tarifa || "$0"),
-      },
-      android: { priority: "high", notification: { sound: "default", channelId: "viajes" } },
-      apns: { payload: { aps: { sound: "default", badge: 1 } }, headers: { "apns-priority": "10" } },
-      tokens,
-    });
+    await mandarAviso(admin.messaging(), tokens,
+      sobreDelAviso("⬆️ El pasajero subió su oferta", (despues.tipo || "Taxi") + " — " + (despues.tarifa || "$0"),
+        { canal: "viajes" }),
+      "notificarNuevaOferta");
     return null;
   } catch (e) {
     console.error("Error notificarNuevaOferta:", e.message);
@@ -195,18 +187,10 @@ async function avisarDelPedidoNuevo(p) {
     }
 
     const totalTxt = p.total ? cop(Number(p.total)) : "";
-    await admin.messaging().sendEachForMulticast({
-      notification: {
-        title: "🍽️ Nuevo pedido a domicilio",
-        body: (p.cliente || "Cliente") + (totalTxt ? " — " + totalTxt : ""),
-      },
-      android: { priority: "high", notification: { sound: "default", channelId: "pedidos" } },
-      apns: {
-        payload: { aps: { sound: "default", badge: 1, contentAvailable: true } },
-        headers: { "apns-priority": "10" },
-      },
-      tokens: tokens,
-    });
+    await mandarAviso(admin.messaging(), tokens,
+      sobreDelAviso("🍽️ Nuevo pedido a domicilio", (p.cliente || "Cliente") + (totalTxt ? " — " + totalTxt : ""),
+        { canal: "pedidos", despertar: true }),
+      "notificarNuevoPedido");
 
     console.log("Notif pedido restaurante enviada a", tokens.length, "tokens");
     return null;
@@ -239,12 +223,8 @@ async function avisarAlClienteDelCambio(antes, despues) {
   if (!m) return null;
 
   try {
-    await admin.messaging().send({
-      token: despues.clienteFcmToken,
-      notification: m,
-      android: { priority: "high", notification: { sound: "default" } },
-      apns: { payload: { aps: { sound: "default", badge: 1 } }, headers: { "apns-priority": "10" } },
-    });
+    await mandarAviso(admin.messaging(), despues.clienteFcmToken, sobreDelAviso(m.title, m.body),
+      "notificarClienteDelPedido");
     console.log("Aviso al cliente:", despues.estado);
     return null;
   } catch (e) {
@@ -273,15 +253,11 @@ exports.notificarNuevaReserva = onDocumentCreated("reservasTurismo/{id}", async 
     });
     if (tokens.length === 0) return null;
     const totalTxt = r.total ? cop(Number(r.total)) : "";
-    await admin.messaging().sendEachForMulticast({
-      notification: {
-        title: "🧭 Nueva reserva",
-        body: (r.cliente || "Cliente") + " reservó " + (r.nombreTour || "un tour") + (totalTxt ? " — " + totalTxt : ""),
-      },
-      android: { priority: "high", notification: { sound: "default", channelId: "pedidos" } },
-      apns: { payload: { aps: { sound: "default", badge: 1, contentAvailable: true } }, headers: { "apns-priority": "10" } },
-      tokens: tokens,
-    });
+    await mandarAviso(admin.messaging(), tokens,
+      sobreDelAviso("🧭 Nueva reserva",
+        (r.cliente || "Cliente") + " reservó " + (r.nombreTour || "un tour") + (totalTxt ? " — " + totalTxt : ""),
+        { canal: "pedidos", despertar: true }),
+      "notificarNuevaReserva");
     return null;
   } catch (e) {
     console.error("Error notificarNuevaReserva:", e.message);
@@ -304,12 +280,8 @@ exports.notificarClienteReserva = onDocumentUpdated("reservasTurismo/{id}", asyn
   const m = mensajes[despues.estado];
   if (!m) return null;
   try {
-    await admin.messaging().send({
-      token: despues.clienteFcmToken,
-      notification: m,
-      android: { priority: "high", notification: { sound: "default" } },
-      apns: { payload: { aps: { sound: "default", badge: 1 } }, headers: { "apns-priority": "10" } },
-    });
+    await mandarAviso(admin.messaging(), despues.clienteFcmToken, sobreDelAviso(m.title, m.body),
+      "notificarClienteReserva");
     return null;
   } catch (e) {
     console.error("Error notificarClienteReserva:", e.message);
@@ -401,12 +373,8 @@ exports.notificarPasajeroOferta = onDocumentCreated("viajes/{viajeId}/contraofer
     if (!token) return null;
     const cuerpo = (of.conductorNombre || "Un conductor") +
       (of.tipoOferta === "acepta" ? " aceptó tu oferta" : " te ofrece " + (of.monto || ""));
-    await admin.messaging().send({
-      token,
-      notification: { title: "🚕 Tienes una oferta de un conductor", body: cuerpo },
-      android: { priority: "high", notification: { sound: "default", channelId: "viajes" } },
-      apns: { payload: { aps: { sound: "default", badge: 1 } }, headers: { "apns-priority": "10" } },
-    });
+    await mandarAviso(admin.messaging(), token,
+      sobreDelAviso("🚕 Tienes una oferta de un conductor", cuerpo, { canal: "viajes" }), "notificarPasajeroOferta");
     return null;
   } catch (e) {
     console.error("Error notificarPasajeroOferta:", e.message);
@@ -1121,13 +1089,11 @@ async function avisarAlNegocio(negocioId, mensaje) {
     // Aliados es una app web: si el dueño nunca aceptó las notificaciones en su
     // navegador, no hay token. A ese cliente no se le puede avisar por aquí.
     if (!token) return { salio: false, porQue: "no tiene notificaciones activadas" };
-    const r = await admin.messaging().sendEachForMulticast({
-      tokens: [token],
-      notification: { title: mensaje.titulo, body: mensaje.texto },
-    });
-    // OJO: esto NO lanza con un token caducado, devuelve `failureCount`. Si no se
+    const r = await mandarAviso(admin.messaging(), token, sobreSencillo(mensaje.titulo, mensaje.texto),
+      "rutinaDeCobros");
+    // OJO: esto NO lanza con un token caducado, devuelve `fallaron`. Si no se
     // mirara, se contaría como avisado un mensaje que no llegó a ninguna parte.
-    if (r && r.failureCount > 0) {
+    if (r.fallaron > 0) {
       return { salio: false, porQue: "su teléfono rechazó el aviso (token vencido)" };
     }
     return { salio: true, porQue: "" };
