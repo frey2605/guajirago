@@ -44,6 +44,9 @@ const { viajesMinimosDe, motivoParaNoUsar, textoParaQuienLaUsa, pesosDelUso, apu
 const { porQueNoLeToca } = require('./leTocaElViaje.cjs');
 // G13: el texto del precio del viaje sale de UN formateador (copia de guajirago/src/moneda.js, atada por prueba).
 const { cop } = require('./moneda.cjs');
+// G18: el descuento pendiente y su código de 4 cifras se fabrican AQUÍ, con una sola receta (la bienvenida del
+// pasajero la fabricaba el teléfono). La receta del código está atada por prueba a la de la app (codigoSeguridad.js).
+const { CREDITO_BIENVENIDA_PASAJERO, PROMO_BIENVENIDA, armarDescuentoPendiente, porQueNoLaBienvenida, aparatoSano } = require('./descuentoPendiente.cjs');
 
 // Distancia en km entre dos coordenadas (Haversine)
 function distanciaKm(lat1, lng1, lat2, lng2) {
@@ -727,23 +730,70 @@ exports.reclamarPromocion = onCall(async (request) => {
           textoParaQuienLaUsa(motivo));
       }
 
-      const codigoVerificacion = String(Math.floor(1000 + Math.random() * 9000));
-      t.set(refUsuario, {
-        descuentoPendiente: {
-          promoId: codigo,
-          tipoBeneficio: promo.tipoBeneficio,
-          valorBeneficio: promo.valorBeneficio || 0,
-          fechaActivacion: new Date().toISOString(),
-          codigoVerificacion,
-        },
-      }, { merge: true });
+      // G18: la ficha y su código salen de UNA receta (descuentoPendiente.cjs), la misma de la bienvenida.
+      const descuentoPendiente = armarDescuentoPendiente(
+        { promoId: codigo, tipoBeneficio: promo.tipoBeneficio, valorBeneficio: promo.valorBeneficio },
+        new Date().toISOString());
+      t.set(refUsuario, { descuentoPendiente }, { merge: true });
 
-      return { tipo: promo.tipoBeneficio, valor: promo.valorBeneficio || 0, codigoVerificacion };
+      return { tipo: promo.tipoBeneficio, valor: promo.valorBeneficio || 0, codigoVerificacion: descuentoPendiente.codigoVerificacion };
     });
   } catch (e) {
     if (e instanceof HttpsError) throw e;
     console.error("Error reclamarPromocion:", e.message);
     throw new HttpsError("internal", "Error al aplicar el código. Intenta de nuevo");
+  }
+});
+
+/**
+ * G18 (28-sep-2026) — EL CRÉDITO DE BIENVENIDA DEL PASAJERO NUEVO. Antes: Login.js en el celular.
+ *
+ * El teléfono decidía el valor ($8.000), miraba él mismo la config y la huella del aparato, fabricaba el código de 4
+ * cifras y se escribía el descuento en su propia ficha. Ese descuento es plata: al usarlo, `consumirDescuentoViaje`
+ * se lo abona al conductor. Ahora lo decide y lo escribe el servidor, UNA vez por persona y por aparato, y el
+ * teléfono solo enseña lo que se le contesta. El teléfono manda únicamente el identificador de su aparato.
+ * Devuelve { valor, codigoVerificacion } si se lo dio, o { valor: 0, motivo } si no le tocaba.
+ */
+exports.descuentoDeBienvenida = onCall(async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Hay que iniciar sesión");
+  const uid = request.auth.uid;
+  const aparato = aparatoSano((request.data || {}).deviceId);
+
+  const db = admin.firestore();
+  const refUsuario = db.collection("usuarios").doc(uid);
+  const refConfig = db.collection("config").doc("global");
+  const huellas = db.collection("dispositivosBeneficio");
+  // La huella de este regalo: con el aparato si lo mandó; si no, una por persona.
+  const refHuella = huellas.doc(aparato || ("sin-aparato-" + uid));
+
+  try {
+    return await db.runTransaction(async (t) => {
+      const [snapUsuario, snapConfig, snapAparato, snapMias, snapViajes] = await Promise.all([
+        t.get(refUsuario), t.get(refConfig),
+        aparato ? t.get(huellas.doc(aparato)) : Promise.resolve(null),
+        t.get(huellas.where("uid", "==", uid).limit(1)),
+        t.get(db.collection("viajes").where("pasajeroId", "==", uid).limit(1)),
+      ]);
+      const motivo = porQueNoLaBienvenida({
+        config: snapConfig.exists ? snapConfig.data() : {},
+        ficha: snapUsuario.exists ? snapUsuario.data() : null,
+        aparatoYaUsado: !!(snapAparato && snapAparato.exists),
+        yaLaRecibio: !snapMias.empty,
+        viajesPedidos: snapViajes.size,
+      });
+      if (motivo) return { valor: 0, motivo };
+
+      const ahora = new Date().toISOString();
+      const descuentoPendiente = armarDescuentoPendiente(
+        { promoId: PROMO_BIENVENIDA, tipoBeneficio: "credito", valorBeneficio: CREDITO_BIENVENIDA_PASAJERO }, ahora);
+      t.set(refUsuario, { descuentoPendiente }, { merge: true });
+      t.set(refHuella, { usado: true, uid, fecha: ahora });
+      return { valor: descuentoPendiente.valorBeneficio, codigoVerificacion: descuentoPendiente.codigoVerificacion };
+    });
+  } catch (e) {
+    if (e instanceof HttpsError) throw e;
+    console.error("Error descuentoDeBienvenida:", e.message);
+    throw new HttpsError("internal", "No se pudo dar el crédito de bienvenida");
   }
 });
 

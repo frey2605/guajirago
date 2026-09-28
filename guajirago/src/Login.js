@@ -12,8 +12,6 @@ import { telefonoDe } from './telefonoUsuario';
 import { telefonoSirve } from './telefonoValido';
 import { cop } from './moneda';
 
-const VALOR_CREDITO_BIENVENIDA = 8000; // Crédito fijo de bienvenida para pasajeros nuevos
-
 // Identificador único de este navegador/dispositivo (persiste en localStorage)
 function obtenerDeviceId() {
   try {
@@ -127,53 +125,28 @@ function Login({ onEntrar }) {
       try { await sendEmailVerification(cuentaCreada.user); } catch (e) {}
       const fechaNacimiento = `${String(diaNac).padStart(2, '0')}/${String(mesNac).padStart(2, '0')}/${anioNac}`;
 
-      // Revisar si corresponde el crédito de bienvenida (según config global + huella de dispositivo)
-      let descuentoBienvenida = null;
-      let deviceId = null;
       let ipRegistro = '';
-      try {
-        const snapCfg = await getDoc(doc(db, 'config', 'global'));
-        const activo = snapCfg.exists() ? (snapCfg.data().viajeGratisNuevoPasajero !== false) : true;
-        if (activo) {
-          deviceId = obtenerDeviceId();
-          let dispositivoYaUsado = false;
-          if (deviceId) {
-            const snapDispositivo = await getDoc(doc(db, 'dispositivosBeneficio', deviceId));
-            dispositivoYaUsado = snapDispositivo.exists();
-          }
-          if (!dispositivoYaUsado) {
-            descuentoBienvenida = {
-              promoId: 'BIENVENIDA',
-              tipoBeneficio: 'credito',
-              valorBeneficio: VALOR_CREDITO_BIENVENIDA,
-              codigoVerificacion: String(Math.floor(1000 + Math.random() * 9000)),
-              fechaActivacion: new Date().toISOString(),
-            };
-          }
-        }
-        ipRegistro = await obtenerIP();
-      } catch (e) {}
+      try { ipRegistro = await obtenerIP(); } catch (e) {}
 
       await setDoc(doc(db, 'usuarios', cuentaCreada.user.uid), {
         nombre, email: email.trim().toLowerCase(), celular: celularLimpio, fechaNacimiento,
         contactoConfianzaNombre: contactoNombre.trim(), contactoConfianzaNumero: contactoNumero.trim(),
         tipo: '', placa: '', vehiculo: '', fechaRegistro: new Date().toISOString(),
         ipRegistro,
-        ...(descuentoBienvenida ? { descuentoPendiente: descuentoBienvenida } : {}),
       });
 
-      if (descuentoBienvenida && deviceId) {
-        try {
-          await setDoc(doc(db, 'dispositivosBeneficio', deviceId), {
-            usado: true,
-            uid: cuentaCreada.user.uid,
-            fecha: new Date().toISOString(),
-          });
-        } catch (e) {}
-      }
+      // G18 — el crédito de bienvenida ya NO lo fabrica este teléfono (valor, código y huella del aparato): con la
+      // ficha ya guardada se lo pide al servidor (functions: descuentoDeBienvenida), que decide si le toca, lo
+      // escribe y contesta cuánto. Aquí solo se enseña. Si falla, el registro NO se cae: entra sin el regalo.
+      let montoBienvenida = 0;
+      try {
+        const pedirBienvenida = httpsCallable(getFunctions(), 'descuentoDeBienvenida');
+        const r = await pedirBienvenida({ deviceId: obtenerDeviceId() });
+        montoBienvenida = (r && r.data && r.data.valor) || 0;
+      } catch (e) {}
 
-      if (descuentoBienvenida) {
-        setCelebracionBienvenida({ monto: descuentoBienvenida.valorBeneficio, datosEntrar: ['', nombre, celular, '', ''] });
+      if (montoBienvenida > 0) {
+        setCelebracionBienvenida({ monto: montoBienvenida, datosEntrar: ['', nombre, celular, '', ''] });
       } else {
         onEntrar('', nombre, celular, '', '');
       }

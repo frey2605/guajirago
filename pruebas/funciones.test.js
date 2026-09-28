@@ -397,6 +397,10 @@ describe('REGLA 7 · reclamarPromocion', () => {
     assert.match(String(r.cuerpo?.result?.codigoVerificacion), /^[1-9][0-9]{3}$/);
     const u = await leer('usuarios/elpasa');
     assert.ok(u.descuentoPendiente, 'no quedo el descuento en la ficha');
+    // G18: la ficha la arma la receta unica del servidor, con el MISMO codigo que se le contesta al telefono.
+    const f = u.descuentoPendiente.mapValue.fields;
+    assert.strictEqual(f.codigoVerificacion.stringValue, String(r.cuerpo.result.codigoVerificacion));
+    assert.strictEqual(f.fabricadoPor?.stringValue, 'servidor', 'la ficha no la firmo la receta del servidor');
   });
 
   test('una promocion vencida no da nada', async () => {
@@ -780,5 +784,106 @@ describe('G01 · confirmarConductor rehace el descuento sobre la tarifa aceptada
     const v = await leer('viajes/vg1');
     assert.strictEqual(v.tarifa.stringValue, '$ 15.000', 'el viaje guardó el texto del teléfono: «' + v.tarifa.stringValue + '»');
     assert.strictEqual(numDe(v.tarifaValor), 15000);
+  });
+});
+
+// ── G18 · EL CREDITO DE BIENVENIDA DEL PASAJERO LO FABRICA EL SERVIDOR ─────────
+// Antes lo fabricaba el telefono (Login.js): el valor, el codigo y la huella del aparato. Se enciende la funcion de
+// verdad y se comprueba que decide ella, una vez por persona y por aparato, y que el telefono no puede pedir mas.
+describe('G18 · descuentoDeBienvenida', () => {
+  const pendienteDe = async (uid) => (await leer('usuarios/' + uid))?.descuentoPendiente?.mapValue?.fields;
+  let n = 0;
+  const nuevo = async (campos = {}) => {
+    n += 1;
+    const uid = 'bienv' + Date.now() + '_' + n;
+    await sembrar('usuarios/' + uid, { tipo: txt(''), nombre: txt('Ana'), ...campos });
+    return uid;
+  };
+
+  beforeEach(async () => {
+    await sembrar('config/global', { comisionTaxi: num(COMISION_TAXI), viajeGratisNuevoPasajero: { booleanValue: true } });
+  });
+
+  test('SIN sesion no se da nada', async () => {
+    const r = await llamarA('descuentoDeBienvenida', null, { deviceId: 'dev_x' });
+    assert.strictEqual(r.cuerpo?.error?.status, 'UNAUTHENTICATED');
+  });
+
+  test('un pasajero nuevo recibe $8.000 con codigo de 4 cifras, firmado por el servidor, y queda la huella', async () => {
+    const uid = await nuevo();
+    const aparato = 'dev_' + uid;
+    const r = await llamarA('descuentoDeBienvenida', uid, { deviceId: aparato });
+    assert.strictEqual(r.cuerpo?.result?.valor, 8000, JSON.stringify(r.cuerpo));
+    const f = await pendienteDe(uid);
+    assert.ok(f, 'no quedo el descuento en la ficha');
+    assert.strictEqual(f.promoId.stringValue, 'BIENVENIDA');
+    assert.strictEqual(f.tipoBeneficio.stringValue, 'credito');
+    assert.strictEqual(Number(f.valorBeneficio.integerValue), 8000);
+    assert.match(f.codigoVerificacion.stringValue, /^[1-9][0-9]{3}$/);
+    assert.strictEqual(f.codigoVerificacion.stringValue, r.cuerpo.result.codigoVerificacion);
+    assert.strictEqual(f.fabricadoPor.stringValue, 'servidor');
+    assert.strictEqual((await leer('usuarios/' + uid)).nombre.stringValue, 'Ana', 'se piso la ficha');
+    const huella = await leer('dispositivosBeneficio/' + aparato);
+    assert.strictEqual(huella?.uid?.stringValue, uid, 'no quedo la huella del aparato');
+  });
+
+  test('el telefono NO puede pedir el valor que quiera', async () => {
+    const uid = await nuevo();
+    const r = await llamarA('descuentoDeBienvenida', uid, { deviceId: 'dev_' + uid, valor: 999999, valorBeneficio: 999999 });
+    assert.strictEqual(r.cuerpo?.result?.valor, 8000);
+    assert.strictEqual(Number((await pendienteDe(uid)).valorBeneficio.integerValue), 8000, 'se colo el valor del telefono');
+  });
+
+  test('SOLO UNA VEZ por persona, aunque cambie de aparato y aunque borre su descuento', async () => {
+    const uid = await nuevo();
+    await llamarA('descuentoDeBienvenida', uid, { deviceId: 'dev_a_' + uid });
+    assert.ok(await pendienteDe(uid), 'la primera vez no se dio');
+    const r = await llamarA('descuentoDeBienvenida', uid, { deviceId: 'dev_b_' + uid });
+    assert.strictEqual(r.cuerpo?.result?.valor, 0);
+    assert.strictEqual(r.cuerpo?.result?.motivo, 'ya_recibida');
+    // El telefono puede borrar su propio descuento (las reglas se lo dejan): aun asi no se le vuelve a dar.
+    await sembrar('usuarios/' + uid, { tipo: txt('') });
+    const r2 = await llamarA('descuentoDeBienvenida', uid, { deviceId: 'dev_c_' + uid });
+    assert.strictEqual(r2.cuerpo?.result?.motivo, 'ya_recibida');
+    assert.strictEqual(await pendienteDe(uid), undefined, 'se le dio la bienvenida dos veces');
+  });
+
+  test('un aparato que ya la uso no se la da a otra cuenta', async () => {
+    const uno = await nuevo();
+    const dos = await nuevo();
+    const aparato = 'dev_compartido_' + uno;
+    await llamarA('descuentoDeBienvenida', uno, { deviceId: aparato });
+    const r = await llamarA('descuentoDeBienvenida', dos, { deviceId: aparato });
+    assert.strictEqual(r.cuerpo?.result?.motivo, 'aparato_usado');
+    assert.strictEqual(await pendienteDe(dos), undefined);
+  });
+
+  test('sin aparato tambien funciona, y tambien una sola vez', async () => {
+    const uid = await nuevo();
+    const r = await llamarA('descuentoDeBienvenida', uid, {});
+    assert.strictEqual(r.cuerpo?.result?.valor, 8000, JSON.stringify(r.cuerpo));
+    const r2 = await llamarA('descuentoDeBienvenida', uid, {});
+    assert.strictEqual(r2.cuerpo?.result?.motivo, 'ya_recibida');
+  });
+
+  test('con el interruptor del panel APAGADO no se da', async () => {
+    await sembrar('config/global', { comisionTaxi: num(COMISION_TAXI), viajeGratisNuevoPasajero: { booleanValue: false } });
+    const uid = await nuevo();
+    const r = await llamarA('descuentoDeBienvenida', uid, { deviceId: 'dev_' + uid });
+    assert.strictEqual(r.cuerpo?.result?.motivo, 'apagada');
+    assert.strictEqual(await pendienteDe(uid), undefined);
+  });
+
+  test('a un conductor, a quien ya pidio viajes o ya tiene otro descuento, no se le da', async () => {
+    const cond = await nuevo({ tipo: txt('conductor') });
+    assert.strictEqual((await llamarA('descuentoDeBienvenida', cond, { deviceId: 'dev_' + cond })).cuerpo?.result?.motivo, 'es_conductor');
+
+    const viejo = await nuevo();
+    await sembrar('viajes/viaje_' + viejo, { pasajeroId: txt(viejo), estado: txt('cancelado') });
+    assert.strictEqual((await llamarA('descuentoDeBienvenida', viejo, { deviceId: 'dev_' + viejo })).cuerpo?.result?.motivo, 'no_es_nuevo');
+
+    const conPromo = await nuevo({ descuentoPendiente: { mapValue: { fields: { promoId: txt('VIVA'), codigoVerificacion: txt('5555') } } } });
+    assert.strictEqual((await llamarA('descuentoDeBienvenida', conPromo, { deviceId: 'dev_' + conPromo })).cuerpo?.result?.motivo, 'ya_tiene_descuento');
+    assert.strictEqual((await pendienteDe(conPromo)).codigoVerificacion.stringValue, '5555', 'se le piso la promocion que tenia');
   });
 });
