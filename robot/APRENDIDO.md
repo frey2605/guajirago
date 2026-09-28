@@ -120,6 +120,23 @@ empleado», «Correo para que inicie sesión», «Mínimo 6 caracteres», se toc
   corridas. Lo que NO se sabe: si a un celular de verdad le pasa igual — eso decide si se puede cerrar la
   puerta de App Check.
 
+**Ajustes → Seguridad y la ubicación del mensaje de emergencia (27-sep-2026, G05).** Cuenta
+pasajero@gg.test → «Ya tengo cuenta» → entrar → «Menú» → «Seguridad» (texto exacto). El contacto de confianza
+ya estaba guardado («Contacto de Prueba», 3000000001); si sale «Sin número», el recorrido guarda uno de mentira.
+- 🔑 **WhatsApp no se abre de verdad:** `antesDeCargar` cambia `window.open` por uno que anota el enlace y la hora
+  en `window.__abiertos`. Así se lee el mensaje entero y se mide cuánto tardó en salir desde el toque.
+- 🔑 **El GPS mudo se finge con un `getCurrentPosition` que no llama a nadie.** Con él, el mensaje sale a los ~4,03 s
+  diciendo «No pude obtener mi ubicación exacta»: el tope de `ubicacionDeAhora.js` funciona en el navegador.
+- 🔴 **El candado de la ley del botón revienta en el navegador** («ROMPIÓ: Illegal invocation»). `candado.js` guarda
+  `{ poner: setTimeout, quitar: clearTimeout }` y los llama como `reloj.poner(…)`: en Node va, en el navegador no
+  (la trampa ya estaba en el cuaderno general, sacada de Talaria). Medido en la página de pruebas:
+  `({ poner: setTimeout }).poner(…)` → «Illegal invocation». Efecto visto con el botón de emergencia colgado del
+  candado: el mensaje salía UNA vez, el botón se quedaba en «Buscando tu ubicación…» y el segundo toque no hacía
+  nada. Por eso los botones de emergencia quedaron SIN candado, y el recorrido exige que el segundo toque funcione.
+  Las pruebas de Node no lo ven porque le pasan su propio reloj al candado.
+- El 🚨 del mapa (Solicitar.js) usa la misma función, pero probarlo pide un viaje en curso con conductor: este
+  recorrido NO lo cubre.
+
 ## Lo que el robot dejó creado en pruebas
 
 - 27-sep-2026: «Robot Taxi De Prueba» (robot.taxi.1790508222079@gg.test) y

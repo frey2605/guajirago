@@ -36,9 +36,9 @@
  *     y `ubicacionDeAhora.js` salen del disco. Las pantallas viejas no llaman a
  *     `ubicacionDeAhora`, y el mensaje de hoy, sin `ubicacionDe`, escribe lo mismo
  *     que el de antes. Así no hace falta una segunda copia de `cargarDeLaApp`.
- *   · No corre React ni un navegador: el candado del botón (`correr`) se sustituye
- *     por uno que solo ejecuta. Si WhatsApp se abre o no en un teléfono de verdad
- *     no se mide aquí.
+ *   · No corre React ni un navegador: si WhatsApp se abre o no en un teléfono de
+ *     verdad no se mide aquí. Eso lo mira el robot (`robot/ubicacion-emergencia.cjs`),
+ *     en el navegador y contra pruebas.
  */
 const path = require('node:path');
 const { execFileSync } = require('node:child_process');
@@ -95,7 +95,7 @@ function leerMensaje(url) {
  * rellenan con una función vacía y se DICEN, porque rellenar a ciegas puede
  * cambiar lo que pasa sin que nadie se entere.
  */
-async function correrUno(boton, como, fase, commit) {
+async function correrUno(boton, como, fase, commit, bloquea = false) {
   const codigo = soloCodigo(fuente(boton.archivo, commit));
   const desde = codigo.indexOf(boton.funcion);
   if (desde < 0) return { falla: 'no encuentro «' + boton.funcion + '» en ' + boton.archivo };
@@ -108,21 +108,21 @@ async function correrUno(boton, como, fase, commit) {
   const nav = gpsFalso(como);
 
   let abierto = null;
+  const avisos = [];
   const ctx = {
     armarMensajeDeEmergencia,
     ubicacionDeAhora: deAhora ? (resp, tope) => deAhora(resp, tope, nav) : undefined,
     navigator: nav,
-    window: { open: (url) => { abierto = url; return {}; }, location: {} },
+    // `bloquea`: el navegador no deja abrir la ventana (devuelve null), como pasa si tarda mucho desde el toque.
+    window: { open: (url) => { abierto = url; return bloquea ? null : {}; }, location: {} },
     // el botón del mapa
     ubicacionEsDelGps: true, ubicacionPasajero: RECOGIDA, ubicacionConductor: CARRO, pantalla: fase,
-    viaje: VIAJE, contactoEmergencia: '3001234567', setAviso: () => {},
+    viaje: VIAJE, contactoEmergencia: '3001234567', setAviso: (a) => { avisos.push(a && a.texto); },
     // el de Ajustes
-    ubicacion: AL_ABRIR, contactoNumero: '3001234567', setError: () => {},
+    ubicacion: AL_ABRIR, contactoNumero: '3001234567', setError: (e) => { if (e) avisos.push(e); },
     auth: { currentUser: { uid: 'u1' } }, db: {},
     query: () => ({}), collection: () => ({}), where: () => ({}),
     getDocs: async () => ({ docs: [] }), elViajeEnCurso: () => VIAJE,
-    // el candado del botón, sin React: solo ejecuta
-    correr: (fn) => Promise.resolve().then(fn),
   };
   const aCiegas = [];
   for (let vuelta = 0; vuelta <= 12; vuelta += 1) {
@@ -133,7 +133,7 @@ async function correrUno(boton, como, fase, commit) {
     try {
       // eslint-disable-next-line no-new-func
       await new Function(...nombres, 'return (async () => {' + cuerpo.texto + '\n})();')(...valores);
-      return { ...leerMensaje(abierto), ms: Date.now() - t0, aCiegas };
+      return { ...leerMensaje(abierto), ms: Date.now() - t0, aCiegas, avisos };
     } catch (e) {
       const falta = /^(\w+) is not defined$/.exec(e.message || '');
       if (!falta || aCiegas.includes(falta[1])) return { falla: 'el botón reventó al correrlo: ' + e.message };
@@ -177,7 +177,21 @@ async function medir(commit) {
   return { salidas, fallos, mentiras, tardios, bien: salidas.filter((s) => s.bien).length, total: salidas.length };
 }
 
-module.exports = { medir, CASOS, PUNTOS, TOPE_ACEPTABLE_MS, correrUno, BOTONES };
+/**
+ * Y SI EL NAVEGADOR NO DEJA ABRIR WHATSAPP, ¿SE DICE? Ahora hay una espera antes de abrir (el GPS, hasta 4 s), y un
+ * navegador puede bloquear la ventana. Cada botón se corre con `window.open` devolviendo null, y se mira si le dijo
+ * algo a la persona que hable de WhatsApp. Devuelve { <botón>: true | false | 'no se pudo correr: …' }.
+ */
+async function seAvisaSiBloquean(commit) {
+  const fuera = {};
+  for (const b of BOTONES) {
+    const r = await correrUno(b, 'contesta', 'fase2', commit, true);
+    fuera[b.nombre] = r.falla ? 'no se pudo correr: ' + r.falla : r.avisos.some((a) => /WhatsApp/.test(String(a)));
+  }
+  return fuera;
+}
+
+module.exports = { medir, seAvisaSiBloquean, CASOS, PUNTOS, TOPE_ACEPTABLE_MS, correrUno, BOTONES };
 
 if (require.main === module) {
   const i = process.argv.indexOf('--commit');
@@ -203,6 +217,8 @@ if (require.main === module) {
     console.log('  mensajes que tardaron más de ' + TOPE_ACEPTABLE_MS + ' ms: ' + v.tardios);
     console.log('  casos como tienen que ser: ' + v.bien + ' de ' + v.total);
     if (v.fallos.length) console.log('  no se pudieron correr: ' + v.fallos.length);
+    const b = await seAvisaSiBloquean(commit);
+    console.log('  si el navegador bloquea WhatsApp, ¿se dice?  ' + Object.entries(b).map(([k, x]) => k + ': ' + (x === true ? 'sí' : x === false ? 'NO' : x)).join(' · '));
     console.log('');
   })();
 }

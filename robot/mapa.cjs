@@ -57,6 +57,14 @@ const RECORRIDOS = [
     archivo: 'radio-panel.cjs',
     vigila: ['guajirago-admin/src/Superadmin.js'],
   },
+  {
+    nombre: 'ubicacion-emergencia',
+    que: 'el mensaje de emergencia de Ajustes lleva la ubicación de AHORA y, sin GPS, sale a tiempo diciéndolo (G05)',
+    archivo: 'ubicacion-emergencia.cjs',
+    // Solicitar.js (el 🚨 del mapa) usa la misma función, pero probarlo pide un viaje en curso con conductor: NO lo
+    // cubre este recorrido, y por eso no se nombra aquí (ver APRENDIDO.md).
+    vigila: ['guajirago/src/Seguridad.js', 'guajirago/src/ubicacionDeAhora.js', 'guajirago/src/mensajeEmergencia.js'],
+  },
 ];
 
 // Los archivos de pantalla: los que, si cambian, el robot debería poder probar. Todo lo que esté en

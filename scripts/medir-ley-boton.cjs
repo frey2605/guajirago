@@ -124,37 +124,19 @@ function funcionesDe(codigo, seguro) {
 const nombresEn = (trozo) => [...sinTextos(trozo).matchAll(/\b([A-Za-z_$][\w$]*)\b/g)].map((m) => m[1]).filter((n) => !NO_SON_NOMBRES.has(n));
 
 // ¿Este trozo llega a una escritura? ¿Y pasa por correr(? Siguiendo la cadena de funciones del archivo.
-// `correr` es la expresión que reconoce el candado de ESTA pantalla (ver `losCandados`); sin ella, el nombre de siempre.
-function alcance(trozo, locales, importados, visto = new Set(), correr = /\bcorrer\s*\(/) {
+function alcance(trozo, locales, importados, visto = new Set()) {
   let escribe = ESCRIBE.test(trozo);
-  let candado = correr.test(trozo);
+  let candado = /\bcorrer\s*\(/.test(trozo);
   for (const n of nombresEn(trozo)) {
     if (visto.has(n)) continue;
     visto.add(n);
     if (locales.has(n)) {
-      const r = alcance(locales.get(n), locales, importados, visto, correr);
+      const r = alcance(locales.get(n), locales, importados, visto);
       escribe = escribe || r.escribe;
       candado = candado || r.candado;
     } else if (importados.has(n)) escribe = true;
   }
   return { escribe, candado };
-}
-
-// Con qué nombres trae la pantalla su(s) candado(s): cada `const { … } = useAccion()` puede renombrar `correr` y
-// `texto` (`correr: correrEmergencia`). Sin renombrar, los de siempre.
-function losCandados(codigo) {
-  const correr = new Set();
-  const texto = new Set();
-  for (const m of codigo.matchAll(/\{([^}]*)\}\s*=\s*useAccion\s*\(/g)) {
-    for (const trozo of m[1].split(',')) {
-      const [de, a] = trozo.split(':').map((s) => s.trim());
-      if (de === 'correr') correr.add(a || 'correr');
-      if (de === 'texto') texto.add(a || 'texto');
-    }
-  }
-  if (!correr.size) correr.add('correr');
-  if (!texto.size) texto.add('texto');
-  return { correr: [...correr], texto: [...texto] };
 }
 
 // Los nombres importados en el archivo (los de `import { a, b as c } from './x'` y `import d from './x'`).
@@ -256,17 +238,12 @@ function revisarArchivo(fuente, escritores = new Set()) {
   const usaLey = /\buseAccion\s*\(/.test(codigo);
   // La palabra del botón se puede traer con otro nombre (`texto: palabra`) cuando la pantalla ya tenía un `texto`
   // propio (Restaurantes.js: lo que se busca en la lista). Se mira con el nombre que tenga.
-  // Y una pantalla puede llevar MÁS DE UN candado (G05, 27-sep-2026): el 🚨 del mapa lleva el suyo, con otros nombres
-  // (`correr: correrEmergencia, texto: palabraEmergencia`), para que un mensaje del chat colgado no lo deje mudo. Antes
-  // aquí solo se conocía `correr` y un solo alias de `texto`: el segundo candado salía como «la palabra no sale nunca».
-  const { correr: nombresCorrer, texto: nombresTexto } = losCandados(codigo);
-  const alias = nombresTexto.join('|');
-  const CORRER = new RegExp('\\b(?:' + nombresCorrer.join('|') + ')\\s*\\(');
-  const PALABRA = new RegExp('\\b(?:' + alias + ')\\(');
-  const PALABRA_CON_NOMBRE = new RegExp('\\b(?:' + alias + ')\\(\\s*[\'"]([^\'"]+)[\'"]\\s*(\\+)?', 'g');
+  const alias = (codigo.match(/\{[^}]*\btexto\s*:\s*([A-Za-z_$][\w$]*)[^}]*\}\s*=\s*useAccion\(/) || [])[1] || 'texto';
+  const PALABRA = new RegExp('\\b' + alias + '\\(');
+  const PALABRA_CON_NOMBRE = new RegExp('\\b' + alias + '\\(\\s*[\'"]([^\'"]+)[\'"]\\s*(\\+)?', 'g');
 
   for (const h of entradasDe(codigo, seguro, locales)) {
-    const r = alcance(h.trozo, locales, importados, new Set(), CORRER);
+    const r = alcance(h.trozo, locales, importados);
     if (r.escribe && !r.candado) sinCandado.push({ linea: h.linea, evento: h.evento, trozo: h.trozo.replace(/\s+/g, ' ').slice(0, 90) });
     if (usaLey && r.candado) {
       const el = elementoEn(codigo, seguro, h.ini);
@@ -300,7 +277,7 @@ function revisarArchivo(fuente, escritores = new Set()) {
   if (usaLey) {
     // La palabra del botón y la acción que corre tienen que llamarse igual, o la palabra no sale nunca.
     const corren = new Set();
-    for (const m of seguro.matchAll(new RegExp(CORRER.source, 'g'))) {
+    for (const m of seguro.matchAll(/\bcorrer\s*\(/g)) {
       const a = argumentos(seguro, codigo, m.index + m[0].length - 1);
       if (a.length < 3) faltas.push(`renglón ${seguro.slice(0, m.index).split('\n').length}: correr(fn, cual, exito) sin su nombre o sin su «se hizo»`);
       // Un nombre fijo ('guardar'), o un comienzo fijo más algo que cambia ('respuesta:' + resp): el comienzo tiene que

@@ -576,13 +576,6 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
   useEffect(() => {
     if (avisoAccion && !avisoAccion.ok) setAviso(avisoAccion);
   }, [avisoAccion]);
-  // 🚨 EL BOTÓN DE EMERGENCIA LLEVA SU PROPIO CANDADO (G05, 27-sep-2026). El candado de arriba es UNO para toda la
-  // pantalla: si un mensaje del chat se quedara colgado sin señal, el 🚨 devolvería `null` y no haría nada. Con el suyo,
-  // el doble toque sigue sin mandar dos mensajes y el botón dice «Buscando tu ubicación…» mientras espera el GPS.
-  const { correr: correrEmergencia, texto: palabraEmergencia, aviso: avisoEmergencia } = useAccion();
-  useEffect(() => {
-    if (avisoEmergencia && !avisoEmergencia.ok) setAviso(avisoEmergencia);
-  }, [avisoEmergencia]);
   const [llamandoConductor, setLlamandoConductor] = useState(false);
   const [llamadaEntrante, setLlamadaEntrante] = useState(false);
   const [tiempoBusqueda, setTiempoBusqueda] = useState(240);
@@ -986,7 +979,10 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
     window.location.href = 'tel:123';
   };
 
-  const compartirSeguridad = () => correrEmergencia(async () => {
+  // 🔴 SIN EL CANDADO DE LA LEY DEL BOTÓN, a propósito (G05, 27-sep-2026): el robot midió en el navegador que
+  // `candado.js` revienta al primer toque («Illegal invocation») y se queda cerrado; colgado de él, el 🚨 serviría
+  // UNA sola vez por viaje. Queda anotado para arreglar el candado aparte.
+  const compartirSeguridad = async () => {
     // EL TEXTO SE ARMA EN `mensajeEmergencia.js`, que es el MISMO archivo que
     // usa el botón de Ajustes (SEGUNDA LEY: un proceso, un sitio). Antes estaba
     // escrito a mano aquí, y los dos ya decían cosas distintas: el de Ajustes
@@ -1052,11 +1048,15 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
     // Y SI EL NAVEGADOR NO DEJA ABRIRLO, SE DICE (G05). Ahora hay una espera
     // antes de abrir (el GPS, hasta 4 s), y un navegador puede bloquear la
     // ventana si pasa mucho rato desde el toque. Un mensaje de emergencia que
-    // no sale no puede quedarse callado: el candado lo pinta en la ventanita.
+    // no sale no puede quedarse callado: se dice en la ventanita.
     const ventana = window.open(url, '_blank');
-    if (!ventana) return { ok: false, error: 'Tu teléfono no dejó abrir WhatsApp. Vuelve a tocar «Compartir»: el mensaje sale de una vez.' };
-    return true;
-  }, 'emergencia', 'El mensaje quedó listo en WhatsApp.', 'abrir WhatsApp');
+    if (!ventana) {
+      setAviso({
+        titulo: 'No se pudo abrir WhatsApp',
+        texto: 'Tu teléfono no dejó abrir WhatsApp. Vuelve a tocar «Compartir»: el mensaje sale de una vez.',
+      });
+    }
+  };
 
   const cancelarViaje = async (razon) => {
     clearInterval(contadorRef.current);
@@ -1422,7 +1422,7 @@ const PanelEmergencia = () => (
           <div onClick={async () => { await compartirSeguridad(); setMostrarEmergencia(false); }} style={{ background: '#FFFFFF', borderRadius: '18px', padding: '20px', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '14px', cursor: 'pointer', border: '1px solid #25D366' }}>
             <span style={{ fontSize: '34px' }}>📤</span>
             <div>
-              <p style={{ color: '#1A1A1E', fontWeight: '900', fontSize: '15px', margin: '0', lineHeight: '1.3' }}>{palabraEmergencia('emergencia', 'Buscando tu ubicación…', 'Compartir ubicación, ruta e identidad del conductor')}</p>
+              <p style={{ color: '#1A1A1E', fontWeight: '900', fontSize: '15px', margin: '0', lineHeight: '1.3' }}>Compartir ubicación, ruta e identidad del conductor</p>
               <p style={{ color: '#25D366', fontSize: '12px', margin: '5px 0 0' }}>Enviar por WhatsApp</p>
             </div>
           </div>

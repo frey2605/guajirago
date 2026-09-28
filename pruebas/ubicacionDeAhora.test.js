@@ -13,7 +13,7 @@
 const { describe, it } = require('node:test');
 const assert = require('node:assert');
 const { cargarDeLaApp, leer, soloCodigo, cuerpoDeLaFuncion, elRespaldoDelGps } = require('./cargar.cjs');
-const { medir } = require('../scripts/medir-ubicacion-panico.cjs');
+const { medir, seAvisaSiBloquean } = require('../scripts/medir-ubicacion-panico.cjs');
 
 const ARCHIVO = 'guajirago/src/ubicacionDeAhora.js';
 const { ubicacionDeAhora, TOPE_UBICACION_MS } = cargarDeLaApp(ARCHIVO);
@@ -133,6 +133,13 @@ describe('LOS DOS BOTONES DE EMERGENCIA · piden la ubicación AL TOCAR', () => 
       .map((s) => s.boton.nombre + ': ' + s.r.aCiegas.join(', '));
     assert.deepStrictEqual([...new Set(aCiegas)], [],
       'el medidor tuvo que rellenar a ciegas nombres que el botón usa; lo que midió puede no ser lo que pasa.');
+  });
+
+  it('EL QUE MUERDE · si el navegador no deja abrir WhatsApp (pasó rato desde el toque), los dos lo DICEN', async () => {
+    const b = await seAvisaSiBloquean(null);
+    assert.deepStrictEqual(b, { 'el 🚨 del mapa': true, 'Ajustes → Seguridad': true },
+      'con WhatsApp bloqueado por el navegador, algún botón se queda callado: la persona cree que el mensaje salió '
+      + 'y no salió. Ahora hay una espera antes de abrir (el GPS), y eso lo hace posible.');
   });
 
   it('y ninguno de los dos pide el GPS por su cuenta: los dos pasan por ubicacionDeAhora', () => {
