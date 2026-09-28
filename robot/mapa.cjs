@@ -244,6 +244,14 @@ const RECORRIDOS = [
     // scripts/medir-origen-del-viaje.cjs y pruebas/direccionDePunto.test.js con un Google de mentira.
     vigila: ['guajirago/src/Restaurantes.js', 'guajirago/src/direccionDePunto.js'],
   },
+  {
+    nombre: 'flujos-pedido',
+    que: 'aliados → Configuración → «Flujos de pedido» enseña las 6 etapas del domicilio en orden, con «(siempre)» solo en Recepcionista y Cajero (G33; no guarda nada)',
+    archivo: 'flujos-pedido.cjs',
+    // guajirago/src/estadosPedido.js (lo que ve el cliente) y el aviso del servidor los EJECUTA
+    // pruebas/estadosPedido.test.js: la pantalla del cliente se ve igual que antes de G33.
+    vigila: ['guajirago-aliados/src/ConfigFlujos.js', 'guajirago-aliados/src/flujoPedidos.js', 'guajirago/src/estadosPedido.js'],
+  },
 ];
 
 // Los archivos de pantalla: los que, si cambian, el robot debería poder probar. Todo lo que esté en

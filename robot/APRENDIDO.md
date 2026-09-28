@@ -397,6 +397,15 @@ la placa de `conductores/{uid}` (la escribe su GPS con la misma placa que va en 
 - La ventanita de «Falta el nombre de la calle» es la misma de «Ubicación no disponible» (la del GPS negado), con otro
   título. Con el `403` de siempre en la consola, que no es de esto.
 
+### flujos-pedido (G33, 28-sep-2026)
+- Camino: restaurante@gg.test → ☰ → «Configuración» (texto exacto) → «Flujos de pedido» (texto exacto). El recuadro
+  de domicilio es el padre del `<p>` «🏍️ Pedidos a domicilio»; sus filas son los hijos desde el tercero (antes van el
+  título y la explicación). El nombre de la etapa es el primer `<p>` de cada fila y «(siempre)» va DENTRO de él.
+- No se toca «Guardar flujos»: el recorrido solo lee. En pruebas el restaurante tiene las 6 etapas encendidas.
+- 🔑 Lo que de verdad arregló G33 (el aviso «¡Pedido entregado!» cuando el negocio apaga esa etapa) no se ve en una
+  pantalla: es un aviso del servidor. Lo ejecuta pruebas/estadosPedido.test.js con las 16 formas del flujo, y en la
+  nube de pruebas se miró el registro de `notificarClienteDelPedido`.
+
 ## Lo que el robot dejó creado en pruebas
 
 - 27-sep-2026: «Robot Taxi De Prueba» (robot.taxi.1790508222079@gg.test) y
