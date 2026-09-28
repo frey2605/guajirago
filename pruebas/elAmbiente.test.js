@@ -82,7 +82,9 @@ describe('EL AMBIENTE (fase 0) · la app de transporte deduce si es PRUEBAS o PR
   it('la llave de notificaciones del conductor y del pasajero sale del ambiente, no del código', () => {
     const t = soloCodigo(leer('guajirago/src/AppConductor.js'));
     assert.ok(!/vapidKey:\s*["']B/.test(t), '⛔ la vapidKey sigue escrita a mano en AppConductor.js');
-    assert.match(t, /vapidKey:\s*process\.env\.REACT_APP_FIREBASE_VAPID_KEY/, '⛔ la vapidKey no se lee de REACT_APP_FIREBASE_VAPID_KEY');
+    // Desde el 27-sep-2026 el conductor ya no pide el token aquí (el GPS llevaba su copia): va por
+    // registrarTokenFCM, y la llave vive en Notificaciones.js, que se mira abajo. Aquí no puede volver ninguna.
+    assert.ok(!/vapidKey/.test(t), '⛔ AppConductor.js vuelve a pedir el token por su cuenta, con su propia llave');
     // El PASAJERO (Solicitar, Restaurantes, Turismo) y el conductor (registrarTokenFCM) piden el token en
     // Notificaciones.js, no en AppConductor.js. Hasta el 25-sep-2026 ese archivo llevaba la llave de PRODUCCIÓN
     // escrita a mano y este `it` no lo miraba: la compilación de pruebas pedía con la llave de producción el

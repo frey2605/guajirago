@@ -75,6 +75,37 @@ describe('LA FICHA DEL CONDUCTOR · nadie la reescribe entera', () => {
   });
 });
 
+describe('EL TOKEN DE AVISOS · un solo camino (27-sep-2026)', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const SRC = path.join(__dirname, '..', 'guajirago', 'src');
+
+  it('solo Notificaciones.js le pide el token a Firebase: ninguna pantalla lleva su copia', () => {
+    const conCopia = fs.readdirSync(SRC).filter((f) => f.endsWith('.js') && f !== 'Notificaciones.js')
+      // El NOMBRE, no la llamada: `import { getToken as gt }` y luego `gt()` se escapaba (sabotaje del 27-sep-2026).
+      .filter((f) => /\bgetToken\b/.test(soloCodigo(leer('guajirago/src/' + f))));
+    assert.deepStrictEqual(conCopia, [], '⛔ una pantalla pide el token por su cuenta');
+  });
+
+  it('el GPS no lleva el token: reintenta con registrarTokenFCM, solo si falta y el permiso está dado', () => {
+    const t = soloCodigo(leer('guajirago/src/AppConductor.js'));
+    const i = t.indexOf('const guardarUbicacion');
+    const cuerpo = t.slice(i, t.indexOf('\n    };', i));
+    assert.ok(i > 0 && cuerpo.length > 100, 'no encuentro guardarUbicacion');
+    assert.ok(!/fcmToken/.test(cuerpo), '⛔ el GPS vuelve a escribir el token por su cuenta');
+    assert.match(cuerpo, /if \(!tokenListo && !pidiendoToken && typeof Notification !== 'undefined' && Notification\.permission === 'granted'\) \{\s*pidiendoToken = true;\s*registrarTokenFCM\(\)\.then\(\(ok\) => \{ tokenListo = ok; pidiendoToken = false; \}\);/,
+      '⛔ el GPS no reintenta por la pieza única, o la llama sin mirar el permiso (repetiría la pregunta)');
+  });
+
+  it('registrarTokenFCM dice si quedó guardado: true tras guardarlo, false si no', () => {
+    const t = soloCodigo(leer('guajirago/src/Notificaciones.js')).replace(/\r\n/g, '\n');
+    const i = t.indexOf('export const registrarTokenFCM');
+    const cuerpo = t.slice(i, t.indexOf('\n};', i) + 3);
+    assert.match(cuerpo, /\{ fcmToken: token \}, \{ merge: true \}\);\s*log\('FCM: guardado OK'\);\s*return true;/, '⛔ no avisa que lo guardó');
+    assert.match(cuerpo, /\n  return false;\n\};$/, '⛔ si no lo guarda, no lo dice');
+  });
+});
+
 describe('LA FICHA DEL CONDUCTOR · el medidor', () => {
   it('cuenta los viajes vivos sin marca y las marcas que apuntan a un viaje terminado', () => {
     const r = medir(

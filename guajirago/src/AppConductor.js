@@ -917,22 +917,22 @@ const cargarSaldo = useCallback(async (uid) => {
     if (!user || !navigator.geolocation) return;
     if (activo) registrarTokenFCM();
 
+    // El token de avisos va por UN solo camino, registrarTokenFCM (27-sep-2026): el GPS llevaba su propia copia
+    // y lo pedía en cada lectura. Aquí solo se reintenta mientras no haya quedado guardado y el permiso esté dado.
+    let tokenListo = false, pidiendoToken = false;
     const guardarUbicacion = async (pos) => {
       const nueva = { lat: pos.coords.latitude, lng: pos.coords.longitude, timestamp: new Date().toISOString() };
       setUbicacion(nueva);
       ubicacionRef.current = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+      if (!tokenListo && !pidiendoToken && typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+        pidiendoToken = true;
+        registrarTokenFCM().then((ok) => { tokenListo = ok; pidiendoToken = false; });
+      }
       try {
-        let tokenFCM = null;
-        try {
-          const { getMessaging, getToken } = await import('firebase/messaging');
-          const messaging = getMessaging();
-          tokenFCM = await getToken(messaging, { vapidKey: process.env.REACT_APP_FIREBASE_VAPID_KEY });
-        } catch(e) {}
         await setDoc(doc(db, 'conductores', user.uid), {
           nombre: nombre || 'Conductor', telefono: telefono || '',
           placa: placa || '', vehiculo: vehiculo || '',
           ubicacion: nueva, activo: true,
-          ...(tokenFCM ? { fcmToken: tokenFCM } : {}),
         // merge (27-sep-2026, G02): sin él, cada lectura del GPS reescribía la ficha ENTERA y borraba
         // lo que pone el servidor al confirmarlo (enViajeId, ocupado) y el token si esta vez no salió.
         }, { merge: true });

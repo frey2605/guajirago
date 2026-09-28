@@ -38,11 +38,13 @@ export const registrarTokenFCM = async () => {
     if (token) {
       await setDoc(doc(db, 'conductores', user.uid), { fcmToken: token }, { merge: true });
       log('FCM: guardado OK');
+      return true; // quién lo llama sabe si quedó guardado (el GPS deja de reintentar)
     }
   } catch(e) {
     if (_onDebug) _onDebug('FCM ERROR: ' + (e.message || e));
     console.log('Error FCM:', e);
   }
+  return false;
 };
 
 // Pide permiso y devuelve el token de notificaciones del cliente (sin guardarlo),
