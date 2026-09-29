@@ -104,9 +104,10 @@ describe('EL ROBOT · solo pruebas', () => {
       for (const v of r.vigila) assert.ok(fs.existsSync(path.join(RAIZ, v)), '⛔ ' + r.nombre + ' vigila un archivo que no existe: ' + v);
     }
     // Créditos era el ejemplo de pantalla sin recorrido hasta el 27-sep-2026, cuando le nació candado-recarga.
-    const a = queProbar(['guajirago/src/documentosConductor.js', 'guajirago/src/Turismo.js', 'pruebas/x.test.js']);
+    // Y Turismo.js hasta el 29-sep-2026, cuando le nació horario-agencia (G46).
+    const a = queProbar(['guajirago/src/documentosConductor.js', 'guajirago/src/Calificacion.js', 'pruebas/x.test.js']);
     assert.deepStrictEqual(a.tocan.map((r) => r.nombre), ['humo', 'registrar-conductor']);
-    assert.deepStrictEqual(a.sinRecorrido, ['guajirago/src/Turismo.js'], '⛔ una pantalla sin recorrido tiene que salir nombrada');
+    assert.deepStrictEqual(a.sinRecorrido, ['guajirago/src/Calificacion.js'], '⛔ una pantalla sin recorrido tiene que salir nombrada');
     assert.deepStrictEqual(queProbar([]).tocan.map((r) => r.nombre), ['humo'], '⛔ el humo corre siempre');
   });
 

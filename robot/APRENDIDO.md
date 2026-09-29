@@ -503,6 +503,17 @@ la placa de `conductores/{uid}` (la escribe su GPS con la misma placa que va en 
 - `registrar-conductor` salió 🔴 una vez en la tanda y otra solo («no salió la bienvenida»), y ✓ las dos siguientes; el
   mototaxi (placa ROB12A) ✓ a la primera. La placa del registro pasa por la regla nueva y ROB123 / ROB12A siguen sirviendo.
 
+### horario-agencia · la agencia y el restaurante dicen lo mismo con la misma hora (G46, 29-sep-2026)
+- En pruebas la agencia y el restaurante de prueba abren y cierran a las 0 y a las 0 (lo siembra
+  `sembrar-pruebas.cjs`): con la regla vieja la lista de agencias decía «Cerrada ahora» A TODA HORA y la de
+  restaurantes «Abierto ahora». Con G46 las dos salen abiertas (misma hora = 24 horas).
+- Pasajero → «Turismo» (el cuadro del menú de módulos, texto exacto) → la tarjeta «Agencia de Turismo de Prueba»; su
+  renglón de estado es un `p` que dice «Abierta ahora» o «Cerrada ahora». En Restaurantes el estado va en un `span`
+  («Abierto ahora» / «Cerrado ahora»). Se busca el nombre y, en los 8 nodos `p`/`span` siguientes, el estado.
+- Para ver que la regla sigue CERRANDO, la agencia (agencia@gg.test, por la base) se pone de (hora de Colombia + 2) a
+  (+ 4); el pasajero vuelve a Turismo y ve «Cerrada ahora». Al final se le devuelve el 0 y 0 (se lee para comprobarlo).
+- ✓ a la primera. Los dos 403 de la consola salen igual que en los demás recorridos.
+
 ## Lo que el robot dejó creado en pruebas
 
 - 27-sep-2026: «Robot Taxi De Prueba» (robot.taxi.1790508222079@gg.test) y

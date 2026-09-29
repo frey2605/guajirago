@@ -322,6 +322,12 @@ const RECORRIDOS = [
     // y el trozo de la placa lo SACA del archivo y lo EJECUTA pruebas/placaVehiculo.test.js.
     vigila: ['guajirago-admin/src/Conductores.js', 'guajirago-admin/src/vehiculoConductor.js', 'guajirago/src/vehiculoConductor.js'],
   },
+  {
+    nombre: 'horario-agencia',
+    que: 'con la agencia y el restaurante de prueba abriendo y cerrando a la misma hora (0 y 0), las listas del pasajero dicen «Abierta ahora» y «Abierto ahora»; con un horario que no incluye la hora de Colombia, la agencia dice «Cerrada ahora» (G46; cambia el horario de la agencia de PRUEBAS y lo devuelve)',
+    archivo: 'horario-agencia.cjs',
+    vigila: ['guajirago/src/Turismo.js', 'guajirago/src/Restaurantes.js', 'guajirago/src/horarioNegocio.js'],
+  },
 ];
 
 // Los archivos de pantalla: los que, si cambian, el robot debería poder probar. Todo lo que esté en
