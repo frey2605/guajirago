@@ -37,7 +37,7 @@ import { direccionDePunto } from './direccionDePunto';
 // El mapa con ruta es UNO para el conductor y el pasajero (G29).
 import MapaConRuta from './MapaConRuta';
 // El número del contacto de emergencia: la MISMA regla que el registro y Seguridad (G10).
-import { celularDiezCifras } from './telefonoValido';
+import { numeroWhatsApp } from './telefonoValido';
 
 /**
  * EL AVISO DE «NO SÉ DÓNDE RECOGERTE» — ESCRITO UNA SOLA VEZ.
@@ -914,8 +914,8 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
     // 🔴 G10: el número sale de la MISMA regla que valida el registro y Seguridad
     // (telefonoValido.js). Antes se le pegaba un 57 a lo que hubiera: «300 123 45»
     // abría wa.me/5730012345, un número que no existe, y «abc» abría wa.me/57.
-    const diez = celularDiezCifras(contactoEmergencia);
-    const numeroFinal = diez ? '57' + diez : '';
+    // G41: y el número para WhatsApp («57» + las 10 cifras) también sale de ahí, no se arma a mano.
+    const numeroFinal = numeroWhatsApp(contactoEmergencia);
     // SIN NÚMERO, SE DICE. Antes abría WhatsApp sin destinatario y el pasajero
     // se encontraba eligiendo un contacto a mano, en una emergencia, sin saber
     // por qué. El mensaje va igual —se abre el selector— pero avisado.

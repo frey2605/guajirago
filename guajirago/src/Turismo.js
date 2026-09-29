@@ -13,6 +13,8 @@ import { prepararTokenDeAvisos } from './Notificaciones';
 // «¿Quién sale en la app?» se contesta en UN solo sitio (SEGUNDA LEY): el mismo
 // que usa Restaurantes.js. Ahí vive también el interruptor `visibleEnEscaparate`.
 import { lasDeTurismo } from './escaparate';
+// El enlace de WhatsApp de la agencia sale de la pieza única (G41): sin número bueno, no hay enlace.
+import { enlaceWhatsApp } from './telefonoValido';
 
 const AZUL = '#1C8EF9';
 const NARANJA = '#FF7A2F';
@@ -219,7 +221,7 @@ function Turismo({ nombre, foto, onVolver, onCerrarSesion, onIrPerfil, onIrGanan
         <div style={{ flex: 1, minWidth: 0 }}>
           <p style={{ color: '#1A1A1E', fontWeight: '900', fontSize: '18px', margin: 0 }}>{agenciaActiva.nombre}</p>
           <p style={{ color: '#6B7280', fontSize: '12px', margin: '2px 0 0' }}>{agenciaActiva.descripcion}</p>
-          {agenciaActiva.telefono && <a href={`https://wa.me/57${String(agenciaActiva.telefono).replace(/\D/g, '').slice(-10)}`} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-block', marginTop: '4px', color: VERDE, fontSize: '12px', fontWeight: '900', textDecoration: 'none' }}>💬 WhatsApp</a>}
+          {enlaceWhatsApp(agenciaActiva.telefono) && <a href={enlaceWhatsApp(agenciaActiva.telefono)} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-block', marginTop: '4px', color: VERDE, fontSize: '12px', fontWeight: '900', textDecoration: 'none' }}>💬 WhatsApp</a>}
         </div>
       </div>
 

@@ -14,7 +14,7 @@ import { armarMensajeDeEmergencia } from './mensajeEmergencia';
 // función que el 🚨 del mapa (G05, 27-sep-2026): lee el porqué en ubicacionDeAhora.js.
 import { ubicacionDeAhora } from './ubicacionDeAhora';
 // ¿El número del contacto sirve? La MISMA regla que el registro (G10): telefonoValido.js.
-import { telefonoSirve, celularDiezCifras } from './telefonoValido';
+import { telefonoSirve, numeroWhatsApp } from './telefonoValido';
 import { motivoDeRechazo, apuntarRechazo } from './avisoRechazo';
 
 function Seguridad({ onVolver }) {
@@ -129,10 +129,11 @@ function Seguridad({ onVolver }) {
 
     // 🔴 G10: antes se le pegaba un 57 a lo que hubiera, y «300 123 45» abría un número que no existe. Si el guardado
     // no sirve, WhatsApp se abre SIN destinatario (el mensaje ya va escrito) y se dice por qué.
-    const diez = celularDiezCifras(contactoNumero);
-    if (!diez) setError('El número de tu contacto no está completo (debe tener 10 cifras): WhatsApp te va a pedir a quién mandarlo. Corrígelo arriba y guárdalo.');
-    const url = diez
-      ? `https://wa.me/57${diez}?text=${encodeURIComponent(texto)}`
+    // G41: el número para WhatsApp («57» + las 10 cifras) sale de la pieza, no se arma a mano.
+    const numero = numeroWhatsApp(contactoNumero);
+    if (!numero) setError('El número de tu contacto no está completo (debe tener 10 cifras): WhatsApp te va a pedir a quién mandarlo. Corrígelo arriba y guárdalo.');
+    const url = numero
+      ? `https://wa.me/${numero}?text=${encodeURIComponent(texto)}`
       : `https://wa.me/?text=${encodeURIComponent(texto)}`;
     // Si el navegador no deja abrir WhatsApp (pasó rato desde el toque), se dice. (Sin el candado de la ley del botón
     // a propósito: el robot midió el 27-sep-2026 que `candado.js` revienta en el navegador y se queda cerrado.)

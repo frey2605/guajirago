@@ -106,14 +106,17 @@ async function correrUno(boton, como, fase, commit, bloquea = false) {
   let deAhora = null;
   try { deAhora = cargarDeLaApp('guajirago/src/ubicacionDeAhora.js').ubicacionDeAhora; } catch (e) { deAhora = null; }
   // El número del contacto (G10, 28-sep-2026): la regla de verdad, no una de mentira.
+  // Desde G41 los botones piden a la pieza el número para WhatsApp (`numeroWhatsApp`): se les da la pieza ENTERA.
   let diezCifras;
-  try { diezCifras = cargarDeLaApp('guajirago/src/telefonoValido.js').celularDiezCifras; } catch (e) { diezCifras = undefined; }
+  let laPieza = {};
+  try { laPieza = cargarDeLaApp('guajirago/src/telefonoValido.js'); diezCifras = laPieza.celularDiezCifras; } catch (e) { diezCifras = undefined; }
   const nav = gpsFalso(como);
 
   let abierto = null;
   const avisos = [];
   const ctx = {
     armarMensajeDeEmergencia,
+    ...laPieza,
     celularDiezCifras: diezCifras,
     ubicacionDeAhora: deAhora ? (resp, tope) => deAhora(resp, tope, nav) : undefined,
     navigator: nav,

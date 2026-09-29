@@ -36,7 +36,8 @@ function laFuncion(archivo, nombre) {
   return (ambito) => f(ambito);
 }
 
-const REGLA = { celularDiezCifras, telefonoSirve };
+// Todo lo que exporta la pieza (desde G41 también `numeroWhatsApp` y `enlaceWhatsApp`, que usan los botones).
+const REGLA = cargarDeLaApp(PIEZA);
 
 describe('G10 · la regla: ¿este teléfono sirve?', () => {
   const SIRVEN = [
