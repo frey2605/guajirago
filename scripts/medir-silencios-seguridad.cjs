@@ -205,8 +205,10 @@ cs.forEach((c, n) => {
   //   · `setError('')` — la cadena vacía no pinta nada.
   //   · `setMensaje('Listo ✅')` — pinta en verde de éxito un fallo.
   //   · Y SÍ cuenta la ventanita, que es como manda avisar el dueño.
+  //   · Y SÍ cuenta el motivo de la pieza única, motivoDeRechazo (G40): nunca da un texto vacío ni de éxito.
   const avisaAlPasajero = /setError\s*\(\s*['"][^'"]{10,}/.test(c.cuerpo)
-    || /set(?:Aviso|Modal)\s*\(\s*\{[^}]*texto\s*:\s*['"][^'"]{10,}/.test(c.cuerpo);
+    || /set(?:Aviso|Modal)\s*\(\s*\{[^}]*texto\s*:\s*['"][^'"]{10,}/.test(c.cuerpo)
+    || /setError\s*\(\s*motivoDeRechazo\s*\(\s*e\s*,/.test(c.cuerpo);
   const marcaElFallo = /fallo\s*(?:\|\|)?=[^;]*'[a-z]+'/.test(c.cuerpo);
   const vaALaBandeja = /guardarRechazo\s*\(/.test(c.cuerpo);
   const avisa = avisaAlPasajero || marcaElFallo || vaALaBandeja;

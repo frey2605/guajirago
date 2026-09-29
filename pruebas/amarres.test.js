@@ -2465,8 +2465,11 @@ describe('EL BOTÓN DE PÁNICO · usa la fuente única del viaje en curso', () =
       // Y SE ACEPTA LA VENTANITA, que es como manda avisar el dueño («todos los
       // avisos al usuario son modales»). Exigiendo solo `setError` se daba rojo
       // a un catch que avisa BIEN con un modal. Lo cazó la segunda opinión.
+      // G40 (28-sep-2026): y cuenta el motivo de la PIEZA ÚNICA (motivoDeRechazo), que nunca da un texto vacío
+      // ni de éxito: con él el catch de guardar dice por qué falló en vez de «Revisa tu conexión» siempre.
       const avisaAlPasajero = /setError\s*\(\s*['"][^'"]{10,}/.test(cuerpo)
-        || /set(?:Aviso|Modal)\s*\(\s*\{[^}]*texto\s*:\s*['"][^'"]{10,}/.test(cuerpo);
+        || /set(?:Aviso|Modal)\s*\(\s*\{[^}]*texto\s*:\s*['"][^'"]{10,}/.test(cuerpo)
+        || /setError\s*\(\s*motivoDeRechazo\s*\(\s*e\s*,/.test(cuerpo);
       const marcaElFallo = /fallo\s*(?:\|\|)?=[^;]*'[a-z]+'/.test(cuerpo);
       const vaALaBandeja = /guardarRechazo\s*\(/.test(cuerpo);
       if (!(avisaAlPasajero || marcaElFallo || vaALaBandeja)) {
@@ -2524,6 +2527,7 @@ describe('EL BOTÓN DE PÁNICO · usa la fuente única del viaje en curso', () =
     [
       ["/setError\\s*\\(\\s*['\"][^'\"]{10,}/", 'el texto de verdad en pantalla'],
       ["/set(?:Aviso|Modal)\\s*\\(\\s*\\{[^}]*texto\\s*:\\s*['\"][^'\"]{10,}/", 'la ventanita'],
+      ['/setError\\s*\\(\\s*motivoDeRechazo\\s*\\(\\s*e\\s*,/', 'el motivo de la pieza única (G40)'],
       ["/fallo\\s*(?:\\|\\|)?=[^;]*'[a-z]+'/", 'la marca del fallo para el mensaje'],
       ['/guardarRechazo\\s*\\(/', 'la bandeja de rechazos'],
     ].forEach(([patron, queEs]) => {

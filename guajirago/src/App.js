@@ -20,6 +20,7 @@ import Creditos from './Creditos';
 import Anuncio from './Anuncio';
 import Logo from './Logo';
 import AvisoModal from './AvisoModal';
+import { motivoDeRechazo, apuntarRechazo } from './avisoRechazo';
 import { auth, db, storage } from './firebase';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
@@ -282,7 +283,11 @@ function PantallaDatosConductor({ nombre, foto, celular, onGuardar, onVolver, on
       } catch (e) {}
 
       onGuardar(placa.toUpperCase(), vehiculo, telefono, tipoVehiculo, creditosIniciales);
-    } catch (e) { setError('Error al guardar. Revisa tu conexión e intenta de nuevo'); }
+    } catch (e) {
+      // G40: el motivo de verdad (motivoDeRechazo), no «Revisa tu conexión» sea cual sea el fallo.
+      apuntarRechazo('App.js (datos del conductor)', e);
+      setError(motivoDeRechazo(e, 'guardar tus datos').texto);
+    }
     setCargando(false);
   };
 

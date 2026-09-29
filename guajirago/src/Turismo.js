@@ -7,6 +7,7 @@ import { fechaDeCalendario } from './fechaCalendario';
 import { collection, query, where, getDocs, getDoc, addDoc, doc } from 'firebase/firestore';
 import Logo from './Logo';
 import AvisoModal from './AvisoModal';
+import { motivoDeRechazo, apuntarRechazo } from './avisoRechazo';
 import MenuLateral from './MenuLateral';
 import { prepararTokenDeAvisos } from './Notificaciones';
 // «¿Quién sale en la app?» se contesta en UN solo sitio (SEGUNDA LEY): el mismo
@@ -109,7 +110,9 @@ function Turismo({ nombre, foto, onVolver, onCerrarSesion, onIrPerfil, onIrGanan
       setTourReserva(null);
     } catch (e) {
       setEnviando(false);
-      setAviso('No se pudo enviar. Revisa tu conexión e intenta de nuevo');
+      // G40: el motivo de verdad (motivoDeRechazo: título y texto), no «Revisa tu conexión» sea cual sea el fallo.
+      apuntarRechazo('Turismo.js (enviarReserva)', e);
+      setAviso(motivoDeRechazo(e, 'enviar la reserva'));
     }
   };
 
@@ -286,7 +289,7 @@ function Turismo({ nombre, foto, onVolver, onCerrarSesion, onIrPerfil, onIrGanan
       )}
 
       {aviso && (
-        <AvisoModal aviso={{ titulo: aviso }} onCerrar={() => setAviso('')} />
+        <AvisoModal aviso={typeof aviso === 'string' ? { titulo: aviso } : aviso} onCerrar={() => setAviso('')} />
       )}
     </div>
   );

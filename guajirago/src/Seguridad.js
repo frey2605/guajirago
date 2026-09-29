@@ -15,6 +15,7 @@ import { armarMensajeDeEmergencia } from './mensajeEmergencia';
 import { ubicacionDeAhora } from './ubicacionDeAhora';
 // ¿El número del contacto sirve? La MISMA regla que el registro (G10): telefonoValido.js.
 import { telefonoSirve, celularDiezCifras } from './telefonoValido';
+import { motivoDeRechazo, apuntarRechazo } from './avisoRechazo';
 
 function Seguridad({ onVolver }) {
   const [contactoNombre, setContactoNombre] = useState('');
@@ -67,7 +68,9 @@ function Seguridad({ onVolver }) {
       setEditandoNumero(false);
       setMensaje('¡Contacto guardado! ✅');
     } catch (e) {
-      setError('Error al guardar. Revisa tu conexión');
+      // G40: el motivo de verdad (motivoDeRechazo), no «Revisa tu conexión» sea cual sea el fallo.
+      apuntarRechazo('Seguridad.js (guardar)', e);
+      setError(motivoDeRechazo(e, 'guardar el contacto').texto);
     }
     setGuardando(false);
   };

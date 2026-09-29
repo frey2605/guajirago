@@ -1013,7 +1013,8 @@ const cargarSaldo = useCallback(async (uid) => {
         return !!(res && res.data && res.data.ok);
       } catch (e) {
         apuntarRechazo('AppConductor.js (verificarCodigo)', e);
-        setErrorCodigo('No se pudo comprobar el código. Revisa tu conexión');
+        // G40: el motivo lo da la pieza única, igual que el código de descuento (antes: «Revisa tu conexión» siempre).
+        setErrorCodigo(motivoDeRechazo(e, 'comprobar el código').texto);
         return { ok: false, avisado: true };
       }
     }, 'codigo', 'Código correcto.', 'comprobar el código');

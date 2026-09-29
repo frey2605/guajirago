@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { auth, db, storage } from './firebase';
 import Logo from './Logo';
 import { telefonoDe } from './telefonoUsuario';
+import { motivoDeRechazo, apuntarRechazo } from './avisoRechazo';
 import { doc, getDoc, setDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
@@ -93,7 +94,9 @@ function MiPerfil({ onVolver }) {
       setEditandoTelefono(false);
       setMensaje('¡Perfil actualizado! ✅');
     } catch (e) {
-      setError('Error al guardar. Revisa tu conexión e intenta de nuevo');
+      // G40: el motivo de verdad (motivoDeRechazo), no «Revisa tu conexión» sea cual sea el fallo.
+      apuntarRechazo('MiPerfil.js (guardar)', e);
+      setError(motivoDeRechazo(e, 'guardar tu perfil').texto);
     }
     setGuardando(false);
   };

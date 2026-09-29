@@ -276,6 +276,16 @@ const RECORRIDOS = [
     // limite-favoritos, y la de la calle, direccion-pedido.
     vigila: ['guajirago/src/Login.js', 'guajirago/src/AvisoModal.js'],
   },
+  {
+    nombre: 'motivo-fallo',
+    que: 'Mi perfil, con una foto de 11 MB que el almacén rechaza, dice el motivo de motivoDeRechazo y no «Revisa tu conexión» (G40; no escribe nada)',
+    archivo: 'motivo-fallo.cjs',
+    // Los otros cinco sitios de G40 (código de seguridad del conductor, sus datos al registrarse, el contacto de
+    // confianza, la reserva de turismo) no los abre este recorrido: provocarles un rechazo desde la pantalla no se
+    // puede sin tocar datos. Sus catch los SACA del archivo y los EJECUTA scripts/medir-motivo-fallo.cjs
+    // (pruebas/motivoFallo.test.js); por eso esos archivos no se nombran aquí.
+    vigila: ['guajirago/src/MiPerfil.js', 'guajirago/src/avisoRechazo.js'],
+  },
 ];
 
 // Los archivos de pantalla: los que, si cambian, el robot debería poder probar. Todo lo que esté en
