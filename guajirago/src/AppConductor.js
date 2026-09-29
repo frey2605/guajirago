@@ -22,6 +22,7 @@ import { RAZONES_CANCELACION_CONDUCTOR } from './textosViaje';
 import ModalCancelacion from './ModalCancelacion';
 import Calificacion from './Calificacion';
 import Llamada from './Llamada';
+import { useLlamadaEntrante } from './llamadaEntrante';
 import Creditos from './Creditos';
 import MiPerfil from './MiPerfil';
 import Ganancias from './Ganancias';
@@ -447,7 +448,7 @@ function AppConductor({ nombre, telefono, placa, vehiculo, tipoVehiculo, onCerra
   const [datosCalificacion, setDatosCalificacion] = useState(null);
   const [enLlamada, setEnLlamada] = useState(false);
   const [confirmarFin, setConfirmarFin] = useState(false);
-  const [llamadaEntrante, setLlamadaEntrante] = useState(false);
+  const [llamadaEntrante, setLlamadaEntrante] = useLlamadaEntrante(viajeActual?.id, setAviso);
   const [mensajesChat, setMensajesChat] = useState([]);
   const [textoChat, setTextoChat] = useState('');
   const chatFinRef = useRef(null);
@@ -1191,15 +1192,6 @@ useEffect(() => {
       setTextoChat('');
     }, 'mensaje', 'Mensaje enviado.', 'enviar el mensaje');
   };
-  useEffect(() => {
-    if (!viajeActual?.id) return;
-    const unsub = onSnapshot(doc(db, 'llamadas', viajeActual.id), (s) => {
-      if (s.exists() && s.data().estado === 'llamando') setLlamadaEntrante(true);
-      if (!s.exists() || s.data().estado === 'terminada') setLlamadaEntrante(false);
-    });
-    return () => unsub();
-  }, [viajeActual]);
-
   if (enLlamada) return <Llamada viajeId={viajeActual?.id} miRol="conductor" nombreOtro={viajeActual?.pasajeroNombre || 'Pasajero'} onCerrar={() => { setEnLlamada(false); }} />;
   if (llamadaEntrante) return <Llamada viajeId={viajeActual?.id} miRol="entrante" nombreOtro={viajeActual?.pasajeroNombre || 'Pasajero'} onCerrar={() => { setLlamadaEntrante(false); }} />;
   const llamarQuienRecibe = () => {

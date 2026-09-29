@@ -6,6 +6,7 @@ import Logo from './Logo';
 import { collection, addDoc, doc, onSnapshot, updateDoc, getDoc, query, orderBy } from 'firebase/firestore';
 import Calificacion from './Calificacion';
 import Llamada from './Llamada';
+import { useLlamadaEntrante } from './llamadaEntrante';
 import { alertarNuevoViaje, precargarAudio, activarAudioiOS, prepararTokenDeAvisos } from './Notificaciones';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { calcularTarifaMinima } from './tarifas';
@@ -498,7 +499,7 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
     if (avisoAccion && !avisoAccion.ok) setAviso(avisoAccion);
   }, [avisoAccion]);
   const [llamandoConductor, setLlamandoConductor] = useState(false);
-  const [llamadaEntrante, setLlamadaEntrante] = useState(false);
+  const [llamadaEntrante, setLlamadaEntrante] = useLlamadaEntrante(viajeId, setAviso);
   const [tiempoBusqueda, setTiempoBusqueda] = useState(BUSQUEDA.segundos);
   const contadorBusquedaRef = useRef(null);
   const radioRef = useRef(null);
@@ -803,14 +804,6 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
     });
     return () => unsub();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [viajeId]);
-  useEffect(() => {
-    if (!viajeId) return;
-    const unsub = onSnapshot(doc(db, 'llamadas', viajeId), (s) => {
-      if (s.exists() && s.data().estado === 'llamando') setLlamadaEntrante(true);
-      if (!s.exists() || s.data().estado === 'terminada') setLlamadaEntrante(false);
-    });
-    return () => unsub();
   }, [viajeId]);
 
   const escucharConductor = useCallback((conductorId) => {
