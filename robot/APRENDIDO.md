@@ -385,6 +385,11 @@ la placa de `conductores/{uid}` (la escribe su GPS con la misma placa que va en 
   (taxista: empieza en 566; pasajero: en 451, la suya mide ~409 por el código de seguridad). Con el arreglo: taxista
   🚗 165 · 📍 451; pasajero 🚗 108 · 📍 394.
 - Cuesta UNA comisión de los créditos de prueba del taxista en cada corrida.
+- 🪤 (29-sep-2026, G74) Dentro de la tanda entera de `probar-cambio.cjs` cayó una vez con «locator.click: Timeout
+  30000ms exceeded», sin llegar a medir. Corrido SOLO justo después, con el mismo paquete publicado: ✓ y las mismas
+  cifras de arriba (taxista 🚗 165 · 📍 451; pasajero 🚗 108 · 📍 394). G74 solo mudó la ventanita «¡Trato hecho!» a
+  TratoHecho.js, sin tocar cuándo sale ni sus 3 s. Es un tropiezo del recorrido, no del cambio: antes de dar por malo
+  un rojo de aquí, se repite solo.
 
 ### direccion-pedido (G30, 28-sep-2026)
 - Camino: pasajero → «Restaurantes» (texto exacto) → «Restaurante de Prueba» → el `+` de un plato es un texto «+»
