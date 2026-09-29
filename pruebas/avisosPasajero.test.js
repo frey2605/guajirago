@@ -105,7 +105,9 @@ describe('REGLA 9 · los botones del pasajero ya no fallan en silencio', () => {
       'el candado dice el motivo pero la pantalla no lo pinta (o lo esconde también cuando falla).');
   });
 
-  for (const [fn, accion] of [['cancelarViaje', 'cancelar el viaje'], ['confirmarViaje', 'confirmar el viaje'], ['rechazarConfirmacion', 'rechazar al conductor']]) {
+  // G59 (29-sep-2026): `confirmarViaje` y `rechazarConfirmacion` se borraron (la ventanita que los llamaba no la abría
+  // nadie); lo que las sustituye lo vigila pruebas/conductorDelViaje.test.js.
+  for (const [fn, accion] of [['cancelarViaje', 'cancelar el viaje']]) {
     it('EL QUE MUERDE · «' + accion + '» pasa por el candado con su motivo, y decide qué hacer si falla', () => {
       const cuerpo = cuerpoDe(soloCodigo(leer(APP)), fn);
       const a = laAccion(cuerpo);
@@ -125,24 +127,6 @@ describe('REGLA 9 · los botones del pasajero ya no fallan en silencio', () => {
     const corte = a.despues.indexOf('if (!r || !r.ok) return;');
     assert.ok(corte >= 0, 'si la cancelación falla, no se corta: el `onVolver()` de después corre igual.');
     assert.ok(a.despues.indexOf('onVolver(') > corte, 'el `onVolver()` va antes del corte.');
-  });
-
-  it('EL QUE MUERDE · aceptar el viaje ya NO miente diciendo «el conductor ya fue tomado», y devuelve la confirmación', () => {
-    const cuerpo = cuerpoDe(soloCodigo(leer(APP)), 'confirmarViaje');
-    assert.ok(!/setConductorYaTomado\s*\(\s*true\s*\)/.test(cuerpo),
-      'confirmarViaje volvió a decir «el conductor ya fue tomado». Por este camino es SIEMPRE falso: la escritura solo '
-      + 'pone `estado: aceptado` en el viaje del propio pasajero y nadie comprueba si el conductor sigue libre.');
-    const fallo = laAccion(cuerpo).despues.match(/if \(!r \|\| !r\.ok\) \{([\s\S]*?)\n    \}/);
-    assert.ok(fallo, 'no encuentro qué hace confirmarViaje cuando el candado dice que no.');
-    assert.match(fallo[1], /setConfirmacionPendiente\(datos\);\s*return;/, 'no devuelve la confirmación: el pasajero pierde la oferta.');
-    assert.ok(!/setPantalla\s*\(|onVolver\s*\(/.test(fallo[1]), 'avisa y SE VA: el pasajero no llega a leerlo.');
-  });
-
-  it('EL QUE MUERDE · rechazar al conductor DEVUELVE la tarjeta si falla', () => {
-    const cuerpo = cuerpoDe(soloCodigo(leer(APP)), 'rechazarConfirmacion');
-    assert.match(cuerpo, /const datosRechazados = confirmacionPendiente;/, 'ya no guarda la tarjeta antes de quitarla.');
-    assert.match(laAccion(cuerpo).despues, /if \(!r \|\| !r\.ok\) setConfirmacionPendiente\(datosRechazados\);/,
-      'si el rechazo falla NO devuelve la tarjeta: el viaje sigue asignado al conductor que acaba de rechazar.');
   });
 
   // Las que se protegen con su propio `.catch` o pasan por el candado con su motivo.

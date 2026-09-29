@@ -482,7 +482,6 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
   const [mostrarEmergencia, setMostrarEmergencia] = useState(false);
   const [contador, setContador] = useState(segundosDeEspera(CONFIG_APP_DEFECTO));
   const [buscandoAgotado, setBuscandoAgotado] = useState(false);
-  const [confirmacionPendiente, setConfirmacionPendiente] = useState(null);
   const [contactoEmergencia, setContactoEmergencia] = useState('');
   const [datosConductor, setDatosConductor] = useState(null);
   const [conductorYaTomado, setConductorYaTomado] = useState(false);
@@ -1200,61 +1199,10 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
     // Si falla, el candado lo dice con su motivo (antes: un renglón rojo «Error al solicitar viaje» sin porqué).
     }, 'pedir', 'Buscando conductor.', 'pedir el viaje');
   };
-const confirmarViaje = async () => {
-    if (!viajeId || !confirmacionPendiente) return;
-    const datos = confirmacionPendiente;
-    setConfirmacionPendiente(null);
-
-    // El pasajero confirma: solo cambia el viaje a 'aceptado'.
-    // El conductor se marca 'ocupado' a sí mismo desde AppConductor.js.
-    const r = await correr(() => updateDoc(doc(db, 'viajes', viajeId), { estado: 'aceptado' }),
-      'confirmar', 'Viaje confirmado.', 'confirmar el viaje');
-    if (!r || !r.ok) {
-      // AQUÍ ESTABA LA MENTIRA. Fallara lo que fallara, esto enseñaba la pantalla
-      // de «el conductor ya fue tomado». Y en este camino ESO NO PUEDE PASAR: la
-      // escritura solo pone `estado: aceptado` en el viaje del propio pasajero;
-      // nadie comprueba si el conductor sigue libre, ni el código ni las reglas
-      // (comprobado el 6-sep-2026). O sea que el mensaje era SIEMPRE falso: el
-      // pasajero creía que había perdido un viaje que seguía ahí.
-      //
-      // Ahora se dice lo que de verdad pasó (lo dice el candado, con la pieza única), y NO se manda a buscar otro
-      // conductor: se le devuelve la confirmación para que pueda reintentar.
-      setConfirmacionPendiente(datos);
-      return;
-    }
-    setCelebrando(true);
-    setTimeout(() => {
-      setCelebrando(false);
-      setPantalla('fase1');
-      if (datos.conductorId) escucharConductor(datos.conductorId);
-    }, 3000);
-  };
-
-  const rechazarConfirmacion = async () => {
-    // Se guarda la tarjeta antes de quitarla: si el rechazo no entra, hay que
-    // devolvérsela. Sin esto se le decía «no se pudo rechazar» y se quedaba sin el
-    // botón para reintentar, con el viaje todavía asignado al conductor que acababa
-    // de rechazar. Es el mismo agujero que se le cerró a confirmarViaje, y estaba
-    // abierto justo al lado; lo señaló la segunda opinión.
-    const datosRechazados = confirmacionPendiente;
-    setConfirmacionPendiente(null);
-    if (viajeId) {
-      // Devolver el viaje a 'esperando' y liberar al conductor
-      const r = await correr(() => updateDoc(doc(db, 'viajes', viajeId), {
-        estado: 'esperando',
-        conductorId: null,
-        conductorNombre: null,
-        conductorPlaca: null,
-        conductorVehiculo: null,
-        conductorTelefono: null,
-        nuevaOferta: new Date().toISOString(),
-      }), 'rechazar', 'Conductor rechazado.', 'rechazar al conductor');
-      // Si esto no entra, el viaje sigue asignado a un conductor que el pasajero
-      // ya rechazó, y el conductor sigue creyendo que va a recogerlo: se le devuelve la tarjeta para reintentar
-      // (el motivo lo dice el candado).
-      if (!r || !r.ok) setConfirmacionPendiente(datosRechazados);
-    }
-  };
+  // G59 (29-sep-2026): aquí vivían `confirmarViaje` y `rechazarConfirmacion`, los botones de la ventanita
+  // «¿Confirmas este viaje?». Nadie la abría desde que se retiró el estado `confirmando` (G22): el único camino para
+  // aceptar a un conductor es `aceptarContraoferta` → `confirmarConductor` en el servidor. `confirmarViaje` ponía
+  // `aceptado` a mano sin pasar por él (sin cobrar la comisión ni marcar al conductor ocupado, G24).
   const aceptarContraoferta = async (oferta) => {
     if (!viajeId || celebrando) return;
     // El candado: una sola aceptación aunque se toque dos (el «celebrando» de antes hacía de bloqueo a mano). La
@@ -1345,32 +1293,6 @@ const PanelEmergencia = () => (
           <p style={{ color: '#6B7280', fontSize: '14px', margin: '0', lineHeight: '1.5' }}>Otro pasajero lo tomó primero. No te preocupes, seguimos buscando otro conductor para ti.</p>
         </div>
         <button onClick={() => { setConductorYaTomado(false); seguirBuscando(); }} disabled={!!ocupado} style={{ marginTop: '28px', width: '100%', maxWidth: '420px', padding: '18px', background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)', border: 'none', borderRadius: '16px', color: '#1A1A1E', fontSize: '17px', fontWeight: '900', cursor: 'pointer' }}>{texto('seguir', 'Buscando…', '🔄 Seguir buscando')}</button>
-        <AvisoModal aviso={aviso} onCerrar={() => setAviso(null)} />
-      </div>
-    );
-  }
-
-  if (confirmacionPendiente) {
-    return (
-      <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.92)', zIndex: 9998, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
-        <div style={{ fontSize: '80px', marginBottom: '16px', animation: 'pulso 1s infinite alternate' }}>🚗</div>
-        <div style={{ background: 'linear-gradient(135deg, #1A1A1E, #2A2A2E)', borderRadius: '28px', padding: '32px 24px', width: '100%', maxWidth: '440px', border: '3px solid #2ECC71', textAlign: 'center' }}>
-          <p style={{ color: '#2ECC71', fontSize: '13px', margin: '0 0 12px', letterSpacing: '2px', fontWeight: 'bold' }}>¡UN CONDUCTOR ACEPTÓ!</p>
-          <div style={{ width: '90px', height: '90px', borderRadius: '50%', background: '#FFFFFF', margin: '0 auto 12px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '40px', overflow: 'hidden', border: '3px solid #2ECC71' }}>
-            {datosConductor?.foto ? <img src={datosConductor.foto} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : '👤'}
-          </div>
-          <h2 style={{ color: '#FFFFFF', fontSize: '24px', fontWeight: '900', margin: '0 0 12px' }}>{confirmacionPendiente.conductorNombre || 'Conductor'}</h2>
-          {confirmacionPendiente.conductorPlaca && <p style={{ color: '#FF7A2F', fontSize: '18px', fontWeight: '900', margin: '0 0 4px' }}>🚘 {confirmacionPendiente.conductorPlaca}</p>}
-          {confirmacionPendiente.conductorVehiculo && <p style={{ color: '#6B7280', fontSize: '14px', margin: '0 0 12px' }}>{confirmacionPendiente.conductorVehiculo}{datosConductor?.color ? ` · ${datosConductor.color}` : ''}</p>}
-          <p style={{ color: '#2ECC71', fontSize: '32px', fontWeight: '900', margin: '8px 0 0' }}>{descuentoPendiente ? cop(calcularTarifaConDescuento(confirmacionPendiente.tarifaValor || parseInt((confirmacionPendiente.tarifa || '0').replace(/\D/g, ''), 10))) : confirmacionPendiente.tarifa}</p>
-          {descuentoPendiente && <p style={{ color: '#6B7280', fontSize: '13px', margin: '4px 0 0', textDecoration: 'line-through' }}>{confirmacionPendiente.tarifa}</p>}
-        </div>
-        <p style={{ color: '#FFFFFF', fontSize: '16px', margin: '24px 0 16px', textAlign: 'center', fontWeight: 'bold' }}>¿Confirmas este viaje?</p>
-        <div style={{ display: 'flex', gap: '12px', width: '100%', maxWidth: '440px' }}>
-          <button onClick={rechazarConfirmacion} disabled={!!ocupado} style={{ flex: 1, padding: '16px', background: '#FFFFFF', border: '1px solid #FF4444', borderRadius: '16px', color: '#FF4444', fontSize: '16px', fontWeight: 'bold', cursor: 'pointer' }}>{texto('rechazar', 'Rechazando…', '❌ No')}</button>
-          <button onClick={confirmarViaje} disabled={!!ocupado} style={{ flex: 2, padding: '16px', background: 'linear-gradient(135deg, #2ECC71, #27AE60)', border: 'none', borderRadius: '16px', color: '#FFFFFF', fontSize: '17px', fontWeight: '900', cursor: 'pointer' }}>{texto('confirmar', 'Confirmando…', '✅ Sí, confirmar')}</button>
-        </div>
-        <style>{`@keyframes pulso { from { transform: scale(1); } to { transform: scale(1.12); } }`}</style>
         <AvisoModal aviso={aviso} onCerrar={() => setAviso(null)} />
       </div>
     );

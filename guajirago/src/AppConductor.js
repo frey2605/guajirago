@@ -34,6 +34,7 @@ import MenuLateral from './MenuLateral';
 // G51: adónde llevan «Mis viajes» y «Ganancias» lo dice UNA tabla; aquí, con el papel de conductor.
 import { pantallaDelMenu } from './navegacionMenu';
 import { fotoDe } from './fotoUsuario';
+import { sinConductor } from './conductorDelViaje';
 import Logo from './Logo';
 // Pedirle el GPS al teléfono, con sus tiempos en un solo sitio (G28).
 import { pedirGps, seguirGps } from './pedirGps';
@@ -579,14 +580,12 @@ function AppConductor({ nombre, telefono, placa, vehiculo, tipoVehiculo, onCerra
         // retirados del mercado, que no los escribía nadie.
         // G55: «buscando conductor» sale de ESTADOS_MERCADO; y como solo entra un viaje que ya está en el mercado, se
         // le deja el estado que tiene (hoy `esperando`, el mismo que se escribía a mano).
+        // G59: los campos del conductor que se borran salen de la lista atada a confirmarConductor (antes se
+        // quedaban la foto y el color).
         if (d.id !== idViajeGanador && ESTADOS_MERCADO.includes(d.data().estado)) {
           updateDoc(doc(db, 'viajes', d.id), {
             estado: d.data().estado,
-            conductorId: null,
-            conductorNombre: null,
-            conductorPlaca: null,
-            conductorVehiculo: null,
-            conductorTelefono: null,
+            ...sinConductor(),
           }).catch(() => {});
         }
       });

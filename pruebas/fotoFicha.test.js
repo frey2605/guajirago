@@ -60,7 +60,8 @@ const NOMBRAN_FOTO = {
   'guajirago/src/fotoUsuario.js': 1,
   'guajirago-admin/src/fotoUsuario.js': 1,
   'guajirago/src/App.js': 1, // `f.foto`: lo que ya devolvió datosDeLaFicha (con fotoDe), no la ficha
-  'guajirago/src/Solicitar.js': 6, // `datosConductor.foto`: la copia del viaje (conductorFoto), no la ficha
+  // (eran 6: G59 borró la ventanita muerta «¿Confirmas este viaje?», que nombraba dos)
+  'guajirago/src/Solicitar.js': 4, // `datosConductor.foto`: la copia del viaje (conductorFoto), no la ficha
 };
 
 /** Las fotos redondas del panel: `{COND ? ( <img src={SRC}`, sacadas del archivo. */
