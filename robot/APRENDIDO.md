@@ -629,6 +629,13 @@ la placa de `conductores/{uid}` (la escribe su GPS con la misma placa que va en 
   sus catch los corre pruebas/erroresDeCuenta.test.js.
 - Otra vez `registrar-conductor` 🔴 dentro de `probar-cambio` (clic que no llegó en 30 s) y ✓ al correrlo solo.
 
+### paginas-legales · Términos y Política se abren enteros (G75, 29-sep-2026)
+- Sin entrar a nada: «Crear cuenta» → los enlaces «Términos y condiciones» / «Política de privacidad» del renglón
+  «He leído y acepto…» (son `span`, se tocan con `getByText(…, { exact: true })`). «Volver» regresa al registro.
+- `r.texto()` devuelve la página en UN solo renglón: contar secciones con `^\d+\. ` da 0. Se busca cada título «N. X»
+  (N de 1 a 11) por separado, y el 12 para cazar una de más.
+- El 403 de la consola sale igual que en los demás recorridos. No crea cuentas ni escribe nada.
+
 ## Lo que el robot dejó creado en pruebas
 
 - 27-sep-2026: «Robot Taxi De Prueba» (robot.taxi.1790508222079@gg.test) y

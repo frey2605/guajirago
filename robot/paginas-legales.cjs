@@ -28,7 +28,10 @@ const PAGINAS = [
       await p.waitForTimeout(1200);
       await r.captura(pg.nombre);
       const t = await r.texto();
-      const secciones = (t.match(/^\s*\d{1,2}\. /gm) || []).length;
+      // el texto llega en un solo renglón: se cuentan los títulos «1. X» … «11. X» que aparecen, cada número una vez.
+      let secciones = 0;
+      for (let n = 1; n <= 11; n++) if (new RegExp('(^|[^0-9])' + n + '\\. [A-ZÁÉÍÓÚ]').test(t)) secciones++;
+      if (new RegExp('(^|[^0-9])12\\. [A-ZÁÉÍÓÚ]').test(t)) secciones++;
       const correos = t.split(CORREO).length - 1;
       const bien = t.includes(pg.enlace) && t.includes('Última actualización: junio de 2026') && t.includes(pg.ultima)
         && secciones === 11 && correos === pg.correos;
