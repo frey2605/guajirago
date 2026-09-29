@@ -14,6 +14,7 @@ import { guardarRechazo } from './guardarRechazo';
 // que usa Turismo.js. Ahí vive también el interruptor `visibleEnEscaparate`.
 import { losDeComida } from './escaparate';
 import { etapaDeVigencia } from './reglaPromocion';
+import { negocioAbiertoAhora } from './horarioNegocio';
 import {
   collection,
   onSnapshot,
@@ -63,17 +64,8 @@ const backBtn = { display: 'inline-flex', alignItems: 'center', gap: '4px', back
 
 const METODOS_PAGO = ['Efectivo', 'Nequi', 'Daviplata', 'Tarjeta'];
 
-// ¿El restaurante está dentro de su horario de atención ahora?
-const dentroHorario = (r) => {
-  const a = r.horarioApertura, c = r.horarioCierre;
-  if (a === undefined || c === undefined) return true;
-  const h = new Date().getHours();
-  if (a === c) return true;            // 24 horas
-  if (a < c) return h >= a && h < c;   // horario normal
-  return h >= a || h < c;              // cruza la medianoche
-};
-// Abierto = no pausado manualmente Y dentro del horario
-const restauranteAbiertoAhora = (r) => r.abierto !== false && dentroHorario(r);
+// ¿El restaurante está abierto ahora? G46: la regla es UNA para restaurantes y agencias, en hora de Colombia
+// (horarioNegocio.js): no pausado a mano Y dentro de su horario; abrir y cerrar a la misma hora = las 24 horas.
 
 function Restaurantes({ nombre, onVolver, foto, onCerrarSesion, onIrPerfil, onIrCreditos, onIrViajes, onIrGanancias, onIrSeguridad, onIrAyuda, onIrConfig, onIrPromociones }) {
   const [pantalla, setPantalla] = useState('lista'); // lista | menu | confirmado
@@ -739,7 +731,7 @@ function Restaurantes({ nombre, onVolver, foto, onCerrarSesion, onIrPerfil, onIr
     const telValido = telefonoSirve(telefono);
     const totalCalif = califsRestaurante.length;
     const promedioCalif = totalCalif ? (califsRestaurante.reduce((s, c) => s + (c.estrellas || 0), 0) / totalCalif) : 0;
-    const abiertoAhora = restauranteAbiertoAhora(restauranteActivo);
+    const abiertoAhora = negocioAbiertoAhora(restauranteActivo);
     return (
       <div style={{ backgroundColor: '#FFFFFF', minHeight: '100vh', fontFamily: 'Arial, sans-serif', paddingBottom: carrito.length > 0 ? '210px' : '20px' }}>
         {avisoAccion && !avisoAccion.ok && <AvisoModal aviso={avisoAccion} onCerrar={cerrarAviso} />}
@@ -1189,7 +1181,7 @@ function Restaurantes({ nombre, onVolver, foto, onCerrarSesion, onIrPerfil, onIr
         )}
 
         {restaurantesFiltrados.map((r) => {
-          const ab = restauranteAbiertoAhora(r);
+          const ab = negocioAbiertoAhora(r);
           return (
             <div
               key={r.id}
