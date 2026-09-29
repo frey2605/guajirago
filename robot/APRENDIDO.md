@@ -477,6 +477,18 @@ la placa de `conductores/{uid}` (la escribe su GPS con la misma placa que va en 
   pasa por `celularDisponible` (ya compara por las 10 cifras en pruebas). Si vuelve a salir rojo, mirar su salida
   entera antes de culpar al cambio: el resumen de `probar-cambio.cjs` no dice el motivo.
 
+### foto-pasajero-panel · la foto del pasajero sale en el panel (G43, 28-sep-2026)
+- Ningún pasajero de pruebas tiene foto, así que el recorrido le PONE una a pasajero@gg.test (`fotoConductor`, que es
+  el nombre con que «Mi perfil» la guarda) y la devuelve al final. La foto es una imagen SVG escrita en la propia
+  dirección (`data:image/svg+xml;utf8,…`): carga sin almacén y sin red, y el panel la pinta igual que una de verdad.
+- 🙋 Pasajeros → «Buscar» → `input[placeholder="Correo electrónico"]` → «🔍 Buscar» → tocar el `div` con el correo
+  (el mismo camino de `estados-panel`). La foto se busca por su `src` exacto entre los `img`, y se exige que cargue
+  (`naturalWidth > 0`).
+- 🪤 `base.cambiar` no sabe BORRAR un campo (un `undefined` lo rechaza `aCampos`): si no había foto, se deja en `null`,
+  que para `fotoDe` es «sin foto».
+- `registrar-conductor` salió 🔴 dos veces seguidas («no salió la bienvenida al crear la cuenta») y ✓ la tercera, sin
+  tocar nada: es la celebración que espera a `descuentoDeBienvenida` en frío (ver arriba, G18). G43 no toca el registro.
+
 ## Lo que el robot dejó creado en pruebas
 
 - 27-sep-2026: «Robot Taxi De Prueba» (robot.taxi.1790508222079@gg.test) y
@@ -511,3 +523,5 @@ la placa de `conductores/{uid}` (la escribe su GPS con la misma placa que va en 
   `vencido` por «app-pasajero» y sin conductor (el primero: AMXhA9Ea3CoD6VEK9AiC).
 - 28-sep-2026 en adelante: un viaje de Taxi de pasajero@gg.test por cada corrida de `ruta-conductor.cjs`, aceptado
   por el taxista y ya `cancelado_conductor` (el primero: foMJSjN38ljk9fUWVraa).
+- 28-sep-2026 en adelante: la ficha de pasajero@gg.test lleva `fotoConductor: null` (lo deja `foto-pasajero-panel.cjs`
+  al devolverla; antes no tenía el campo). Para `fotoDe` es lo mismo: sin foto.
