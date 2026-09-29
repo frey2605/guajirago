@@ -117,24 +117,25 @@ describe('REGLA 9 · los botones del viaje del conductor ya no fallan en silenci
     assert.match(a.despues, /if \(r && r\.ok\) setOfertaEnviada\(monto\);/, '«enviada» no depende de que la oferta entrara.');
   });
 
-  it('EL QUE MUERDE · «liberarte para recibir viajes» avisa si el servidor dice que no, en sus tres sitios', () => {
+  // G57 (29-sep-2026): antes eran TRES copias de la escritura; ahora es UNA, dentro de `soltarmeDelViaje`, envuelta
+  // en `libre` y usada por sus dos caminos: el del candado ('por el candado') y el que avisa con su `.catch`. Esta prueba
+  // mira la forma; pruebas/soltarmeDelViaje.test.js CORRE la pieza y comprueba que cada camino avisa de verdad.
+  it('EL QUE MUERDE · «liberarte para recibir viajes» avisa si el servidor dice que no, por sus dos caminos', () => {
     const t = soloCodigo(leer(APP));
     const ancla = "setDoc(doc(db, 'conductores', user.uid), { ocupado: false, enViajeId: null }";
-    assert.strictEqual(t.split(ancla).length - 1, 3, 'la escritura de «liberarte» cambió o se copió: esta prueba mira al vacío.');
-    let desde = 0;
-    for (let n = 0; n < 3; n += 1) {
-      const pos = t.indexOf(ancla, desde);
-      desde = pos + ancla.length;
-      const donde = 'liberarte (copia ' + (n + 1) + ', renglón ' + t.slice(0, pos).split('\n').length + ')';
-      if (dentroDeCorrer(t, pos)) {
-        assert.ok(t.slice(pos, pos + 400).includes("'liberarte para recibir viajes'"), donde + ': va por el candado sin decir qué se intentaba.');
-        continue;
-      }
-      const manejador = catchPropioDe(t, pos);
-      assert.ok(manejador && manejador.trim(), donde + ': ni candado ni `.catch` con algo dentro.');
-      assert.ok(/apuntarRechazo\s*\(/.test(manejador), donde + ': no deja rastro');
-      assert.ok(/setAviso\s*\(\s*motivoDeRechazo/.test(manejador), donde + ': saca el motivo pero no lo enseña.');
-    }
+    assert.strictEqual(t.split(ancla).length - 1, 1, 'la escritura de «liberarte» cambió o se copió: esta prueba mira al vacío.');
+    const pieza = cuerpoDe(t, 'soltarmeDelViaje');
+    assert.ok(pieza.includes('const libre = () => ' + ancla), 'la escritura de «liberarte» ya no es `libre`, dentro de soltarmeDelViaje.');
+    const usos = [...sinTextos(pieza).matchAll(/\blibre\b/g)].length;
+    assert.strictEqual(usos, 3, 'soltarmeDelViaje usa `libre` por un camino que esta prueba no mira (' + usos + ' veces).');
+    const a = laAccion(pieza);
+    assert.ok(a && a.args[0] === 'libre', 'el camino «por el candado» no pasa `libre` por el candado.');
+    assert.strictEqual(a.args[3], "'liberarte para recibir viajes'", 'va por el candado sin decir qué se intentaba.');
+    const pos = pieza.indexOf('libre().catch(');
+    assert.ok(pos >= 0, 'el otro camino no lleva su `.catch`.');
+    const manejador = catchPropioDe(pieza, pos);
+    assert.ok(manejador && /apuntarRechazo\s*\(/.test(manejador), 'el `.catch` de «liberarte» no deja rastro.');
+    assert.ok(/setAviso\s*\(\s*motivoDeRechazo\(e, 'liberarte para recibir viajes'\)/.test(manejador), 'el `.catch` de «liberarte» no enseña el motivo.');
   });
 
   it('EL QUE MUERDE · cerrar sesión con un viaje en marcha NO se va si la cancelación no entró', () => {
@@ -175,6 +176,9 @@ describe('REGLA 9 · los botones del viaje del conductor ya no fallan en silenci
     const FUERA = [
       "'contraofertas', miId), { vigente: false }",     // retirar mis ofertas
       "{ activo: false, nombre: nombre || '', ubicacion: deleteField() }", // apagarse (desde el 27-sep con merge, G02)
+      // No es muda: es `libre` de soltarmeDelViaje (G57), que se usa por el candado o con su `.catch`; la vigila la
+      // prueba de «liberarte» de arriba, que exige que esté UNA sola vez y que sus dos usos avisen.
+      "{ ocupado: false, enViajeId: null }, { merge: true });",
     ];
     const mudas = [];
     for (const m of t.matchAll(/(?:setDoc|updateDoc|addDoc|deleteDoc)\s*\(/g)) {

@@ -61,6 +61,8 @@ const VIGILANTES = {
     archivo: 'guajirago/src/AppConductor.js',
     ancla: "const unsub = onSnapshot(doc(db, 'viajes', viajeActual.id), (snap) => {",
     asincrono: false,
+    // G57: desde el 29-sep-2026 el conductor sale del viaje por UNA pieza, `soltarmeDelViaje`: se corre la de verdad.
+    ayudantes: ['const soltarmeDelViaje = async (modo) => {'],
   },
   conductorOfertas: {
     archivo: 'guajirago/src/AppConductor.js',

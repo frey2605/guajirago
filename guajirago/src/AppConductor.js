@@ -908,8 +908,7 @@ const cargarSaldo = useCallback(async (uid) => {
         if (ESTADOS_QUE_CIERRA_EL_SERVIDOR.includes(data.estado)) {
           clearInterval(contadorRef.current);
           setAviso(avisoDelCierre(data, 'conductor'));
-          setMostrarCancelacion(false); setMostrarCodigo(false); setMostrarCodigoDescuento(false);
-          setFase(null); faseRef.current = null; setViajeActual(null); setUbicacionPasajero(null); setDestinoCoords(null); setActivo(true);
+          soltarmeDelViaje('sin escribir');
           return;
         }
         if (data.fase === 'en_viaje' && fase !== 'en_viaje') {
@@ -920,6 +919,9 @@ const cargarSaldo = useCallback(async (uid) => {
       }
     });
     return () => unsub();
+    // G57: soltarmeDelViaje('sin escribir') usa setters y refs, que no cambian entre dibujos, y `configApp` solo para
+    // reponer el contador de espera: si viniera de un dibujo anterior, lo peor es un contador con el tiempo de antes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viajeActual, fase, recibirMensajePasajero]);
 
   const geocodificarDestino = (destinoTexto) => {
@@ -1041,18 +1043,46 @@ const cargarSaldo = useCallback(async (uid) => {
         'cancelar', 'Viaje cancelado.', 'cancelar el viaje');
       if (!r || !r.ok) return;
     }
-    const user = auth.currentUser;
-    if (user) setDoc(doc(db, 'conductores', user.uid), { ocupado: false, enViajeId: null }, { merge: true }).catch((e) => { apuntarRechazo('AppConductor.js (soltar el viaje)', e); setAviso(motivoDeRechazo(e, 'liberarte para recibir viajes')); });
-    setMostrarCancelacion(false);
-    setFase(null); faseRef.current = null;
-    setViajeActual(null); setTiempoLlegada(null); setDistancia(null);
-    setRespuestaPasajero(null); setMensajeGrande(null); ultimoMensajeRef.current = null;
-    setUbicacionPasajero(null); setDestinoCoords(null); setActivo(true); setContador(segundosDeEspera(configApp));
+    soltarmeDelViaje();
   };
 
   const [mostrarCodigoDescuento, setMostrarCodigoDescuento] = useState(false);
   const [codigoDescuentoIngresado, setCodigoDescuentoIngresado] = useState('');
   const [errorCodigoDescuento, setErrorCodigoDescuento] = useState('');
+
+  // G57 (29-sep-2026) · SOLTARME DEL VIAJE: la ficha queda libre y la pantalla sale del viaje, en UN solo sitio.
+  // Antes estaba escrito a mano en cuatro (cancelar, terminar, «El pasajero canceló» y el cierre del servidor) y cada
+  // uno limpiaba una lista distinta: tras «El pasajero canceló» o un cierre del servidor, el viaje SIGUIENTE enseñaba
+  // el último mensaje del pasajero anterior y su tiempo de llegada. Tres formas de llamarla:
+  //   · sin nada       → el viaje ya se cerró por el candado (cancelar, terminar): se escribe sin volver a trancar la
+  //                      pantalla —el candado ya dijo su verdad— y, si no entra, se AVISA; la pantalla sale igual,
+  //                      porque el viaje ya no existe y quedarse en él no deja reintentar nada.
+  //   · 'por el candado' → «El pasajero canceló»: la escritura ES el botón, así que pasa por el candado y, si no entra,
+  //                      NO sale (el conductor se queda para reintentar).
+  //   · 'sin escribir' → lo cerró el servidor (G20): `onViajeCerrado` ya soltó al conductor.
+  // ¿Y por qué escribe la app si el servidor también suelta (`onViajeCerrado`)? Porque el servidor lo hace DESPUÉS y
+  // una sola vez: si esa función falla (solo lo apunta en su registro) o se retrasa, el conductor se queda «ocupado»
+  // y `confirmarConductor` le rechaza los viajes siguientes. Las dos escriben lo mismo: da igual cuál llegue primero.
+  // Con merge (G02) y siempre `enViajeId: null`: la app nunca PONE un viaje, eso lo hace el servidor al confirmar.
+  const soltarmeDelViaje = async (modo) => {
+    const user = auth.currentUser;
+    if (user && modo !== 'sin escribir') {
+      const libre = () => setDoc(doc(db, 'conductores', user.uid), { ocupado: false, enViajeId: null }, { merge: true });
+      if (modo === 'por el candado') {
+        const r = await correr(libre, 'volver', 'Listo para recibir viajes.', 'liberarte para recibir viajes');
+        if (!r || !r.ok) return false;
+      } else {
+        libre().catch((e) => { apuntarRechazo('AppConductor.js (soltar el viaje)', e); setAviso(motivoDeRechazo(e, 'liberarte para recibir viajes')); });
+      }
+    }
+    setMostrarCancelacion(false); setMostrarCodigo(false);
+    setMostrarCodigoDescuento(false); setCodigoDescuentoIngresado(''); setErrorCodigoDescuento('');
+    setFase(null); faseRef.current = null;
+    setViajeActual(null); setTiempoLlegada(null); setDistancia(null);
+    setRespuestaPasajero(null); setMensajeGrande(null); ultimoMensajeRef.current = null;
+    setUbicacionPasajero(null); setDestinoCoords(null); setActivo(true); setContador(segundosDeEspera(configApp));
+    return true;
+  };
 
   // REGLA 9 · «Nada se rechaza en silencio». Y aquí hace falta MÁS que avisar.
   //
@@ -1083,13 +1113,7 @@ const cargarSaldo = useCallback(async (uid) => {
         return;
       }
     }
-    const user = auth.currentUser;
-    if (user) setDoc(doc(db, 'conductores', user.uid), { ocupado: false, enViajeId: null }, { merge: true }).catch((e) => { apuntarRechazo('AppConductor.js (soltar el viaje)', e); setAviso(motivoDeRechazo(e, 'liberarte para recibir viajes')); });
-    setFase(null); faseRef.current = null;
-    setViajeActual(null); setTiempoLlegada(null); setDistancia(null);
-    setRespuestaPasajero(null); setMensajeGrande(null); ultimoMensajeRef.current = null;
-    setUbicacionPasajero(null); setDestinoCoords(null); setActivo(true); setContador(segundosDeEspera(configApp));
-    setMostrarCodigoDescuento(false); setCodigoDescuentoIngresado(''); setErrorCodigoDescuento('');
+    soltarmeDelViaje();
   };
 
   const finalizarViaje = async () => {
@@ -1249,17 +1273,9 @@ useEffect(() => {
         <h2 style={{ color: '#1A1A1E', fontSize: '24px', fontWeight: '900', margin: '0 0 12px', textAlign: 'center' }}>El pasajero canceló el viaje</h2>
         <p style={{ color: '#6B7280', fontSize: '14px', margin: '0 0 8px', textAlign: 'center' }}>Razón: <span style={{ color: '#FF7A2F' }}>{viajeActual?.razonCancelacion || 'No especificada'}</span></p>
         <p style={{ color: '#6B7280', fontSize: '13px', margin: '0 0 32px', textAlign: 'center' }}>Puedes activarte para recibir nuevos viajes</p>
-        <button onClick={async () => {
-          const user = auth.currentUser;
-          // Si no entra, se queda en esta pantalla (el candado dice por qué): antes volvía al inicio igual, y el
-          // conductor quedaba «ocupado» en el servidor sin recibir viajes y sin saberlo.
-          if (user) {
-            const r = await correr(() => setDoc(doc(db, 'conductores', user.uid), { ocupado: false, enViajeId: null }, { merge: true }),
-              'volver', 'Listo para recibir viajes.', 'liberarte para recibir viajes');
-            if (!r || !r.ok) return;
-          }
-          setFase(null); faseRef.current = null; setViajeActual(null); setUbicacionPasajero(null); setDestinoCoords(null); setActivo(true);
-        }} disabled={!!ocupado} style={{ width: '100%', padding: '18px', background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)', border: 'none', borderRadius: '16px', color: '#FFFFFF', fontSize: '18px', fontWeight: '900', cursor: 'pointer' }}>{texto('volver', 'Un momento…', 'Volver al inicio')}</button>
+        {/* Si no entra, se queda en esta pantalla (el candado dice por qué): antes volvía al inicio igual, y el
+            conductor quedaba «ocupado» en el servidor sin recibir viajes y sin saberlo. */}
+        <button onClick={() => soltarmeDelViaje('por el candado')} disabled={!!ocupado} style={{ width: '100%', padding: '18px', background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)', border: 'none', borderRadius: '16px', color: '#FFFFFF', fontSize: '18px', fontWeight: '900', cursor: 'pointer' }}>{texto('volver', 'Un momento…', 'Volver al inicio')}</button>
       </div>
     );
   }

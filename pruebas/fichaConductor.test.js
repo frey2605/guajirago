@@ -48,7 +48,10 @@ describe('LA FICHA DEL CONDUCTOR · nadie la reescribe entera', () => {
 
   it('encuentra las escrituras que tiene que encontrar (si no, la prueba no mira nada)', () => {
     const escrituras = todos.filter((s) => s.llamada === 'setDoc');
-    assert.ok(escrituras.length >= 6, 'solo encontré ' + escrituras.length + ' escrituras de la ficha');
+    // Eran 7; desde G57 (29-sep-2026) las tres copias de «soltarme del viaje» son UNA (soltarmeDelViaje): quedan 5.
+    assert.ok(escrituras.length >= 5, 'solo encontré ' + escrituras.length + ' escrituras de la ficha');
+    assert.ok(escrituras.some((s) => /^doc\(db, 'conductores', user\.uid\), \{ ocupado: false, enViajeId: null \}/.test(s.args)),
+      'no encuentro la de soltarse del viaje');
     assert.ok(escrituras.some((s) => /ubicacion: nueva/.test(s.args)), 'no encuentro la del GPS');
     assert.ok(escrituras.some((s) => /activo: false, nombre/.test(s.args)), 'no encuentro la de apagarse');
   });
