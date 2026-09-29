@@ -16,6 +16,8 @@ import { losDeComida } from './escaparate';
 import { etapaDeVigencia } from './reglaPromocion';
 // G47: «¿me pueden pedir ahora?» es UNA regla (candado + escaparate + pausa + horario), la misma del dueño y del panel.
 import { sePuedePedirAhora } from './horarioNegocio';
+// G48: la fecha guardada de un pedido (texto o Timestamp) se lee en un solo sitio.
+import { msDeFecha } from './fechaGuardada';
 import {
   collection,
   onSnapshot,
@@ -1045,10 +1047,11 @@ function Restaurantes({ nombre, onVolver, foto, onCerrarSesion, onIrPerfil, onIr
   // PANTALLA: mis pedidos (los que este dispositivo ha hecho)
   // ============================================================
   if (pantalla === 'misPedidos') {
+    // G48: la fecha la lee la pieza única (texto o Timestamp). El que aún no llega del servidor va arriba: es el recién hecho.
     const lista = [...misPedidos].sort((a, b) => {
-      const ta = a.creado && a.creado.seconds ? a.creado.seconds : 0;
-      const tb = b.creado && b.creado.seconds ? b.creado.seconds : 0;
-      return tb - ta;
+      const ta = msDeFecha(a.creado);
+      const tb = msDeFecha(b.creado);
+      return (tb === null ? Infinity : tb) - (ta === null ? Infinity : ta) || 0;
     });
     return (
       <div style={{ backgroundColor: '#FFFFFF', minHeight: '100vh', fontFamily: 'Arial, sans-serif' }}>

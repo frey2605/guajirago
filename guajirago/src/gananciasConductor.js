@@ -21,13 +21,11 @@
 import { hoyEnColombia } from './reglaPromocion';
 import { valorDelViaje } from './valorViaje';
 import { comisionDeViaje } from './comisiones';
+import { diaEnColombiaDe } from './fechaGuardada';
 
-/** El día (AAAA-MM-DD) en Colombia en que cae una fecha guardada. null si no se puede leer. */
+/** El día (AAAA-MM-DD) en Colombia en que cae una fecha guardada. null si no se puede leer. G48: lo lee la pieza única. */
 export function diaEnColombia(fecha) {
-  if (!fecha) return null;
-  const d = new Date(fecha);
-  if (Number.isNaN(d.getTime())) return null;
-  return hoyEnColombia(d);
+  return diaEnColombiaDe(fecha);
 }
 
 /** Los tres periodos, como días de Colombia: hoy, el domingo que abre la semana y el día 1 del mes. */
