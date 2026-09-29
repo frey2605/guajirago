@@ -53,6 +53,8 @@ const { sobreDelAviso, sobreSencillo, mandarAviso } = require('./avisos.cjs');
 const { avisoDelCambio } = require('./estadosPedido.cjs');
 // G42: ¿es el mismo celular? Por las 10 cifras, con la regla de la app (copia atada por pruebas/telefonoUnico.test.js).
 const { celularDiezCifras, formasGuardadas } = require('./telefonoValido.cjs');
+// G53: el regalo al conductor nuevo y su respaldo salen de UNA pieza (atada al panel por pruebas/regaloConductorNuevo.test.js).
+const { regaloDelConductorNuevo } = require('./regaloConductorNuevo.cjs');
 
 // Distancia en km entre dos coordenadas (Haversine)
 function distanciaKm(lat1, lng1, lat2, lng2) {
@@ -812,9 +814,7 @@ exports.creditosDeBienvenida = onCall(async (request) => {
 
       const snapCfg = await t.get(refConfig);
       const cfg = snapCfg.exists ? snapCfg.data() : {};
-      const monto = u.tipoVehiculo === "Mototaxi"
-        ? (cfg.incentivoNuevoMototaxi ?? 10000)
-        : (cfg.incentivoNuevoTaxi ?? 20000);
+      const monto = regaloDelConductorNuevo(u.tipoVehiculo, cfg);
       if (monto <= 0) return { creditos: 0, motivo: "sin_incentivo" };
 
       t.set(refUsuario, { creditos: monto }, { merge: true });
