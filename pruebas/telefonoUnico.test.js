@@ -153,7 +153,8 @@ describe('G42 · cada formulario guarda las 10 cifras limpias, y no guarda lo qu
     const guardar = laFuncion('guajirago/src/App.js', 'guardar');
     const correr = async (telefono) => {
       const r = { b: base() };
-      await guardar({ ...APP, ...r.b, tipoVehiculo: 'carro', telefono, placa: 'ABC123', marca: 'Kia', marcaOtra: '', modelo: '2020',
+      // G45: el alta decide la placa y arma el vehículo con vehiculoConductor.js; se le da tal cual.
+      await guardar({ ...APP, ...cargarDeLaApp('guajirago/src/vehiculoConductor.js'), ...r.b, tipoVehiculo: 'carro', telefono, placa: 'ABC123', marca: 'Kia', marcaOtra: '', modelo: '2020',
         color: 'Rojo', documento: '123', fotoConductor: {}, fotosDocs: {}, documentoQueFalta: () => null, nombreDelDocumento: () => '',
         DOCUMENTOS_CONDUCTOR: [], auth: { currentUser: { uid: 'c1' } }, subirFoto: async () => 'url',
         getFunctions: () => ({}), httpsCallable: () => async () => ({ data: { creditos: 0 } }),

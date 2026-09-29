@@ -31,6 +31,7 @@ import { DOCUMENTOS_CONDUCTOR, documentoQueFalta, nombreDelDocumento, iconoDelDo
 import { telefonoDe } from './telefonoUsuario';
 import { fotoDe } from './fotoUsuario';
 import { telefonoSirve, celularDiezCifras } from './telefonoValido';
+import { placaLimpia, placaMientrasEscribe, vehiculoDe } from './vehiculoConductor';
 import { cop } from './moneda';
 import { leerConfig, modulosDe, mensajeDeMantenimiento } from './configApp';
 const MARCAS_VEHICULO = [
@@ -232,7 +233,8 @@ function PantallaDatosConductor({ nombre, foto, celular, onGuardar, onVolver, on
     if (!telefonoSirve(telefono)) { setError('El teléfono debe tener 10 cifras, por ejemplo 300 123 4567'); setCampoError('telefono'); return; }
     const telefonoLimpio = celularDiezCifras(telefono);
     if (!placa) { setError('Falta la placa del vehículo'); setCampoError('placa'); return; }
-    if (placa.trim().length !== 6) { setError('La placa debe tener exactamente 6 caracteres'); setCampoError('placa'); return; }
+    // G45: la regla única de la placa (vehiculoConductor.js), la misma que usa el panel al editarla.
+    if (!placaLimpia(placa)) { setError('La placa debe tener 6 letras o números, por ejemplo ABC123'); setCampoError('placa'); return; }
     if (!marca) { setError('Falta escoger la marca'); setCampoError('marca'); return; }
     if (marca === 'Otra' && !marcaOtra.trim()) { setError('Escribe la marca del vehículo'); setCampoError('marcaOtra'); return; }
     if (!modelo) { setError('Falta el modelo'); setCampoError('modelo'); return; }
@@ -250,7 +252,7 @@ function PantallaDatosConductor({ nombre, foto, celular, onGuardar, onVolver, on
       const urlsDocs = {};
       for (const d of DOCUMENTOS_CONDUCTOR) urlsDocs[d.campo] = await subirFoto(fotosDocs[d.campo], d.carpeta, user.uid);
       const marcaFinal = marca === 'Otra' ? marcaOtra.trim() : marca;
-      const vehiculo = `${marcaFinal} ${modelo}`;
+      const vehiculo = vehiculoDe(marcaFinal, modelo);
 
       // REGLA 7 — los créditos de bienvenida ya NO los decide este teléfono.
       // Antes, la app miraba la config, calculaba el monto según el vehículo y
@@ -261,7 +263,7 @@ function PantallaDatosConductor({ nombre, foto, celular, onGuardar, onVolver, on
       await setDoc(doc(db, 'usuarios', user.uid), {
         tipo: 'conductor',
         tipoVehiculo,
-        placa: placa.toUpperCase(),
+        placa: placaLimpia(placa),
         marca: marcaFinal,
         modelo,
         color,
@@ -287,7 +289,7 @@ function PantallaDatosConductor({ nombre, foto, celular, onGuardar, onVolver, on
         if (dados > 0) creditosIniciales = dados;
       } catch (e) {}
 
-      onGuardar(placa.toUpperCase(), vehiculo, telefonoLimpio, tipoVehiculo, creditosIniciales);
+      onGuardar(placaLimpia(placa), vehiculo, telefonoLimpio, tipoVehiculo, creditosIniciales);
     } catch (e) {
       // G40: el motivo de verdad (motivoDeRechazo), no «Revisa tu conexión» sea cual sea el fallo.
       apuntarRechazo('App.js (datos del conductor)', e);
@@ -327,7 +329,7 @@ function PantallaDatosConductor({ nombre, foto, celular, onGuardar, onVolver, on
       </div>
       <div style={campoRojo('placa')}>
         <span style={{ fontSize: '20px' }}>{iconoDelDocumento({ icono: '🚘' }, tipoVehiculo)}</span>
-        <input value={placa} onChange={e => setPlaca(e.target.value.toUpperCase().slice(0, 6))} placeholder="Placa del vehículo (6 caracteres)" style={estiloInput} />
+        <input value={placa} onChange={e => setPlaca(placaMientrasEscribe(e.target.value))} placeholder="Placa del vehículo (6 caracteres)" style={estiloInput} />
       </div>
       <div onClick={() => setListaMarcaAbierta(true)} style={{ ...campoRojo('marca'), cursor: 'pointer' }}>
         <span style={{ fontSize: '20px' }}>🏭</span>

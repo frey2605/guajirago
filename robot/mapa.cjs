@@ -314,6 +314,14 @@ const RECORRIDOS = [
     // pruebas/fotoFicha.test.js; por eso esos archivos no se nombran aquí.
     vigila: ['guajirago-admin/src/Pasajeros.js', 'guajirago-admin/src/fotoUsuario.js', 'guajirago/src/fotoUsuario.js'],
   },
+  {
+    nombre: 'placa-panel',
+    que: 'editando la ficha en 🚗 Conductores del panel, una placa («AB 12») o un vehículo («hola») que no sirven NO se guardan y sale la ventanita (G45; toca la ficha de PRUEBAS de taxi@ y la devuelve)',
+    archivo: 'placa-panel.cjs',
+    // El registro del conductor (App.js) también usa la regla: lo cubre registrar-conductor (escribe ROB123 / ROB12A),
+    // y el trozo de la placa lo SACA del archivo y lo EJECUTA pruebas/placaVehiculo.test.js.
+    vigila: ['guajirago-admin/src/Conductores.js', 'guajirago-admin/src/vehiculoConductor.js', 'guajirago/src/vehiculoConductor.js'],
+  },
 ];
 
 // Los archivos de pantalla: los que, si cambian, el robot debería poder probar. Todo lo que esté en
