@@ -611,6 +611,19 @@ la placa de `conductores/{uid}` (la escribe su GPS con la misma placa que va en 
 - «Cambiar contraseña» (Configuración) NO se prueba aquí: mandaría un correo de verdad a la cuenta de prueba.
 - `registrar-conductor` volvió a salir 🔴 dentro de `probar-cambio` (un clic que no llegó en 30 s) y ✓ al correrlo solo.
 
+### errores-de-cuenta · entrar mal dice lo mismo en las tres apps (G72, 29-sep-2026)
+- Sin entrar a nada: transporte «Ya tengo cuenta» → «Correo electrónico» / «Contraseña» → «Entrar a GuajiraGo»; panel
+  «Correo electrónico» / «Contraseña» → «Entrar al panel»; aliados «Ya tengo cuenta» → «Correo» / «Contrasena» →
+  «Entrar» (exacto). El fallo sale en el renglón rojo (en transporte, en la ventanita «Atención»); se esperan 5 s.
+- El servidor de pruebas contesta `auth/invalid-credential` tanto al correo que no existe como a restaurante@gg.test
+  con la contraseña mala (tiene la protección contra adivinar correos): por eso las cuatro frases salen iguales. El
+  400 de la consola es esa respuesta; el 403 sale igual que en los demás recorridos.
+- Un solo intento fallido por cuenta: con varios seguidos el servidor contesta «demasiados intentos» y bloquearía un
+  rato la cuenta de prueba del restaurante, que usan otros recorridos.
+- Crear cuenta, eliminar la cuenta y crear empleado NO se prueban aquí con errores (crean o borran cuentas de verdad):
+  sus catch los corre pruebas/erroresDeCuenta.test.js.
+- Otra vez `registrar-conductor` 🔴 dentro de `probar-cambio` (clic que no llegó en 30 s) y ✓ al correrlo solo.
+
 ## Lo que el robot dejó creado en pruebas
 
 - 27-sep-2026: «Robot Taxi De Prueba» (robot.taxi.1790508222079@gg.test) y
