@@ -20,3 +20,10 @@ export const centroRiohacha = { lat: 11.5444, lng: -72.9072 };
  * Fuera de este rectángulo no se sugiere nada.
  */
 export const BOUNDS_RIOHACHA = { north: 11.7, south: 11.3, east: -72.6, west: -73.0 };
+
+/**
+ * Lo que se le pega a una dirección escrita para que Google la busque AQUÍ y no
+ * en otra ciudad (G60 · 29-sep-2026). Estaba escrito a mano cuatro veces, en
+ * dos pantallas. Solo lo usa `puntoDeDireccion` (direccionDePunto.js).
+ */
+export const CIUDAD_PARA_BUSCAR = ', Riohacha, Colombia';

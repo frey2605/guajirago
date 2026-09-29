@@ -829,10 +829,15 @@ async function correrElPedido({ punto, pin, ubicacion, esDelGps, origen, encuent
   try {
     const aviso = elAvisoDeNoSaber();
     if (aviso.falla) return { falla: aviso.falla };
+    // G60 (29-sep-2026): la dirección escrita se busca con la pieza común `puntoDeDireccion`
+    // (direccionDePunto.js). Se le da la pieza DE VERDAD, cargada del disco, y ella habla con el
+    // `window` de mentira de aquí. Sin ella, el trozo se tropieza DENTRO de su `try` callado y la
+    // dirección «no se encuentra» nunca: la fila «una dirección escrita que sí se encuentra» se pone roja.
+    const { puntoDeDireccion, geocodificadorDe } = cargarDeLaApp('guajirago/src/direccionDePunto.js');
     // eslint-disable-next-line no-new-func
     const correr = new Function('window', 'setCargando', 'setAviso', 'setError', 'esMensajeria',
       'NO_SE_DONDE_ESTAS', 'puntoRecogida', 'pinActivoRef', 'ubicacionPasajero',
-      'ubicacionEsDelGps', 'origen', 'destino',
+      'ubicacionEsDelGps', 'origen', 'destino', 'puntoDeDireccion', 'geocodificadorDe',
       // 🔴 SI SE LLEGA AQUÍ SIN PUNTO, LA GUARDIA NO CORTÓ. El trozo acaba donde acaba la guardia, así que sin esta
       // comprobación quitarle su `return` dejaba todo en verde: aquí se devolvía `null` («no se crea») mientras la
       // pantalla de verdad seguía de largo y creaba el viaje sin punto. Lo destapó un sabotaje el 26-sep-2026, y el
@@ -840,7 +845,7 @@ async function correrElPedido({ punto, pin, ubicacion, esDelGps, origen, encuent
       'return (async () => {\n' + cadena.trozo + '\nif (!coordsRecogida) return { siguioSinPunto: true };\nreturn coordsRecogida;\n})();');
     const coords = await correr(windowFalso(encuentra), () => {}, (a) => avisos.push(a),
       (t) => avisos.push({ titulo: '', texto: t, enLinea: true }), false, aviso.armar,
-      punto, { current: pin }, ubicacion, esDelGps, origen, 'Cl. 1 # 2-3');
+      punto, { current: pin }, ubicacion, esDelGps, origen, 'Cl. 1 # 2-3', puntoDeDireccion, geocodificadorDe);
     if (coords && coords.siguioSinPunto) return { falla: 'la guardia sin punto no corta: la pantalla sigue de largo y crea el viaje sin saber dónde recoger' };
     // «No se crea» son DOS formas: el `return` vacío de siempre, y desde LA LEY DEL BOTÓN (26-sep-2026) el
     // `return { ok: false, avisado: true }` con que la guardia le dice al candado «ya avisé yo». Cualquier otra cosa

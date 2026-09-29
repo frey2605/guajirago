@@ -35,7 +35,7 @@ import { armarMensajeDeEmergencia } from './mensajeEmergencia';
 import { ubicacionDeAhora } from './ubicacionDeAhora';
 // Pedirle el GPS al teléfono, con sus tiempos en un solo sitio (G28).
 import { pedirGps } from './pedirGps';
-import { direccionDePunto } from './direccionDePunto';
+import { direccionDePunto, puntoDeDireccion, geocodificadorDe } from './direccionDePunto';
 // El mapa con ruta es UNO para el conductor y el pasajero (G29).
 import MapaConRuta from './MapaConRuta';
 // El número del contacto de emergencia: la MISMA regla que el registro y Seguridad (G10).
@@ -174,12 +174,10 @@ function AutocompleteInput({ value, onChange, placeholder, icon, onPlaceCoords }
       if (onPlaceCoordsRef.current && place && place.geometry && place.geometry.location) {
         onPlaceCoordsRef.current({ lat: place.geometry.location.lat(), lng: place.geometry.location.lng() });
       } else if (onPlaceCoordsRef.current && place && place.name && window.google) {
-        // Respaldo: si Google no trajo las coordenadas, las buscamos para que el pin salte a la primera
-        const geocoder = new window.google.maps.Geocoder();
-        geocoder.geocode({ address: place.name + ', Riohacha, Colombia' }, (results, status) => {
-          if (status === 'OK' && results && results[0] && onPlaceCoordsRef.current) {
-            onPlaceCoordsRef.current({ lat: results[0].geometry.location.lat(), lng: results[0].geometry.location.lng() });
-          }
+        // Respaldo: si Google no trajo las coordenadas, las buscamos para que el pin salte a la primera.
+        // G60: la búsqueda sale de la pieza común (direccionDePunto.js); si falla, el pin no salta, como antes.
+        puntoDeDireccion(geocodificadorDe(window.google), place.name, (r) => {
+          if (r.ok && onPlaceCoordsRef.current) onPlaceCoordsRef.current({ lat: r.lat, lng: r.lng });
         });
       }
     });
@@ -818,11 +816,10 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
     }
   }, [viaje?.conductorFoto, viaje?.conductorColor]);
 
+  // G60: el destino escrito se convierte en punto con la pieza común (direccionDePunto.js); si falla, no se pinta, como antes.
   const geocodificarDestino = (destinoTexto) => {
-    if (!window.google || !destinoTexto) return;
-    const geocoder = new window.google.maps.Geocoder();
-    geocoder.geocode({ address: destinoTexto + ', Riohacha, Colombia' }, (results, status) => {
-      if (status === 'OK' && results[0]) setDestinoCoords({ lat: results[0].geometry.location.lat(), lng: results[0].geometry.location.lng() });
+    puntoDeDireccion(geocodificadorDe(window.google), destinoTexto, (r) => {
+      if (r.ok) setDestinoCoords({ lat: r.lat, lng: r.lng });
     });
   };
 
@@ -1101,19 +1098,12 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
       : null;
     if (!usarPin) {
       try {
-        if (window.google) {
-          const geocoder = new window.google.maps.Geocoder();
-          const resultado = await new Promise((resolve) => {
-            geocoder.geocode({ address: origen + ', Riohacha, Colombia' }, (results, status) => {
-              if (status === 'OK' && results[0]) {
-                resolve({ lat: results[0].geometry.location.lat(), lng: results[0].geometry.location.lng() });
-              } else {
-                resolve(null);
-              }
-            });
-          });
-          if (resultado) coordsRecogida = resultado;
-        }
+        // G60: la dirección escrita se busca con la pieza común (direccionDePunto.js). Sin Google, o si no la
+        // encuentra, contesta un fallo y `coordsRecogida` se queda como estaba: lo que sigue decide, igual que antes.
+        const resultado = await new Promise((resolve) => {
+          puntoDeDireccion(geocodificadorDe(window.google), origen, (r) => resolve(r.ok ? { lat: r.lat, lng: r.lng } : null));
+        });
+        if (resultado) coordsRecogida = resultado;
       } catch (e) {}
       // Si el texto no se pudo convertir en un punto, queda la ubicación del
       // aparato — pero SOLO si de verdad viene del aparato. Ese caso ya

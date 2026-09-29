@@ -16,10 +16,13 @@
  * no es lo mismo (el mapa deja el campo como está; el pedido deja las
  * coordenadas y avisa).
  *
- * Sin imports y sin React: `pruebas/cargar.cjs` la carga y la EJECUTA tal cual.
- * El geocodificador se pasa como argumento —en la app es el de Google, o `null`
- * si no está cargado—, y así las pruebas le dan uno de mentira.
+ * Sin React y sin más import que la ciudad de `riohacha.js`: `pruebas/cargar.cjs`
+ * la carga y la EJECUTA tal cual. El geocodificador se pasa como argumento —en
+ * la app es el de Google, o `null` si no está cargado—, y así las pruebas le dan
+ * uno de mentira.
  */
+import { CIUDAD_PARA_BUSCAR } from './riohacha';
+
 export function direccionDePunto(geocodificador, lat, lng, alTerminar) {
   if (!geocodificador) {
     alTerminar({ ok: false, motivo: 'SIN_MAPAS' });
@@ -28,6 +31,46 @@ export function direccionDePunto(geocodificador, lat, lng, alTerminar) {
   geocodificador.geocode({ location: { lat, lng } }, (results, status) => {
     const direccion = status === 'OK' && results && results[0] && results[0].formatted_address;
     if (direccion) alTerminar({ ok: true, direccion });
+    else alTerminar({ ok: false, motivo: status || 'SIN_RESPUESTA' });
+  });
+}
+
+/**
+ * EL GEOCODIFICADOR DE GOOGLE, O NADA (G60). Se le pasa `window.google`: si
+ * Google no está cargado devuelve `null`, y las piezas de aquí contestan
+ * `SIN_MAPAS` en vez de reventar.
+ */
+export function geocodificadorDe(google) {
+  return google && google.maps && google.maps.Geocoder ? new google.maps.Geocoder() : null;
+}
+
+/**
+ * LA INVERSA: DE UNA DIRECCIÓN ESCRITA A SU PUNTO (G60 · 29-sep-2026).
+ *
+ * Se hacía en cuatro sitios, cada uno pegándole a mano «, Riohacha, Colombia»:
+ * el respaldo del autocompletar y el pedido del viaje (Solicitar.js), y el
+ * destino del mapa del pasajero y el del conductor (`geocodificarDestino`,
+ * repetida en Solicitar.js y AppConductor.js). La ciudad sale de riohacha.js.
+ *
+ * Contesta SIEMPRE una de dos cosas, una sola vez:
+ *   · `{ ok: true, lat, lng }` — Google dio un punto;
+ *   · `{ ok: false, motivo }`  — no lo dio: lo que contestó Google, `SIN_MAPAS`
+ *     si no está cargado, o `SIN_TEXTO` si no hay nada escrito (preguntar solo
+ *     por la ciudad devolvería su centro, la plaza, y eso no es un punto).
+ * Qué hacer con un fallo lo decide cada pantalla, como en `direccionDePunto`.
+ */
+export function puntoDeDireccion(geocodificador, texto, alTerminar) {
+  if (!geocodificador) {
+    alTerminar({ ok: false, motivo: 'SIN_MAPAS' });
+    return;
+  }
+  if (!texto) {
+    alTerminar({ ok: false, motivo: 'SIN_TEXTO' });
+    return;
+  }
+  geocodificador.geocode({ address: texto + CIUDAD_PARA_BUSCAR }, (results, status) => {
+    const lugar = status === 'OK' && results && results[0] && results[0].geometry && results[0].geometry.location;
+    if (lugar) alTerminar({ ok: true, lat: lugar.lat(), lng: lugar.lng() });
     else alTerminar({ ok: false, motivo: status || 'SIN_RESPUESTA' });
   });
 }

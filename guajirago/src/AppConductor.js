@@ -35,6 +35,7 @@ import MenuLateral from './MenuLateral';
 import { pantallaDelMenu } from './navegacionMenu';
 import { fotoDe } from './fotoUsuario';
 import { sinConductor } from './conductorDelViaje';
+import { puntoDeDireccion, geocodificadorDe } from './direccionDePunto';
 import Logo from './Logo';
 // Pedirle el GPS al teléfono, con sus tiempos en un solo sitio (G28).
 import { pedirGps, seguirGps } from './pedirGps';
@@ -924,13 +925,10 @@ const cargarSaldo = useCallback(async (uid) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viajeActual, fase, recibirMensajePasajero]);
 
+  // G60: el destino escrito se convierte en punto con la pieza común (direccionDePunto.js); si falla, no se pinta, como antes.
   const geocodificarDestino = (destinoTexto) => {
-    if (!window.google || !destinoTexto) return;
-    const geocoder = new window.google.maps.Geocoder();
-    geocoder.geocode({ address: destinoTexto + ', Riohacha, Colombia' }, (results, status) => {
-      if (status === 'OK' && results[0]) {
-        setDestinoCoords({ lat: results[0].geometry.location.lat(), lng: results[0].geometry.location.lng() });
-      }
+    puntoDeDireccion(geocodificadorDe(window.google), destinoTexto, (r) => {
+      if (r.ok) setDestinoCoords({ lat: r.lat, lng: r.lng });
     });
   };
 
