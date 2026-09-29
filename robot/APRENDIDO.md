@@ -489,6 +489,20 @@ la placa de `conductores/{uid}` (la escribe su GPS con la misma placa que va en 
 - `registrar-conductor` salió 🔴 dos veces seguidas («no salió la bienvenida al crear la cuenta») y ✓ la tercera, sin
   tocar nada: es la celebración que espera a `descuentoDeBienvenida` en frío (ver arriba, G18). G43 no toca el registro.
 
+### placa-panel · el panel no guarda una placa o un vehículo que no sirven (G45, 28-sep-2026)
+- 🚗 Conductores → «Buscar» → `input[placeholder="Nombre del conductor"]` con la primera palabra del nombre de
+  taxi@gg.test (se lee de su ficha) → «🔍 Buscar» → su fila → «✏️ Editar datos». Las casillas de edición no tienen
+  `placeholder`: se buscan por su rótulo, `p` «PLACA» / «VEHÍCULO» y el `input` del `div` que le sigue.
+- Un caso por vuelta (primero la placa, después el vehículo): la placa se revisa ANTES que el vehículo, así que con
+  los dos malos a la vez solo se vería la ventanita de la placa. Tras cada «Guardar cambios» se cierra la ventanita
+  («Entendido») y, si la edición sigue abierta, «Cancelar».
+- Careo hecho: con el panel viejo en pruebas guardó «AB 12» y «hola» sin decir nada (🔴 4 fallos); con el nuevo,
+  ventanita «Revisa la placa» / «Revisa el vehículo» y la ficha como estaba (✓).
+- La ficha de taxi@gg.test tiene vehículo «Chevrolet Spark (de prueba)», que NO es «Marca Año»: no pasa nada mientras
+  no se edite el vehículo (la regla solo mira lo que se cambia).
+- `registrar-conductor` salió 🔴 una vez en la tanda y otra solo («no salió la bienvenida»), y ✓ las dos siguientes; el
+  mototaxi (placa ROB12A) ✓ a la primera. La placa del registro pasa por la regla nueva y ROB123 / ROB12A siguen sirviendo.
+
 ## Lo que el robot dejó creado en pruebas
 
 - 27-sep-2026: «Robot Taxi De Prueba» (robot.taxi.1790508222079@gg.test) y
@@ -525,3 +539,5 @@ la placa de `conductores/{uid}` (la escribe su GPS con la misma placa que va en 
   por el taxista y ya `cancelado_conductor` (el primero: foMJSjN38ljk9fUWVraa).
 - 28-sep-2026 en adelante: la ficha de pasajero@gg.test lleva `fotoConductor: null` (lo deja `foto-pasajero-panel.cjs`
   al devolverla; antes no tenía el campo). Para `fotoDe` es lo mismo: sin foto.
+- 28-sep-2026 en adelante: la ficha de taxi@gg.test lleva `marca: null` y `modelo: null` (lo deja `placa-panel.cjs` al
+  devolverla; antes no tenía esos campos). Nadie los lee de esa ficha.
