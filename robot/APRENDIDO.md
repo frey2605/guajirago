@@ -469,6 +469,14 @@ la placa de `conductores/{uid}` (la escribe su GPS con la misma placa que va en 
   WhatsApp» no se ve sin tocar datos; esa rama la ejecuta `pruebas/numeroWhatsApp.test.js`.
 - Las tarjetas de la lista se encuentran por lo que dicen («N platos», «N tours/alquileres»), no por el estilo solo.
 
+### telefono-unico · Mi perfil no guarda un teléfono que no sirve (G42, 28-sep-2026)
+- En Mi perfil el teléfono guardado es el `span` que va justo después del del ícono «📞»; el segundo «Editar» (`nth(1)`)
+  es el del teléfono y su campo es `input[placeholder="Tu teléfono"]`. Con «abc» sale el renglón rojo «10 cifras» y
+  no se escribe nada (pasajero@gg.test tiene 3000000000).
+- `registrar-conductor` salió 🔴 UNA vez dentro de la tanda del robot y ✓ al correrlo solo, sin tocar nada: es el que
+  pasa por `celularDisponible` (ya compara por las 10 cifras en pruebas). Si vuelve a salir rojo, mirar su salida
+  entera antes de culpar al cambio: el resumen de `probar-cambio.cjs` no dice el motivo.
+
 ## Lo que el robot dejó creado en pruebas
 
 - 27-sep-2026: «Robot Taxi De Prueba» (robot.taxi.1790508222079@gg.test) y
