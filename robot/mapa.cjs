@@ -259,7 +259,15 @@ const RECORRIDOS = [
     archivo: 'ruta-conductor.cjs',
     // Las pantallas «en viaje» de las dos apps usan el mismo mapa, pero llegar ahí pide el código de seguridad del
     // pasajero: las EJECUTA pruebas/mapaRuta.test.js con un Google Maps de mentira.
-    vigila: ['guajirago/src/MapaConRuta.js', 'guajirago/src/AppConductor.js', 'guajirago/src/Solicitar.js'],
+    vigila: ['guajirago/src/MapaConRuta.js', 'guajirago/src/AppConductor.js', 'guajirago/src/Solicitar.js',
+      'guajirago/public/index.html'],
+  },
+  {
+    nombre: 'llave-maps',
+    que: 'transporte y aliados cargan Google Maps con la llave de su .env.pruebas (la escribe CRA en el index.html), Google no la rechaza y un mapa se dibuja (G62; no entra ni escribe nada)',
+    archivo: 'llave-maps.cjs',
+    vigila: ['guajirago/public/index.html', 'guajirago/.env.pruebas', 'guajirago/.env.produccion',
+      'guajirago-aliados/public/index.html', 'guajirago-aliados/.env.pruebas', 'guajirago-aliados/.env.produccion'],
   },
   {
     nombre: 'direccion-pedido',
@@ -267,7 +275,7 @@ const RECORRIDOS = [
     archivo: 'direccion-pedido.cjs',
     // El mapa de recogida (Solicitar.js) también usa direccionDePunto.js: ese lo EJECUTAN
     // scripts/medir-origen-del-viaje.cjs y pruebas/direccionDePunto.test.js con un Google de mentira.
-    vigila: ['guajirago/src/Restaurantes.js', 'guajirago/src/direccionDePunto.js'],
+    vigila: ['guajirago/src/Restaurantes.js', 'guajirago/src/direccionDePunto.js', 'guajirago/public/index.html'],
   },
   {
     nombre: 'flujos-pedido',

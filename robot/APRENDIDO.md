@@ -592,6 +592,15 @@ la placa de `conductores/{uid}` (la escribe su GPS con la misma placa que va en 
 - Con el panel VIEJO (862a143) publicado en pruebas: Mensajería dice «Lo soltó el repartidor», Viajes otra cosa, y ninguna
   enseña el porqué del sistema → 4 fallos, rojo. Con el nuevo → verde.
 
+### llave-maps · Maps carga con la llave del .env (G62, 29-sep-2026)
+- La llave de Maps se lee del `<script>` que queda en la página (`document.scripts`), no del código: es lo que de verdad
+  sirvió el sitio. Si CRA no la reemplazó, llega como `%REACT_APP_GOOGLE_MAPS_KEY%`.
+- `window.gm_authFailure` es lo que Google llama cuando la llave o el dominio no valen; se pone en `antesDeCargar` para
+  que exista antes de que Google cargue. Google comprueba la llave al DIBUJAR, así que el recorrido dibuja un mapa
+  pequeño (espera `tilesloaded`) sin entrar con ninguna cuenta.
+- Con la llave escrita a mano (antes de G62) y con la del .env (después): las dos apps de pruebas cargan, dibujan y 0
+  rechazos.
+
 ## Lo que el robot dejó creado en pruebas
 
 - 27-sep-2026: «Robot Taxi De Prueba» (robot.taxi.1790508222079@gg.test) y
