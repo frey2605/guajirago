@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { auth, db } from './firebase';
-import { createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, sendEmailVerification } from 'firebase/auth';
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword, sendEmailVerification } from 'firebase/auth';
 // collection/query/where/getDocs salieron con la REGLA 6: la unica consulta de
 // LISTA que hacia esta pantalla se mudo al servidor (functions: celularDisponible).
 import { doc, setDoc, getDoc } from 'firebase/firestore';
@@ -12,6 +12,8 @@ import AvisoModal from './AvisoModal';
 import { telefonoDe } from './telefonoUsuario';
 import { telefonoSirve, celularDiezCifras } from './telefonoValido';
 import { cop } from './moneda';
+import { useAccion } from './useAccion';
+import { mandarCorreoDeRecuperacion, CORREO_DE_RECUPERACION_ENVIADO } from './recuperarContrasena';
 
 // Identificador único de este navegador/dispositivo (persiste en localStorage)
 function obtenerDeviceId() {
@@ -84,7 +86,7 @@ function Login({ onEntrar }) {
   const [contactoNumero, setContactoNumero] = useState('');
   const [error, setError] = useState('');
   const [cargando, setCargando] = useState(false);
-  const [mensajeRecuperar, setMensajeRecuperar] = useState('');
+  const { ocupado, correr, texto, aviso, cerrarAviso } = useAccion();
   const [verPassword, setVerPassword] = useState(false);
   const [verPasswordConfirm, setVerPasswordConfirm] = useState(false);
   const [enviando, setEnviando] = useState(false);
@@ -181,14 +183,12 @@ function Login({ onEntrar }) {
     setCargando(false);
   };
 
-  const recuperarContrasena = async () => {
+  // G71: el correo sale de la pieza recuperarContrasena.js, con el mismo aviso exista o no el correo; los fallos los
+  // dice el candado con motivoDeRechazo (sin señal, demasiados intentos, correo mal escrito).
+  const recuperarContrasena = () => {
     if (!email) { setError('Ingresa tu correo para recuperar la contraseña'); return; }
-    setCargando(true); setError(''); setMensajeRecuperar('');
-    try {
-      await sendPasswordResetEmail(auth, email.trim().toLowerCase());
-      setMensajeRecuperar('Te enviamos un correo para restablecer tu contraseña ✅');
-    } catch (err) { setError('No encontramos ese correo. Verifica e intenta de nuevo'); }
-    setCargando(false);
+    setError('');
+    return correr(() => mandarCorreoDeRecuperacion(email), 'recuperar', CORREO_DE_RECUPERACION_ENVIADO, 'enviar el correo');
   };
 
   // ---- Estilos reutilizables del tema claro ----
@@ -205,7 +205,7 @@ function Login({ onEntrar }) {
         <img src="/logo-completo.svg" alt="GuajiraGo" style={{ width: '360px', maxWidth: '90vw', height: 'auto', marginBottom: '36px' }} />
         <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '12px' }}>
           <button onClick={() => { setError(''); setPantalla('registro'); }} style={btnPrimario}>Crear cuenta</button>
-          <button onClick={() => { setError(''); setMensajeRecuperar(''); setPantalla('login'); }} style={{ width: '100%', padding: '18px', background: '#FFFFFF', border: '1.5px solid #1C8EF9', borderRadius: '16px', color: '#1C8EF9', fontSize: '18px', fontWeight: '900', cursor: 'pointer' }}>Ya tengo cuenta</button>
+          <button onClick={() => { setError(''); setPantalla('login'); }} style={{ width: '100%', padding: '18px', background: '#FFFFFF', border: '1.5px solid #1C8EF9', borderRadius: '16px', color: '#1C8EF9', fontSize: '18px', fontWeight: '900', cursor: 'pointer' }}>Ya tengo cuenta</button>
         </div>
       </div>
     );
@@ -315,14 +315,14 @@ function Login({ onEntrar }) {
             <input value={password} onChange={e => setPassword(e.target.value)} placeholder="Contraseña" type="password" style={estiloInput} />
           </div>
           {error && <p style={{ color: '#FF4444', fontSize: '13px', textAlign: 'center', marginBottom: '12px' }}>{error}</p>}
-          {mensajeRecuperar && <p style={{ color: '#2ECC71', fontSize: '13px', textAlign: 'center', marginBottom: '12px' }}>{mensajeRecuperar}</p>}
+          {aviso && <AvisoModal aviso={aviso} onCerrar={cerrarAviso} />}
           <button onClick={iniciarSesion} style={{ ...btnPrimario, background: cargando ? '#E7E7EA' : 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)', color: cargando ? '#9AA0A6' : '#FFFFFF', marginBottom: '12px', marginTop: '8px' }}>
             {cargando ? 'Cargando...' : 'Entrar a GuajiraGo'}
           </button>
-          <button onClick={recuperarContrasena} style={{ width: '100%', padding: '16px', background: '#FFFFFF', border: '1.5px solid #1C8EF9', borderRadius: '16px', color: '#1C8EF9', fontSize: '15px', fontWeight: '900', cursor: 'pointer', marginBottom: '12px' }}>
-            ¿Olvidaste tu contraseña?
+          <button onClick={recuperarContrasena} disabled={!!ocupado} style={{ width: '100%', padding: '16px', background: '#FFFFFF', border: '1.5px solid #1C8EF9', borderRadius: '16px', color: '#1C8EF9', fontSize: '15px', fontWeight: '900', cursor: 'pointer', marginBottom: '12px' }}>
+            {texto('recuperar', 'Enviando…', '¿Olvidaste tu contraseña?')}
           </button>
-          <button onClick={() => { setError(''); setMensajeRecuperar(''); setPantalla('inicio'); }} style={{ width: '100%', padding: '14px', background: 'none', border: 'none', color: '#6B7280', fontSize: '15px', fontWeight: 'bold', cursor: 'pointer' }}>Volver</button>
+          <button onClick={() => { setError(''); setPantalla('inicio'); }} style={{ width: '100%', padding: '14px', background: 'none', border: 'none', color: '#6B7280', fontSize: '15px', fontWeight: 'bold', cursor: 'pointer' }}>Volver</button>
         </div>
       </div>
     );

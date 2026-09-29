@@ -345,9 +345,9 @@ function medir() {
 const PENDIENTES = {
   'guajirago/src/App.js': [1, 1],
   'guajirago/src/Calificacion.js': [1, 1],
-  'guajirago/src/Configuracion.js': [4, 0],
+  'guajirago/src/Configuracion.js': [3, 0], // G71: «Cambiar contraseña» ya pasa por el candado
   'guajirago/src/Llamada.js': [3, 0],
-  'guajirago/src/Login.js': [3, 3],
+  'guajirago/src/Login.js': [2, 2], // G71: «¿Olvidaste tu contraseña?» ya pasa por el candado
   'guajirago/src/MiPerfil.js': [1, 1],
   'guajirago/src/Seguridad.js': [1, 1],
   'guajirago/src/Turismo.js': [1, 1],

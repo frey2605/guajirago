@@ -3,7 +3,9 @@ import { db, auth } from './firebase';
 import Logo from './Logo';
 import AvisoModal from './AvisoModal';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { sendPasswordResetEmail, deleteUser, reauthenticateWithCredential, EmailAuthProvider } from 'firebase/auth';
+import { deleteUser, reauthenticateWithCredential, EmailAuthProvider } from 'firebase/auth';
+import { useAccion } from './useAccion';
+import { mandarCorreoDeRecuperacion } from './recuperarContrasena';
 import TerminosCondiciones from './TerminosCondiciones';
 import PoliticaPrivacidad from './PoliticaPrivacidad';
 
@@ -17,7 +19,7 @@ function Configuracion({ onVolver, onCerrarSesion }) {
   const [verTerminos, setVerTerminos] = useState(false);
   const [verPrivacidad, setVerPrivacidad] = useState(false);
   const [confirmarEliminar, setConfirmarEliminar] = useState(false);
-  const [correoEnviado, setCorreoEnviado] = useState('');
+  const { ocupado, correr, texto, aviso, cerrarAviso } = useAccion();
   const [contrasenaEliminar, setContrasenaEliminar] = useState('');
   const [errorEliminar, setErrorEliminar] = useState('');
   const [verContrasena, setVerContrasena] = useState(false);
@@ -58,16 +60,15 @@ function Configuracion({ onVolver, onCerrarSesion }) {
     guardarPreferencia('configNotificaciones', nuevo);
   };
 
-  const cambiarContrasena = async () => {
-    setError(''); setMensaje(''); setCorreoEnviado('');
-    try {
-      const user = auth.currentUser;
-      if (!user || !user.email) { setError('No se pudo identificar tu correo'); return; }
-      await sendPasswordResetEmail(auth, user.email);
-      setCorreoEnviado(user.email);
-    } catch (e) {
-      setError('No se pudo enviar el correo. Intenta más tarde');
-    }
+  // G71: el correo sale de la pieza recuperarContrasena.js (la misma del inicio de sesión); los fallos los dice el
+  // candado con motivoDeRechazo. Aquí la persona ya entró, así que el aviso sí nombra su correo.
+  const cambiarContrasena = () => {
+    setError(''); setMensaje('');
+    const user = auth.currentUser;
+    if (!user || !user.email) { setError('No se pudo identificar tu correo'); return; }
+    return correr(() => mandarCorreoDeRecuperacion(user.email), 'contrasena',
+      `Te enviamos un enlace para cambiar tu contraseña a: ${user.email}. Si no lo ves en tu bandeja de entrada, revisa la carpeta de correo no deseado o spam.`,
+      'enviar el correo');
   };
 
   const eliminarCuenta = async () => {
@@ -120,9 +121,7 @@ function Configuracion({ onVolver, onCerrarSesion }) {
     <div style={{ backgroundColor: '#FFFFFF', minHeight: '100vh', fontFamily: 'Arial, sans-serif' }}>
 
       {/* Modal correo enviado */}
-      {correoEnviado && (
-        <AvisoModal aviso={{ icono: '📧', titulo: '¡Correo enviado!', texto: `Te enviamos un enlace para cambiar tu contraseña a: ${correoEnviado}. Si no lo ves en tu bandeja de entrada, revisa la carpeta de correo no deseado o spam.` }} onCerrar={() => setCorreoEnviado('')} />
-      )}
+      {aviso && <AvisoModal aviso={aviso} onCerrar={cerrarAviso} />}
 
       <div style={{ background: 'linear-gradient(135deg, #FFFFFF, #ECECEF)', padding: '24px 20px', position: 'relative', display: 'flex', alignItems: 'center' }}>
         <div onClick={onVolver} style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(0,0,0,0.06)', borderRadius: '12px', color: '#1A1A1E', fontSize: '14px', fontWeight: '500', padding: '8px 16px', cursor: 'pointer' }}>
@@ -140,7 +139,7 @@ function Configuracion({ onVolver, onCerrarSesion }) {
         {filaToggle('🔔', 'Notificaciones push', notificaciones, cambiarNotificaciones)}
 
         <p style={{ color: '#6B7280', fontSize: '11px', letterSpacing: '3px', margin: '16px 0 8px' }}>CUENTA</p>
-        {filaBoton('🔑', 'Cambiar contraseña', cambiarContrasena)}
+        {filaBoton('🔑', texto('contrasena', 'Enviando…', 'Cambiar contraseña'), cambiarContrasena)}
         {filaBoton('🗑️', 'Eliminar mi cuenta', () => setConfirmarEliminar(true), '#FF4444')}
 
         <p style={{ color: '#6B7280', fontSize: '11px', letterSpacing: '3px', margin: '16px 0 8px' }}>PREFERENCIAS</p>
@@ -184,7 +183,7 @@ function Configuracion({ onVolver, onCerrarSesion }) {
             </div>
             {errorEliminar && <p style={{ color: '#FF4444', fontSize: '13px', margin: '0 0 12px', fontWeight: 'bold' }}>{errorEliminar}</p>}
             <div style={{ display: 'flex', gap: '12px' }}>
-              <button onClick={() => { setConfirmarEliminar(false); setContrasenaEliminar(''); setErrorEliminar(''); }} style={{ flex: 1, padding: '16px', background: '#FFFFFF', border: '1px solid #ECECEF', borderRadius: '14px', color: '#1A1A1E', fontSize: '15px', fontWeight: 'bold', cursor: 'pointer' }}>Cancelar</button>
+              <button disabled={!!ocupado} onClick={() => { setConfirmarEliminar(false); setContrasenaEliminar(''); setErrorEliminar(''); }} style={{ flex: 1, padding: '16px', background: '#FFFFFF', border: '1px solid #ECECEF', borderRadius: '14px', color: '#1A1A1E', fontSize: '15px', fontWeight: 'bold', cursor: 'pointer' }}>Cancelar</button>
               <button onClick={eliminarCuenta} style={{ flex: 1, padding: '16px', background: '#FF4444', border: 'none', borderRadius: '14px', color: '#FFFFFF', fontSize: '15px', fontWeight: '900', cursor: 'pointer' }}>Eliminar</button>
             </div>
           </div>

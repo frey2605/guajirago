@@ -105,10 +105,9 @@ const CAMBIADAS = [
   { nombre: 'App · falta un dato del conductor', archivo: 'guajirago/src/App.js', modal: "onCerrar={() => setError('')}",
     caso: { error: 'Falta la placa del vehículo' },
     decia: ['⚠️', 'Falta un dato', 'Falta la placa del vehículo'] },
-  { nombre: 'Configuracion · correo enviado', archivo: 'guajirago/src/Configuracion.js', modal: "onCerrar={() => setCorreoEnviado('')}",
-    caso: { correoEnviado: 'ana@correo.com' },
-    // Antes: el correo en verde y la nota del spam en un recuadro amarillo; las mismas palabras, en un solo texto.
-    decia: ['📧', '¡Correo enviado!', 'Te enviamos un enlace para cambiar tu contraseña a: ana@correo.com. Si no lo ves en tu bandeja de entrada, revisa la carpeta de correo no deseado o spam.'] },
+  // «Configuracion · correo enviado» salió de esta lista con G71 (29-sep-2026): «Cambiar contraseña» pasa ahora por el
+  // candado de LA LEY DEL BOTÓN, y su ventanita es la del candado (el mismo texto, con «¡Listo!» por título). Lo que
+  // dice lo ejecuta pruebas/recuperarContrasena.test.js.
 ];
 
 /** Lee un archivo del disco, o de un commit (`git show`). Los de admin y aliados son repos aparte. */

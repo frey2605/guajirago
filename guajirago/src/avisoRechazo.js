@@ -75,12 +75,30 @@ function clasificar(codigo, queIba) {
         + 'permiso para hacerlo.',
     };
   }
-  if (codigo === 'unavailable' || codigo === 'deadline-exceeded') {
+  // G71 (29-sep-2026): las cuentas (firebase/auth) dicen «sin señal» con otro código, «network-request-failed».
+  if (codigo === 'unavailable' || codigo === 'deadline-exceeded' || codigo === 'network-request-failed') {
     return {
       clave: 'sinRed',
       titulo: 'Sin conexión',
       texto: 'No hay internet ahora mismo, así que no se pudo ' + queIba
         + '. Inténtalo otra vez cuando haya señal.',
+    };
+  }
+  // G71: dos fallos de las cuentas que no delatan a nadie y que la persona puede arreglar ella misma. Siguen siendo de
+  // la clase 'otro' (no hay clase nueva): lo que cambia es que el texto dice la verdad en vez de «algo falló».
+  if (codigo === 'too-many-requests') {
+    return {
+      clave: 'otro',
+      titulo: 'Demasiados intentos',
+      texto: 'Se hicieron demasiados intentos seguidos, así que no se pudo ' + queIba
+        + '. Espera unos minutos y vuelve a intentar.',
+    };
+  }
+  if (codigo === 'invalid-email' || codigo === 'missing-email') {
+    return {
+      clave: 'otro',
+      titulo: 'No se pudo ' + queIba,
+      texto: 'El correo no está bien escrito. Revísalo y vuelve a intentar.',
     };
   }
   return {

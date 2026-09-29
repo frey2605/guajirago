@@ -73,7 +73,15 @@ describe('G68 · el medidor ve lo que tiene que ver', () => {
       vieja = execFileSync('git', ['show', '1f3b28c:' + CALIF], { cwd: RAIZ, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
     } catch (e) { vieja = null; }
     assert.ok(vieja, 'no pude sacar ' + CALIF + ' del commit 1f3b28c');
-    const r = M.medir({ fuenteCalif: vieja });
+    // Contra la pieza COMO LA DEJÓ G68 (2387169). Desde G71 (29-sep-2026) la pieza también reconoce la falta de señal
+    // de las cuentas («network-request-failed»), así que contra la de hoy la vieja se separa en 2 más: eso ya no es
+    // lo que G68 arregló, y este careo mide lo de G68.
+    let piezaG68;
+    try {
+      piezaG68 = execFileSync('git', ['show', '2387169:guajirago/src/avisoRechazo.js'], { cwd: RAIZ, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+    } catch (e) { piezaG68 = null; }
+    assert.ok(piezaG68, 'no pude sacar avisoRechazo.js del commit 2387169');
+    const r = M.medir({ fuenteCalif: vieja, fuentePieza: piezaG68 });
     assert.strictEqual(r.traductor, 'motivoDeRechazo');
     assert.deepStrictEqual(r.distintos.map((d) => d.error).sort(),
       ['functions/deadline-exceeded', 'functions/permission-denied', 'functions/unavailable']);

@@ -415,6 +415,14 @@ const RECORRIDOS = [
     vigila: ['guajirago/src/navegacionMenu.js', 'guajirago/src/MenuLateral.js', 'guajirago/src/App.js', 'guajirago/src/Home.js',
       'guajirago/src/AppConductor.js'],
   },
+  {
+    nombre: 'recuperar-contrasena',
+    que: 'sin entrar a ninguna cuenta, «¿Olvidaste tu contraseña?» con un correo que no existe da la ventanita neutra («Si ese correo está registrado…») y con uno mal escrito dice que no está bien escrito (G71; no envía correos ni toca la base)',
+    archivo: 'recuperar-contrasena.cjs',
+    // «Cambiar contraseña» de Configuracion.js manda un correo de verdad a la cuenta de prueba: no lo toca este
+    // recorrido. Lo SACA del archivo y lo EJECUTA, con cada respuesta del servidor, pruebas/recuperarContrasena.test.js.
+    vigila: ['guajirago/src/Login.js', 'guajirago/src/recuperarContrasena.js'],
+  },
 ];
 
 // Los archivos de pantalla: los que, si cambian, el robot debería poder probar. Todo lo que esté en
