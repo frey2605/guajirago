@@ -245,6 +245,35 @@ describe('G16 · los seis sitios deciden con la regla, ejecutándolos', () => {
   }
 });
 
+describe('G16 · la prueba del canje (funciones.test.js) arma sus días como el servidor, a cualquier hora', () => {
+  // Esa prueba corre contra el emulador con el reloj de verdad: si arma «ayer» con otra cuenta que la del servidor,
+  // se pone roja solo de 7 p. m. a medianoche de Colombia. Aquí se EJECUTAN sus renglones con el reloj parado.
+  it('la VENCIDA (ayer→ayer) nunca sale vigente y la VIVA (ayer→mañana) siempre, las 24 horas y en cualquier zona', () => {
+    const t = sinCR(leer('pruebas/funciones.test.js'));
+    const a = t.indexOf("describe('REGLA 7 · reclamarPromocion', () => {\n");
+    const b = t.indexOf('  beforeEach(', a);
+    assert.ok(a >= 0 && b > a, 'no está el arranque del bloque de reclamarPromocion en funciones.test.js');
+    const cuerpo = t.slice(t.indexOf('\n', a) + 1, b);
+    assert.match(cuerpo, /const AYER = /, 'el bloque ya no arma AYER aquí');
+    const dias = (ahora) => new Function('Date', 'require', cuerpo + '\nreturn { AYER, MANANA };')(
+      relojEn(ahora), (r) => require(path.join(RAIZ, 'pruebas', r)));
+    for (const tz of ZONAS) {
+      enZona(tz, () => {
+        for (let m = Date.parse('2026-09-28T05:00:00Z'); m < Date.parse('2026-09-29T05:00:00Z'); m += 1800000) {
+          const ahora = new RealDate(m);
+          const { AYER, MANANA } = dias(ahora);
+          const hora = tz + ' ' + ahora.toISOString();
+          assert.strictEqual(NUBE.etapaDeVigencia(AYER, AYER, ahora), 'despues', 'la VENCIDA sale vigente para el servidor a las ' + hora);
+          assert.strictEqual(NUBE.etapaDeVigencia(AYER, MANANA, ahora), 'vigente', 'la VIVA no sale vigente para el servidor a las ' + hora);
+          // Y son el ayer y el mañana DEL SERVIDOR, no otros días: hace 24 h era AYER, dentro de 24 h será MANANA.
+          assert.strictEqual(NUBE.etapaDeVigencia(AYER, AYER, new RealDate(m - 86400000)), 'vigente', 'AYER no es el ayer del servidor a las ' + hora);
+          assert.strictEqual(NUBE.etapaDeVigencia(MANANA, MANANA, new RealDate(m + 86400000)), 'vigente', 'MANANA no es el mañana del servidor a las ' + hora);
+        }
+      });
+    }
+  });
+});
+
 describe('G16 · las fechas de promociones se pintan con el día guardado', () => {
   it('la app («Válida hasta») y el panel (el rango) usan fechaDeCalendario, y da el día de verdad en Colombia', () => {
     const app = sinCR(leer('guajirago/src/Promociones.js'));

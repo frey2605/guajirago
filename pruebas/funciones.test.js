@@ -364,9 +364,11 @@ describe('REGLA 7 · canjearCodigoRecarga', () => {
 });
 
 describe('REGLA 7 · reclamarPromocion', () => {
-  const HOY = new Date().toISOString().slice(0, 10);
-  const AYER = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
-  const MANANA = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+  // Los días salen de la MISMA pieza con que el servidor cuenta la vigencia (G16): en UTC, de 7 p. m. a medianoche
+  // de Colombia el «ayer» de la prueba era el «hoy» del servidor y la VENCIDA salía vigente. Colombia no cambia de hora.
+  const { hoyEnColombia } = require('../guajirago/functions/cobros.cjs');
+  const AYER = hoyEnColombia(new Date(Date.now() - 86400000));
+  const MANANA = hoyEnColombia(new Date(Date.now() + 86400000));
 
   beforeEach(async () => {
     await sembrar('promociones/VIVA', {
