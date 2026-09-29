@@ -355,6 +355,15 @@ const RECORRIDOS = [
     vigila: ['guajirago-aliados/src/CorteCaja.js', 'guajirago-aliados/src/fechaGuardada.js', 'guajirago-aliados/src/Mesero.js',
       'guajirago-aliados/src/PedidosDomicilio.js', 'guajirago-aliados/src/HistorialDomicilios.js', 'guajirago-aliados/src/ResumenDia.js'],
   },
+  {
+    nombre: 'aprobar-negocio',
+    que: 'con el Restaurante de Prueba suspendido y la cuenta apagada en Cobros, «✅ Aprobar» del panel lo aprueba y la cuenta sigue apagada (G49; cambia tres campos del restaurante de PRUEBAS y los devuelve)',
+    archivo: 'aprobar-negocio.cjs',
+    // Los tres botones (Restaurantes, Turismo y Aliados pendientes) los SACA de su archivo y los EJECUTA
+    // pruebas/aprobarNegocio.test.js.
+    vigila: ['guajirago-admin/src/aprobarNegocio.js', 'guajirago-admin/src/Restaurantes.js', 'guajirago-admin/src/Turismo.js',
+      'guajirago-admin/src/AliadosPendientes.js'],
+  },
 ];
 
 // Los archivos de pantalla: los que, si cambian, el robot debería poder probar. Todo lo que esté en

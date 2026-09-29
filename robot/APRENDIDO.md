@@ -542,6 +542,16 @@ la placa de `conductores/{uid}` (la escribe su GPS con la misma placa que va en 
   fechas «desde / hasta» son los dos `input[type="date"]`.
 - Con aliados VIEJO publicado en pruebas (2e224b7) las dos salen con el día de MAÑANA; con el nuevo (f56c606), hoy.
 
+### aprobar-negocio · aprobar respeta lo que se apagó en Cobros (G49, 29-sep-2026)
+- Las llaves se ponen como SUPERADMIN (`entrarALaBase('admin@gg.test')`): el dueño del restaurante no puede escribir
+  `aprobado` ni `activo` (las reglas se lo niegan). Suspendido + `activo:false` es lo que deja Cobros al apagar «La
+  cuenta está viva».
+- La ficha del panel se abre tocando el nombre «Restaurante de Prueba» en la lista de 🍽️; con `aprobado:false` el botón
+  es «✅ Aprobar» y, ya aprobado, sale «🚫 Suspender» (sirve para saber que el clic entró).
+- La verdad se lee en la BASE, no en la pantalla: el chip dice «Bloqueado» en los dos casos y no distingue.
+- Con el panel VIEJO publicado en pruebas (2df3503) `activo` vuelve a true; con el nuevo (6d06be8) se queda en false.
+- Los 403 de la consola salen igual que en los demás recorridos.
+
 ## Lo que el robot dejó creado en pruebas
 
 - 27-sep-2026: «Robot Taxi De Prueba» (robot.taxi.1790508222079@gg.test) y
@@ -582,3 +592,5 @@ la placa de `conductores/{uid}` (la escribe su GPS con la misma placa que va en 
   devolverla; antes no tenía esos campos). Nadie los lee de esa ficha.
 - 29-sep-2026 en adelante: un pedido de domicilio de pasajero@gg.test al Restaurante de Prueba por cada corrida de
   `fecha-pedido.cjs` (dos jugos de corozo, «Calle Robot G48 #1-2»), ya `cancelado` por el cliente.
+- 29-sep-2026 en adelante: el Restaurante de Prueba lleva `fechaAprobacion` (lo escribe cada corrida de
+  `aprobar-negocio.cjs`; antes no tenía el campo). `aprobado`, `estadoAprobacion` y `activo` se le devuelven como estaban.
