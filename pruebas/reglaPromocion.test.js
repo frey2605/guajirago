@@ -294,7 +294,9 @@ describe('G17 · la receta del uso es UNA, y las tres copias dicen lo mismo', ()
   it('nadie más suma usos o «Invertido» a mano, en las tres apps ni en el servidor', () => {
     const fsn = require('node:fs'); const pathn = require('node:path');
     const RAIZ = pathn.resolve(__dirname, '..');
-    const PERMITIDOS = [NUBE_RUTA, APP_RUTA, PANEL_RUTA];
+    // G47: aliados lleva una copia IGUAL de la de la app (la pide horarioNegocio.js por hoyEnColombia); la ata
+    // pruebas/pedirAhora.test.js letra por letra, así que no es una receta propia.
+    const PERMITIDOS = [NUBE_RUTA, APP_RUTA, PANEL_RUTA, 'guajirago-aliados/src/reglaPromocion.js'];
     const culpables = [];
     const recorrer = (dir) => {
       for (const e of fsn.readdirSync(pathn.join(RAIZ, dir), { withFileTypes: true })) {

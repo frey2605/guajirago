@@ -14,7 +14,8 @@ import { prepararTokenDeAvisos } from './Notificaciones';
 // que usa Restaurantes.js. Ahí vive también el interruptor `visibleEnEscaparate`.
 import { lasDeTurismo } from './escaparate';
 // G46: «¿abierta ahora?» sale de la regla única de restaurantes y agencias, en hora de Colombia.
-import { negocioAbiertoAhora } from './horarioNegocio';
+// G47: «¿me pueden pedir ahora?» es UNA regla (candado + escaparate + pausa + horario), la misma del dueño y del panel.
+import { sePuedePedirAhora } from './horarioNegocio';
 // El enlace de WhatsApp de la agencia sale de la pieza única (G41): sin número bueno, no hay enlace.
 import { enlaceWhatsApp, telefonoSirve, celularDiezCifras, cifrasMientrasEscribe } from './telefonoValido';
 
@@ -150,7 +151,7 @@ function Turismo({ nombre, foto, onVolver, onCerrarSesion, onIrPerfil, onIrGanan
         {cargando ? <p style={{ color: '#999' }}>Cargando...</p> : filtradas.length === 0 ? (
           <p style={{ color: '#999', fontSize: '14px', textAlign: 'center', padding: '30px 0' }}>Aún no hay agencias de turismo disponibles.</p>
         ) : filtradas.map(a => {
-          const ab = negocioAbiertoAhora(a);
+          const ab = sePuedePedirAhora(a);
           return (
             <div key={a.id} onClick={() => { setAgenciaActiva(a); setPantalla('agencia'); }} style={{ background: '#FFFFFF', borderRadius: '16px', padding: '14px', marginBottom: '10px', display: 'flex', gap: '12px', alignItems: 'center', cursor: 'pointer', border: '1px solid #ECECEF' }}>
               {a.logo ? <img src={a.logo} alt={a.nombre} style={{ width: '58px', height: '58px', borderRadius: '12px', objectFit: 'cover', flexShrink: 0 }} /> : <span style={{ fontSize: '40px' }}>🧭</span>}

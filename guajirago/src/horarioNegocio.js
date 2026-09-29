@@ -18,10 +18,23 @@
  * La hora es la de COLOMBIA, sacada de `hoyEnColombia` (la misma pieza de las promociones y las ganancias): la hora es
  * lo que ha pasado desde la medianoche de ese día. No hay otra cuenta de «qué hora es en Colombia».
  *
- * La usan la lista de restaurantes, el menú del restaurante y la lista de agencias. Es la pieza que tiene que reusar
- * «¿me pueden pedir ahora?» (G47) en la app del negocio y en el panel. La vigila pruebas/horarioNegocio.test.js.
+ * La vigila pruebas/horarioNegocio.test.js.
+ *
+ * ── G47 (29-sep-2026): «¿ME PUEDEN PEDIR AHORA?» — la pregunta ENTERA, también aquí ──────────────────────────────
+ * Hasta el 29-sep-2026 la contestaban tres pantallas, cada una a su manera: el cliente (escaparate + pausa + horario),
+ * el dueño en aliados (solo la pausa: «🟢 Abierto · Los clientes pueden pedirte» a las 3 de la mañana) y el panel
+ * («ABIERTOS AHORA» = aprobado + pausa). Y ninguna miraba el candado que el servidor sí mira al crear el pedido.
+ * Ahora es UNA regla, `motivoParaNoPedir`, y se contesta en este orden (el primero que falle es el motivo):
+ *   1. el candado del negocio (`activo`, `estadoComercial`) — lo mismo que `negocioPuedeOperar` en firestore.rules;
+ *   2. que salga en la app de clientes — `saleEnElEscaparate` (aprobado, visible, ficha llena);
+ *   3. que no lo hayan pausado a mano — `abierto`;
+ *   4. que esté dentro de su horario, en hora de Colombia — `dentroDelHorario`.
+ * La usan la lista de restaurantes, el menú, la lista de agencias, la bienvenida del dueño en aliados y el panel.
+ * Aliados y el panel no pueden importar este archivo: tienen una COPIA IGUAL (con escaparate.js y reglaPromocion.js),
+ * y pruebas/pedirAhora.test.js exige que sean iguales letra por letra y las corre.
  */
 import { hoyEnColombia } from './reglaPromocion';
+import { saleEnElEscaparate } from './escaparate';
 
 /** La hora (0 a 23) en Colombia en el instante `ahora` (o ya). */
 export function horaEnColombia(ahora) {
@@ -53,3 +66,35 @@ export function negocioAbiertoAhora(negocio, ahora) {
   if (!negocio || negocio.abierto === false) return false;
   return dentroDelHorario(negocio, ahora);
 }
+
+/**
+ * El candado del negocio: lo MISMO que pregunta el servidor al crear el pedido (firestore.rules, `puedeOperarEn`).
+ * Un campo que falta no frena: `activo` ausente = true, `estadoComercial` ausente = 'alDia'.
+ */
+export function negocioPuedeOperar(negocio) {
+  return !!negocio && negocio.activo !== false && negocio.estadoComercial !== 'bloqueado';
+}
+
+/** Por qué NO se le puede pedir ahora a este negocio (null = sí se puede). */
+export function motivoParaNoPedir(negocio, ahora) {
+  if (!negocio) return 'no-existe';
+  if (!negocioPuedeOperar(negocio)) return 'bloqueado';
+  if (!saleEnElEscaparate(negocio)) return 'no-sale-en-la-app';
+  if (negocio.abierto === false) return 'pausado';
+  if (!dentroDelHorario(negocio, ahora)) return 'fuera-de-horario';
+  return null;
+}
+
+/** ¿Se le puede pedir (o reservar) ahora? La respuesta del cliente, del dueño y del panel. */
+export function sePuedePedirAhora(negocio, ahora) {
+  return motivoParaNoPedir(negocio, ahora) === null;
+}
+
+/** Cómo se dice cada motivo: `corto` para el panel, `alDueno` para la bienvenida de aliados. */
+export const MOTIVO_PARA_NO_PEDIR = {
+  'no-existe': { corto: 'Cerrado', alDueno: 'No encontramos tu negocio: los clientes no pueden pedirte' },
+  bloqueado: { corto: 'Bloqueado', alDueno: 'Tu negocio está suspendido: los clientes no pueden pedirte' },
+  'no-sale-en-la-app': { corto: 'No sale en la app', alDueno: 'No sales en la app de clientes: no pueden pedirte' },
+  pausado: { corto: 'Pausado', alDueno: 'Lo pausaste: no apareces para pedir' },
+  'fuera-de-horario': { corto: 'Fuera de horario', alDueno: 'Estás fuera de tu horario: ahora no pueden pedirte' },
+};

@@ -117,10 +117,11 @@ describe('G46 · las dos pantallas dicen lo mismo (corridas, no leídas)', () =>
   });
 
   it('cada pantalla decide con la pieza en los sitios donde enseña «abierto» (lista y menú)', () => {
+    // G47: la pregunta es ya la ENTERA (sePuedePedirAhora), que por dentro usa este mismo horario.
     const rest = soloCodigo(leer('guajirago/src/Restaurantes.js'));
     const tur = soloCodigo(leer('guajirago/src/Turismo.js'));
-    assert.strictEqual((rest.match(/negocioAbiertoAhora\(/g) || []).length, 2, 'Restaurantes.js: la lista y el menú');
-    assert.strictEqual((tur.match(/negocioAbiertoAhora\(/g) || []).length, 1, 'Turismo.js: la lista de agencias');
+    assert.strictEqual((rest.match(/sePuedePedirAhora\(/g) || []).length, 2, 'Restaurantes.js: la lista y el menú');
+    assert.strictEqual((tur.match(/sePuedePedirAhora\(/g) || []).length, 1, 'Turismo.js: la lista de agencias');
   });
 });
 
@@ -130,6 +131,9 @@ describe('G46 · nadie más decide con la hora de abrir o cerrar', () => {
     PIEZA,
     'guajirago-aliados/src/PerfilRestaurante.js',
     'guajirago-aliados/src/PerfilAgencia.js',
+    // G47: las copias iguales de la pieza en aliados y en el panel (pruebas/pedirAhora.test.js exige que sean iguales).
+    'guajirago-aliados/src/horarioNegocio.js',
+    'guajirago-admin/src/horarioNegocio.js',
   ]);
   const archivos = (dir) => {
     const fuera = [];

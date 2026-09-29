@@ -14,7 +14,8 @@ import { guardarRechazo } from './guardarRechazo';
 // que usa Turismo.js. Ahí vive también el interruptor `visibleEnEscaparate`.
 import { losDeComida } from './escaparate';
 import { etapaDeVigencia } from './reglaPromocion';
-import { negocioAbiertoAhora } from './horarioNegocio';
+// G47: «¿me pueden pedir ahora?» es UNA regla (candado + escaparate + pausa + horario), la misma del dueño y del panel.
+import { sePuedePedirAhora } from './horarioNegocio';
 import {
   collection,
   onSnapshot,
@@ -731,7 +732,7 @@ function Restaurantes({ nombre, onVolver, foto, onCerrarSesion, onIrPerfil, onIr
     const telValido = telefonoSirve(telefono);
     const totalCalif = califsRestaurante.length;
     const promedioCalif = totalCalif ? (califsRestaurante.reduce((s, c) => s + (c.estrellas || 0), 0) / totalCalif) : 0;
-    const abiertoAhora = negocioAbiertoAhora(restauranteActivo);
+    const abiertoAhora = sePuedePedirAhora(restauranteActivo);
     return (
       <div style={{ backgroundColor: '#FFFFFF', minHeight: '100vh', fontFamily: 'Arial, sans-serif', paddingBottom: carrito.length > 0 ? '210px' : '20px' }}>
         {avisoAccion && !avisoAccion.ok && <AvisoModal aviso={avisoAccion} onCerrar={cerrarAviso} />}
@@ -1181,7 +1182,7 @@ function Restaurantes({ nombre, onVolver, foto, onCerrarSesion, onIrPerfil, onIr
         )}
 
         {restaurantesFiltrados.map((r) => {
-          const ab = negocioAbiertoAhora(r);
+          const ab = sePuedePedirAhora(r);
           return (
             <div
               key={r.id}

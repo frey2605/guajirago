@@ -68,6 +68,14 @@ function flechaDelTexto(texto, nombre) {
 function reglaDe(pantalla, commit) {
   const texto = textoDe(pantalla, commit);
   if (texto == null) throw new Error('no está ' + pantalla + (commit ? ' en ' + commit : ''));
+  // G47 (29-sep-2026): las pantallas usan ya la pregunta ENTERA, «¿me pueden pedir ahora?» (candado + escaparate +
+  // pausa + horario). Aquí se mide solo el horario, así que se le da un negocio que SÍ sale en la lista (ficha llena):
+  // los que no salen no se le enseñan al cliente, y eso lo mide scripts/medir-pedir-ahora.cjs.
+  if (/import \{[^}]*\bsePuedePedirAhora\b[^}]*\} from '\.\/horarioNegocio'/.test(texto)) {
+    const ruta = 'guajirago/src/horarioNegocio.js';
+    const pieza = cargarDeLaApp(ruta, textoDe(ruta, commit));
+    return { como: 'la pieza única (horarioNegocio.js, sePuedePedirAhora)', correr: (n, t) => pieza.sePuedePedirAhora({ perfilCompleto: true, ...n }, t) };
+  }
   if (/import \{[^}]*\bnegocioAbiertoAhora\b[^}]*\} from '\.\/horarioNegocio'/.test(texto)) {
     const ruta = 'guajirago/src/horarioNegocio.js';
     const fuente = textoDe(ruta, commit);
