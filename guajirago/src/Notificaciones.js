@@ -7,17 +7,7 @@ import { auth } from './firebase';
 // pruebas pedía con ella el token del pasajero (obtenerTokenFCM) y el del conductor (registrarTokenFCM).
 // La vigila pruebas/elAmbiente.test.js.
 const VAPID_KEY = process.env.REACT_APP_FIREBASE_VAPID_KEY;
-// Audio precargado una sola vez, para que suene rápido aunque la conexión esté lenta
-let _audioAlerta = null;
-export const precargarAudio = () => {
-  try {
-    if (!_audioAlerta) {
-      _audioAlerta = new Audio('/gogo.mp3');
-      _audioAlerta.load();
-    }
-  } catch (e) {}
-};
-
+// (La alarma sonora de un aviso nuevo vivía aquí. Desde G63 vive en alerta.js, la misma pieza que usa aliados.)
 // ¿Puede este celular avisarle al conductor de un viaje nuevo con la app cerrada? 'granted' (sí), 'denied'
 // (lo bloqueó), 'default' (no ha contestado) o 'no-soportado' (el navegador no sabe avisar).
 export const permisoDeAvisos = () => (typeof Notification === 'undefined' ? 'no-soportado' : Notification.permission);
@@ -90,42 +80,4 @@ export const prepararTokenDeAvisos = (campo) => {
   return (ref) => token
     .then((t) => (t ? updateDoc(ref, { [campo]: t }).then(() => true) : false))
     .catch((e) => { console.warn('No se pudo pegar el token de avisos (' + campo + '):', (e && e.message) || e); return false; });
-};
-
-export const alertarNuevoViaje = () => {
-  if (navigator.vibrate) navigator.vibrate([300, 100, 300, 100, 600]);
-  try {
-    if (!_audioAlerta) { _audioAlerta = new Audio('/gogo.mp3'); }
-    const audio = _audioAlerta;
-    audio.currentTime = 0;
-    audio.volume = 1.0;
-    audio.play().catch(() => {
-      try {
-        const ctx = new (window.AudioContext || window.webkitAudioContext)();
-        const nota = (freq, start, duration) => {
-          const o = ctx.createOscillator();
-          const g = ctx.createGain();
-          o.connect(g); g.connect(ctx.destination);
-          o.frequency.value = freq; o.type = 'sine';
-          g.gain.setValueAtTime(0.4, ctx.currentTime + start);
-          g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + start + duration);
-          o.start(ctx.currentTime + start);
-          o.stop(ctx.currentTime + start + duration + 0.05);
-        };
-        nota(523, 0.0, 0.15); nota(659, 0.18, 0.15); nota(784, 0.36, 0.25);
-        nota(659, 0.75, 0.15); nota(784, 0.93, 0.15); nota(1047, 1.11, 0.35);
-      } catch(e) {}
-    });
-  } catch(e) {}
-};
-
-export const activarAudioiOS = () => {
-  try {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    const o = ctx.createOscillator();
-    const g = ctx.createGain();
-    o.connect(g); g.connect(ctx.destination);
-    g.gain.setValueAtTime(0, ctx.currentTime);
-    o.start(); o.stop(ctx.currentTime + 0.001);
-  } catch(e) {}
 };

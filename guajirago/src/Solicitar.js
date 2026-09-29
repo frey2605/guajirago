@@ -7,7 +7,8 @@ import { collection, addDoc, doc, onSnapshot, updateDoc, getDoc, query, orderBy 
 import Calificacion from './Calificacion';
 import Llamada from './Llamada';
 import { useLlamadaEntrante } from './llamadaEntrante';
-import { alertarNuevoViaje, precargarAudio, activarAudioiOS, prepararTokenDeAvisos } from './Notificaciones';
+import { prepararTokenDeAvisos } from './Notificaciones';
+import { sonarAlerta, desbloquearAudio } from './alerta';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { calcularTarifaMinima } from './tarifas';
 import { RESPALDO_CONFIG, leerConfig, segundosDeEspera, BUSQUEDA, marcaDelVencido, maximoDeFavoritos, lugaresFavoritos } from './configApp';
@@ -723,7 +724,7 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
       if (data.estado === 'aceptado' && pantallaRef.current !== 'fase1' && pantallaRef.current !== 'fase2' && !celebrando) {
         if (radioRef.current) { clearTimeout(radioRef.current.ampliar); clearTimeout(radioRef.current.agotar); }
         clearInterval(contadorBusquedaRef.current);
-        alertarNuevoViaje();
+        sonarAlerta();
         setContraofertas([]);
         contaofertasIdsRef.current.clear();
         setCelebrando(true);
@@ -789,7 +790,7 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
         .slice(0, 5);
       lista.forEach(o => {
         const key = o.conductorId + '_' + (o.contraofertaValor || '');
-        if (!contaofertasIdsRef.current.has(key)) { contaofertasIdsRef.current.add(key); alertarNuevoViaje(); }
+        if (!contaofertasIdsRef.current.has(key)) { contaofertasIdsRef.current.add(key); sonarAlerta(); }
       });
       setContraofertas(lista);
     });
@@ -1068,8 +1069,7 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
         return;
       }
     }
-    activarAudioiOS();
-    precargarAudio();
+    desbloquearAudio();
     setError('');
 
     // LA LEY DEL BOTÓN: desde aquí hasta crear el viaje, UNA sola vez aunque se toque dos. El candado cubre también

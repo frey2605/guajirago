@@ -49,7 +49,7 @@ const RECORRIDOS = [
     nombre: 'conductor-en-turno',
     que: 'el conductor se pone disponible y el GPS escribe su posición sin borrarle el viaje en curso (mira la base de pruebas)',
     archivo: 'conductor-en-turno.cjs',
-    vigila: ['guajirago/src/AppConductor.js', 'guajirago/src/Notificaciones.js', 'guajirago/src/pedirGps.js'],
+    vigila: ['guajirago/src/AppConductor.js', 'guajirago/src/Notificaciones.js', 'guajirago/src/pedirGps.js', 'guajirago/src/alerta.js'],
   },
   {
     nombre: 'radio-panel',
@@ -368,7 +368,7 @@ const RECORRIDOS = [
     // La regla entera (candado, escaparate, pausa, horario) la SACA de cada pantalla y la EJECUTA pruebas/pedirAhora.test.js.
     vigila: ['guajirago-aliados/src/App.js', 'guajirago-aliados/src/horarioNegocio.js', 'guajirago-aliados/src/escaparate.js',
       'guajirago-aliados/src/reglaPromocion.js', 'guajirago-admin/src/Restaurantes.js', 'guajirago-admin/src/horarioNegocio.js',
-      'guajirago-admin/src/escaparate.js'],
+      'guajirago-admin/src/escaparate.js', 'guajirago-aliados/src/alerta.js'],
   },
   {
     nombre: 'fecha-pedido',

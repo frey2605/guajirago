@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { db, auth } from './firebase';
 import { collection, query, where, limit, onSnapshot, doc, updateDoc, setDoc, getDoc, getDocs, addDoc, orderBy, deleteField } from 'firebase/firestore';
-import { registrarTokenFCM, alertarNuevoViaje, activarAudioiOS, precargarAudio, permisoDeAvisos, avisoDeAvisos } from './Notificaciones';
+import { registrarTokenFCM, permisoDeAvisos, avisoDeAvisos } from './Notificaciones';
+import { sonarAlerta, desbloquearAudio } from './alerta';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { comisionSegunTipoDeViaje, comisionParaActivarse } from './comisiones';
 import { porQueNoLeToca } from './leTocaElViaje';
@@ -863,7 +864,7 @@ const cargarSaldo = useCallback(async (uid) => {
         .slice(0, 5);
 
       const nuevas = vigentes.filter(v => !solicitudesIdsRef.current.has(v.id) && !v.nuevaOferta);
-      if (nuevas.length > 0) alertarNuevoViaje();
+      if (nuevas.length > 0) sonarAlerta();
       solicitudesIdsRef.current = new Set(vigentes.map(v => v.id));
       setSolicitudes(vigentes);
     });
@@ -1512,7 +1513,7 @@ if (sancionActiva) return (
         
         <div style={{ background: '#FFFFFF', border: '1.5px solid #ECECEF', borderRadius: '14px', padding: '12px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
           <p style={{ color: activo ? '#1A1A1E' : '#6B7280', fontWeight: '900', fontSize: '15px', margin: '0' }}>{activo ? '🟢 Estoy disponible' : '⚪ No disponible'}</p>
-          <div onClick={() => { if (!activo && saldoCreditos !== null && saldoCreditos < comisionParaActivarse(tipoVehiculo, configApp)) { alert('No tienes saldo suficiente para recibir viajes. Recarga tus créditos.'); return; } activarAudioiOS(); precargarAudio(); setActivo(!activo); }} style={{ width: '52px', height: '30px', borderRadius: '15px', background: activo ? 'linear-gradient(135deg, #FFCF4D, #FF7A2F)' : '#ECECEF', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '0 4px', justifyContent: activo ? 'flex-end' : 'flex-start', flexShrink: 0 }}>
+          <div onClick={() => { if (!activo && saldoCreditos !== null && saldoCreditos < comisionParaActivarse(tipoVehiculo, configApp)) { alert('No tienes saldo suficiente para recibir viajes. Recarga tus créditos.'); return; } desbloquearAudio(); setActivo(!activo); }} style={{ width: '52px', height: '30px', borderRadius: '15px', background: activo ? 'linear-gradient(135deg, #FFCF4D, #FF7A2F)' : '#ECECEF', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '0 4px', justifyContent: activo ? 'flex-end' : 'flex-start', flexShrink: 0 }}>
             <div style={{ width: '22px', height: '22px', borderRadius: '50%', background: '#FFFFFF' }}/>
           </div>
         </div>
