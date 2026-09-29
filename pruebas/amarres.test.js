@@ -998,14 +998,15 @@ describe('AMARRES · el panel y la app dicen lo mismo', () => {
       + 'la pestaña sin tocar la lista, así que este amarre no lo ve venir y los viajes '
       + 'vuelven a desaparecer.');
 
-    // Y que cada final tenga nombre en la etiqueta: sin entrada en el mapa
-    // salen con el nombre crudo del estado.
-    const mapa = /const\s+etiquetaEstado[\s\S]*?const\s+mapa\s*=\s*\{([\s\S]*?)\n {4}\};/.exec(t);
-    assert.ok(mapa, 'no encuentro el mapa de `etiquetaEstado` en el panel de viajes.');
+    // Y que cada final tenga nombre en la etiqueta: sin él salen con el nombre crudo del estado.
+    // G56 (29-sep-2026): los nombres ya no son un mapa de la pantalla, salen de `comoTermino(v, 'panel')` de la copia
+    // atada; así que se EJECUTA la etiqueta, sacada del archivo, con cada final.
+    const P = require('../scripts/medir-que-paso.cjs').lasPantallas(null, null);
     for (const e of ESTADOS_TERMINADOS) {
-      assert.ok(new RegExp('\\b' + e + '\\s*:').test(mapa[1]),
-        'al mapa de `etiquetaEstado` le falta «' + e + '», así que ese viaje sale con el '
-        + 'nombre crudo del estado en vez de en cristiano.');
+      const et = P.viajes({ estado: e });
+      assert.ok(et && et.texto && et.texto !== e,
+        'la etiqueta de `etiquetaEstado` para «' + e + '» sale con el nombre crudo del estado (o vacía) en vez de '
+        + 'en cristiano: «' + (et && et.texto) + '».');
     }
   });
 
@@ -1043,15 +1044,15 @@ describe('AMARRES · el panel y la app dicen lo mismo', () => {
     // Y QUE CADA FINAL TENGA SU NOMBRE EN PALABRAS. Que entren en la caja no
     // basta: si los cuatro dicen «Cancelado», quien mira el panel no sabe si el
     // cliente se arrepintió, si el repartidor lo soltó o si no lo cogió nadie.
-    const nombres = /const\s+NOMBRE_DEL_FINAL\s*=\s*\{([\s\S]*?)\}/.exec(t);
-    assert.ok(nombres, 'el panel ya no tiene `NOMBRE_DEL_FINAL`, que es lo que pone en '
-      + 'palabras cada forma de terminar.');
-    for (const e of deberia) {
-      assert.ok(new RegExp('\\b' + e + '\\s*:').test(nombres[1]),
-        'a `NOMBRE_DEL_FINAL` le falta «' + e + '», así que ese final saldría con el nombre '
-        + 'de otro. No es lo mismo que el cliente cancele, que el repartidor suelte el '
-        + 'mandado, o que no lo tome nadie.');
-    }
+    // G56 (29-sep-2026): los nombres ya no son una tabla de la pantalla (`NOMBRE_DEL_FINAL`): salen de
+    // `comoTermino(m, 'panel')` de la copia atada. Se EJECUTA la etiqueta, sacada del archivo, con cada final.
+    const P = require('../scripts/medir-que-paso.cjs').lasPantallas(null, null);
+    const nombres = deberia.map((e) => P.mensajeria({ estado: e, tipo: 'Mensajería' }).t);
+    assert.strictEqual(new Set(nombres).size, deberia.length,
+      'dos finales del panel de mensajería dicen lo MISMO (' + nombres.join(' / ') + '). No es lo mismo que el '
+      + 'cliente cancele, que el repartidor suelte el mandado, o que no lo tome nadie.');
+    deberia.forEach((e, i) => assert.ok(nombres[i] && nombres[i] !== e,
+      'el final «' + e + '» sale en mensajería con el nombre crudo del estado (o vacío): «' + nombres[i] + '».'));
 
     // ── Y EL CAJÓN DE SASTRE NO VUELVE ────────────────────────────────────
     //  Lo que de verdad escondió el fallo no fue la lista corta: fue que lo
@@ -1092,16 +1093,10 @@ describe('AMARRES · el panel y la app dicen lo mismo', () => {
         + 'vivos durante meses. Lo desconocido se dice, no se pinta de naranja.');
     }
 
-    // Y QUE LOS NOMBRES SE USEN, no solo que estén escritos. Dejar la tabla
-    // declarada y devolver «Cancelado» a pelo la dejaba de adorno — es la misma
-    // lección del amarre que tuvo que mirar el `exports.` de un disparador.
-    assert.match(cuerpo, /NOMBRE_DEL_FINAL\s*\[/,
-      '`etiquetaEstado` ya no usa `NOMBRE_DEL_FINAL`. La tabla puede estar perfecta y no '
-      + 'servir de nada: los cuatro finales volverían a salir con el mismo nombre.');
-
-    // Y que ninguno de los nombres diga que el mandado sigue vivo.
-    assert.ok(!/En curso|En camino|Buscando/i.test(nombres[1]),
-      'uno de los nombres de `NOMBRE_DEL_FINAL` dice que el mandado sigue vivo. Son los '
+    // Y que ninguno de los nombres diga que el mandado sigue vivo (G56: se miran los que SALEN al ejecutarla; que
+    // la etiqueta los use lo vigila pruebas/quePaso.test.js).
+    assert.ok(!nombres.some((n) => /En curso|En camino|Buscando/i.test(n)),
+      'uno de los nombres de los finales de mensajería dice que el mandado sigue vivo. Son los '
       + 'finales: si uno dice «En curso», vuelve el disfraz por la puerta de al lado.');
 
     // Y que la tarjeta siga preguntándole a `etiquetaEstado`. Si deja de

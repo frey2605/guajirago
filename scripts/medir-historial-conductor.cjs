@@ -530,7 +530,10 @@ function elTrozoDelResultado(p) {
   //  conductor: cualquier uso nuevo cambia eso, así que cualquier uso nuevo
   //  tiene que mirarlo una persona. Si el que llega es legítimo, se sube el
   //  número aquí y se dice por qué.
-  const USOS = 4; // la declaración · el color · el texto · el renglón de la razón
+  // G56 (29-sep-2026): de 4 a 6. El renglón de la razón ya no lee `v.razonCancelacion` sino el `porque` de la pieza
+  // (que también trae el motivo con que el sistema cierra el viaje): `!fin.completado && fin.porque && … {fin.porque}`,
+  // o sea tres usos donde había uno. No esconde nada: solo decide si sale el renglón de la razón.
+  const USOS = 6; // la declaración · el color · el texto · el renglón de la razón (tres: completado, porque, porque)
   const usos = (cuerpoTarjeta.match(new RegExp('\\b' + bandera + '\\b', 'g')) || []).length;
   if (usos !== USOS) {
     return malo('en la tarjeta del historial «' + bandera + '» se usa ' + usos + ' veces, y '

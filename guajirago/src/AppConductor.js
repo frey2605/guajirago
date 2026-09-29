@@ -266,7 +266,7 @@ function HistorialConductor({ onVolver }) {
                   <p style={{ color: '#1A1A1E', fontSize: '13px', margin: '0' }}>{v.destino}</p>
                 </div>
               </div>
-              {!fin.completado && v.razonCancelacion && <p style={{ color: '#6B7280', fontSize: '12px', margin: '10px 0 0' }}>Razón: {v.razonCancelacion}</p>}
+              {!fin.completado && fin.porque && <p style={{ color: '#6B7280', fontSize: '12px', margin: '10px 0 0' }}>Razón: {fin.porque}</p>}
             </div>
           );
         })}

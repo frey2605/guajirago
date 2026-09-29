@@ -130,7 +130,7 @@ export const ESTADOS_QUE_CIERRA_EL_SERVIDOR = ['vencido', 'expirado'];
 export function avisoDelCierre(viaje, quien) {
   const v = viaje || {};
   if (!ESTADOS_QUE_CIERRA_EL_SERVIDOR.includes(v.estado)) return null;
-  const motivo = typeof v.motivoExpiracion === 'string' ? v.motivoExpiracion.trim() : '';
+  const motivo = motivoDelServidor(v);
   const porque = motivo
     ? 'El sistema lo cerró: ' + motivo + '.'
     : (v.estado === 'vencido'
@@ -140,6 +140,12 @@ export function avisoDelCierre(viaje, quien) {
     ? ' Ya quedaste libre para recibir viajes nuevos.'
     : ' Si todavía lo necesitas, pide uno nuevo.';
   return { icono: '⏱️', titulo: 'Este viaje ya se cerró', texto: porque + ahora };
+}
+
+// El porqué que escribe quien CIERRA el viaje sin ser una persona del viaje (el servidor, o el teléfono del pasajero
+// cuando se le acaba la búsqueda: `marcaDelVencido` en configApp.js). Lo leen la ventanita de arriba y `comoTermino`.
+function motivoDelServidor(v) {
+  return typeof v.motivoExpiracion === 'string' ? v.motivoExpiracion.trim() : '';
 }
 
 /**
@@ -203,8 +209,13 @@ export function meAceptaronEsteViaje(viaje, miId) {
 //  Las palabras cambian según QUIÉN MIRA, y solo eso: `cancelado` lo escribe el pasajero al cancelar
 //  (`Solicitar.js`, `canceladoPor: 'pasajero'`) y `cancelado_conductor` el conductor (`AppConductor.js`). Así que al
 //  pasajero `cancelado` le dice «Lo cancelaste tú» y al conductor «Lo canceló el cliente».
-//  (El panel tiene sus propias tablas, en tercera persona y en OTRO repo: `guajirago-admin/src/Viajes.js` y
-//  `Mensajeria.js`. No pueden importar esto.)
+//
+//  G56 (29-sep-2026): y un TERCERO que mira, el panel, en tercera persona. Hasta hoy el panel tenía DOS tablas suyas
+//  (`etiquetaEstado` de Viajes.js y `NOMBRE_DEL_FINAL` de Mensajeria.js) que del MISMO mandado decían cosas distintas
+//  («Cancelado por pasajero» y «Lo canceló el cliente»; «Finalizado» y «Entregado»): 10 de los 12 mandados de
+//  producción, medido con `scripts/medir-que-paso.cjs`. Ahora las dos pantallas usan esta tabla, por la copia atada
+//  del panel (`guajirago-admin/src/estadosViaje.js`, que `pruebas/quePaso.test.js` compara EJECUTANDO las dos).
+//  Quién maneja no es otra tabla: sale del tipo del viaje (`quienManeja`), así el mandado dice «repartidor».
 export const FINAL_EN_PALABRAS = {
   pasajero: {
     cancelado: 'Lo cancelaste tú',
@@ -218,24 +229,44 @@ export const FINAL_EN_PALABRAS = {
     vencido: 'Nadie lo tomó',
     expirado: 'Quedó sin terminar',
   },
+  panel: {
+    cancelado: 'Lo canceló el cliente',
+    cancelado_conductor: 'Lo canceló el {quienManeja}',
+    vencido: 'Nadie lo tomó',
+    expirado: 'Quedó sin terminar',
+  },
 };
 
+// Quién maneja el viaje, en palabras: en un mandado (`tipo: 'Mensajería'`) es el repartidor.
+export function quienManeja(viaje) {
+  return (viaje || {}).tipo === 'Mensajería' ? 'repartidor' : 'conductor';
+}
+
 /**
- * CÓMO TERMINÓ UN VIAJE, para su tarjeta del historial.
+ * CÓMO TERMINÓ UN VIAJE, para su tarjeta (el historial de la app, y 🚕 Viajes y 📦 Mensajería del panel).
  *
  * @param viaje  el documento del viaje, tal cual
- * @param quien  'pasajero' o 'conductor': quién está mirando (cambia las palabras, no el color)
- * @returns `{ completado, texto, color }`
+ * @param quien  'pasajero', 'conductor' o 'panel': quién está mirando (cambia las palabras, no el color)
+ * @returns `{ completado, texto, color, porque }`
  *
  * Completado es UNO (`finalizado`): todo lo demás es un final que NO se completó y sale en rojo, con sus palabras. Un
  * estado que no conozca sale en rojo con su nombre crudo, nunca en verde: equivocarse por defecto es no dar por hecho
  * un trabajo que no se hizo.
+ *
+ * `porque` (G56): el motivo que se enseña debajo. Si lo cerró el sistema (`vencido`, `expirado`) es `motivoExpiracion`
+ * —hasta hoy ninguna tarjeta lo enseñaba: leían `razonCancelacion`, que el sistema no escribe—; si lo cancelaron las
+ * personas, `razonCancelacion`. Vacío si no hay.
  */
 export function comoTermino(viaje, quien) {
-  const estado = (viaje || {}).estado;
-  if (estado === 'finalizado') return { completado: true, texto: 'Completado', color: '#2ECC71' };
-  const palabras = FINAL_EN_PALABRAS[quien === 'conductor' ? 'conductor' : 'pasajero'];
-  return { completado: false, texto: palabras[estado] || String(estado || '—'), color: '#FF4444' };
+  const v = viaje || {};
+  const estado = v.estado;
+  if (estado === 'finalizado') return { completado: true, texto: 'Completado', color: '#2ECC71', porque: '' };
+  const palabras = Object.prototype.hasOwnProperty.call(FINAL_EN_PALABRAS, quien) ? FINAL_EN_PALABRAS[quien]
+    : FINAL_EN_PALABRAS.pasajero;
+  const texto = (palabras[estado] || String(estado || '—')).replace('{quienManeja}', quienManeja(v));
+  const razon = typeof v.razonCancelacion === 'string' ? v.razonCancelacion.trim() : '';
+  const porque = (ESTADOS_QUE_CIERRA_EL_SERVIDOR.includes(estado) ? motivoDelServidor(v) : '') || razon;
+  return { completado: false, texto, color: '#FF4444', porque };
 }
 
 // Las fases que SÍ se guardan en el viaje (`AppConductor.js:980` y `:1006`).

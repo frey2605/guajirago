@@ -143,7 +143,7 @@ function Historial({ onVolver }) {
                 </div>
               </div>
               {v.conductorNombre && <p style={{ color: '#6B7280', fontSize: '12px', margin: '10px 0 0' }}>Conductor: <span style={{ color: '#FF7A2F' }}>{v.conductorNombre}</span></p>}
-              {!fin.completado && v.razonCancelacion && <p style={{ color: '#6B7280', fontSize: '12px', margin: '4px 0 0' }}>Razón: {v.razonCancelacion}</p>}
+              {!fin.completado && fin.porque && <p style={{ color: '#6B7280', fontSize: '12px', margin: '4px 0 0' }}>Razón: {fin.porque}</p>}
             </div>
           );
         })}

@@ -23,9 +23,10 @@ const NO_COMPLETADOS = ESTADOS_TERMINADOS.filter((e) => e !== 'finalizado');
 
 describe('G21 · cómo terminó un viaje sale de UNA pieza (comoTermino)', () => {
   it('EL QUE MUERDE · completado es UNO; los demás finales salen en rojo y en palabras', () => {
-    for (const quien of ['pasajero', 'conductor']) {
+    for (const quien of ['pasajero', 'conductor', 'panel']) {
       const bien = comoTermino({ estado: 'finalizado' }, quien);
-      assert.deepStrictEqual(bien, { completado: true, texto: 'Completado', color: '#2ECC71' });
+      // G56: y trae su porqué (vacío: un viaje completado no tiene motivo que enseñar).
+      assert.deepStrictEqual(bien, { completado: true, texto: 'Completado', color: '#2ECC71', porque: '' });
       const textos = new Set();
       for (const e of NO_COMPLETADOS) {
         const r = comoTermino({ estado: e }, quien);
