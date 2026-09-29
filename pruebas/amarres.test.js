@@ -1674,7 +1674,7 @@ describe('AMARRES · REGLA 9 · las tres apps clasifican IGUAL un rechazo', () =
     // clase dentro. Se normalizan las dos formas y se comparan.
     const app = cargarDeLaApp('guajirago/src/avisoCalificacion.js');
     const claseEnLaApp = (e) => {
-      const m = app.motivoDeRechazo(e);
+      const m = app.motivoDeCalificacion(e);
       for (const k of Object.keys(app.MOTIVOS)) if (app.MOTIVOS[k] === m) return k;
       return '(ninguna)';
     };
@@ -1692,7 +1692,9 @@ describe('AMARRES · REGLA 9 · las tres apps clasifican IGUAL un rechazo', () =
     // archivos, más los raros de siempre. Si mañana una app aprende un código que
     // las otras no, este barrido lo encuentra solo.
     const nombrados = new Set();
-    for (const ruta of ['guajirago/src/avisoCalificacion.js',
+    // G68: la calificación ya no nombra códigos (le pregunta la clase a avisoRechazo.js de la app), así que se
+    // barre esa pieza, que es la que decide ahora en la app del pasajero.
+    for (const ruta of ['guajirago/src/avisoRechazo.js',
       'guajirago-aliados/src/avisoRechazo.js', 'guajirago-admin/src/avisoRechazo.js']) {
       // Se sacan de donde se comparan de verdad —`codigo === '…'`— y no de
       // cualquier texto entrecomillado del archivo: así no entran las claves
@@ -1703,7 +1705,10 @@ describe('AMARRES · REGLA 9 · las tres apps clasifican IGUAL un rechazo', () =
       'esperaba al menos 3 códigos de fallo entre los tres archivos y encontré '
       + nombrados.size + ': ' + [...nombrados].join(', '));
     const RAROS = [null, undefined, {}, 'un texto suelto', new Error('boom'), { code: 42 }];
-    const TODOS = [...[...nombrados].map((code) => ({ code })), ...RAROS];
+    // G68: y cada código también CON APELLIDO («functions/…»), que es como llegan los de las funciones de la nube.
+    // Por ahí se separaron: la calificación los mandaba a «otro» y la pieza no, y este barrido no los probaba.
+    const TODOS = [...[...nombrados].map((code) => ({ code })),
+      ...[...nombrados].map((code) => ({ code: 'functions/' + code })), ...RAROS];
 
     for (const e of TODOS) {
       const enApp = claseEnLaApp(e);
@@ -1736,7 +1741,7 @@ describe('AMARRES · REGLA 9 · las tres apps clasifican IGUAL un rechazo', () =
     const panel = cargarDeLaApp('guajirago-admin/src/avisoRechazo.js');
     for (const c of CASOS.concat([{ e: 'un texto suelto' }, { e: new Error('boom') }])) {
       for (const [nombre, m] of [
-        ['la app', app.motivoDeRechazo(c.e)],
+        ['la app', app.motivoDeCalificacion(c.e)],
         ['aliados', aliados.motivoDeRechazo(c.e, 'hacer algo')],
         ['el panel', panel.motivoDeRechazo(c.e, 'hacer algo')],
       ]) {
@@ -1803,7 +1808,7 @@ describe('AMARRES · REGLA 9 · la bandeja de rechazos', () => {
     const aliados = cargarDeLaApp('guajirago-aliados/src/avisoRechazo.js');
     for (const code of ['permission-denied', 'unavailable', 'deadline-exceeded', 'vete-a-saber']) {
       assert.strictEqual(
-        app.motivoDeRechazo({ code }).clave,
+        app.motivoDeCalificacion({ code }).clave,
         aliados.motivoDeRechazo({ code }, 'hacer algo').clave,
         'con «' + code + '» la app apunta una clase y aliados otra');
     }

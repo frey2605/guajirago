@@ -31,7 +31,8 @@ const path = require('node:path');
 // se quedaron de más: los usa también pruebas/avisosPanel.test.js.
 const { leer, cargarDeLaApp, soloCodigo, cuerpoDelCatch } = require('./cargar.cjs');
 
-const { motivoDeRechazo, MOTIVOS } = cargarDeLaApp('guajirago/src/avisoCalificacion.js');
+// G68: la función de la calificación se llama motivoDeCalificacion (la clase la saca de avisoRechazo.js).
+const { motivoDeCalificacion: motivoDeRechazo, MOTIVOS } = cargarDeLaApp('guajirago/src/avisoCalificacion.js');
 describe('REGLA 9 · una calificación que no entra se le dice al cliente', () => {
   it('el «no tienes permiso» del servidor se traduce a algo que una persona entiende', () => {
     const m = motivoDeRechazo({ code: 'permission-denied' });
@@ -106,8 +107,8 @@ describe('REGLA 9 · las dos pantallas que califican ya no se tragan el fallo', 
       const t = leer(s.archivo);
       assert.ok(t.includes("from './avisoCalificacion'"),
         s.archivo + ' no importa el archivo de los motivos');
-      assert.ok(t.includes('motivoDeRechazo('),
-        s.archivo + ' no llama a motivoDeRechazo()');
+      assert.ok(t.includes('motivoDeCalificacion('),
+        s.archivo + ' no llama a motivoDeCalificacion()');
       assert.ok(t.includes('apuntarRechazo('),
         s.archivo + ' no deja rastro del rechazo');
     });
@@ -135,9 +136,9 @@ describe('REGLA 9 · las dos pantallas que califican ya no se tragan el fallo', 
       assert.ok(cuerpo !== null, 'no encontré el catch en ' + p.archivo);
       assert.ok(/apuntarRechazo\s*\(/.test(cuerpo),
         p.archivo + ': el catch no deja rastro del rechazo');
-      assert.ok(/motivoDeRechazo\s*\(/.test(cuerpo),
+      assert.ok(/motivoDeCalificacion\s*\(/.test(cuerpo),
         p.archivo + ': el catch no saca el motivo del archivo compartido');
-      assert.ok(/set[A-Za-z]*\s*\(\s*motivo(DeRechazo)?\b/.test(cuerpo),
+      assert.ok(/set[A-Za-z]*\s*\(\s*motivo(DeCalificacion)?\b/.test(cuerpo),
         p.archivo + ': saca el motivo pero NO lo enseña. Calcularlo y no pintarlo '
         + 'es exactamente lo mismo que tragárselo.');
     }

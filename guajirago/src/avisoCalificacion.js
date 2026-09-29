@@ -28,6 +28,15 @@
 // Y los rechazos mudos que quedaban en las otras dos apps también se cerraron ese
 // día (aliados/CalificacionesRestaurante.js y admin/ComentariosReportados.js).
 // `guajirago/functions/index.js` no toca calificaciones: por ahí no hay nada.
+//
+// G68 (29-sep-2026): QUÉ CLASE DE FALLO ES ya no se decide aquí. Este archivo tenía su propia `motivoDeRechazo`
+// —con el MISMO nombre que la de avisoRechazo.js— y su propia `apuntarRechazo`. El 26-sep la de avisoRechazo.js
+// aprendió a quitarle el apellido al código («functions/permission-denied») y ésta no: el mismo fallo daba «permiso»
+// en un botón y «otro» en la calificación, y eso es lo que se guarda en la bandeja. Ahora la clase la da la pieza
+// (`motivoDeRechazo` de avisoRechazo.js, «la única que lo sabe decir», LEY DEL BOTÓN) y el rastro de la consola
+// también (`apuntarRechazo` de allí). Aquí queda solo lo PROPIO de la calificación: sus palabras, una por clase.
+// Lo mide scripts/medir-traductores-g68.cjs y lo vigila pruebas/traductorCalificacion.test.js.
+import { motivoDeRechazo } from './avisoRechazo';
 
 // El texto que ve el cliente. Sale de aquí y de ningún otro sitio.
 //
@@ -67,29 +76,13 @@ export const MOTIVOS = {
 };
 
 /**
- * Convierte el fallo de Firestore en algo que una persona entiende.
+ * Lo que se le dice al cliente cuando su calificación no entró.
  *
- * Se mira `e.code`, no el mensaje: el mensaje cambia entre versiones del SDK y
- * viene en inglés. El código es el contrato.
- *
- * Cualquier cosa que no se reconozca cae en 'otro' A PROPÓSITO: es mejor un
- * aviso genérico que ningún aviso, que es de donde venimos.
+ * La CLASE del fallo (permiso, sinRed, otro) la decide `motivoDeRechazo` de
+ * avisoRechazo.js; aquí solo se escoge el texto de esa clase. Lo que no se
+ * reconozca cae en 'otro' A PROPÓSITO: es mejor un aviso genérico que ningún
+ * aviso, que es de donde venimos.
  */
-export function motivoDeRechazo(e) {
-  const codigo = (e && e.code) ? String(e.code) : '';
-  if (codigo === 'permission-denied') return MOTIVOS.permiso;
-  if (codigo === 'unavailable' || codigo === 'deadline-exceeded') return MOTIVOS.sinRed;
-  return MOTIVOS.otro;
-}
-
-/**
- * Para la consola del que revisa. NO es la bandeja de la REGLA 9 —es solo un
- * rastro en el navegador— pero sin esto un fallo raro no deja NADA, y ya
- * sabemos cómo acaba eso.
- */
-export function apuntarRechazo(donde, e) {
-  const codigo = (e && e.code) ? e.code : '(sin código)';
-  const mensaje = (e && e.message) ? e.message : String(e);
-  // eslint-disable-next-line no-console
-  console.error('[calificación rechazada] ' + donde + ' · ' + codigo + ' · ' + mensaje);
+export function motivoDeCalificacion(e) {
+  return MOTIVOS[motivoDeRechazo(e, 'guardar tu calificación').clave] || MOTIVOS.otro;
 }
