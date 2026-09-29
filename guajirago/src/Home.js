@@ -17,6 +17,7 @@ import LlamadoAtencion from './LlamadoAtencion';
 import { ESTADOS_TERMINADOS, comoTermino } from './estadosViaje';
 // El marco de Riohacha vive en riohacha.js (SEGUNDA LEY): un solo sitio para la geografía.
 import { BOUNDS_RIOHACHA } from './riohacha';
+import { fotoDe } from './fotoUsuario';
 
 const ICONOS_FAVORITOS = ['🏠', '💼', '❤️', '⭐', '🏥', '🏫', '🛒', '🏖️', '⛪', '🏋️'];
 
@@ -184,7 +185,7 @@ function Home({ nombre, onCerrarSesion, onVolver, onCambiarNegocio }) {
         const user = auth.currentUser;
         if (!user) return;
         const snap = await getDoc(doc(db, 'usuarios', user.uid));
-        if (snap.exists()) setFotoUsuario(snap.data().fotoConductor || snap.data().foto || null);
+        if (snap.exists()) setFotoUsuario(fotoDe(snap.data()));
       } catch (e) {}
     };
     cargar();

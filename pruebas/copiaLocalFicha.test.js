@@ -15,6 +15,7 @@ const assert = require('node:assert');
 const { leer, soloCodigo, cuerpoDeLaFuncion, cargarDeLaApp } = require('./cargar.cjs');
 
 const { telefonoDe } = cargarDeLaApp('guajirago/src/telefonoUsuario.js');
+const { fotoDe } = cargarDeLaApp('guajirago/src/fotoUsuario.js'); // G43: datosDeLaFicha saca la foto con la regla única
 
 /** El efecto de arranque de App y la traducción de la ficha, sacados del texto de App.js (el de hoy, o el que se dé). */
 function piezasDeApp(fuente) {
@@ -40,6 +41,7 @@ async function arrancar({ copia, ficha, sesion = true, sinRed = false, fuente })
     cargarLocal: () => (guardada ? JSON.parse(JSON.stringify(guardada)) : null),
     guardarLocal: (d) => { guardada = JSON.parse(JSON.stringify(d)); },
     telefonoDe,
+    fotoDe,
     auth: {},
     db: {},
     doc: (_db, col, id) => col + '/' + id,

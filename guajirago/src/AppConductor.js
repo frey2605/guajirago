@@ -30,6 +30,7 @@ import AyudaSoporte from './AyudaSoporte';
 import Configuracion from './Configuracion';
 import Promociones from './Promociones';
 import MenuLateral from './MenuLateral';
+import { fotoDe } from './fotoUsuario';
 import Logo from './Logo';
 // Pedirle el GPS al teléfono, con sus tiempos en un solo sitio (G28).
 import { pedirGps, seguirGps } from './pedirGps';
@@ -724,7 +725,7 @@ const cargarSaldo = useCallback(async (uid) => {
       const snap = await getDoc(doc(db, 'usuarios', id));
       if (snap.exists()) {
         setSaldoCreditos(snap.data().creditos || 0);
-        setFotoConductor(snap.data().fotoConductor || null);
+        setFotoConductor(fotoDe(snap.data()));
         setColorConductor(snap.data().color || '');
       } else {
         setSaldoCreditos(0);

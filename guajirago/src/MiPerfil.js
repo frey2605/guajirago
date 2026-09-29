@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { auth, db, storage } from './firebase';
 import Logo from './Logo';
 import { telefonoDe } from './telefonoUsuario';
+import { fotoDe } from './fotoUsuario';
 import { telefonoSirve, celularDiezCifras } from './telefonoValido';
 import { motivoDeRechazo, apuntarRechazo } from './avisoRechazo';
 import { doc, getDoc, setDoc, collection, query, where, getDocs } from 'firebase/firestore';
@@ -35,7 +36,7 @@ function MiPerfil({ onVolver }) {
           setDatos(d);
           setNombre(d.nombre || '');
           setTelefono(telefonoDe(d));
-          setFoto(d.fotoConductor || d.foto || null);
+          setFoto(fotoDe(d));
         }
 
         // Cargar calificaciones recibidas

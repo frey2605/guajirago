@@ -305,6 +305,15 @@ const RECORRIDOS = [
     // SACA del archivo y las EJECUTA pruebas/telefonoUnico.test.js; por eso esos archivos no se nombran aquí.
     vigila: ['guajirago/src/MiPerfil.js', 'guajirago/src/telefonoValido.js'],
   },
+  {
+    nombre: 'foto-pasajero-panel',
+    que: 'la ficha de 🙋 Pasajeros del panel enseña la foto guardada en fotoConductor (G43; pone una foto en la ficha de PRUEBAS de pasajero@ y la devuelve)',
+    archivo: 'foto-pasajero-panel.cjs',
+    // Las otras pantallas de G43 (App.js, Home.js, MiPerfil.js y AppConductor.js en la app, y Conductores.js en el
+    // panel) ya enseñaban fotoConductor antes y la siguen enseñando: las SACA del archivo y las EJECUTA
+    // pruebas/fotoFicha.test.js; por eso esos archivos no se nombran aquí.
+    vigila: ['guajirago-admin/src/Pasajeros.js', 'guajirago-admin/src/fotoUsuario.js', 'guajirago/src/fotoUsuario.js'],
+  },
 ];
 
 // Los archivos de pantalla: los que, si cambian, el robot debería poder probar. Todo lo que esté en

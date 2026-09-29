@@ -29,6 +29,7 @@ import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { DOCUMENTOS_CONDUCTOR, documentoQueFalta, nombreDelDocumento, iconoDelDocumento, iconoDelVehiculo } from './documentosConductor';
 import { telefonoDe } from './telefonoUsuario';
+import { fotoDe } from './fotoUsuario';
 import { telefonoSirve, celularDiezCifras } from './telefonoValido';
 import { cop } from './moneda';
 import { leerConfig, modulosDe, mensajeDeMantenimiento } from './configApp';
@@ -71,7 +72,7 @@ function cargarLocal() {
 function datosDeLaFicha(f) {
   return {
     nombre: f.nombre || '', telefonoActual: telefonoDe(f), placa: f.placa || '', vehiculo: f.vehiculo || '',
-    tipoVehiculo: f.tipoVehiculo || '', foto: f.fotoConductor || f.foto || null,
+    tipoVehiculo: f.tipoVehiculo || '', foto: fotoDe(f),
   };
 }
 
