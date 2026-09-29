@@ -43,6 +43,8 @@ import { direccionDePunto, puntoDeDireccion, geocodificadorDe } from './direccio
 import MapaConRuta from './MapaConRuta';
 // El número del contacto de emergencia: la MISMA regla que el registro y Seguridad (G10).
 import { numeroWhatsApp, telefonoSirve, celularDiezCifras, cifrasMientrasEscribe } from './telefonoValido';
+// La tarjeta roja «Llamar al 123» y el número salen de UNA pieza, la misma de Ajustes › Seguridad (G70).
+import { TarjetaLlamar123 } from './LlamarAl123';
 
 /**
  * EL AVISO DE «NO SÉ DÓNDE RECOGERTE» — ESCRITO UNA SOLA VEZ.
@@ -848,9 +850,6 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
       setTextoChat('');
     }, 'mensaje', 'Mensaje enviado.', 'enviar el mensaje');
   };
-  const llamarEmergencia = () => {
-    window.location.href = 'tel:123';
-  };
 
   // 🔴 SIN EL CANDADO DE LA LEY DEL BOTÓN, a propósito (G05, 27-sep-2026): el robot midió en el navegador que
   // `candado.js` revienta al primer toque («Illegal invocation») y se queda cerrado; colgado de él, el 🚨 serviría
@@ -1234,13 +1233,7 @@ const PanelEmergencia = () => (
           <p style={{ color: '#FF4444', fontSize: '14px', margin: '0 0 4px', letterSpacing: '2px', fontWeight: 'bold', textAlign: 'center' }}>🚨 EMERGENCIA</p>
           <p style={{ color: '#6B7280', fontSize: '13px', margin: '0 0 24px', textAlign: 'center', lineHeight: '1.4' }}>¿Qué necesitas hacer?</p>
 
-          <div onClick={() => { llamarEmergencia(); }} style={{ background: 'linear-gradient(135deg, #FF4444, #CC0000)', borderRadius: '18px', padding: '20px', marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '14px', cursor: 'pointer' }}>
-            <span style={{ fontSize: '34px' }}>🚨</span>
-            <div>
-              <p style={{ color: '#FFFFFF', fontWeight: '900', fontSize: '17px', margin: '0' }}>Llamar al 123</p>
-              <p style={{ color: 'rgba(255,255,255,0.8)', fontSize: '12px', margin: '3px 0 0' }}>Línea de emergencias</p>
-            </div>
-          </div>
+          <TarjetaLlamar123 donde="viaje" />
 
           <div onClick={async () => { await compartirSeguridad(); setMostrarEmergencia(false); }} style={{ background: '#FFFFFF', borderRadius: '18px', padding: '20px', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '14px', cursor: 'pointer', border: '1px solid #25D366' }}>
             <span style={{ fontSize: '34px' }}>📤</span>

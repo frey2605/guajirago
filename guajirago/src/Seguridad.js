@@ -16,6 +16,8 @@ import { ubicacionDeAhora } from './ubicacionDeAhora';
 // ¿El número del contacto sirve? La MISMA regla que el registro (G10): telefonoValido.js.
 import { telefonoSirve, numeroWhatsApp, celularDiezCifras } from './telefonoValido';
 import { motivoDeRechazo, apuntarRechazo } from './avisoRechazo';
+// La tarjeta roja «Llamar al 123» y el número salen de UNA pieza, la misma del 🚨 del viaje (G70).
+import { TarjetaLlamar123 } from './LlamarAl123';
 
 function Seguridad({ onVolver }) {
   const [contactoNombre, setContactoNombre] = useState('');
@@ -141,10 +143,6 @@ function Seguridad({ onVolver }) {
     if (!ventana) setError('Tu teléfono no dejó abrir WhatsApp. Vuelve a tocar el botón: el mensaje sale de una vez.');
   };
 
-  const llamarEmergencia = () => {
-    window.location.href = 'tel:123';
-  };
-
   return (
     <div style={{ backgroundColor: '#FFFFFF', minHeight: '100vh', fontFamily: 'Arial, sans-serif' }}>
       <div style={{ background: 'linear-gradient(135deg, #FFFFFF, #ECECEF)', padding: '24px 20px', position: 'relative', display: 'flex', alignItems: 'center' }}>
@@ -158,13 +156,7 @@ function Seguridad({ onVolver }) {
       <div style={{ padding: '24px 20px' }}>
 
         {/* Botón emergencia */}
-        <div onClick={llamarEmergencia} style={{ background: 'linear-gradient(135deg, #FF4444, #CC0000)', borderRadius: '20px', padding: '24px', marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '16px', cursor: 'pointer', border: '2px solid #FF4444' }}>
-          <span style={{ fontSize: '40px' }}>🚨</span>
-          <div>
-            <p style={{ color: '#FFFFFF', fontWeight: '900', fontSize: '18px', margin: '0' }}>Llamar al 123</p>
-            <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '13px', margin: '4px 0 0' }}>Línea de emergencias Colombia</p>
-          </div>
-        </div>
+        <TarjetaLlamar123 donde="ajustes" />
 
         {/* Contacto de confianza */}
         <p style={{ color: '#6B7280', fontSize: '11px', letterSpacing: '3px', margin: '0 0 12px' }}>CONTACTO DE CONFIANZA</p>
