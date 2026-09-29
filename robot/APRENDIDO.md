@@ -584,6 +584,14 @@ la placa de `conductores/{uid}` (la escribe su GPS con la misma placa que va en 
 - Con el panel VIEJO publicado en pruebas: «VALOR RECARGADO» $ 50.000 contra $ 90.000 de la cuenta única → rojo.
   Con el nuevo, $ 90.000 → verde.
 
+### que-paso-panel · Viajes y Mensajería dicen lo mismo de cada final (G56, 29-sep-2026)
+- El pasajero de prueba SÍ puede escribir un mandado en `cancelado_conductor` (con `canceladoPor` y `razonCancelacion`)
+  y otro en `expirado` con `motivoExpiracion`: las reglas lo dejan porque el viaje es suyo.
+- 📦 Mensajería → Buscar filtra al escribir (sin botón); el campo se encuentra por el principio del texto de ayuda
+  (`placeholder^="Quien envía"`). 🛣️ Viajes → Buscar sí necesita «🔍 Buscar», y el detalle se abre tocando la tarjeta.
+- Con el panel VIEJO (862a143) publicado en pruebas: Mensajería dice «Lo soltó el repartidor», Viajes otra cosa, y ninguna
+  enseña el porqué del sistema → 4 fallos, rojo. Con el nuevo → verde.
+
 ## Lo que el robot dejó creado en pruebas
 
 - 27-sep-2026: «Robot Taxi De Prueba» (robot.taxi.1790508222079@gg.test) y
@@ -631,3 +639,6 @@ la placa de `conductores/{uid}` (la escribe su GPS con la misma placa que va en 
 - 29-sep-2026: dos códigos de recarga FIJOS de `total-recargas.cjs`, `codigos/ROBOT-G54-COBRADO` ($ 50.000, usado) y
   `codigos/ROBOT-G54-COBRADO-ANULADO` ($ 40.000, usado y anulado), sin conductor. Ya cobrados: nadie los puede canjear y
   no tocaron ningún saldo. Cada corrida los reusa. Suben el «💰 Recargas» del tablero de pruebas del 29-sep a $ 90.000.
+- 29-sep-2026 en adelante: dos mandados FIJOS de pasajero@gg.test, `viajes/robot-que-paso-g56-soltado`
+  (`cancelado_conductor`) y `viajes/robot-que-paso-g56-cerrado` (`expirado`, con `motivoExpiracion`), de
+  `que-paso-panel.cjs`. Cada corrida los reescribe; ya terminados, nadie los toma.

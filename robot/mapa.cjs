@@ -173,6 +173,13 @@ const RECORRIDOS = [
     vigila: ['guajirago-admin/src/Codigos.js', 'guajirago-admin/src/recargas.js'],
   },
   {
+    nombre: 'que-paso-panel',
+    que: '📦 Mensajería y 🛣️ Viajes del panel dicen la MISMA palabra de cada final de un mandado («Lo canceló el repartidor», «Quedó sin terminar») y enseñan su porqué, también el del sistema (G56; deja dos mandados fijos en pruebas)',
+    archivo: 'que-paso-panel.cjs',
+    // Las tarjetas del historial de la app (AppConductor, Home, MisViajes) las EJECUTA pruebas/quePaso.test.js.
+    vigila: ['guajirago-admin/src/Mensajeria.js', 'guajirago-admin/src/Viajes.js', 'guajirago-admin/src/estadosViaje.js'],
+  },
+  {
     nombre: 'placa-fresca',
     que: 'el admin corrige la placa del taxista en su ficha y, con la copia del teléfono puesta, la app enseña y manda la placa nueva (mira la base de pruebas) (G09)',
     archivo: 'placa-fresca.cjs',
