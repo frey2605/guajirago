@@ -99,7 +99,8 @@ describe('G10 · los formularios no guardan un contacto que no sirve', () => {
       const escrito = {};
       await guardar(ambitoSeguridad(bueno, escrito));
       assert.ok(escrito.guardado, 'Seguridad no guardó «' + bueno + '»: ' + escrito.error);
-      assert.strictEqual(escrito.guardado.contactoConfianzaNumero, bueno.trim());
+      // G42: se guarda en UN solo formato, las 10 cifras limpias (antes, tal cual se escribió).
+      assert.strictEqual(escrito.guardado.contactoConfianzaNumero, '3001234567');
     }
   });
 

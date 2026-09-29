@@ -18,7 +18,7 @@ const { describe, it } = require('node:test');
 const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
-const { leer, cuerpoDeLaFuncion } = require('./cargar.cjs');
+const { leer, cuerpoDeLaFuncion, cargarDeLaApp } = require('./cargar.cjs');
 
 const RAIZ = path.resolve(__dirname, '..');
 const PIEZA = require('../guajirago/functions/descuentoPendiente.cjs');
@@ -149,6 +149,8 @@ describe('G18 · el registro (Login.js) ya no fabrica el descuento: se lo pide a
       diaNac: '1', mesNac: '2', anioNac: '1990', password: 'secreta1', passwordConfirm: 'secreta1',
       contactoNombre: 'Mamá', contactoNumero: '3007654321', aceptaTerminos: true,
       telefonoSirve: () => true,
+      // G42: el registro limpia el celular con la regla única (telefonoValido.js); se le da la de verdad.
+      celularDiezCifras: cargarDeLaApp('guajirago/src/telefonoValido.js').celularDiezCifras,
       setError: (t) => { r.error = t; }, setEnviando: () => {},
       auth: {}, db: { base: true },
       createUserWithEmailAndPassword: async () => ({ user: { uid: 'ana1' } }),

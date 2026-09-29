@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { auth, db, storage } from './firebase';
 // El formateador de pesos vive en moneda.js: un solo sitio (SEGUNDA LEY).
 import { cop } from './moneda';
+import { telefonoSirve, celularDiezCifras, cifrasMientrasEscribe } from './telefonoValido';
 // Y el filtro anti-datos de los chats, en filtroChat.js — amarrado al panel.
 import { contieneInfoSensible } from './filtroChat';
 // REGLA 9 — qué se le dice al cliente cuando una calificación no entra. Sale de
@@ -311,8 +312,8 @@ function Restaurantes({ nombre, onVolver, foto, onCerrarSesion, onIrPerfil, onIr
 
   // ---------- Enviar pedido ----------
   const enviarPedido = async () => {
-    const tel = telefono.replace(/\D/g, '');
-    if (carrito.length === 0 || !direccion.trim() || tel.length !== 10) return;
+    const tel = celularDiezCifras(telefono); // G42: la regla única; '' si no sirve
+    if (carrito.length === 0 || !direccion.trim() || !tel) return;
     if (!metodoPago) { setAvisoPago('Escoge cómo vas a pagar tu pedido para continuar.'); return; }
     setAvisoPago('');
     // Una sola vez aunque se toque dos: un pedido doble es plata doble. Si falla, lo dice el candado en una
@@ -735,7 +736,7 @@ function Restaurantes({ nombre, onVolver, foto, onCerrarSesion, onIrPerfil, onIr
     const minimoPedido = restauranteActivo.pedidoMinimo || 0;
     const totalConDom = totalCarrito + costoDom;
     const bajoMinimo = carrito.length > 0 && totalCarrito < minimoPedido;
-    const telValido = telefono.replace(/\D/g, '').length === 10;
+    const telValido = telefonoSirve(telefono);
     const totalCalif = califsRestaurante.length;
     const promedioCalif = totalCalif ? (califsRestaurante.reduce((s, c) => s + (c.estrellas || 0), 0) / totalCalif) : 0;
     const abiertoAhora = restauranteAbiertoAhora(restauranteActivo);
@@ -928,7 +929,7 @@ function Restaurantes({ nombre, onVolver, foto, onCerrarSesion, onIrPerfil, onIr
             >{ubicando ? '⏳ Buscando tu ubicación...' : '📍 Usar mi ubicación'}</button>
             <input
               value={telefono}
-              onChange={(e) => setTelefono(e.target.value.replace(/\D/g, '').slice(0, 10))}
+              onChange={(e) => setTelefono(cifrasMientrasEscribe(e.target.value))}
               placeholder="📞 Tu teléfono (obligatorio · 10 dígitos)"
               type="tel"
               inputMode="numeric"

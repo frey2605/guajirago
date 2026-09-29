@@ -14,7 +14,7 @@ import { prepararTokenDeAvisos } from './Notificaciones';
 // que usa Restaurantes.js. Ahí vive también el interruptor `visibleEnEscaparate`.
 import { lasDeTurismo } from './escaparate';
 // El enlace de WhatsApp de la agencia sale de la pieza única (G41): sin número bueno, no hay enlace.
-import { enlaceWhatsApp } from './telefonoValido';
+import { enlaceWhatsApp, telefonoSirve, celularDiezCifras, cifrasMientrasEscribe } from './telefonoValido';
 
 const AZUL = '#1C8EF9';
 const NARANJA = '#FF7A2F';
@@ -79,7 +79,7 @@ function Turismo({ nombre, foto, onVolver, onCerrarSesion, onIrPerfil, onIrGanan
   const enviarReserva = async () => {
     if (!fecha) { setAviso('Escoge la fecha'); return; }
     if (!cliente.trim()) { setAviso('Escribe tu nombre'); return; }
-    if (telefono.replace(/\D/g, '').length !== 10) { setAviso('El teléfono debe tener 10 números'); return; }
+    if (!telefonoSirve(telefono)) { setAviso('El teléfono debe tener 10 números'); return; } // G42: la regla única
     setEnviando(true);
     try {
       // G34: la reserva ya no espera a que el cliente conteste el cartel de permiso; el token se le pega cuando llegue.
@@ -96,7 +96,7 @@ function Turismo({ nombre, foto, onVolver, onCerrarSesion, onIrPerfil, onIrGanan
         nombreTour: tourReserva.nombre,
         imagen: tourReserva.imagen || '',
         cliente: cliente.trim(),
-        telefono: '+57' + telefono.replace(/\D/g, '').slice(-10),
+        telefono: celularDiezCifras(telefono), // G42: 10 cifras limpias (antes «+57» + las 10 últimas)
         personas: parseInt(personas || '1', 10) || 1,
         fecha,
         total: totalReserva(),
@@ -128,7 +128,7 @@ function Turismo({ nombre, foto, onVolver, onCerrarSesion, onIrPerfil, onIrGanan
     setMisReservas(out); setCargandoMis(false);
   };
 
-  const soloDigitos = (v) => v.replace(/[^0-9]/g, '').slice(0, 10);
+  const soloDigitos = cifrasMientrasEscribe; // G42: la máscara única del teléfono (telefonoValido.js)
   const estadoTxt = (e) => ({ nueva: '⏳ Esperando confirmación', confirmada: '✅ Confirmada', realizada: '🏁 Realizada', cancelada: '❌ Cancelada' }[e] || e);
   const estadoColor = (e) => ({ nueva: NARANJA, confirmada: VERDE, realizada: AZUL, cancelada: '#E33' }[e] || '#666');
   const fechaTxt = (v) => fechaDeCalendario(v, { weekday: 'long', day: 'numeric', month: 'long' });

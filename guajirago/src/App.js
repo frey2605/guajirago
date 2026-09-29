@@ -29,6 +29,7 @@ import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { DOCUMENTOS_CONDUCTOR, documentoQueFalta, nombreDelDocumento, iconoDelDocumento, iconoDelVehiculo } from './documentosConductor';
 import { telefonoDe } from './telefonoUsuario';
+import { telefonoSirve, celularDiezCifras } from './telefonoValido';
 import { cop } from './moneda';
 import { leerConfig, modulosDe, mensajeDeMantenimiento } from './configApp';
 const MARCAS_VEHICULO = [
@@ -226,6 +227,9 @@ function PantallaDatosConductor({ nombre, foto, celular, onGuardar, onVolver, on
   const guardar = async () => {
     if (!tipoVehiculo) { setError('Falta escoger el tipo de vehículo'); setCampoError('tipoVehiculo'); return; }
     if (!telefono) { setError('Falta el número de teléfono'); setCampoError('telefono'); return; }
+    // G42: la regla única del teléfono (antes bastaba con que no estuviera vacío), y se guarda en 10 cifras limpias.
+    if (!telefonoSirve(telefono)) { setError('El teléfono debe tener 10 cifras, por ejemplo 300 123 4567'); setCampoError('telefono'); return; }
+    const telefonoLimpio = celularDiezCifras(telefono);
     if (!placa) { setError('Falta la placa del vehículo'); setCampoError('placa'); return; }
     if (placa.trim().length !== 6) { setError('La placa debe tener exactamente 6 caracteres'); setCampoError('placa'); return; }
     if (!marca) { setError('Falta escoger la marca'); setCampoError('marca'); return; }
@@ -262,7 +266,7 @@ function PantallaDatosConductor({ nombre, foto, celular, onGuardar, onVolver, on
         color,
         documento,
         vehiculo,
-        telefono,
+        telefono: telefonoLimpio,
         fotoConductor: urlFotoConductor,
         ...urlsDocs,
       }, { merge: true });
@@ -282,7 +286,7 @@ function PantallaDatosConductor({ nombre, foto, celular, onGuardar, onVolver, on
         if (dados > 0) creditosIniciales = dados;
       } catch (e) {}
 
-      onGuardar(placa.toUpperCase(), vehiculo, telefono, tipoVehiculo, creditosIniciales);
+      onGuardar(placa.toUpperCase(), vehiculo, telefonoLimpio, tipoVehiculo, creditosIniciales);
     } catch (e) {
       // G40: el motivo de verdad (motivoDeRechazo), no «Revisa tu conexión» sea cual sea el fallo.
       apuntarRechazo('App.js (datos del conductor)', e);

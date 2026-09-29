@@ -296,6 +296,15 @@ const RECORRIDOS = [
     // (que nadie llama); por eso esos archivos no se nombran aquí.
     vigila: ['guajirago-admin/src/Restaurantes.js', 'guajirago-admin/src/Turismo.js', 'guajirago-admin/src/telefonoValido.js'],
   },
+  {
+    nombre: 'telefono-unico',
+    que: 'Mi perfil no guarda un teléfono que no sirve («abc») y dice que debe tener 10 cifras (G42; no escribe nada)',
+    archivo: 'telefono-unico.cjs',
+    // Los otros formularios de G42 (registro, alta del conductor, pedido, reserva, mandado, registro y perfil de
+    // aliados, editar conductor en el panel) guardan de verdad o piden una cuenta nueva: sus funciones de guardar las
+    // SACA del archivo y las EJECUTA pruebas/telefonoUnico.test.js; por eso esos archivos no se nombran aquí.
+    vigila: ['guajirago/src/MiPerfil.js', 'guajirago/src/telefonoValido.js'],
+  },
 ];
 
 // Los archivos de pantalla: los que, si cambian, el robot debería poder probar. Todo lo que esté en

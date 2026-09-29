@@ -37,7 +37,7 @@ import { direccionDePunto } from './direccionDePunto';
 // El mapa con ruta es UNO para el conductor y el pasajero (G29).
 import MapaConRuta from './MapaConRuta';
 // El número del contacto de emergencia: la MISMA regla que el registro y Seguridad (G10).
-import { numeroWhatsApp } from './telefonoValido';
+import { numeroWhatsApp, telefonoSirve, celularDiezCifras, cifrasMientrasEscribe } from './telefonoValido';
 
 /**
  * EL AVISO DE «NO SÉ DÓNDE RECOGERTE» — ESCRITO UNA SOLA VEZ.
@@ -1060,7 +1060,7 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
       if (!destino) faltan.push('Dónde se entrega');
       if (!queEnvia.trim()) faltan.push('Qué vas a enviar');
       if (!recibeNombre.trim()) faltan.push('Nombre de quien recibe');
-      if (recibeTel.trim().length !== 10) faltan.push('Teléfono de quien recibe (10 números)');
+      if (!telefonoSirve(recibeTel)) faltan.push('Teléfono de quien recibe (10 números)');
       if (!notaEnvio.trim()) faltan.push('Nota para el domiciliario');
       if (faltan.length > 0) { setAviso({ icono: '📋', titulo: 'Te faltan datos', texto: 'Completa esto para enviar tu mandado: ' + faltan.join(', ') + '.' }); return; }
     } else {
@@ -1172,7 +1172,7 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
         tipo, origen, destino, tarifa,
         datosDescuento,
         radioBusqueda: configApp.radioBusquedaInicial,
-        extras: { mensajeria: { queEnvia: queEnvia.trim(), recibeNombre: recibeNombre.trim(), recibeTel: recibeTel.trim(), nota: notaEnvio.trim() } },
+        extras: { mensajeria: { queEnvia: queEnvia.trim(), recibeNombre: recibeNombre.trim(), recibeTel: celularDiezCifras(recibeTel), nota: notaEnvio.trim() } },
       }));
       setViajeId(docRef.id);
       // El código, al cajón privado del viaje: ahí solo lo ve ella.
@@ -1710,7 +1710,7 @@ const PanelEmergencia = () => (
           </div>
           <div style={{ background: '#FFFFFF', border: '1.5px solid #ECECEF', borderRadius: '14px', padding: '10px 14px', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '10px' }}>
             <span style={{ fontSize: '18px' }}>📞</span>
-            <input value={recibeTel} onChange={e => setRecibeTel(e.target.value.replace(/\D/g, '').slice(0, 10))} placeholder="Teléfono (10 números)" type="tel" inputMode="numeric" maxLength={10} style={{ background: 'none', border: 'none', outline: 'none', color: '#1A1A1E', fontSize: '16px', width: '100%' }} />
+            <input value={recibeTel} onChange={e => setRecibeTel(cifrasMientrasEscribe(e.target.value))} placeholder="Teléfono (10 números)" type="tel" inputMode="numeric" maxLength={10} style={{ background: 'none', border: 'none', outline: 'none', color: '#1A1A1E', fontSize: '16px', width: '100%' }} />
           </div>
           <div style={{ background: '#FFFFFF', border: '1.5px solid #ECECEF', borderRadius: '14px', padding: '10px 14px', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '10px' }}>
             <span style={{ fontSize: '18px' }}>📝</span>

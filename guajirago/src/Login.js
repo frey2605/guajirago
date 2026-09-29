@@ -10,7 +10,7 @@ import PoliticaPrivacidad from './PoliticaPrivacidad';
 import Logo from './Logo';
 import AvisoModal from './AvisoModal';
 import { telefonoDe } from './telefonoUsuario';
-import { telefonoSirve } from './telefonoValido';
+import { telefonoSirve, celularDiezCifras } from './telefonoValido';
 import { cop } from './moneda';
 
 // Identificador único de este navegador/dispositivo (persiste en localStorage)
@@ -99,6 +99,10 @@ function Login({ onEntrar }) {
     if (!contactoNumero.trim()) { setError('Escribe el número de tu contacto de emergencia'); return; }
     // ¿Sirve? La MISMA regla que Seguridad al cambiarlo (G10): telefonoValido.js.
     if (!telefonoSirve(contactoNumero)) { setError('El número del contacto de emergencia debe tener 10 dígitos'); return; }
+    // G42: el celular propio también pasa por la regla única, y se guarda en 10 cifras limpias. Antes se guardaba
+    // tal cual se escribiera («1», «300 123 4567»…) y el servidor lo comparaba letra por letra.
+    const celularLimpio = celularDiezCifras(celular);
+    if (!celularLimpio) { setError('Tu celular debe tener 10 cifras, por ejemplo 300 123 4567'); return; }
     if (email.trim().toLowerCase() !== emailConfirm.trim().toLowerCase()) { setError('Los correos no coinciden'); return; }
     if (password !== passwordConfirm) { setError('Las contraseñas no coinciden'); return; }
     if (password.length < 6) { setError('La contraseña debe tener mínimo 6 caracteres'); return; }
@@ -112,7 +116,6 @@ function Login({ onEntrar }) {
       // lista tenía que estar abierta a cualquiera: ahí quedaban a la vista los
       // teléfonos, las fechas de nacimiento y las fotos de cédula de todo el mundo.
       // Ahora lo pregunta el servidor y contesta solo sí o no (functions: celularDisponible).
-      const celularLimpio = celular.trim();
       const preguntar = httpsCallable(getFunctions(), 'celularDisponible');
       const respuesta = await preguntar({ celular: celularLimpio });
       if (!(respuesta && respuesta.data && respuesta.data.disponible)) {
@@ -131,7 +134,7 @@ function Login({ onEntrar }) {
 
       await setDoc(doc(db, 'usuarios', cuentaCreada.user.uid), {
         nombre, email: email.trim().toLowerCase(), celular: celularLimpio, fechaNacimiento,
-        contactoConfianzaNombre: contactoNombre.trim(), contactoConfianzaNumero: contactoNumero.trim(),
+        contactoConfianzaNombre: contactoNombre.trim(), contactoConfianzaNumero: celularDiezCifras(contactoNumero),
         tipo: '', placa: '', vehiculo: '', fechaRegistro: new Date().toISOString(),
         ipRegistro,
       });
@@ -147,9 +150,9 @@ function Login({ onEntrar }) {
       } catch (e) {}
 
       if (montoBienvenida > 0) {
-        setCelebracionBienvenida({ monto: montoBienvenida, datosEntrar: ['', nombre, celular, '', ''] });
+        setCelebracionBienvenida({ monto: montoBienvenida, datosEntrar: ['', nombre, celularLimpio, '', ''] });
       } else {
-        onEntrar('', nombre, celular, '', '');
+        onEntrar('', nombre, celularLimpio, '', '');
       }
     } catch (err) {
       if (err.code === 'auth/email-already-in-use') setError('Este correo ya está registrado');

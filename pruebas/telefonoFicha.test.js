@@ -73,8 +73,10 @@ const LEEN_TELEFONO = {
 // Dónde se nombra `celular` hoy. Login: el registro (setDoc de la ficha), la pregunta a
 // celularDisponible y el campo del formulario. App.js: la copia LOCAL del teléfono
 // (guardarLocal) y la prop del alta del conductor. Funciones: el dato de celularDisponible.
+// G42 (28-sep-2026): Login baja de 5 a 4 — el celular se limpia UNA vez (`celularDiezCifras(celular)`) y
+// lo que se le entrega a la app al entrar es ese número limpio (`celularLimpio`), ya no el texto crudo.
 const NOMBRAN_CELULAR = {
-  'guajirago/src/Login.js': 5,
+  'guajirago/src/Login.js': 4,
   'guajirago/src/App.js': 6,
   'guajirago/functions/index.js': 1,
 };

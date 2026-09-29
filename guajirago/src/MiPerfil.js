@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { auth, db, storage } from './firebase';
 import Logo from './Logo';
 import { telefonoDe } from './telefonoUsuario';
+import { telefonoSirve, celularDiezCifras } from './telefonoValido';
 import { motivoDeRechazo, apuntarRechazo } from './avisoRechazo';
 import { doc, getDoc, setDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
@@ -67,6 +68,8 @@ function MiPerfil({ onVolver }) {
   const guardar = async () => {
     if (!nombre.trim()) { setError('El nombre no puede estar vacío'); return; }
     if (!telefono.trim()) { setError('El teléfono no puede estar vacío'); return; }
+    // G42: la regla única del teléfono (antes bastaba con que no estuviera vacío: «1» o «abc» se guardaban).
+    if (!telefonoSirve(telefono)) { setError('El teléfono debe tener 10 cifras, por ejemplo 300 123 4567'); return; }
     setGuardando(true); setError(''); setMensaje('');
     try {
       const user = auth.currentUser;
@@ -81,7 +84,7 @@ function MiPerfil({ onVolver }) {
 
       const actualizacion = {
         nombre: nombre.trim(),
-        telefono: telefono.trim(),
+        telefono: celularDiezCifras(telefono), // G42: se guarda en 10 cifras limpias
       };
       if (urlFoto) actualizacion.fotoConductor = urlFoto;
 

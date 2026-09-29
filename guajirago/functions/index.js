@@ -51,6 +51,8 @@ const { CREDITO_BIENVENIDA_PASAJERO, PROMO_BIENVENIDA, armarDescuentoPendiente, 
 const { sobreDelAviso, sobreSencillo, mandarAviso } = require('./avisos.cjs');
 // G33: qué aviso le toca al cliente cuando su pedido cambia, por PASO DEL CLIENTE (copia atada de la app).
 const { avisoDelCambio } = require('./estadosPedido.cjs');
+// G42: ¿es el mismo celular? Por las 10 cifras, con la regla de la app (copia atada por pruebas/telefonoUnico.test.js).
+const { celularDiezCifras, formasGuardadas } = require('./telefonoValido.cjs');
 
 // Distancia en km entre dos coordenadas (Haversine)
 function distanciaKm(lat1, lng1, lat2, lng2) {
@@ -503,13 +505,19 @@ exports.verificarCodigoViaje = onCall(async (request) => {
 // Ahora la pregunta se hace aquí. El servidor mira la lista y devuelve UN SÍ O UN
 // NO. Nunca devuelve de quién es el celular, ni ningún otro dato: quien pregunta
 // solo se entera de lo que ya sabía — el número que él mismo escribió.
+//
+// G42 (28-sep-2026): se compara por las 10 CIFRAS, no letra por letra. Antes «300 123 4567» y «3001234567» eran
+// «distintos» y el mismo número se podía registrar dos veces. Se busca el número en todas las formas en que una
+// ficha vieja lo pudo guardar (telefonoValido.cjs: formasGuardadas); las nuevas ya lo guardan en 10 cifras limpias.
 exports.celularDisponible = onCall(async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Hay que iniciar sesión");
   const celular = String((request.data || {}).celular || "").trim();
   if (!celular) throw new HttpsError("invalid-argument", "Falta el celular");
+  const diez = celularDiezCifras(celular);
+  if (!diez) throw new HttpsError("invalid-argument", "El celular debe tener 10 cifras");
 
   const snap = await admin.firestore()
-    .collection("usuarios").where("celular", "==", celular).limit(2).get();
+    .collection("usuarios").where("celular", "in", formasGuardadas(diez)).limit(2).get();
 
   // Su propia ficha no cuenta: si vuelve a intentarlo, no se bloquea a sí mismo.
   const deOtro = snap.docs.some((d) => d.id !== request.auth.uid);

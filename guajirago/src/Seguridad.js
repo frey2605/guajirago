@@ -14,7 +14,7 @@ import { armarMensajeDeEmergencia } from './mensajeEmergencia';
 // función que el 🚨 del mapa (G05, 27-sep-2026): lee el porqué en ubicacionDeAhora.js.
 import { ubicacionDeAhora } from './ubicacionDeAhora';
 // ¿El número del contacto sirve? La MISMA regla que el registro (G10): telefonoValido.js.
-import { telefonoSirve, numeroWhatsApp } from './telefonoValido';
+import { telefonoSirve, numeroWhatsApp, celularDiezCifras } from './telefonoValido';
 import { motivoDeRechazo, apuntarRechazo } from './avisoRechazo';
 
 function Seguridad({ onVolver }) {
@@ -61,7 +61,7 @@ function Seguridad({ onVolver }) {
       if (!user) { setError('Error de sesión'); setGuardando(false); return; }
       await setDoc(doc(db, 'usuarios', user.uid), {
         contactoConfianzaNombre: contactoNombre.trim(),
-        contactoConfianzaNumero: contactoNumero.trim(),
+        contactoConfianzaNumero: celularDiezCifras(contactoNumero), // G42: se guarda en 10 cifras limpias
       }, { merge: true });
       setHayCambios(false);
       setEditandoNombre(false);
