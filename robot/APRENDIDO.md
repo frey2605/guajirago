@@ -514,6 +514,16 @@ la placa de `conductores/{uid}` (la escribe su GPS con la misma placa que va en 
   (+ 4); el pasajero vuelve a Turismo y ve «Cerrada ahora». Al final se le devuelve el 0 y 0 (se lee para comprobarlo).
 - ✓ a la primera. Los dos 403 de la consola salen igual que en los demás recorridos.
 
+### pedir-ahora · el dueño y el panel dicen lo mismo que el cliente (G47, 29-sep-2026)
+- El restaurante de prueba (restaurante@gg.test, por la base) se pone de (hora de Colombia + 2) a (+ 4). En aliados,
+  `entrarComoRestaurante` deja al dueño en la bienvenida: la tarjeta tiene que decir «🔴 Cerrado ahora» y «Estás fuera
+  de tu horario: ahora no pueden pedirte», y NO «Los clientes pueden pedirte». En el panel (admin@gg.test) → 🍽️ (menú
+  de abajo, texto exacto del ícono) → la sección «Todos» ya viene abierta; el chip va en un `span` en los 8 nodos
+  `p`/`span` después de «Restaurante de Prueba» y dice «⚪ Fuera de horario».
+- Corrido ANTES de publicar (pruebas con el código viejo) salió ROJO: el dueño veía «Los clientes pueden pedirte» y el
+  panel «🟢 Abierto» fuera de horario. Después de publicar, verde a la primera. Al final se le devuelve el 0 y 0.
+- Los 403 de la consola salen igual que en los demás recorridos.
+
 ## Lo que el robot dejó creado en pruebas
 
 - 27-sep-2026: «Robot Taxi De Prueba» (robot.taxi.1790508222079@gg.test) y

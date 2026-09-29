@@ -328,6 +328,15 @@ const RECORRIDOS = [
     archivo: 'horario-agencia.cjs',
     vigila: ['guajirago/src/Turismo.js', 'guajirago/src/Restaurantes.js', 'guajirago/src/horarioNegocio.js'],
   },
+  {
+    nombre: 'pedir-ahora',
+    que: 'fuera de horario, la tarjeta del dueño en aliados dice «🔴 Cerrado ahora · Estás fuera de tu horario…» y el panel «⚪ Fuera de horario» (como el cliente); con 24 horas, «🟢 Abierto» en los dos (G47; cambia el horario del restaurante de PRUEBAS y lo devuelve)',
+    archivo: 'pedir-ahora.cjs',
+    // La regla entera (candado, escaparate, pausa, horario) la SACA de cada pantalla y la EJECUTA pruebas/pedirAhora.test.js.
+    vigila: ['guajirago-aliados/src/App.js', 'guajirago-aliados/src/horarioNegocio.js', 'guajirago-aliados/src/escaparate.js',
+      'guajirago-aliados/src/reglaPromocion.js', 'guajirago-admin/src/Restaurantes.js', 'guajirago-admin/src/horarioNegocio.js',
+      'guajirago-admin/src/escaparate.js'],
+  },
 ];
 
 // Los archivos de pantalla: los que, si cambian, el robot debería poder probar. Todo lo que esté en
