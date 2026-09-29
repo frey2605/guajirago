@@ -57,6 +57,8 @@ const { celularDiezCifras, formasGuardadas } = require('./telefonoValido.cjs');
 const { regaloDelConductorNuevo } = require('./regaloConductorNuevo.cjs');
 // G55: «buscando conductor» y «aceptado» salen de UNA pieza (atada a src/estadosViaje.js por pruebas/estadosAMano.test.js).
 const { ESTADOS_MERCADO, ESTADO_ACEPTADO, ESTADOS_EN_CURSO } = require('./estadosViaje.cjs');
+// G64: a qué EMPLEADOS del negocio les llega cada aviso (pedido, reserva, cobro) sale de UNA tabla.
+const { tokensDeLosEmpleados } = require('./quienRecibeElAviso.cjs');
 
 // Distancia en km entre dos coordenadas (Haversine)
 function distanciaKm(lat1, lng1, lat2, lng2) {
@@ -182,12 +184,7 @@ async function avisarDelPedidoNuevo(p) {
     const restSnap = await admin.firestore().collection(NEGOCIO_PRIVADO).doc(restauranteId).get();
     if (restSnap.exists && restSnap.data().fcmToken) tokens.push(restSnap.data().fcmToken);
 
-    const empSnap = await admin.firestore().collection("empleados").where("restauranteId", "==", restauranteId).get();
-    empSnap.forEach((doc) => {
-      const d = doc.data();
-      const r = d.roles || {};
-      if (d.fcmToken && d.activo !== false && (r.recepcionista || r.administrador)) tokens.push(d.fcmToken);
-    });
+    tokens.push(...(await tokensDeLosEmpleados(admin.firestore(), restauranteId, "pedidoNuevo")));
 
     if (tokens.length === 0) {
       console.log("Sin tokens para restaurante", restauranteId);
@@ -246,11 +243,7 @@ exports.notificarNuevaReserva = onDocumentCreated("reservasTurismo/{id}", async 
     const tokens = [];
     const agSnap = await admin.firestore().collection(NEGOCIO_PRIVADO).doc(agenciaId).get();
     if (agSnap.exists && agSnap.data().fcmToken) tokens.push(agSnap.data().fcmToken);
-    const empSnap = await admin.firestore().collection("empleados").where("restauranteId", "==", agenciaId).get();
-    empSnap.forEach((doc) => {
-      const d = doc.data();
-      if (d.fcmToken && d.activo !== false && (d.roles || {}).administrador) tokens.push(d.fcmToken);
-    });
+    tokens.push(...(await tokensDeLosEmpleados(admin.firestore(), agenciaId, "reservaNueva")));
     if (tokens.length === 0) return null;
     const totalTxt = r.total ? cop(Number(r.total)) : "";
     await mandarAviso(admin.messaging(), tokens,
@@ -1093,7 +1086,9 @@ async function avisarAlNegocio(negocioId, mensaje) {
     // Aliados es una app web: si el dueño nunca aceptó las notificaciones en su
     // navegador, no hay token. A ese cliente no se le puede avisar por aquí.
     if (!token) return { salio: false, porQue: "no tiene notificaciones activadas" };
-    const r = await mandarAviso(admin.messaging(), token, sobreSencillo(mensaje.titulo, mensaje.texto),
+    // G64: los empleados que reciben el cobro los dice la tabla (hoy, ninguno: es asunto del dueño).
+    const tokens = [token, ...(await tokensDeLosEmpleados(admin.firestore(), negocioId, "cobro"))];
+    const r = await mandarAviso(admin.messaging(), tokens, sobreSencillo(mensaje.titulo, mensaje.texto),
       "rutinaDeCobros");
     // OJO: esto NO lanza con un token caducado, devuelve `fallaron`. Si no se
     // mirara, se contaría como avisado un mensaje que no llegó a ninguna parte.

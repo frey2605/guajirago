@@ -16,100 +16,19 @@
 // ═══════════════════════════════════════════════════════════════════════════
 const { describe, it } = require('node:test');
 const assert = require('node:assert');
-const path = require('path');
-const Module = require('module');
-const { execSync } = require('child_process');
 const { leer } = require('./cargar.cjs');
 const { cop } = require('../guajirago/functions/moneda.cjs');
 const AVISOS = require('../guajirago/functions/avisos.cjs');
 const { sitiosQueMandan, archivosDeLaNube } = require('../scripts/medir-sobres-de-aviso.cjs');
 
-const RAIZ = path.resolve(__dirname, '..');
-const DIR = path.join(RAIZ, 'guajirago', 'functions');
 const REF = process.env.SOBRE_REF || '';
 
 // ── La nube de mentira ─────────────────────────────────────────────────────
-function baseDeMentira(datos) {
-  const snap = (col, id) => {
-    const d = (datos[col] || {})[id];
-    return { id, exists: !!d, data: () => d, updateTime: { toMillis: () => Date.now() - 60 * 1000 } };
-  };
-  const ref = (col, id) => ({ col, id, get: async () => snap(col, id) });
-  const consulta = (col, filtros) => ({
-    where: (campo, op, valor) => consulta(col, [...filtros, [campo, valor]]),
-    get: async () => {
-      const docs = Object.keys(datos[col] || {}).map((id) => snap(col, id))
-        .filter((s) => filtros.every(([c, v]) => s.data()[c] === v));
-      return { size: docs.length, docs, forEach: (fn) => docs.forEach(fn) };
-    },
-  });
-  return {
-    collection: (col) => ({ doc: (id) => ref(col, id), where: (c, o, v) => consulta(col, [[c, v]]) }),
-    getAll: async (...refs) => refs.map((r) => snap(r.col, r.id)),
-  };
-}
-
-/** Lo que Google recibiría, un mensaje por token (así llega a cada celular), y los tokens que «fallan». */
-function mensajeroDeMentira(fallan = {}) {
-  const recibidos = [];
-  const error = (codigo) => Object.assign(new Error('falló: ' + codigo), { code: codigo });
-  return {
-    recibidos,
-    async send(m) {
-      recibidos.push(m);
-      if (fallan[m.token]) throw error(fallan[m.token]);
-      return 'id';
-    },
-    async sendEachForMulticast({ tokens, ...resto }) {
-      const responses = tokens.map((token) => {
-        recibidos.push({ ...resto, token });
-        return fallan[token] ? { success: false, error: error(fallan[token]) } : { success: true, messageId: 'id' };
-      });
-      const failureCount = responses.filter((r) => !r.success).length;
-      return { responses, failureCount, successCount: responses.length - failureCount };
-    },
-  };
-}
-
-/** Carga index.js (el de hoy, o el de SOBRE_REF) con la nube de mentira, y deja a mano sus funciones internas. */
-function cargarIndex(datos, fallan) {
-  const mensajero = mensajeroDeMentira(fallan);
-  const admin = { initializeApp() {}, firestore: () => baseDeMentira(datos), messaging: () => mensajero };
-  const tal = (a, b) => (typeof b === 'function' ? b : a);
-  class HttpsError extends Error {}
-  const funciones = {
-    'firebase-functions/v2/firestore': { onDocumentCreated: tal, onDocumentUpdated: tal },
-    'firebase-functions/v2/https': { onCall: tal, HttpsError },
-    'firebase-functions/v2/scheduler': { onSchedule: tal },
-    'firebase-admin': admin,
-  };
-  const fuente = (REF ? execSync('git show ' + REF + ':guajirago/functions/index.js', { cwd: RAIZ }).toString()
-    : leer('guajirago/functions/index.js'))
-    + '\nmodule.exports.__internas = { avisarDelPedidoNuevo, avisarAlClienteDelCambio, avisarAlNegocio };\n';
-  const archivo = path.join(DIR, 'index.js');
-  const original = Module._load;
-  Module._load = function (pedido, ...resto) {
-    if (Object.prototype.hasOwnProperty.call(funciones, pedido)) return funciones[pedido];
-    return original.call(this, pedido, ...resto);
-  };
-  try {
-    const m = new Module(archivo, null);
-    m.filename = archivo;
-    m.paths = Module._nodeModulePaths(DIR);
-    m._compile(fuente, archivo);
-    return { fx: m.exports, mensajero };
-  } finally {
-    Module._load = original;
-  }
-}
-
-/** Corre algo y devuelve lo que escribió en el registro (log, warn y error). */
-async function conRegistro(hacer) {
-  const lineas = [];
-  const guardado = { log: console.log, warn: console.warn, error: console.error };
-  for (const k of Object.keys(guardado)) console[k] = (...a) => lineas.push(k + ': ' + a.join(' '));
-  try { return { valor: await hacer(), registro: lineas.join('\n') }; } finally { Object.assign(console, guardado); }
-}
+// Vive en pruebas/nubeDeMentira.cjs desde el 29-sep-2026 (G64): el medidor de a quién del negocio le llega cada
+// aviso la necesita igual, y una segunda copia sería un gemelo. Aquí solo se le pasa el commit del careo.
+const NUBE = require('./nubeDeMentira.cjs');
+const { mensajeroDeMentira, conRegistro } = NUBE;
+const cargarIndex = (datos, fallan) => NUBE.cargarIndex(datos, fallan, REF);
 
 // ── Los datos y los 8 avisos ───────────────────────────────────────────────
 const DATOS = {
