@@ -460,6 +460,15 @@ la placa de `conductores/{uid}` (la escribe su GPS con la misma placa que va en 
 - `registrar-conductor` salió 🔴 una vez dentro de `probar-cambio` y ✓ al correrlo solo, sin cambiar nada: se carea
   antes de llamarlo fallo.
 
+### whatsapp-panel · el «💬 WhatsApp» abre el número de la pieza (G41, 28-sep-2026)
+- 🔑 **Ver a dónde abre un botón sin abrir nada**: `antesDeCargar` cambia `window.open` por uno que solo apunta la
+  dirección en `window.__abiertos` y devuelve `{}`. Así se lee el enlace exacto y no sale ninguna pestaña.
+- ⚠ `r.texto()` llega en UN solo renglón: un `match(/📞\s*([^\n]*)/)` se traga la ficha entera. El teléfono se corta
+  en el siguiente ícono (`/📞\s*(.*?)\s*✉️/`).
+- En pruebas hay un restaurante y una agencia, los dos con un teléfono BUENO (+57 …20): la ventanita «No puedo abrir
+  WhatsApp» no se ve sin tocar datos; esa rama la ejecuta `pruebas/numeroWhatsApp.test.js`.
+- Las tarjetas de la lista se encuentran por lo que dicen («N platos», «N tours/alquileres»), no por el estilo solo.
+
 ## Lo que el robot dejó creado en pruebas
 
 - 27-sep-2026: «Robot Taxi De Prueba» (robot.taxi.1790508222079@gg.test) y

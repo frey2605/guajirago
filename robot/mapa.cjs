@@ -286,6 +286,16 @@ const RECORRIDOS = [
     // (pruebas/motivoFallo.test.js); por eso esos archivos no se nombran aquí.
     vigila: ['guajirago/src/MiPerfil.js', 'guajirago/src/avisoRechazo.js'],
   },
+  {
+    nombre: 'whatsapp-panel',
+    que: 'el «💬 WhatsApp» de Restaurantes y Turismo en el panel abre wa.me con el número que da la pieza (telefonoValido.js), o sale la ventanita si el teléfono no sirve (G41; no escribe nada)',
+    archivo: 'whatsapp-panel.cjs',
+    // Los negocios de pruebas tienen un teléfono BUENO, así que la ventanita de «no sirve» no se ve aquí sin tocar
+    // datos: esa rama la SACA del archivo y la EJECUTA scripts/medir-numero-whatsapp.cjs (pruebas/numeroWhatsApp.test.js),
+    // igual que el enlace de la agencia en la app, el de pedidos y reservas de aliados y enviarWhatsApp de Codigos
+    // (que nadie llama); por eso esos archivos no se nombran aquí.
+    vigila: ['guajirago-admin/src/Restaurantes.js', 'guajirago-admin/src/Turismo.js', 'guajirago-admin/src/telefonoValido.js'],
+  },
 ];
 
 // Los archivos de pantalla: los que, si cambian, el robot debería poder probar. Todo lo que esté en
