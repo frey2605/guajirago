@@ -432,6 +432,15 @@ const RECORRIDOS = [
     vigila: ['guajirago/src/Login.js', 'guajirago/src/avisoRechazo.js', 'guajirago-admin/src/App.js',
       'guajirago-admin/src/avisoRechazo.js', 'guajirago-aliados/src/Login.js', 'guajirago-aliados/src/avisoRechazo.js'],
   },
+  {
+    nombre: 'paginas-legales',
+    que: 'sin entrar a ninguna cuenta, «Crear cuenta» → «Términos y condiciones» y «Política de privacidad» abren con su título, sus 11 secciones y el correo de soporte (1 y 2 veces), y «‹ Volver» regresa al registro (G75; no escribe nada)',
+    archivo: 'paginas-legales.cjs',
+    // La Ayuda (que también dice el correo) la cubre limite-favoritos. Que las tres pantallas se vean EXACTAMENTE como
+    // antes (HTML pintado) lo vigila pruebas/soporteLegal.test.js.
+    vigila: ['guajirago/src/TerminosCondiciones.js', 'guajirago/src/PoliticaPrivacidad.js', 'guajirago/src/PaginaLegal.js',
+      'guajirago/src/correoSoporte.js'],
+  },
 ];
 
 // Los archivos de pantalla: los que, si cambian, el robot debería poder probar. Todo lo que esté en
