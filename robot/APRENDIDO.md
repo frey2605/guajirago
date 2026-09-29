@@ -430,6 +430,15 @@ la placa de `conductores/{uid}` (la escribe su GPS con la misma placa que va en 
 - Al final el campo queda en `null` si no lo tenía (el robot no sabe borrar un campo; la app lee `null` y «no está»
   igual).
 
+### promo-asignar · la frase del servidor, limpia y en ventanita (G38, 28-sep-2026)
+- 🔑 **La librería de firebase 12 le pega « [estado]» a TODO mensaje de nuestras funciones** («… Llevas 0 [400]»). En
+  pantalla ya no sale (lo quita `motivoDeRechazo`), pero en la CONSOLA sí, en el renglón `[rechazo] useAccion (…)`:
+  ese es el sitio bueno para la marca. Si el robot busca la frase en `a.texto()`, que no la exija con la marca.
+- La ventanita del candado dice el título «No se pudo aplicar el código» y la frase debajo; el recorrido exige los dos.
+- La primera corrida dentro de `probar-cambio.cjs` falló con «locator.click: Timeout 30000ms» en el lado del PANEL;
+  corrida sola, a los dos minutos, pasó entera. Es la carrera del panel al cargar, no la app: se vuelve a correr
+  antes de llamarlo fallo.
+
 ## Lo que el robot dejó creado en pruebas
 
 - 27-sep-2026: «Robot Taxi De Prueba» (robot.taxi.1790508222079@gg.test) y
