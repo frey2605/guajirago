@@ -19,6 +19,7 @@ import Promociones from './Promociones';
 import Creditos from './Creditos';
 import Anuncio from './Anuncio';
 import Logo from './Logo';
+import AvisoModal from './AvisoModal';
 import { auth, db, storage } from './firebase';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
@@ -293,15 +294,7 @@ function PantallaDatosConductor({ nombre, foto, celular, onGuardar, onVolver, on
   return (
     <div style={{ backgroundColor: '#FFFFFF', minHeight: '100vh', fontFamily: 'Arial, sans-serif', display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '32px 24px', position: 'relative' }}>
       {error && campoError && (
-        <div onClick={() => setError('')} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
-          <div onClick={(e) => e.stopPropagation()} style={{ background: '#FFFFFF', borderRadius: '24px', padding: '32px 24px', width: '100%', maxWidth: '380px', border: '2px solid #FF4444', textAlign: 'center', position: 'relative' }}>
-            <span onClick={() => setError('')} style={{ position: 'absolute', top: '16px', right: '20px', color: '#6B7280', fontSize: '26px', cursor: 'pointer', lineHeight: '1' }}>✕</span>
-            <div style={{ fontSize: '54px', marginBottom: '12px' }}>⚠️</div>
-            <h2 style={{ color: '#1A1A1E', fontSize: '20px', fontWeight: '900', margin: '0 0 10px' }}>Falta un dato</h2>
-            <p style={{ color: '#1A1A1E', fontSize: '17px', margin: '0 0 24px', lineHeight: '1.5', fontWeight: 'bold' }}>{error}</p>
-            <button onClick={() => setError('')} style={{ width: '100%', padding: '16px', background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F)', border: 'none', borderRadius: '14px', color: '#141416', fontSize: '16px', fontWeight: '900', cursor: 'pointer' }}>Entendido</button>
-          </div>
-        </div>
+        <AvisoModal aviso={{ titulo: 'Falta un dato', texto: error }} onCerrar={() => setError('')} />
       )}
       <MenuLateral nombre={nombre} foto={foto} onIrPerfil={onIrPerfil} onIrGanancias={onIrGanancias} onIrSeguridad={onIrSeguridad} onIrViajes={onIrViajes} onIrCreditos={onIrCreditos} onIrAyuda={onIrAyuda} onIrConfig={onIrConfig} onIrPromociones={onIrPromociones} onCerrarSesion={onCerrarSesion} />
       <div onClick={onVolver} style={{ position: 'absolute', top: '18px', left: '120px', display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(0,0,0,0.06)', borderRadius: '12px', color: '#1A1A1E', fontSize: '14px', fontWeight: '500', padding: '8px 16px', cursor: 'pointer', zIndex: 5 }}><span style={{ fontSize: '20px', fontWeight: '900', lineHeight: '1' }}>‹</span> Volver</div>

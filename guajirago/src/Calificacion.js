@@ -6,6 +6,7 @@ import { doc, updateDoc, addDoc, collection } from 'firebase/firestore';
 import { motivoDeRechazo, apuntarRechazo } from './avisoCalificacion';
 // Y la BANDEJA: la otra mitad de la REGLA 9, la que ve el dueño en el panel.
 import { guardarRechazo } from './guardarRechazo';
+import AvisoModal from './AvisoModal';
 
 const OPCIONES_PASAJERO = [
   { texto: 'Llegó rápido', buena: true },
@@ -144,18 +145,11 @@ function Calificacion({ tipo, viajeId, nombreCalificado, calificadoId, quienCali
       </button>
       <button onClick={onFinalizar} style={{ background: 'none', border: 'none', color: '#6B7280', fontSize: '13px', cursor: 'pointer', marginTop: '16px' }}>Omitir</button>
 
-      {/* Ventanita: la calificacion no entro. Misma forma que las de Restaurantes.js
-          a proposito — el dueño quiere que TODO aviso sea una ventanita, y que se
-          parezcan entre si. */}
+      {/* Ventanita: la calificacion no entro. Es la ventanita comun (AvisoModal), la
+          misma de Restaurantes.js — el dueño quiere que TODO aviso sea una ventanita, y
+          que se parezcan entre si (G39: antes estaba escrita a mano aqui). */}
       {aviso && (
-        <div onClick={() => setAviso(null)} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', zIndex: 10000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
-          <div onClick={(e) => e.stopPropagation()} style={{ background: '#FFFFFF', borderRadius: '20px', padding: '28px 24px', width: '100%', maxWidth: '340px', textAlign: 'center' }}>
-            <div style={{ fontSize: '46px', marginBottom: '8px' }}>⭐</div>
-            <p style={{ color: '#1A1A1E', fontSize: '17px', fontWeight: '900', margin: '0 0 8px' }}>{aviso.titulo}</p>
-            <p style={{ color: '#6B7280', fontSize: '14px', margin: '0 0 20px' }}>{aviso.texto}</p>
-            <button onClick={() => setAviso(null)} style={{ width: '100%', padding: '14px', background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F)', border: 'none', borderRadius: '12px', color: '#FFF', fontSize: '15px', fontWeight: '900', cursor: 'pointer' }}>Entendido</button>
-          </div>
-        </div>
+        <AvisoModal aviso={{ ...aviso, icono: '⭐' }} onCerrar={() => setAviso(null)} />
       )}
     </div>
   );

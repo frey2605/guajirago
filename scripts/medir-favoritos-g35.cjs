@@ -47,7 +47,9 @@ function piezasDeHoy(fuenteSolicitar, fuenteAyuda) {
   if (iG < 0) throw new Error('Solicitar.js: no encuentro `const guardarFavorito =`');
   const cuerpo = (cuerpoDeLaFuncion(fs, iG) || {}).texto;
   if (!cuerpo) throw new Error('Solicitar.js: no pude sacar el cuerpo de guardarFavorito');
-  const iAviso = cuerpo.indexOf('setAvisoLimite(true)');
+  // G39: la ventanita del límite ya no es una propia (`setAvisoLimite(true)`): entra por la ventanita general de la
+  // pantalla, `setAviso({ … titulo: 'Llegaste al límite', texto: `…` })`.
+  const iAviso = cuerpo.indexOf("titulo: 'Llegaste al límite'");
   if (iAviso < 0) throw new Error('Solicitar.js: guardarFavorito ya no abre la ventanita del límite');
   const iIf = cuerpo.lastIndexOf('if (', iAviso);
   if (iIf < 0) throw new Error('Solicitar.js: no encuentro el `if (` que abre la ventanita del límite');
@@ -60,11 +62,11 @@ function piezasDeHoy(fuenteSolicitar, fuenteAyuda) {
 
   const iTit = fs.indexOf('Llegaste al límite');
   if (iTit < 0) throw new Error('Solicitar.js: no encuentro la ventanita «Llegaste al límite»');
-  const iP = fs.indexOf('<p ', iTit);
-  const iAbre = iP < 0 ? -1 : fs.indexOf('>', iP);
-  const iCierra = iAbre < 0 ? -1 : fs.indexOf('</p>', iAbre);
-  if (iCierra < 0) throw new Error('Solicitar.js: la ventanita del límite ya no tiene su <p>');
-  const ventanita = jsxAPlantilla(fs.slice(iAbre + 1, iCierra));
+  // El texto es la plantilla que va en `texto: `…`` del mismo aviso: se ejecuta tal cual está escrita.
+  const iT = fs.indexOf('texto: `', iTit);
+  const iCierra = iT < 0 ? -1 : fs.indexOf('`', iT + 'texto: `'.length);
+  if (iCierra < 0 || fs.slice(iTit, iT).includes('\n')) throw new Error('Solicitar.js: la ventanita del límite ya no tiene su texto: `…`');
+  const ventanita = fs.slice(iT + 'texto: '.length, iCierra + 1);
 
   const iPreg = fa.indexOf('¿Puedo guardar mis direcciones favoritas?');
   if (iPreg < 0) throw new Error('AyudaSoporte.js: no encuentro la pregunta de los favoritos');

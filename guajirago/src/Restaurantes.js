@@ -721,14 +721,7 @@ function Restaurantes({ nombre, onVolver, foto, onCerrarSesion, onIrPerfil, onIr
             NUNCA. Lo cazó la segunda opinión con el mismo Babel que compila la
             app. El guardián no podía verlo: compara ARCHIVOS, no sitios. */}
         {avisoCalif && (
-          <div onClick={() => setAvisoCalif(null)} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', zIndex: 10000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
-            <div onClick={(e) => e.stopPropagation()} style={{ background: '#FFFFFF', borderRadius: '20px', padding: '28px 24px', width: '100%', maxWidth: '340px', textAlign: 'center' }}>
-              <div style={{ fontSize: '46px', marginBottom: '8px' }}>⭐</div>
-              <p style={{ color: '#1A1A1E', fontSize: '17px', fontWeight: '900', margin: '0 0 8px' }}>{avisoCalif.titulo}</p>
-              <p style={{ color: '#6B7280', fontSize: '14px', margin: '0 0 20px' }}>{avisoCalif.texto}</p>
-              <button onClick={() => setAvisoCalif(null)} style={{ width: '100%', padding: '14px', background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F)', border: 'none', borderRadius: '12px', color: '#FFF', fontSize: '15px', fontWeight: '900', cursor: 'pointer' }}>Entendido</button>
-            </div>
-          </div>
+          <AvisoModal aviso={{ ...avisoCalif, icono: '⭐' }} onCerrar={() => setAvisoCalif(null)} />
         )}
       </div>
     );
@@ -984,38 +977,17 @@ function Restaurantes({ nombre, onVolver, foto, onCerrarSesion, onIrPerfil, onIr
 
         {/* Ventanita: falta método de pago */}
         {avisoPago && (
-          <div onClick={() => setAvisoPago('')} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', zIndex: 10000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
-            <div onClick={(e) => e.stopPropagation()} style={{ background: '#FFFFFF', borderRadius: '20px', padding: '28px 24px', width: '100%', maxWidth: '340px', textAlign: 'center' }}>
-              <div style={{ fontSize: '46px', marginBottom: '8px' }}>💳</div>
-              <p style={{ color: '#1A1A1E', fontSize: '17px', fontWeight: '900', margin: '0 0 8px' }}>Falta el método de pago</p>
-              <p style={{ color: '#6B7280', fontSize: '14px', margin: '0 0 20px' }}>{avisoPago}</p>
-              <button onClick={() => setAvisoPago('')} style={{ width: '100%', padding: '14px', background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F)', border: 'none', borderRadius: '12px', color: '#FFF', fontSize: '15px', fontWeight: '900', cursor: 'pointer' }}>Entendido</button>
-            </div>
-          </div>
+          <AvisoModal aviso={{ icono: '💳', titulo: 'Falta el método de pago', texto: avisoPago }} onCerrar={() => setAvisoPago('')} />
         )}
 
         {/* Ventanita: promoción con límite alcanzado */}
         {avisoPromo && (
-          <div onClick={() => setAvisoPromo('')} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', zIndex: 10000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
-            <div onClick={(e) => e.stopPropagation()} style={{ background: '#FFFFFF', borderRadius: '20px', padding: '28px 24px', width: '100%', maxWidth: '340px', textAlign: 'center' }}>
-              <div style={{ fontSize: '46px', marginBottom: '8px' }}>🏷️</div>
-              <p style={{ color: '#1A1A1E', fontSize: '17px', fontWeight: '900', margin: '0 0 8px' }}>Promoción sin cupos</p>
-              <p style={{ color: '#6B7280', fontSize: '14px', margin: '0 0 20px' }}>{avisoPromo}</p>
-              <button onClick={() => setAvisoPromo('')} style={{ width: '100%', padding: '14px', background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F)', border: 'none', borderRadius: '12px', color: '#FFF', fontSize: '15px', fontWeight: '900', cursor: 'pointer' }}>Entendido</button>
-            </div>
-          </div>
+          <AvisoModal aviso={{ icono: '🏷️', titulo: 'Promoción sin cupos', texto: avisoPromo }} onCerrar={() => setAvisoPromo('')} />
         )}
 
         {/* Ventanita: no se pudo obtener la ubicación */}
         {avisoUbic && (
-          <div onClick={() => setAvisoUbic('')} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', zIndex: 10000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
-            <div onClick={(e) => e.stopPropagation()} style={{ background: '#FFFFFF', borderRadius: '20px', padding: '28px 24px', width: '100%', maxWidth: '340px', textAlign: 'center' }}>
-              <div style={{ fontSize: '46px', marginBottom: '8px' }}>📍</div>
-              <p style={{ color: '#1A1A1E', fontSize: '17px', fontWeight: '900', margin: '0 0 8px' }}>{avisoUbic === SIN_NOMBRE_DE_CALLE ? 'Falta el nombre de la calle' : 'Ubicación no disponible'}</p>
-              <p style={{ color: '#6B7280', fontSize: '14px', margin: '0 0 20px' }}>{avisoUbic}</p>
-              <button onClick={() => setAvisoUbic('')} style={{ width: '100%', padding: '14px', background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F)', border: 'none', borderRadius: '12px', color: '#FFF', fontSize: '15px', fontWeight: '900', cursor: 'pointer' }}>Entendido</button>
-            </div>
-          </div>
+          <AvisoModal aviso={{ icono: '📍', titulo: avisoUbic === SIN_NOMBRE_DE_CALLE ? 'Falta el nombre de la calle' : 'Ubicación no disponible', texto: avisoUbic }} onCerrar={() => setAvisoUbic('')} />
         )}
 
         {/* Modal: configurar plato con adiciones */}

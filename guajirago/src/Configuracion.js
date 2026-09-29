@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { db, auth } from './firebase';
 import Logo from './Logo';
+import AvisoModal from './AvisoModal';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { sendPasswordResetEmail, deleteUser, reauthenticateWithCredential, EmailAuthProvider } from 'firebase/auth';
 import TerminosCondiciones from './TerminosCondiciones';
@@ -120,18 +121,7 @@ function Configuracion({ onVolver, onCerrarSesion }) {
 
       {/* Modal correo enviado */}
       {correoEnviado && (
-        <div onClick={() => setCorreoEnviado('')} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
-          <div onClick={(e) => e.stopPropagation()} style={{ background: '#FFFFFF', borderRadius: '24px', padding: '32px 24px', width: '100%', maxWidth: '400px', border: '2px solid #2ECC71', textAlign: 'center' }}>
-            <div style={{ fontSize: '54px', marginBottom: '12px' }}>📧</div>
-            <h2 style={{ color: '#1A1A1E', fontSize: '20px', fontWeight: '900', margin: '0 0 10px' }}>¡Correo enviado!</h2>
-            <p style={{ color: '#6B7280', fontSize: '14px', margin: '0 0 8px', lineHeight: '1.5' }}>Te enviamos un enlace para cambiar tu contraseña a:</p>
-            <p style={{ color: '#2ECC71', fontSize: '15px', fontWeight: 'bold', margin: '0 0 16px' }}>{correoEnviado}</p>
-            <div style={{ background: 'rgba(255,207,77,0.1)', borderRadius: '12px', padding: '12px 16px', marginBottom: '24px', border: '1px solid #FFCF4D' }}>
-              <p style={{ color: '#FF7A2F', fontSize: '13px', margin: '0', lineHeight: '1.5' }}>⚠️ Si no lo ves en tu bandeja de entrada, revisa la carpeta de <strong>correo no deseado o spam</strong>.</p>
-            </div>
-            <button onClick={() => setCorreoEnviado('')} style={{ width: '100%', padding: '16px', background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F)', border: 'none', borderRadius: '14px', color: '#FFFFFF', fontSize: '16px', fontWeight: '900', cursor: 'pointer' }}>Entendido</button>
-          </div>
-        </div>
+        <AvisoModal aviso={{ icono: '📧', titulo: '¡Correo enviado!', texto: `Te enviamos un enlace para cambiar tu contraseña a: ${correoEnviado}. Si no lo ves en tu bandeja de entrada, revisa la carpeta de correo no deseado o spam.` }} onCerrar={() => setCorreoEnviado('')} />
       )}
 
       <div style={{ background: 'linear-gradient(135deg, #FFFFFF, #ECECEF)', padding: '24px 20px', position: 'relative', display: 'flex', alignItems: 'center' }}>

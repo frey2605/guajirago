@@ -6,6 +6,7 @@ import { cop } from './moneda';
 import { fechaDeCalendario } from './fechaCalendario';
 import { collection, query, where, getDocs, getDoc, addDoc, doc } from 'firebase/firestore';
 import Logo from './Logo';
+import AvisoModal from './AvisoModal';
 import MenuLateral from './MenuLateral';
 import { prepararTokenDeAvisos } from './Notificaciones';
 // «¿Quién sale en la app?» se contesta en UN solo sitio (SEGUNDA LEY): el mismo
@@ -285,13 +286,7 @@ function Turismo({ nombre, foto, onVolver, onCerrarSesion, onIrPerfil, onIrGanan
       )}
 
       {aviso && (
-        <div onClick={() => setAviso('')} style={ovl}>
-          <div onClick={e => e.stopPropagation()} style={modalBox}>
-            <div style={{ fontSize: '44px', marginBottom: '8px' }}>⚠️</div>
-            <p style={{ color: '#1A1A1E', fontSize: '15px', fontWeight: 'bold', margin: '0 0 18px' }}>{aviso}</p>
-            <button onClick={() => setAviso('')} style={{ ...btnOk, width: '100%' }}>Entendido</button>
-          </div>
-        </div>
+        <AvisoModal aviso={{ titulo: aviso }} onCerrar={() => setAviso('')} />
       )}
     </div>
   );

@@ -439,6 +439,15 @@ la placa de `conductores/{uid}` (la escribe su GPS con la misma placa que va en 
   corrida sola, a los dos minutos, pasó entera. Es la carrera del panel al cargar, no la app: se vuelve a correr
   antes de llamarlo fallo.
 
+### ventanitas-aviso · el aviso sale en la ventanita común (G39, 28-sep-2026)
+- 🔑 **Las palabras no distinguen la ventanita común de una hecha a mano**: las dos dicen «Atención» y «Entendido». Lo
+  que sí las distingue es el botón: el de `AvisoModal` es azul liso (`rgb(28, 142, 249)`, sin degradado) y los de las
+  hechas a mano eran naranja degradado. El recorrido lo lee con `getComputedStyle` (fondo e imagen de fondo). Con el
+  código de antes (la app de pruebas sin publicar) salió 🔴 «linear-gradient(… rgb(255, 207, 77) …)»; es la forma de
+  saber que el recorrido mira algo.
+- En el inicio hay DOS botones «Crear cuenta» a lo largo del camino (el del inicio y el de enviar el registro): se toca
+  `.first()` en el inicio y `.last()` ya en el registro.
+
 ## Lo que el robot dejó creado en pruebas
 
 - 27-sep-2026: «Robot Taxi De Prueba» (robot.taxi.1790508222079@gg.test) y

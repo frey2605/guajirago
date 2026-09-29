@@ -266,6 +266,16 @@ const RECORRIDOS = [
     // este recorrido no la abre. Que la ponga (y solo sin viaje en curso) lo vigila pruebas/llamadoAtencion.test.js.
     vigila: ['guajirago/src/LlamadoAtencion.js', 'guajirago/src/Home.js', 'guajirago/src/AppConductor.js'],
   },
+  {
+    nombre: 'ventanitas-aviso',
+    que: 'sin entrar a ninguna cuenta, «Crear cuenta» con todo vacío saca «Atención · Por favor completa todos los campos» en la ventanita COMÚN (AvisoModal, «Entendido» azul) y «Entendido» la cierra (G39; no crea cuentas)',
+    archivo: 'ventanitas-aviso.cjs',
+    // Las otras ventanitas que pasaron a AvisoModal en G39 (Calificacion, Turismo, App, Configuracion y las de
+    // Restaurantes y Solicitar) no las abre este recorrido: las SACA del archivo y las EJECUTA
+    // scripts/medir-ventanitas-aviso.cjs (pruebas/ventanitasAviso.test.js). La del límite de favoritos la ve
+    // limite-favoritos, y la de la calle, direccion-pedido.
+    vigila: ['guajirago/src/Login.js', 'guajirago/src/AvisoModal.js'],
+  },
 ];
 
 // Los archivos de pantalla: los que, si cambian, el robot debería poder probar. Todo lo que esté en

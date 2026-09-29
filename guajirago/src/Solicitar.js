@@ -424,9 +424,7 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
   const [recibeNombre, setRecibeNombre] = useState('');
   const [recibeTel, setRecibeTel] = useState('');
   const [notaEnvio, setNotaEnvio] = useState('');
-  const [avisoFaltan, setAvisoFaltan] = useState(null);
   const [favoritos, setFavoritos] = useState([]);
-  const [avisoLimite, setAvisoLimite] = useState(false);
   const [pantalla, setPantalla] = useState('solicitar');
   const [viajeId, setViajeId] = useState(null);
   // REGLAS 5 y 11 — el código ya no viaja dentro del viaje: se lee del cajón
@@ -509,7 +507,6 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
   const [ofertaModificada, setOfertaModificada] = useState(false);
   // Contraofertas múltiples: lista de { conductorId, conductorNombre, conductorPlaca, conductorVehiculo, contraoferta, contraofertaValor }
   const [contraofertas, setContraofertas] = useState([]);
-  const [avisoOcupado, setAvisoOcupado] = useState('');
   const contadorRef = useRef(null);
   const pantallaRef = useRef(pantalla);
   const intervaloRespaldoRef = useRef(null);
@@ -977,7 +974,7 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
     if (!destino) return;
     const user = auth.currentUser;
     if (!user) return;
-    if (favoritos.length >= maximoDeFavoritos(configApp)) { setAvisoLimite(true); return; }
+    if (favoritos.length >= maximoDeFavoritos(configApp)) { setAviso({ icono: '📍', titulo: 'Llegaste al límite', texto: `Solo puedes guardar ${lugaresFavoritos(configApp)}. Borra uno para poder agregar otro.` }); return; }
     if (favoritos.find(f => f.direccion === destino)) { setError('Ese lugar ya está guardado'); return; }
     const nuevo = { nombre: destino.length > 18 ? destino.slice(0, 18) + '…' : destino, direccion: destino, icono: '⭐' };
     const nuevos = [...favoritos, nuevo];
@@ -1065,7 +1062,7 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
       if (!recibeNombre.trim()) faltan.push('Nombre de quien recibe');
       if (recibeTel.trim().length !== 10) faltan.push('Teléfono de quien recibe (10 números)');
       if (!notaEnvio.trim()) faltan.push('Nota para el domiciliario');
-      if (faltan.length > 0) { setAvisoFaltan(faltan); return; }
+      if (faltan.length > 0) { setAviso({ icono: '📋', titulo: 'Te faltan datos', texto: 'Completa esto para enviar tu mandado: ' + faltan.join(', ') + '.' }); return; }
     } else {
       // 🔴 SI LO QUE FALTA ES DÓNDE ESTÁ, SE DICE CÓMO DECIRLO.
       //
@@ -1288,10 +1285,10 @@ const confirmarViaje = async () => {
       return;
     }
     if (r.motivo === 'ocupado') {
-      setAvisoOcupado(oferta.conductorNombre || 'Ese conductor');
+      setAviso({ icono: esMensajeria ? '🏍️' : '🚕', titulo: 'Conductor ocupado', texto: `${oferta.conductorNombre || 'Ese conductor'} ya tomó otro ${esMensajeria ? 'servicio' : 'viaje'}. Escoge otra de las propuestas.` });
       setContraofertas(prev => prev.filter(c => c.conductorId !== oferta.conductorId));
     } else {
-      setAvisoOcupado('__error__');
+      setAviso({ titulo: 'No se pudo confirmar', texto: 'Intenta de nuevo en un momento.' });
     }
   };
 
@@ -1611,18 +1608,6 @@ const PanelEmergencia = () => (
           </div>
         )}
 
-        {/* Ventanita: conductor ya ocupado */}
-        {avisoOcupado && (
-          <div onClick={() => setAvisoOcupado('')} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', zIndex: 10000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
-            <div onClick={(e) => e.stopPropagation()} style={{ background: '#FFFFFF', borderRadius: '20px', padding: '28px 24px', width: '100%', maxWidth: '340px', textAlign: 'center' }}>
-              <div style={{ fontSize: '46px', marginBottom: '8px' }}>{avisoOcupado === '__error__' ? '⚠️' : (esMensajeria ? '🏍️' : '🚕')}</div>
-              <p style={{ color: '#1A1A1E', fontSize: '17px', fontWeight: '900', margin: '0 0 8px' }}>{avisoOcupado === '__error__' ? 'No se pudo confirmar' : 'Conductor ocupado'}</p>
-              <p style={{ color: '#6B7280', fontSize: '14px', margin: '0 0 20px' }}>{avisoOcupado === '__error__' ? 'Intenta de nuevo en un momento.' : `${avisoOcupado} ya tomó otro ${esMensajeria ? 'servicio' : 'viaje'}. Escoge otra de las propuestas.`}</p>
-              <button onClick={() => setAvisoOcupado('')} style={{ width: '100%', padding: '14px', background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F)', border: 'none', borderRadius: '12px', color: '#FFF', fontSize: '15px', fontWeight: '900', cursor: 'pointer' }}>Entendido</button>
-            </div>
-          </div>
-        )}
-
         {/* Contraofertas múltiples */}
         {contraofertas.length > 0 && (
           <div style={{ width: '100%', marginBottom: '16px' }}>
@@ -1664,35 +1649,6 @@ const PanelEmergencia = () => (
 
   return (
     <div style={{ backgroundColor: '#FFFFFF', minHeight: '100vh', fontFamily: 'Arial, sans-serif' }}>
-      {avisoFaltan && (
-        <div onClick={() => setAvisoFaltan(null)} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
-          <div onClick={e => e.stopPropagation()} style={{ background: '#FFFFFF', borderRadius: '24px', padding: '28px 24px', width: '100%', maxWidth: '400px', border: '2px solid #FF7A2F' }}>
-            <div style={{ fontSize: '48px', textAlign: 'center', marginBottom: '8px' }}>📋</div>
-            <p style={{ color: '#FF7A2F', fontSize: '13px', margin: '0 0 6px', letterSpacing: '2px', fontWeight: 'bold', textAlign: 'center' }}>TE FALTAN DATOS</p>
-            <p style={{ color: '#1A1A1E', fontSize: '18px', fontWeight: '900', margin: '0 0 18px', textAlign: 'center' }}>Completa esto para enviar tu mandado:</p>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '22px' }}>
-              {avisoFaltan.map((f, i) => (
-                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '10px', background: '#FFFFFF', borderRadius: '12px', padding: '12px 14px' }}>
-                  <span style={{ fontSize: '18px' }}>❌</span>
-                  <span style={{ color: '#1A1A1E', fontSize: '15px', fontWeight: 'bold' }}>{f}</span>
-                </div>
-              ))}
-            </div>
-            <button onClick={() => setAvisoFaltan(null)} style={{ width: '100%', padding: '16px', background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)', border: 'none', borderRadius: '14px', color: '#1A1A1E', fontSize: '16px', fontWeight: '900', cursor: 'pointer' }}>Entendido</button>
-          </div>
-        </div>
-      )}
-      {avisoLimite && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
-          <div style={{ background: '#FFFFFF', borderRadius: '24px', padding: '32px 24px', width: '100%', maxWidth: '380px', border: '1px solid #FF7A2F', textAlign: 'center', position: 'relative' }}>
-            <span onClick={() => setAvisoLimite(false)} style={{ position: 'absolute', top: '16px', right: '20px', color: '#6B7280', fontSize: '26px', cursor: 'pointer', lineHeight: '1' }}>✕</span>
-            <div style={{ fontSize: '54px', marginBottom: '12px' }}>📍</div>
-            <h2 style={{ color: '#1A1A1E', fontSize: '20px', fontWeight: '900', margin: '0 0 10px' }}>Llegaste al límite</h2>
-            <p style={{ color: '#6B7280', fontSize: '14px', margin: '0 0 24px', lineHeight: '1.5' }}>Solo puedes guardar {lugaresFavoritos(configApp)}. Borra uno para poder agregar otro.</p>
-            <button onClick={() => setAvisoLimite(false)} style={{ width: '100%', padding: '16px', background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F)', border: 'none', borderRadius: '14px', color: '#1A1A1E', fontSize: '16px', fontWeight: '900', cursor: 'pointer' }}>Entendido</button>
-          </div>
-        </div>
-      )}
       <div style={{ background: '#FFFFFF', padding: '12px 20px', display: 'flex', alignItems: 'center', gap: '16px', position: 'relative', borderBottom: '1px solid #ECECEF' }}>
         <div onClick={onVolver} style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(0,0,0,0.06)', borderRadius: '12px', color: '#1A1A1E', fontSize: '14px', fontWeight: '500', padding: '8px 16px', cursor: 'pointer' }}><span style={{ fontSize: '22px', fontWeight: '900', lineHeight: '1', position: 'relative', top: '-1px' }}>‹</span> Volver</div>
         <h2 style={{ color: '#1A1A1E', margin: '0', fontSize: '20px' }}>{esMensajeria ? 'Pedir mandado 📦' : `Solicitar ${tipo}`}</h2>

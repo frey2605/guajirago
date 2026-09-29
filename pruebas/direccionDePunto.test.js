@@ -86,6 +86,7 @@ describe('G30 · la dirección de un punto del mapa sale de una sola pieza', () 
       }
     });
     // Y la ventanita no dice «Ubicación no disponible» cuando la ubicación SÍ se encontró.
-    assert.match(codigo, /\{avisoUbic === SIN_NOMBRE_DE_CALLE \? 'Falta el nombre de la calle' : 'Ubicación no disponible'\}/);
+    // (G39: la ventanita es AvisoModal y el título va en su `titulo:`; pruebas/ventanitasAviso.test.js lo ejecuta.)
+    assert.match(codigo, /titulo: avisoUbic === SIN_NOMBRE_DE_CALLE \? 'Falta el nombre de la calle' : 'Ubicación no disponible'/);
   });
 });

@@ -8,6 +8,7 @@ import { getFunctions, httpsCallable } from 'firebase/functions';
 import TerminosCondiciones from './TerminosCondiciones';
 import PoliticaPrivacidad from './PoliticaPrivacidad';
 import Logo from './Logo';
+import AvisoModal from './AvisoModal';
 import { telefonoDe } from './telefonoUsuario';
 import { telefonoSirve } from './telefonoValido';
 import { cop } from './moneda';
@@ -211,15 +212,7 @@ function Login({ onEntrar }) {
     return (
       <div style={{ backgroundColor: '#FFFFFF', minHeight: '100vh', fontFamily: 'Arial, sans-serif', display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '32px 24px' }}>
         {error && (
-          <div onClick={() => setError('')} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
-            <div onClick={(e) => e.stopPropagation()} style={{ background: '#FFFFFF', borderRadius: '24px', padding: '32px 24px', width: '100%', maxWidth: '380px', border: '2px solid #FF4444', textAlign: 'center', position: 'relative', boxShadow: '0 12px 40px rgba(0,0,0,0.18)' }}>
-              <span onClick={() => setError('')} style={{ position: 'absolute', top: '16px', right: '20px', color: '#9AA0A6', fontSize: '26px', cursor: 'pointer', lineHeight: '1' }}>✕</span>
-              <div style={{ fontSize: '54px', marginBottom: '12px' }}>⚠️</div>
-              <h2 style={{ color: '#1A1A1E', fontSize: '20px', fontWeight: '900', margin: '0 0 10px' }}>Atención</h2>
-              <p style={{ color: '#1A1A1E', fontSize: '17px', margin: '0 0 24px', lineHeight: '1.5', fontWeight: 'bold' }}>{error}</p>
-              <button onClick={() => setError('')} style={{ width: '100%', padding: '16px', background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F)', border: 'none', borderRadius: '14px', color: '#FFFFFF', fontSize: '16px', fontWeight: '900', cursor: 'pointer' }}>Entendido</button>
-            </div>
-          </div>
+          <AvisoModal aviso={{ titulo: 'Atención', texto: error }} onCerrar={() => setError('')} />
         )}
         <div style={{ textAlign: 'center', marginBottom: '28px' }}>
           <Logo size={64} style={{ marginBottom: '10px' }} />
