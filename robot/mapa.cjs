@@ -346,6 +346,15 @@ const RECORRIDOS = [
     vigila: ['guajirago-admin/src/Restaurantes.js', 'guajirago-admin/src/fechaGuardada.js', 'guajirago/src/fechaGuardada.js',
       'guajirago/src/Restaurantes.js'],
   },
+  {
+    nombre: 'corte-caja-hoy',
+    que: 'con el reloj de la página a las 8 p. m. de Colombia, Corte de caja de aliados abre en el día de HOY y no en el de mañana (G48 y hallazgo de G16; no escribe nada)',
+    archivo: 'corte-caja-hoy.cjs',
+    // Los convertidores de Mesero, PedidosDomicilio, HistorialDomicilios y ResumenDia no cambian lo que se ve (leen
+    // igual los dos formatos): los SACA de su archivo y los EJECUTA pruebas/fechaPedido.test.js.
+    vigila: ['guajirago-aliados/src/CorteCaja.js', 'guajirago-aliados/src/fechaGuardada.js', 'guajirago-aliados/src/Mesero.js',
+      'guajirago-aliados/src/PedidosDomicilio.js', 'guajirago-aliados/src/HistorialDomicilios.js', 'guajirago-aliados/src/ResumenDia.js'],
+  },
 ];
 
 // Los archivos de pantalla: los que, si cambian, el robot debería poder probar. Todo lo que esté en

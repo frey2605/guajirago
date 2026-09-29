@@ -534,6 +534,14 @@ la placa de `conductores/{uid}` (la escribe su GPS con la misma placa que va en 
   fechas de la ficha en «—». Con el nuevo (2df3503): sube en uno y las fechas salen («29/9/2026, 1:17:32 a. m.»).
 - Los 403 de la consola salen igual que en los demás recorridos.
 
+### corte-caja-hoy · el «hoy» de Corte de caja es el de Colombia (G48, 29-sep-2026)
+- Para probar «a las 8 p. m.» sin esperar a las 8 p. m.: `antesDeCargar` cambia `window.Date` por uno CORRIDO (misma
+  hora que corre, más un corrimiento hasta las 20:00 de hoy en Colombia). `new Date(x)` con fecha no se toca. El
+  inicio de sesión de Firebase aguanta el reloj corrido unas horas hacia adelante sin quejarse.
+- Corte de caja está en ☰ → «💰 Corte de caja» (el módulo `corte` viene encendido en el restaurante de prueba). Las
+  fechas «desde / hasta» son los dos `input[type="date"]`.
+- Con aliados VIEJO publicado en pruebas (2e224b7) las dos salen con el día de MAÑANA; con el nuevo (f56c606), hoy.
+
 ## Lo que el robot dejó creado en pruebas
 
 - 27-sep-2026: «Robot Taxi De Prueba» (robot.taxi.1790508222079@gg.test) y
