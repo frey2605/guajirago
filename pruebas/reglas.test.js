@@ -4775,3 +4775,94 @@ describe('LA MUDANZA DE LOS NEGOCIOS · las dos carpetas', () => {
     });
   });
 });
+
+// ───────────────────────────────────────────────────────────────────────────
+// SEGURIDAD · UNA PROMOCIÓN LA ESCRIBE SOLO EL ADMINISTRADOR (29-sep-2026)
+// ───────────────────────────────────────────────────────────────────────────
+// Antes `promociones` y su contador `usos` tenían `allow create, update: if
+// request.auth != null`: un pasajero se fabricaba una promoción de crédito de un
+// millón y la canjeaba con `reclamarPromocion` (el servidor le suma los pesos), o
+// se ponía en cero su contador de usos para saltarse el tope por persona.
+// Quien las escribe de verdad es el panel (guajirago-admin/src/Promociones.js);
+// la app solo las LEE, y el canje y el cobro van por las funciones.
+describe('SEGURIDAD · una promoción la escribe solo el administrador', () => {
+  // Lo que el panel guarda al crear (Promociones.js, `guardar`).
+  const promoDelPanel = {
+    nombre: 'Bienvenida', categoria: 'bienvenida', tipoBeneficio: 'credito', valorBeneficio: 8000,
+    aplicaA: 'todos', fechaInicio: '2026-09-01', fechaFin: '2026-12-31', requiereCodigo: true,
+    descripcion: '', limiteUsosPorPersona: 1, viajesMinimosRequeridos: 0,
+    activa: true, usosTotales: 0, inversionTotal: 0, creadoPor: 'Admin', fechaCreacion: '2026-09-29T00:00:00.000Z',
+  };
+  const promoFabricada = { ...promoDelPanel, nombre: 'REGALO', valorBeneficio: 1000000, limiteUsosPorPersona: null };
+
+  it('un pasajero NO puede crear una promoción', async () => {
+    const { doc, setDoc } = FS;
+    await RUT.assertFails(setDoc(doc(como('pasajero1'), 'promociones/REGALO'), promoFabricada));
+  });
+
+  it('un conductor NO puede crear una promoción', async () => {
+    const { doc, setDoc } = FS;
+    await RUT.assertFails(setDoc(doc(como('conductor1'), 'promociones/REGALO'), promoFabricada));
+  });
+
+  it('alguien sin cuenta NO puede crear una promoción', async () => {
+    const { doc, setDoc } = FS;
+    await RUT.assertFails(setDoc(doc(sinCuenta(), 'promociones/REGALO'), promoFabricada));
+  });
+
+  it('un pasajero NO puede editar una promoción que ya existe (subirle el valor)', async () => {
+    const { doc, updateDoc } = FS;
+    await RUT.assertFails(updateDoc(doc(como('pasajero1'), 'promociones/promo1'), { valorBeneficio: 1000000 }));
+  });
+
+  it('un pasajero NO puede reactivar una promoción apagada', async () => {
+    const { doc, updateDoc } = FS;
+    await RUT.assertFails(updateDoc(doc(como('pasajero1'), 'promociones/promo1'), { activa: true }));
+  });
+
+  it('un pasajero NO puede ponerse en cero su contador de usos (saltarse el tope)', async () => {
+    const { doc, setDoc } = FS;
+    await entorno.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'promociones/promo1/usos/pasajero1'), { veces: 1 });
+    });
+    await RUT.assertFails(setDoc(doc(como('pasajero1'), 'promociones/promo1/usos/pasajero1'), { veces: 0 }));
+  });
+
+  it('un pasajero NO puede crearse un contador de usos', async () => {
+    const { doc, setDoc } = FS;
+    await RUT.assertFails(setDoc(doc(como('pasajero1'), 'promociones/promo1/usos/pasajero1'), { veces: 0 }));
+  });
+
+  // ── LOS CAMINOS LEGÍTIMOS ─────────────────────────────────────────────────
+  it('la app SIGUE pudiendo leer las promociones (Promociones.js de la app)', async () => {
+    const { collection, getDocs } = FS;
+    await RUT.assertSucceeds(getDocs(collection(como('pasajero1'), 'promociones')));
+  });
+
+  it('el admin SÍ puede crear una promoción (panel: guardar)', async () => {
+    const { doc, setDoc } = FS;
+    await RUT.assertSucceeds(setDoc(doc(como('eladmin'), 'promociones/NUEVA'), promoDelPanel));
+  });
+
+  it('el superadmin SÍ puede crear, editar, desactivar y reactivar (panel)', async () => {
+    const { doc, setDoc, updateDoc } = FS;
+    const db = como('eljefe');
+    await RUT.assertSucceeds(setDoc(doc(db, 'promociones/NUEVA'), promoDelPanel));
+    await RUT.assertSucceeds(updateDoc(doc(db, 'promociones/NUEVA'), { nombre: 'Bienvenida 2', valorBeneficio: 9000 }));
+    await RUT.assertSucceeds(updateDoc(doc(db, 'promociones/NUEVA'), { activa: false }));
+    await RUT.assertSucceeds(updateDoc(doc(db, 'promociones/NUEVA'), { activa: true }));
+  });
+
+  it('el superadmin SÍ puede asignar a mano: apunta el uso y la promoción (panel: asignarPromoManual)', async () => {
+    const { doc, runTransaction } = FS;
+    const db = como('eljefe');
+    await RUT.assertSucceeds(runTransaction(db, async (t) => {
+      const refUso = doc(db, 'promociones/promo1/usos/pasajero1');
+      const refPromo = doc(db, 'promociones/promo1');
+      await t.get(refUso);
+      await t.get(refPromo);
+      t.set(refUso, { veces: 1, ultimoUso: '2026-09-29T00:00:00.000Z', nombreUsuario: 'Ana' }, { merge: true });
+      t.update(refPromo, { usosTotales: 1, inversionTotal: 8000 });
+    }));
+  });
+});

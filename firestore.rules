@@ -1084,7 +1084,12 @@ service cloud.firestore {
     }
     match /promociones/{promoId} {
       allow read: if request.auth != null;
-      allow create, update: if request.auth != null;
+      // SEGURIDAD (29-sep-2026): antes `if request.auth != null` — cualquier pasajero
+      // se fabricaba una promoción de crédito y la canjeaba con `reclamarPromocion`.
+      // Las escribe SOLO el panel (guajirago-admin/src/Promociones.js: crear, editar,
+      // desactivar, reactivar, asignar). La app solo las lee, y el canje y el cobro
+      // van por las funciones (SDK de administrador, no pasa por aquí).
+      allow create, update: if esAdmin();
       // EXCEPCION medida: el panel borra promociones (Promociones.js:155).
       allow delete: if request.auth != null && (
         get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.rol == 'admin' ||
@@ -1092,7 +1097,11 @@ service cloud.firestore {
       );
       match /usos/{usoId} {
         allow read: if request.auth != null;
-        allow create, update: if request.auth != null;
+        // SEGURIDAD (29-sep-2026): el contador del tope por persona. Abierto a
+        // cualquiera, un pasajero se lo ponía en cero y canjeaba sin límite. Desde
+        // G17 lo sube el servidor al cobrar; desde el teléfono solo el panel al
+        // asignar a mano (Promociones.js: asignarPromoManual).
+        allow create, update: if esAdmin();
         allow delete: if false;
       }
     }
