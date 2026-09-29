@@ -349,7 +349,6 @@ const PENDIENTES = {
   'guajirago/src/Llamada.js': [3, 0],
   'guajirago/src/Login.js': [3, 3],
   'guajirago/src/MiPerfil.js': [1, 1],
-  'guajirago/src/Promociones.js': [1, 1],
   'guajirago/src/Seguridad.js': [1, 1],
   'guajirago/src/Turismo.js': [1, 1],
   'guajirago-admin/src/AliadosPendientes.js': [2, 0],

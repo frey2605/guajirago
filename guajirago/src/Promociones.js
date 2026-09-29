@@ -7,6 +7,8 @@ import Logo from './Logo';
 import { motivoPorLaPromocion } from './reglaPromocion';
 import { cop } from './moneda';
 import { fechaDeCalendario } from './fechaCalendario';
+import { useAccion } from './useAccion';
+import AvisoModal from './AvisoModal';
 
 function CelebracionPromo({ codigo, textoValor, onCerrar }) {
   const confeti = Array.from({ length: 30 }, (_, i) => i);
@@ -50,9 +52,10 @@ function Promociones({ onVolver }) {
   // de abajo sigue filtrándose con el 'tipo' que se lee al cargar.
   const [cargando, setCargando] = useState(true);
   const [codigo, setCodigo] = useState('');
-  const [error, setError] = useState('');
   const [mensaje, setMensaje] = useState('');
-  const [aplicando, setAplicando] = useState(false);
+  // LA LEY DEL BOTÓN (G38): el «Aplicar» pasa por el candado, y el motivo del fallo lo dice motivoDeRechazo en una
+  // ventanita — ya no una copia a mano de su regla en letra roja.
+  const { ocupado, correr, texto, aviso, cerrarAviso } = useAccion();
   const [celebrandoPromo, setCelebrandoPromo] = useState(null);
   const [descuentoActivo, setDescuentoActivo] = useState(null);
 
@@ -88,36 +91,28 @@ function Promociones({ onVolver }) {
 
   const categoriaInfo = (id) => CATEGORIAS.find(c => c.id === id) || { label: id, icono: '🎁' };
 
-  const aplicarCodigo = async () => {
-    setError(''); setMensaje('');
+  const aplicarCodigo = () => correr(async () => {
+    setMensaje('');
     const cod = codigo.trim().toUpperCase();
-    if (!cod) { setError('Escribe un código de promoción'); return; }
+    if (!cod) return { ok: false, error: 'Escribe un código de promoción' };
     const user = auth.currentUser;
-    if (!user) { setError('Error de sesión. Vuelve a iniciar sesión'); return; }
+    if (!user) return { ok: false, error: 'Error de sesión. Vuelve a iniciar sesión' };
+    // REGLA 7 — el reclamo ya NO se hace aquí. Este teléfono comprobaba la
+    // vigencia y el tipo de cuenta (¡mandando él mismo su 'tipoUsuario'!) y se
+    // escribía el beneficio. Ahora lo hace el servidor
+    // (functions: reclamarPromocion), que lee el tipo de la FICHA.
+    const reclamar = httpsCallable(getFunctions(), 'reclamarPromocion');
+    const respuesta = await reclamar({ codigo: cod });
+    const resultado = respuesta.data;
 
-    setAplicando(true);
-    try {
-      // REGLA 7 — el reclamo ya NO se hace aquí. Este teléfono comprobaba la
-      // vigencia y el tipo de cuenta (¡mandando él mismo su 'tipoUsuario'!) y se
-      // escribía el beneficio. Ahora lo hace el servidor
-      // (functions: reclamarPromocion), que lee el tipo de la FICHA.
-      const reclamar = httpsCallable(getFunctions(), 'reclamarPromocion');
-      const respuesta = await reclamar({ codigo: cod });
-      const resultado = respuesta.data;
-
-      const textoValor = resultado.tipo === 'credito' ? cop(resultado.valor) : `${resultado.valor}%`;
-      setCelebrandoPromo({ codigo: resultado.codigoVerificacion, textoValor });
-      setDescuentoActivo({ codigoVerificacion: resultado.codigoVerificacion, textoValor });
-      setCodigo('');
-    } catch (e) {
-      // El motivo lo explica ahora el servidor, con las mismas palabras de
-      // antes, y esos mensajes SIEMPRE llevan espacios. Si falla la red, la
-      // librería pone el código pelado ('internal'): eso no se enseña.
-      const delServidor = e && e.message && e.message.includes(' ');
-      setError(delServidor ? e.message : 'Error al aplicar el código. Intenta de nuevo');
-    }
-    setAplicando(false);
-  };
+    const textoValor = resultado.tipo === 'credito' ? cop(resultado.valor) : `${resultado.valor}%`;
+    setCelebrandoPromo({ codigo: resultado.codigoVerificacion, textoValor });
+    setDescuentoActivo({ codigoVerificacion: resultado.codigoVerificacion, textoValor });
+    setCodigo('');
+    return resultado;
+    // Si el servidor dice que no, el candado lo atrapa y motivoDeRechazo (la pieza única) enseña su frase tal cual
+    // —«Ese código no existe. Verifícalo»—, sin la marca « [404]» que le pega la librería (G38).
+  }, 'aplicar', 'Código activado.', 'aplicar el código');
 
   if (celebrandoPromo) return <CelebracionPromo codigo={celebrandoPromo.codigo} textoValor={celebrandoPromo.textoValor} onCerrar={() => setCelebrandoPromo(null)} />;
 
@@ -154,11 +149,12 @@ function Promociones({ onVolver }) {
               placeholder="Escribe el código"
               style={{ flex: 1, background: '#FFFFFF', border: '1px solid #ECECEF', borderRadius: '12px', padding: '12px 14px', color: '#1A1A1E', fontSize: '15px', outline: 'none' }}
             />
-            <button onClick={aplicarCodigo} disabled={aplicando} style={{ padding: '12px 18px', background: aplicando ? '#ECECEF' : 'linear-gradient(135deg, #FF7A2F, #D6357E)', border: 'none', borderRadius: '12px', color: aplicando ? '#6B7280' : '#FFFFFF', fontSize: '14px', fontWeight: '900', cursor: aplicando ? 'default' : 'pointer' }}>
-              {aplicando ? '...' : 'Aplicar'}
+            <button onClick={aplicarCodigo} disabled={!!ocupado} style={{ padding: '12px 18px', background: ocupado ? '#ECECEF' : 'linear-gradient(135deg, #FF7A2F, #D6357E)', border: 'none', borderRadius: '12px', color: ocupado ? '#6B7280' : '#FFFFFF', fontSize: '14px', fontWeight: '900', cursor: ocupado ? 'default' : 'pointer' }}>
+              {texto('aplicar', 'Aplicando…', 'Aplicar')}
             </button>
           </div>
-          {error && <p style={{ color: '#FF4444', fontSize: '12px', margin: 0 }}>{error}</p>}
+          {/* El éxito lo dice la celebración; aquí solo los fallos, en ventanita (G38). */}
+          <AvisoModal aviso={aviso && !aviso.ok ? aviso : null} onCerrar={cerrarAviso} />
           {mensaje && <p style={{ color: '#2ECC71', fontSize: '13px', fontWeight: 'bold', margin: 0 }}>{mensaje}</p>}
         </div>
 

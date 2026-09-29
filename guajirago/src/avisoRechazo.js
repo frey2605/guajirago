@@ -56,8 +56,13 @@ export function motivoDeRechazo(e, accion) {
   // Y la FRASE de nuestras funciones se respeta: el servidor contesta «Ese código ya fue usado» o «Ese código es de
   // otro conductor», escrito para la persona. Cambiarla por «Algo falló» le quitaría el motivo. Una frase lleva
   // espacios; cuando falla la red, Firebase pone de mensaje el código pelado («internal»), y ése no se enseña.
-  const frase = e && /^functions\//.test(String(e.code)) && typeof e.message === 'string' && /\s/.test(e.message.trim());
-  if (frase && m.clave !== 'sinRed') return { ...m, texto: e.message };
+  // G38 (28-sep-2026): desde firebase 12 la librería del teléfono le PEGA al final el estado HTTP —«Ese código no
+  // existe. Verifícalo [404]»— y sin señal el mensaje es «internal [0]», que lleva espacio y pasaba por frase. Esa
+  // marca es para el que revisa (sigue en la consola con apuntarRechazo), no para la persona: se quita ANTES de mirar
+  // si es una frase. Esta es la ÚNICA copia de la regla; lo mide scripts/medir-motivo-servidor.cjs con la librería real.
+  const limpio = (e && typeof e.message === 'string') ? e.message.replace(/\s*\[\d+\]\s*$/, '').trim() : '';
+  const frase = e && /^functions\//.test(String(e.code)) && /\s/.test(limpio);
+  if (frase && m.clave !== 'sinRed') return { ...m, texto: limpio };
   return m;
 }
 

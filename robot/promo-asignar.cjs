@@ -106,6 +106,10 @@ async function recorrer(fallos, hora, VENCIDA, VIAJES, ficha, admin, pasajero, s
     console.log('APP · EL SERVIDOR DIJO:', dijoLaApp || '(nada)');
     if (!dijoLaApp) fallos.push('la app no dijo nada al aplicar el código que pide 99 viajes');
     else if (!/99 viajes completados\. Llevas \d+/.test(dijoLaApp)) fallos.push('el servidor de pruebas dejó canjear sin los viajes previos: «' + dijoLaApp + '»');
+    // G38: esa frase la enseña motivoDeRechazo en la VENTANITA del candado, entera y sin la marca « [400]» que la
+    // librería de firebase le pega (antes salía en letra roja: «… Llevas 0 [400]»).
+    if (dijoLaApp && /\[\d+\]/.test(dijoLaApp)) fallos.push('la frase del servidor llegó con la marca técnica pegada: «' + dijoLaApp + '»');
+    if (dijoLaApp && !/No se pudo aplicar el código/.test(await a.texto())) fallos.push('el motivo no salió en la ventanita «No se pudo aplicar el código»');
     console.log('ERRORES DE LA APP:', a.errores.join(' || ') || 'ninguno');
   } finally {
     console.log('CAPTURAS APP:', a.carpeta);
