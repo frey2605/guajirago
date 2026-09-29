@@ -8,7 +8,7 @@ import { porQueNoLeToca } from './leTocaElViaje';
 import { calcularTarifaMinima } from './tarifas';
 import { RESPALDO_CONFIG, leerConfig, segundosDeEspera, BUSQUEDA } from './configApp';
 import { cop } from './moneda';
-import { ESTADOS_MERCADO, ESTADOS_TERMINADOS, ESTADOS_QUE_CIERRA_EL_SERVIDOR, avisoDelCierre, comoTermino, meAceptaronEsteViaje } from './estadosViaje';
+import { ESTADOS_MERCADO, ESTADO_ACEPTADO, ESTADOS_TERMINADOS, ESTADOS_QUE_CIERRA_EL_SERVIDOR, avisoDelCierre, comoTermino, meAceptaronEsteViaje } from './estadosViaje';
 import { consultaDeGanancias, resumenDeGanancias } from './gananciasConductor';
 // REGLA 9 · qué se le dice al conductor cuando el servidor dice que no. Mismo
 // archivo que usan el panel y aliados, copia idéntica byte a byte.
@@ -576,9 +576,11 @@ function AppConductor({ nombre, telefono, placa, vehiculo, tipoVehiculo, onCerra
       snap.docs.forEach(d => {
         // Sin `confirmando` (9-sep-2026) ni `en_negociacion` (12-sep): estados
         // retirados del mercado, que no los escribía nadie.
-        if (d.id !== idViajeGanador && d.data().estado === 'esperando') {
+        // G55: «buscando conductor» sale de ESTADOS_MERCADO; y como solo entra un viaje que ya está en el mercado, se
+        // le deja el estado que tiene (hoy `esperando`, el mismo que se escribía a mano).
+        if (d.id !== idViajeGanador && ESTADOS_MERCADO.includes(d.data().estado)) {
           updateDoc(doc(db, 'viajes', d.id), {
-            estado: 'esperando',
+            estado: d.data().estado,
             conductorId: null,
             conductorNombre: null,
             conductorPlaca: null,
@@ -647,7 +649,7 @@ function AppConductor({ nombre, telefono, placa, vehiculo, tipoVehiculo, onCerra
         return;
       }
 
-      if (data.estado === 'aceptado' && data.conductorId !== miId) {
+      if (data.estado === ESTADO_ACEPTADO && data.conductorId !== miId) {
         cerrarEsteVigilante();
         return;
       }
@@ -660,7 +662,7 @@ function AppConductor({ nombre, telefono, placa, vehiculo, tipoVehiculo, onCerra
       }
 
       // El pasajero subió su oferta: soltar este viaje para que reaparezca en la lista de solicitudes
-      if (data.estado === 'esperando' && data.nuevaOferta) {
+      if (ESTADOS_MERCADO.includes(data.estado) && data.nuevaOferta) {
         delete descartadosRef.current[idViaje];
         cerrarEsteVigilante();
         return;

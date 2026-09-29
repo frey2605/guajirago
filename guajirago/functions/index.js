@@ -55,6 +55,8 @@ const { avisoDelCambio } = require('./estadosPedido.cjs');
 const { celularDiezCifras, formasGuardadas } = require('./telefonoValido.cjs');
 // G53: el regalo al conductor nuevo y su respaldo salen de UNA pieza (atada al panel por pruebas/regaloConductorNuevo.test.js).
 const { regaloDelConductorNuevo } = require('./regaloConductorNuevo.cjs');
+// G55: «buscando conductor» y «aceptado» salen de UNA pieza (atada a src/estadosViaje.js por pruebas/estadosAMano.test.js).
+const { ESTADOS_MERCADO, ESTADO_ACEPTADO, ESTADOS_EN_CURSO } = require('./estadosViaje.cjs');
 
 // Distancia en km entre dos coordenadas (Haversine)
 function distanciaKm(lat1, lng1, lat2, lng2) {
@@ -96,7 +98,7 @@ async function tokensConductoresCerca(viaje) {
 
 exports.notificarNuevoViaje = onDocumentCreated("viajes/{viajeId}", async (event) => {
   const viaje = event.data.data();
-  if (!viaje || viaje.estado !== "esperando") return null;
+  if (!viaje || !ESTADOS_MERCADO.includes(viaje.estado)) return null;
   try {
     const tokens = await tokensConductoresCerca(viaje);
     console.log("notificarNuevoViaje: conductores en radio con token:", tokens.length);
@@ -115,7 +117,7 @@ exports.notificarNuevoViaje = onDocumentCreated("viajes/{viajeId}", async (event
 exports.notificarNuevaOferta = onDocumentUpdated("viajes/{viajeId}", async (event) => {
   const antes = event.data.before.data();
   const despues = event.data.after.data();
-  if (!despues || despues.estado !== "esperando") return null;
+  if (!despues || !ESTADOS_MERCADO.includes(despues.estado)) return null;
   if (antes.tarifaValor === despues.tarifaValor) return null;
   try {
     const tokens = await tokensConductoresCerca(despues);
@@ -317,7 +319,7 @@ exports.confirmarConductor = onCall(async (request) => {
       if (viaje.pasajeroId !== request.auth.uid) {
         throw new HttpsError("permission-denied", "Este viaje no es tuyo");
       }
-      if (viaje.estado !== "esperando") return { ok: false, motivo: "viaje_no_disponible" };
+      if (!ESTADOS_MERCADO.includes(viaje.estado)) return { ok: false, motivo: "viaje_no_disponible" };
       const cond = condSnap.exists ? condSnap.data() : {};
       if (cond.enViajeId && cond.enViajeId !== viajeId) return { ok: false, motivo: "ocupado" };
       if (!ofertaSnap.exists) return { ok: false, motivo: "sin_oferta" };
@@ -332,7 +334,7 @@ exports.confirmarConductor = onCall(async (request) => {
       const descuentoInfo = descuentoSobreTarifaAceptada(viaje.descuentoInfo, tarifaValorAceptada);
 
       t.update(viajeRef, {
-        estado: "aceptado",
+        estado: ESTADO_ACEPTADO,
         conductorId,
         conductorNombre: of.conductorNombre || "",
         conductorTelefono: of.conductorTelefono || "",
@@ -433,7 +435,7 @@ exports.expirarViajesColgados = onSchedule(
 
     // Se pregunta por los dos estados que esta rutina cierra. Los demás ni se
     // leen: es lo que mantiene barata la pasada.
-    for (const estado of ["esperando", "aceptado"]) {
+    for (const estado of ESTADOS_EN_CURSO) {
       try {
         const snap = await db.collection("viajes").where("estado", "==", estado).limit(400).get();
         for (const d of snap.docs) {

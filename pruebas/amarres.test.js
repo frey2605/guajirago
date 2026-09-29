@@ -2119,9 +2119,21 @@ describe('LA RUTINA DE VIAJES COLGADOS · obedece a la calculadora', () => {
 
   it('EL QUE MUERDE · mira los DOS estados, no solo las búsquedas', () => {
     const cuerpo = laRutina();
-    const lista = cuerpo.match(/for\s*\(\s*const\s+estado\s+of\s*\[([^\]]*)\]/);
+    const lista = cuerpo.match(/for\s*\(\s*const\s+estado\s+of\s*(?:\[([^\]]*)\]|([A-Za-z_$][\w$]*))/);
     assert.ok(lista, 'la rutina ya no recorre una lista de estados: mírala entera.');
-    const estados = lista[1].replace(/["'\s]/g, '').split(',').filter(Boolean).sort();
+    let estados;
+    if (lista[1] !== undefined) {
+      estados = lista[1].replace(/["'\s]/g, '').split(',').filter(Boolean).sort();
+    } else {
+      // G55 (29-sep-2026): la rutina recorre `ESTADOS_EN_CURSO` de la pieza del servidor. Tiene que venir de ESA pieza
+      // (la atada a la app por pruebas/estadosAMano.test.js), no de una constante escrita en index.js.
+      assert.strictEqual(lista[2], 'ESTADOS_EN_CURSO', 'la rutina recorre `' + lista[2] + '`: tiene que ser ESTADOS_EN_CURSO de functions/estadosViaje.cjs');
+      const index = soloCodigo(leer('guajirago/functions/index.js'));
+      assert.match(index, /const\s*\{[^}]*\bESTADOS_EN_CURSO\b[^}]*\}\s*=\s*require\(\s*['"]\.\/estadosViaje\.cjs['"]\s*\)/,
+        'index.js recorre ESTADOS_EN_CURSO pero no lo saca de ./estadosViaje.cjs');
+      assert.ok(!/(?:const|let|var)\s+ESTADOS_EN_CURSO\s*=/.test(index), 'index.js se escribió su propio ESTADOS_EN_CURSO en vez de usar la pieza');
+      estados = [...require('../guajirago/functions/estadosViaje.cjs').ESTADOS_EN_CURSO].sort();
+    }
     // G25 (28-sep-2026): contra la FUENTE (`ESTADOS_EN_CURSO` de la app), no contra una lista escrita aquí: si mañana
     // entra un estado vivo nuevo y la rutina no lo mira, sus viajes no los cierra nadie.
     const { ESTADOS_EN_CURSO: vivos } = cargarDeLaApp('guajirago/src/estadosViaje.js');

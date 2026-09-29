@@ -54,6 +54,9 @@
  * minuto a minuto, así que no hay forma. La fase es la mejor señal que hay.
  */
 
+// G55: «buscando conductor» y «aceptado» salen de la pieza de estados del servidor (atada a la app).
+const { ESTADOS_MERCADO, ESTADO_ACEPTADO } = require('./estadosViaje.cjs');
+
 // Las fases en las que YA HAY ALGUIEN ESPERANDO O MONTADO.
 const RODANDO = ['en_punto', 'en_viaje'];
 
@@ -123,7 +126,7 @@ function queHacerConElViaje(viaje, ahora) {
   const no = (porQue, minutos) => ({ cerrar: false, estado: null, porQue, minutos: minutos ?? null });
 
   // 1) LA BÚSQUEDA COLGADA. Nadie lo tomó: no hay conductor a quien avisar.
-  if (v.estado === 'esperando') {
+  if (ESTADOS_MERCADO.includes(v.estado)) {
     // «Seguir buscando» (`Solicitar.js:877`) devuelve el viaje a `esperando` y
     // escribe `nuevaOferta`, pero NO toca `fechaSolicitud`. Contando desde la
     // fecha vieja, a un pasajero que lleva 25 min dándole al botón se le muere
@@ -139,7 +142,7 @@ function queHacerConElViaje(viaje, ahora) {
   }
 
   // 2) EL VIAJE ACEPTADO. Aquí es donde se miraba solo el reloj.
-  if (v.estado === 'aceptado') {
+  if (v.estado === ESTADO_ACEPTADO) {
     const rodando = RODANDO.includes(v.fase);
 
     if (!rodando) {

@@ -96,7 +96,10 @@ export const ESTADOS_MERCADO = ['esperando'];
 // de aquí al lado lo cazó: `en_negociacion` estaba en el mercado y se me quedó
 // fuera de esta lista. Derivándola, el día que un estado entre o salga del
 // mercado, esto se mueve con él y no hay nada que acordarse de tocar.
-export const ESTADOS_EN_CURSO = [...ESTADOS_MERCADO, 'aceptado'];
+// G55 (29-sep-2026): «ya tiene conductor», con nombre propio. Lo usan la pantalla del conductor y, por su copia atada
+// (`functions/estadosViaje.cjs`, pruebas/estadosAMano.test.js), el servidor: nadie más lo escribe a mano.
+export const ESTADO_ACEPTADO = 'aceptado';
+export const ESTADOS_EN_CURSO = [...ESTADOS_MERCADO, ESTADO_ACEPTADO];
 export const ESTADOS_TERMINADOS = ['finalizado', 'cancelado', 'cancelado_conductor', 'vencido', 'expirado'];
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -184,7 +187,7 @@ export function huellaDelViaje(viaje) {
  */
 export function meAceptaronEsteViaje(viaje, miId) {
   const v = viaje || {};
-  return !!miId && v.estado === 'aceptado' && v.conductorId === miId && v.fase !== 'en_viaje';
+  return !!miId && v.estado === ESTADO_ACEPTADO && v.conductorId === miId && v.fase !== 'en_viaje';
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -286,6 +289,6 @@ export function elViajeEnCurso(viajes) {
   const masReciente = (lista) => lista.slice()
     .sort((a, b) => cuando(b).localeCompare(cuando(a)))[0] || null;
   // Con conductor primero: en una emergencia, la placa vale más que la ruta.
-  return masReciente(enCurso.filter((v) => v.estado === 'aceptado'))
+  return masReciente(enCurso.filter((v) => v.estado === ESTADO_ACEPTADO))
     || masReciente(enCurso);
 }
