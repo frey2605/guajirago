@@ -337,6 +337,15 @@ const RECORRIDOS = [
       'guajirago-aliados/src/reglaPromocion.js', 'guajirago-admin/src/Restaurantes.js', 'guajirago-admin/src/horarioNegocio.js',
       'guajirago-admin/src/escaparate.js'],
   },
+  {
+    nombre: 'fecha-pedido',
+    que: 'el pasajero hace un domicilio (y lo cancela) y «🧾 pedidos hoy» del panel sube en uno, con la fecha pintada en la ficha (G48; crea un pedido en PRUEBAS)',
+    archivo: 'fecha-pedido.cjs',
+    // La pieza, cada convertidor de aliados y el «hoy» de Corte de caja los SACA de su archivo y los EJECUTA
+    // pruebas/fechaPedido.test.js.
+    vigila: ['guajirago-admin/src/Restaurantes.js', 'guajirago-admin/src/fechaGuardada.js', 'guajirago/src/fechaGuardada.js',
+      'guajirago/src/Restaurantes.js'],
+  },
 ];
 
 // Los archivos de pantalla: los que, si cambian, el robot debería poder probar. Todo lo que esté en

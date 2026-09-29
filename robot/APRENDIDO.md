@@ -524,6 +524,16 @@ la placa de `conductores/{uid}` (la escribe su GPS con la misma placa que va en 
   panel «🟢 Abierto» fuera de horario. Después de publicar, verde a la primera. Al final se le devuelve el 0 y 0.
 - Los 403 de la consola salen igual que en los demás recorridos.
 
+### fecha-pedido · «pedidos hoy» del panel cuenta el domicilio (G48, 29-sep-2026)
+- El Restaurante de Prueba pide un mínimo de $ 10.000: un «Jugo de corozo» ($ 5.000) no alcanza y el botón dice
+  «Pedido mínimo $ 10.000». Se toca dos veces el ÚLTIMO «+» (el primero es el del menú; el segundo ya es el del carrito).
+- En el panel, «🧾 N pedidos hoy» va en un `span` dentro de los 12 nodos `p`/`span` después de «Restaurante de Prueba».
+  En la ficha (se abre tocando el nombre), cada fila de «Pedidos recientes» dice «<fecha> · <estado>»: el separador no
+  casa con « · » a pelo (el texto no trae espacios normales ahí); se busca con `\s·`.
+- Corrido con el panel VIEJO publicado en pruebas (a9b5a4c): «0 pedidos hoy» antes y después del domicilio, y las tres
+  fechas de la ficha en «—». Con el nuevo (2df3503): sube en uno y las fechas salen («29/9/2026, 1:17:32 a. m.»).
+- Los 403 de la consola salen igual que en los demás recorridos.
+
 ## Lo que el robot dejó creado en pruebas
 
 - 27-sep-2026: «Robot Taxi De Prueba» (robot.taxi.1790508222079@gg.test) y
@@ -562,3 +572,5 @@ la placa de `conductores/{uid}` (la escribe su GPS con la misma placa que va en 
   al devolverla; antes no tenía el campo). Para `fotoDe` es lo mismo: sin foto.
 - 28-sep-2026 en adelante: la ficha de taxi@gg.test lleva `marca: null` y `modelo: null` (lo deja `placa-panel.cjs` al
   devolverla; antes no tenía esos campos). Nadie los lee de esa ficha.
+- 29-sep-2026 en adelante: un pedido de domicilio de pasajero@gg.test al Restaurante de Prueba por cada corrida de
+  `fecha-pedido.cjs` (dos jugos de corozo, «Calle Robot G48 #1-2»), ya `cancelado` por el cliente.
