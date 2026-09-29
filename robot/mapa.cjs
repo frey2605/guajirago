@@ -221,7 +221,7 @@ const RECORRIDOS = [
     nombre: 'me-aceptaron',
     que: 'el pasajero acepta la oferta a los 12 min de pedir (con confirmarConductor, en la base de pruebas) y la app del conductor dice «¡Trato hecho!» y pasa a «YENDO A RECOGER» (G24)',
     archivo: 'me-aceptaron.cjs',
-    vigila: ['guajirago/src/AppConductor.js', 'guajirago/src/estadosViaje.js'],
+    vigila: ['guajirago/src/AppConductor.js', 'guajirago/src/estadosViaje.js', 'guajirago/src/TratoHecho.js'],
   },
   {
     nombre: 'espera-conductor',

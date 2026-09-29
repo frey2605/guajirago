@@ -23,6 +23,7 @@ import { RAZONES_CANCELACION_CONDUCTOR, AVISO_SIN_SALDO } from './textosViaje';
 import ModalCancelacion from './ModalCancelacion';
 import Calificacion from './Calificacion';
 import Llamada from './Llamada';
+import TratoHecho from './TratoHecho'; // G74: la ventanita «¡Trato hecho!», la misma para pasajero y conductor
 import { useLlamadaEntrante } from './llamadaEntrante';
 import Creditos from './Creditos';
 import MiPerfil from './MiPerfil';
@@ -71,20 +72,6 @@ const TARIFA_MINIMA = calcularTarifaMinima(undefined, CONFIG_APP_DEFECTO);
 // del servidor (que no puede importar archivos de la app). Se importa arriba.
 
 // Las razones de cancelación viven en textosViaje.js (SEGUNDA LEY). Se importan arriba.
-
-function Celebracion() {
-  return (
-    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: '#FFFFFF', zIndex: 9999, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-      <div style={{ fontSize: '100px', marginBottom: '24px', animation: 'bounce 0.5s infinite alternate' }}>🤝</div>
-      <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
-        {['🎊', '🎉', '🎊', '🎉', '🎊'].map((e, i) => <span key={i} style={{ fontSize: '32px' }}>{e}</span>)}
-      </div>
-      <h2 style={{ color: '#1A1A1E', fontSize: '28px', fontWeight: '900', margin: '0 0 8px', textAlign: 'center' }}>¡Trato hecho!</h2>
-      <p style={{ color: '#FF7A2F', fontSize: '16px', margin: '0', textAlign: 'center' }}>El viaje está confirmado 🚀</p>
-      <style>{`@keyframes bounce { from { transform: scale(1); } to { transform: scale(1.2); } }`}</style>
-    </div>
-  );
-}
 
 function CelebracionConductor({ monto, onCerrar }) {
   const confeti = Array.from({ length: 30 }, (_, i) => i);
@@ -1240,7 +1227,7 @@ useEffect(() => {
   if (verAyuda) return <AyudaSoporte onVolver={() => setVerAyuda(false)} />;
   if (verConfig) return <Configuracion onVolver={() => setVerConfig(false)} onCerrarSesion={cerrarSesion} />;
   if (verPromociones) return <Promociones onVolver={() => setVerPromociones(false)} />;
-  if (celebrando) return <Celebracion />;
+  if (celebrando) return <TratoHecho />;
 
   if (saldoVirtualRecibido !== null) return (
     <CelebracionConductor

@@ -6,6 +6,7 @@ import Logo from './Logo';
 import { collection, addDoc, doc, onSnapshot, updateDoc, getDoc, query, orderBy } from 'firebase/firestore';
 import Calificacion from './Calificacion';
 import Llamada from './Llamada';
+import TratoHecho from './TratoHecho'; // G74: la ventanita «¡Trato hecho!», la misma para pasajero y conductor
 import { useLlamadaEntrante } from './llamadaEntrante';
 import { prepararTokenDeAvisos } from './Notificaciones';
 import { sonarAlerta, desbloquearAudio } from './alerta';
@@ -74,20 +75,6 @@ const CONFIG_APP_DEFECTO = RESPALDO_CONFIG;
 // donde se calcula para toda la app (SEGUNDA LEY). Se importa arriba.
 // El centro y el marco de Riohacha, las respuestas rápidas y las razones de
 // cancelación tampoco: viven en riohacha.js y textosViaje.js. Se importan arriba.
-
-function Celebracion() {
-  return (
-    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: '#FFFFFF', zIndex: 9999, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-      <div style={{ fontSize: '100px', marginBottom: '24px', animation: 'bounce 0.5s infinite alternate' }}>🤝</div>
-      <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
-        {['🎊', '🎉', '🎊', '🎉', '🎊'].map((e, i) => <span key={i} style={{ fontSize: '32px' }}>{e}</span>)}
-      </div>
-      <h2 style={{ color: '#1A1A1E', fontSize: '28px', fontWeight: '900', margin: '0 0 8px', textAlign: 'center' }}>¡Trato hecho!</h2>
-      <p style={{ color: '#FF7A2F', fontSize: '16px', margin: '0', textAlign: 'center' }}>El viaje está confirmado 🚀</p>
-      <style>{`@keyframes bounce { from { transform: scale(1); } to { transform: scale(1.2); } }`}</style>
-    </div>
-  );
-}
 
 function ConductorLlego({ nombre, placa, onCerrar }) {
   const handleCerrar = (e) => { e.preventDefault(); e.stopPropagation(); onCerrar(); };
@@ -1257,7 +1244,7 @@ const PanelEmergencia = () => (
     </div>
   ) : null;
   if (mostrarCalificacion) return <Calificacion tipo={tipo} viajeId={viajeId} nombreCalificado={viaje?.conductorNombre} calificadoId={viaje?.conductorId} quienCalifica="pasajero" onFinalizar={onVolver} />;
-  if (celebrando) return <Celebracion />;
+  if (celebrando) return <TratoHecho />;
   if (llamandoConductor) return <Llamada viajeId={viajeId} miRol="pasajero" nombreOtro={viaje?.conductorNombre || 'Conductor'} onCerrar={() => setLlamandoConductor(false)} />;
   if (llamadaEntrante) return <Llamada viajeId={viajeId} miRol="entrante" nombreOtro={viaje?.conductorNombre || 'Conductor'} onCerrar={() => setLlamadaEntrante(false)} />;
 
