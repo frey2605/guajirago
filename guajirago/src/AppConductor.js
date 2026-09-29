@@ -19,7 +19,7 @@ import LlamadoAtencion from './LlamadoAtencion';
 // LA LEY DEL BOTÓN (26-sep-2026): todo lo que guarda en la app del conductor pasa por el candado.
 import { useAccion } from './useAccion';
 import { calcularDistanciaKm } from './distancia';
-import { RAZONES_CANCELACION_CONDUCTOR } from './textosViaje';
+import { RAZONES_CANCELACION_CONDUCTOR, AVISO_SIN_SALDO } from './textosViaje';
 import ModalCancelacion from './ModalCancelacion';
 import Calificacion from './Calificacion';
 import Llamada from './Llamada';
@@ -322,7 +322,7 @@ function TarjetaSolicitud({ solicitud, nombre, telefono, placa, vehiculo, tipoVe
     // G03: la misma cifra que cobrará el servidor, que mira el tipo del VIAJE (no el vehículo del conductor).
     const comisionAplicable = comisionSegunTipoDeViaje(solicitud.tipo, configApp);
     if (saldoCreditos !== null && saldoCreditos < comisionAplicable) {
-      alert('No tienes saldo suficiente para tomar viajes. Recarga tus créditos.');
+      onAviso(AVISO_SIN_SALDO); // G69: la misma ventanita que el interruptor, texto de textosViaje.js
       return;
     }
     const user = auth.currentUser;
@@ -1513,7 +1513,7 @@ if (sancionActiva) return (
         
         <div style={{ background: '#FFFFFF', border: '1.5px solid #ECECEF', borderRadius: '14px', padding: '12px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
           <p style={{ color: activo ? '#1A1A1E' : '#6B7280', fontWeight: '900', fontSize: '15px', margin: '0' }}>{activo ? '🟢 Estoy disponible' : '⚪ No disponible'}</p>
-          <div onClick={() => { if (!activo && saldoCreditos !== null && saldoCreditos < comisionParaActivarse(tipoVehiculo, configApp)) { alert('No tienes saldo suficiente para recibir viajes. Recarga tus créditos.'); return; } desbloquearAudio(); setActivo(!activo); }} style={{ width: '52px', height: '30px', borderRadius: '15px', background: activo ? 'linear-gradient(135deg, #FFCF4D, #FF7A2F)' : '#ECECEF', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '0 4px', justifyContent: activo ? 'flex-end' : 'flex-start', flexShrink: 0 }}>
+          <div onClick={() => { if (!activo && saldoCreditos !== null && saldoCreditos < comisionParaActivarse(tipoVehiculo, configApp)) { setAviso(AVISO_SIN_SALDO); return; } desbloquearAudio(); setActivo(!activo); }} style={{ width: '52px', height: '30px', borderRadius: '15px', background: activo ? 'linear-gradient(135deg, #FFCF4D, #FF7A2F)' : '#ECECEF', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '0 4px', justifyContent: activo ? 'flex-end' : 'flex-start', flexShrink: 0 }}>
             <div style={{ width: '22px', height: '22px', borderRadius: '50%', background: '#FFFFFF' }}/>
           </div>
         </div>

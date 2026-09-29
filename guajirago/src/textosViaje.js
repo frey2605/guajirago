@@ -38,3 +38,18 @@ export const RAZONES_CANCELACION_CONDUCTOR = [
   'Problema con el vehículo',
   'Otro motivo',
 ];
+
+/**
+ * El aviso de «no te alcanza el saldo» del conductor — gemelo G69 (29-sep-2026).
+ *
+ * AppConductor.js frena por saldo en DOS sitios: al prender el interruptor y al aceptar o contraofertar una
+ * solicitud. Cada uno avisaba con un alert() del navegador y su propio texto («para recibir viajes» / «para tomar
+ * viajes»). Ahora los dos enseñan ESTA ventanita (AvisoModal). Aquí solo vive CÓMO se dice: cuánto saldo hace falta
+ * lo decide comisiones.js, y eso no se toca aquí.
+ */
+export const AVISO_SIN_SALDO = {
+  ok: false,
+  icono: '💳',
+  titulo: 'Te falta saldo',
+  texto: 'No tienes saldo suficiente para recibir ni aceptar viajes. Recarga tus créditos en «Mis créditos», en el menú.',
+};
