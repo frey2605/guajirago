@@ -601,6 +601,16 @@ la placa de `conductores/{uid}` (la escribe su GPS con la misma placa que va en 
 - Con la llave escrita a mano (antes de G62) y con la del .env (después): las dos apps de pruebas cargan, dibujan y 0
   rechazos.
 
+### recuperar-contrasena · aviso neutro y la verdad del fallo (G71, 29-sep-2026)
+- Se hace sin entrar a ninguna cuenta: «Ya tengo cuenta» → correo → «¿Olvidaste tu contraseña?». La ventanita es la del
+  candado (AvisoModal, «Entendido»); hay que cerrarla antes de volver a tocar el botón.
+- Con un correo que NO existe no se envía nada: el servidor de pruebas (y el de producción) tiene la protección contra
+  adivinar correos y contesta «listo». Por eso el recorrido puede pedirlo cuantas veces quiera sin mandar correos.
+- Un correo mal escrito («esto no es un correo») lo rechaza el servidor con `auth/invalid-email`, no el navegador: tarda
+  lo mismo que el bueno (se esperan 4 s).
+- «Cambiar contraseña» (Configuración) NO se prueba aquí: mandaría un correo de verdad a la cuenta de prueba.
+- `registrar-conductor` volvió a salir 🔴 dentro de `probar-cambio` (un clic que no llegó en 30 s) y ✓ al correrlo solo.
+
 ## Lo que el robot dejó creado en pruebas
 
 - 27-sep-2026: «Robot Taxi De Prueba» (robot.taxi.1790508222079@gg.test) y
