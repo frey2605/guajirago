@@ -22,6 +22,16 @@ export const centroRiohacha = { lat: 11.5444, lng: -72.9072 };
 export const BOUNDS_RIOHACHA = { north: 11.7, south: 11.3, east: -72.6, west: -73.0 };
 
 /**
+ * El marco de La Guajira (G61 · 29-sep-2026): Riohacha y alrededores. Lo usan las
+ * sugerencias de los domicilios y de los perfiles de los negocios, que solo lo toman
+ * como PREFERENCIA (se sugiere primero lo de adentro, pero no se prohíbe lo de afuera).
+ * Estaba escrito a mano tres veces (Restaurantes.js y los dos perfiles de aliados).
+ * Aliados lleva una copia de los DOS marcos (repo aparte, no puede importar este archivo),
+ * atada en pruebas/sugerencias.test.js: se cambia AQUÍ y se copia igual.
+ */
+export const BOUNDS_LA_GUAJIRA = { north: 12.5, south: 10.9, east: -71.1, west: -73.4 };
+
+/**
  * Lo que se le pega a una dirección escrita para que Google la busque AQUÍ y no
  * en otra ciudad (G60 · 29-sep-2026). Estaba escrito a mano cuatro veces, en
  * dos pantallas. Solo lo usa `puntoDeDireccion` (direccionDePunto.js).

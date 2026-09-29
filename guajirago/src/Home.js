@@ -19,7 +19,8 @@ import LlamadoAtencion from './LlamadoAtencion';
 // G21: qué viajes salen en el historial y cómo terminó cada uno salen de UNA pieza, la misma de las otras dos pantallas.
 import { ESTADOS_TERMINADOS, comoTermino } from './estadosViaje';
 // El marco de Riohacha vive en riohacha.js (SEGUNDA LEY): un solo sitio para la geografía.
-import { BOUNDS_RIOHACHA } from './riohacha';
+// G61: y el cuadro de sugerencias que lo usa sale de UNA pieza.
+import { ponerSugerencias } from './sugerenciasDeDirecciones';
 import { fotoDe } from './fotoUsuario';
 
 const ICONOS_FAVORITOS = ['🏠', '💼', '❤️', '⭐', '🏥', '🏫', '🛒', '🏖️', '⛪', '🏋️'];
@@ -33,15 +34,7 @@ function ModalFavorito({ onGuardar, onCerrar }) {
 
   useEffect(() => {
     if (!inputDireccionRef.current || !window.google) return;
-    autocompleteRef.current = new window.google.maps.places.Autocomplete(inputDireccionRef.current, {
-      componentRestrictions: { country: 'co' },
-      bounds: new window.google.maps.LatLngBounds(
-        new window.google.maps.LatLng(BOUNDS_RIOHACHA.south, BOUNDS_RIOHACHA.west),
-        new window.google.maps.LatLng(BOUNDS_RIOHACHA.north, BOUNDS_RIOHACHA.east)
-      ),
-      strictBounds: true,
-      types: ['establishment', 'geocode'],
-    });
+    autocompleteRef.current = ponerSugerencias(window.google, inputDireccionRef.current, 'favorito');
     autocompleteRef.current.addListener('place_changed', () => {
       const place = autocompleteRef.current.getPlace();
       if (place && place.name) setDireccion(place.name);

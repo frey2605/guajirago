@@ -43,6 +43,7 @@ import { prepararTokenDeAvisos } from './Notificaciones';
 // Pedirle el GPS al teléfono, con sus tiempos en un solo sitio (G28).
 import { pedirGps } from './pedirGps';
 import { direccionDePunto, textoDeCoordenadas } from './direccionDePunto';
+import { ponerSugerencias } from './sugerenciasDeDirecciones';
 // G33: qué paso ve el cliente según el estado que puso el negocio, en una sola tabla.
 import { PASOS_DEL_CLIENTE, indiceDelPaso, yaLlegoAlCliente, terminadoParaElCliente, etiquetaParaElCliente } from './estadosPedido';
 
@@ -192,13 +193,8 @@ function Restaurantes({ nombre, onVolver, foto, onCerrarSesion, onIrPerfil, onIr
       const el = direccionRef.current;
       if (el && !el._acDone && window.google && window.google.maps && window.google.maps.places) {
         el._acDone = true;
-        // Sesgar las sugerencias a La Guajira (Riohacha y alrededores)
-        const laGuajira = new window.google.maps.LatLngBounds(
-          new window.google.maps.LatLng(10.9, -73.4),
-          new window.google.maps.LatLng(12.5, -71.1)
-        );
-        const ac = new window.google.maps.places.Autocomplete(el, { componentRestrictions: { country: 'co' }, bounds: laGuajira, fields: ['formatted_address'] });
-        ac.setBounds(laGuajira);
+        // Sesgar las sugerencias a La Guajira (Riohacha y alrededores). G61: sale de UNA pieza, con el marco de riohacha.js.
+        const ac = ponerSugerencias(window.google, el, 'entrega');
         ac.addListener('place_changed', () => { const p = ac.getPlace(); if (p.formatted_address) setDireccion(p.formatted_address); });
         clearInterval(iv);
       }

@@ -18,7 +18,9 @@ import { generarCodigoSeguridad, guardarCodigoDeViaje, cargarCodigoDeViaje } fro
 import { armarViajeNuevo } from './viajeNuevo';
 import { ESTADOS_QUE_CIERRA_EL_SERVIDOR, avisoDelCierre, huellaDelViaje } from './estadosViaje';
 // Los datos que comparten las pantallas salen de archivos únicos (SEGUNDA LEY).
-import { centroRiohacha, BOUNDS_RIOHACHA } from './riohacha';
+import { centroRiohacha } from './riohacha';
+// G61: el cuadro de sugerencias de direcciones sale de UNA pieza (con su marco de Riohacha).
+import { ponerSugerencias } from './sugerenciasDeDirecciones';
 import { RESPUESTAS_RAPIDAS, RAZONES_CANCELACION_PASAJERO } from './textosViaje';
 import ModalCancelacion from './ModalCancelacion';
 // REGLA 9 · qué se le dice al pasajero cuando el servidor dice que no. Mismo
@@ -158,15 +160,7 @@ function AutocompleteInput({ value, onChange, placeholder, icon, onPlaceCoords }
   useEffect(() => { onChangeRef.current = onChange; }, [onChange]);
   useEffect(() => {
     if (!inputRef.current || !window.google) return;
-    autocompleteRef.current = new window.google.maps.places.Autocomplete(inputRef.current, {
-      componentRestrictions: { country: 'co' },
-      bounds: new window.google.maps.LatLngBounds(
-        new window.google.maps.LatLng(BOUNDS_RIOHACHA.south, BOUNDS_RIOHACHA.west),
-        new window.google.maps.LatLng(BOUNDS_RIOHACHA.north, BOUNDS_RIOHACHA.east)
-      ),
-      strictBounds: true, types: ['establishment', 'geocode'],
-      fields: ['geometry', 'name', 'formatted_address'],
-    });
+    autocompleteRef.current = ponerSugerencias(window.google, inputRef.current, 'viaje');
     autocompleteRef.current.addListener('place_changed', () => {
       const place = autocompleteRef.current.getPlace();
       if (place && place.name) onChangeRef.current(place.name);
