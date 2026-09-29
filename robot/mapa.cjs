@@ -165,6 +165,14 @@ const RECORRIDOS = [
     vigila: ['guajirago-admin/src/App.js', 'guajirago-admin/src/Superadmin.js', 'guajirago-admin/src/comisiones.js'],
   },
   {
+    nombre: 'total-recargas',
+    que: '🎟️ Códigos → «VALOR RECARGADO» es la cuenta única del panel (recargas.js) sobre los códigos de la base de pruebas, contando el cobrado y anulado (G54; crea dos códigos fijos si faltan)',
+    archivo: 'total-recargas.cjs',
+    // El tablero (App.js, 💰 Recargas) usa la misma pieza; sus gráficas no se leen aquí: la cuenta con fechas la
+    // EJECUTA pruebas/totalRecargas.test.js.
+    vigila: ['guajirago-admin/src/Codigos.js', 'guajirago-admin/src/recargas.js'],
+  },
+  {
     nombre: 'placa-fresca',
     que: 'el admin corrige la placa del taxista en su ficha y, con la copia del teléfono puesta, la app enseña y manda la placa nueva (mira la base de pruebas) (G09)',
     archivo: 'placa-fresca.cjs',

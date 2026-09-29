@@ -575,6 +575,15 @@ la placa de `conductores/{uid}` (la escribe su GPS con la misma placa que va en 
 - Con la app VIEJA publicada en pruebas: pasajero, módulos → la de los dos lados (50 etiquetas) y su menú → la suya;
   «Ganancias» del pasajero → «muy pronto»; taxista, módulos → la de los dos lados (39 etiquetas) y su menú → la suya.
 
+### total-recargas · «VALOR RECARGADO» es la cuenta única del panel (G54, 29-sep-2026)
+- La base de pruebas NO tenía ningún código de recarga: sin datos la cuenta vieja y la nueva dan $ 0 y el recorrido no
+  demuestra nada. Por eso crea (solo si faltan) dos códigos fijos: uno cobrado ($ 50.000) y otro cobrado y ANULADO
+  ($ 40.000), el caso que separaba las cuentas. Las reglas no dejan borrar un código ni cambiarle `usado`: se REUSAN.
+- Los códigos no se pueden LISTAR desde el robot (`entrarALaBase` solo lee de a uno): el recorrido saca los nombres de
+  la pantalla «Todos» (el texto que va justo después de la etiqueta DISPONIBLE / USADO / ANULADO) y los lee uno por uno.
+- Con el panel VIEJO publicado en pruebas: «VALOR RECARGADO» $ 50.000 contra $ 90.000 de la cuenta única → rojo.
+  Con el nuevo, $ 90.000 → verde.
+
 ## Lo que el robot dejó creado en pruebas
 
 - 27-sep-2026: «Robot Taxi De Prueba» (robot.taxi.1790508222079@gg.test) y
@@ -619,3 +628,6 @@ la placa de `conductores/{uid}` (la escribe su GPS con la misma placa que va en 
   `aprobar-negocio.cjs`; antes no tenía el campo). `aprobado`, `estadoAprobacion` y `activo` se le devuelven como estaban.
 - 29-sep-2026 en adelante: una promoción `promociones/ROBOT-G52-<hora>` sin tipo de beneficio y valor 15, de un solo día,
   por cada corrida de `texto-beneficio.cjs`, ya apagada.
+- 29-sep-2026: dos códigos de recarga FIJOS de `total-recargas.cjs`, `codigos/ROBOT-G54-COBRADO` ($ 50.000, usado) y
+  `codigos/ROBOT-G54-COBRADO-ANULADO` ($ 40.000, usado y anulado), sin conductor. Ya cobrados: nadie los puede canjear y
+  no tocaron ningún saldo. Cada corrida los reusa. Suben el «💰 Recargas» del tablero de pruebas del 29-sep a $ 90.000.
