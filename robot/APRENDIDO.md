@@ -448,6 +448,18 @@ la placa de `conductores/{uid}` (la escribe su GPS con la misma placa que va en 
 - En el inicio hay DOS botones «Crear cuenta» a lo largo del camino (el del inicio y el de enviar el registro): se toca
   `.first()` en el inicio y `.last()` ya en el registro.
 
+### motivo-fallo · el fallo al guardar dice por qué (G40, 28-sep-2026)
+- 🔑 **Un rechazo de verdad sin tocar datos**: una «foto» de 11 MB (`setInputFiles` con un `Buffer` y `mimeType`
+  `image/jpeg`) pasa el `accept="image/*"` del teléfono, pero el almacén la rechaza por grande (`esUnaFoto` pide menos
+  de 10 MB) con un 403 → `storage/unauthorized`. No se sube nada y el perfil no se toca.
+- Con el código de antes (la app de pruebas sin publicar) salió 🔴 «Error al guardar. Revisa tu conexión e intenta de
+  nuevo» con la red perfecta; con G40 dice «Algo falló por el camino y el cambio no se hizo. Inténtalo otra vez.» y la
+  consola lleva el rastro `[rechazo] MiPerfil.js (guardar) · storage/unauthorized`.
+- ⚠ `motivoDeRechazo` no conoce los códigos del almacén (`storage/unauthorized` cae en «otro», no en «sin permiso»):
+  anotado para el dueño, no se tocó (la pieza está tres veces, atada en los tres repos).
+- `registrar-conductor` salió 🔴 una vez dentro de `probar-cambio` y ✓ al correrlo solo, sin cambiar nada: se carea
+  antes de llamarlo fallo.
+
 ## Lo que el robot dejó creado en pruebas
 
 - 27-sep-2026: «Robot Taxi De Prueba» (robot.taxi.1790508222079@gg.test) y
