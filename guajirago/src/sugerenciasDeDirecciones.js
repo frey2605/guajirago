@@ -8,11 +8,13 @@
  *
  * Las diferencias entre ellos SON A PROPÓSITO, y por eso viven aquí juntas, en una
  * tabla, y no en cinco copias:
- *   · el TAXI y los FAVORITOS solo sugieren dentro de Riohacha (`soloDentro`): el
- *     servicio es de la ciudad, y lo de afuera no se puede pedir;
+ *   · el TAXI solo sugiere dentro de Riohacha (`soloDentro`): el servicio es de la
+ *     ciudad, y lo de afuera no se puede pedir;
  *   · los DOMICILIOS y los NEGOCIOS prefieren La Guajira, pero no prohíben lo de afuera;
- *   · cada pantalla pide a Google solo los campos que usa (los favoritos no dicen
- *     cuáles, así que Google manda todos: se dejó igual, está anotado).
+ *   · cada pantalla pide a Google solo los campos que usa.
+ * (El uso «favorito» —la ventanita «Agregar lugar favorito» de Home.js— se quitó con
+ * G67, 29-sep-2026: guardaba en el teléfono y nadie la abría. Los favoritos se guardan
+ * desde el campo del destino al pedir el viaje, que usa «viaje».)
  *
  * Qué hace cada pantalla con la sugerencia escogida lo sigue decidiendo cada pantalla
  * (su propio `place_changed`): eso no es una copia, es su trabajo.
@@ -28,7 +30,6 @@ const TIPOS_DE_LA_CIUDAD = ['establishment', 'geocode'];
 /** Cada uso del cuadro, con lo que lo hace distinto. */
 export const SUGERENCIAS = {
   viaje: { marco: BOUNDS_RIOHACHA, soloDentro: true, tipos: TIPOS_DE_LA_CIUDAD, campos: ['geometry', 'name', 'formatted_address'] },
-  favorito: { marco: BOUNDS_RIOHACHA, soloDentro: true, tipos: TIPOS_DE_LA_CIUDAD, campos: null },
   entrega: { marco: BOUNDS_LA_GUAJIRA, soloDentro: false, tipos: null, campos: ['formatted_address'] },
   negocio: { marco: BOUNDS_LA_GUAJIRA, soloDentro: false, tipos: null, campos: ['formatted_address', 'geometry'] },
 };

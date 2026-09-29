@@ -9,7 +9,7 @@
  *      diferencias a propósito (taxi y favoritos: solo Riohacha; domicilios y negocios:
  *      preferencia de La Guajira);
  *   2. ata las copias de aliados;
- *   3. corre, con el medidor, el efecto de CADA uno de los cinco sitios sacado del archivo
+ *   3. corre, con el medidor, el efecto de CADA uno de los sitios (cinco; cuatro desde G67) sacado del archivo
  *      y exige lo que hacía antes de G61, y que nadie vuelva a armar el cuadro a mano;
  *   4. le da al medidor el código de ANTES y exige que lo vea (que no se pueda ablandar).
  */
@@ -32,7 +32,6 @@ const LA_GUAJIRA = { south: 10.9, west: -73.4, north: 12.5, east: -71.1 };
 // Lo que cada sitio le pedía a Google ANTES de G61 (medido corriendo el código de 40db86e / ef77969).
 const OPCIONES = {
   viaje: { componentRestrictions: { country: 'co' }, bounds: RIOHACHA, strictBounds: true, types: ['establishment', 'geocode'], fields: ['geometry', 'name', 'formatted_address'] },
-  favorito: { componentRestrictions: { country: 'co' }, bounds: RIOHACHA, strictBounds: true, types: ['establishment', 'geocode'] },
   entrega: { componentRestrictions: { country: 'co' }, bounds: LA_GUAJIRA, fields: ['formatted_address'] },
   negocio: { componentRestrictions: { country: 'co' }, bounds: LA_GUAJIRA, fields: ['formatted_address', 'geometry'] },
 };
@@ -40,7 +39,8 @@ const DIRECCION = '"Cra. 7 #10-20, Riohacha, La Guajira, Colombia"';
 const PUNTO = '{"lat":11.5501,"lng":-72.9012}';
 const SITIOS = [
   ['app · pedir el viaje', 'viaje', ['texto del campo ← "Cra. 7 # 10-20"', 'punto del mapa ← ' + PUNTO]],
-  ['app · lugar favorito', 'favorito', ['dirección ← "Cra. 7 # 10-20"']],
+  // «app · lugar favorito» (Home.js, uso «favorito») se quitó con G67: era la ventanita muerta de los favoritos del
+  // teléfono. Lo vigila pruebas/favoritosUnaFuente.test.js.
   ['app · dirección de entrega', 'entrega', ['dirección ← ' + DIRECCION]],
   ['aliados · perfil del restaurante', 'negocio', ['dirección ← ' + DIRECCION, 'ubicación ← ' + PUNTO]],
   ['aliados · perfil de la agencia', 'negocio', ['dirección ← ' + DIRECCION, 'ubicación ← ' + PUNTO]],
@@ -97,7 +97,7 @@ describe('G61 · las copias de aliados siguen atadas', () => {
   });
 });
 
-describe('G61 · los cinco sitios, corridos: hacen lo mismo que antes y ninguno arma el cuadro a mano', () => {
+describe('G61 · los sitios (cuatro desde G67), corridos: hacen lo mismo que antes y ninguno arma el cuadro a mano', () => {
   const hoy = medir(lector());
 
   it('nadie arma el cuadro, ni el marco, ni escribe esquinas con números, fuera de la pieza y de riohacha.js', () => {
@@ -129,7 +129,7 @@ describe('G61 · y el medidor no se puede ablandar', () => {
     execFileSync('git', ['cat-file', '-e', 'ef77969^{commit}'], { cwd: path.join(RAIZ, 'guajirago-aliados'), stdio: 'ignore' });
   } catch (e) { hayHistoria = false; }
 
-  it('con el código de antes de G61 cuenta 5 cuadros, 5 marcos, 6 esquinas y 3 setBounds, y los mismos cinco comportamientos', { skip: !hayHistoria && 'sin la historia de git de los dos repos' }, () => {
+  it('con el código de antes de G61 cuenta 5 cuadros, 5 marcos, 6 esquinas y 3 setBounds, y los mismos comportamientos en los cuatro sitios que quedan', { skip: !hayHistoria && 'sin la historia de git de los dos repos' }, () => {
     const antes = medir(lector('40db86e', 'ef77969'));
     const total = (l) => l.reduce((a, [, n]) => a + n, 0);
     assert.deepStrictEqual(

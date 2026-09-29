@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import Solicitar from './Solicitar';
 import Restaurantes from './Restaurantes';
 import MenuLateral from './MenuLateral';
@@ -18,53 +18,12 @@ import { collection, query, where, orderBy, limit, getDocs, doc, getDoc } from '
 import LlamadoAtencion from './LlamadoAtencion';
 // G21: qué viajes salen en el historial y cómo terminó cada uno salen de UNA pieza, la misma de las otras dos pantallas.
 import { ESTADOS_TERMINADOS, comoTermino } from './estadosViaje';
-// El marco de Riohacha vive en riohacha.js (SEGUNDA LEY): un solo sitio para la geografía.
-// G61: y el cuadro de sugerencias que lo usa sale de UNA pieza.
-import { ponerSugerencias } from './sugerenciasDeDirecciones';
 import { fotoDe } from './fotoUsuario';
 
-const ICONOS_FAVORITOS = ['🏠', '💼', '❤️', '⭐', '🏥', '🏫', '🛒', '🏖️', '⛪', '🏋️'];
-
-function ModalFavorito({ onGuardar, onCerrar }) {
-  const [nombre, setNombre] = useState('');
-  const [direccion, setDireccion] = useState('');
-  const [icono, setIcono] = useState('⭐');
-  const inputDireccionRef = useRef(null);
-  const autocompleteRef = useRef(null);
-
-  useEffect(() => {
-    if (!inputDireccionRef.current || !window.google) return;
-    autocompleteRef.current = ponerSugerencias(window.google, inputDireccionRef.current, 'favorito');
-    autocompleteRef.current.addListener('place_changed', () => {
-      const place = autocompleteRef.current.getPlace();
-      if (place && place.name) setDireccion(place.name);
-    });
-  }, []);
-
-  return (
-    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', zIndex: 999, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
-      <div style={{ background: '#FFFFFF', border: '1.5px solid #ECECEF', borderRadius: '24px 24px 0 0', padding: '28px 24px', width: '100%', maxWidth: '480px' }}>
-        <p style={{ color: '#1A1A1E', fontSize: '18px', fontWeight: '900', margin: '0 0 20px', textAlign: 'center' }}>Agregar lugar favorito</p>
-        <p style={{ color: '#6B7280', fontSize: '12px', margin: '0 0 10px', letterSpacing: '1px' }}>ÍCONO</p>
-        <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', flexWrap: 'wrap' }}>
-          {ICONOS_FAVORITOS.map(i => (
-            <div key={i} onClick={() => setIcono(i)} style={{ width: '44px', height: '44px', borderRadius: '12px', background: icono === i ? 'linear-gradient(135deg, #FFCF4D, #FF7A2F)' : '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '22px', cursor: 'pointer', border: icono === i ? 'none' : '1px solid #ECECEF' }}>
-              {i}
-            </div>
-          ))}
-        </div>
-        <p style={{ color: '#6B7280', fontSize: '12px', margin: '0 0 8px', letterSpacing: '1px' }}>NOMBRE (ej: Casa, Trabajo, Mamá)</p>
-        <input value={nombre} onChange={e => setNombre(e.target.value)} placeholder="¿Cómo lo llamas?" style={{ width: '100%', padding: '14px 16px', background: '#FFFFFF', border: '1px solid #ECECEF', borderRadius: '14px', color: '#1A1A1E', fontSize: '16px', outline: 'none', marginBottom: '12px', boxSizing: 'border-box' }} />
-        <p style={{ color: '#6B7280', fontSize: '12px', margin: '0 0 8px', letterSpacing: '1px' }}>DIRECCIÓN</p>
-        <input ref={inputDireccionRef} value={direccion} onChange={e => setDireccion(e.target.value)} placeholder="Escribe la dirección o lugar" style={{ width: '100%', padding: '14px 16px', background: '#FFFFFF', border: '1px solid #ECECEF', borderRadius: '14px', color: '#1A1A1E', fontSize: '16px', outline: 'none', marginBottom: '20px', boxSizing: 'border-box' }} />
-        <div style={{ display: 'flex', gap: '12px' }}>
-          <button onClick={onCerrar} style={{ flex: 1, padding: '14px', background: '#FFFFFF', border: '1px solid #ECECEF', borderRadius: '14px', color: '#6B7280', fontSize: '14px', cursor: 'pointer' }}>Cancelar</button>
-          <button onClick={() => nombre && direccion && onGuardar({ nombre, direccion, icono })} style={{ flex: 2, padding: '14px', background: nombre && direccion ? 'linear-gradient(135deg, #FFCF4D, #FF7A2F)' : '#ECECEF', border: 'none', borderRadius: '14px', color: nombre && direccion ? '#FFFFFF' : '#6B7280', fontSize: '14px', fontWeight: '900', cursor: nombre && direccion ? 'pointer' : 'default' }}>Guardar</button>
-        </div>
-      </div>
-    </div>
-  );
-}
+// G67 (29-sep-2026): los lugares favoritos viven en UN sitio, la nube (`usuarios/{uid}.favoritos`), y los guarda y
+// borra Solicitar.js con el tope de config/global. Aquí había una segunda versión en el TELÉFONO (localStorage
+// 'guajirago_favoritos', sin tope, con su ventanita «Agregar lugar favorito» y su cuadro de sugerencias) que venía de
+// junio: se leía al abrir la pantalla y no se pintaba, y la ventanita no la abría nadie. Se quitó entera.
 
 function Historial({ onVolver }) {
   const [viajes, setViajes] = useState([]);
@@ -145,11 +104,8 @@ function Historial({ onVolver }) {
   );
 }
 
-const STORAGE_FAVORITOS = 'guajirago_favoritos';
 const STORAGE_RECIENTES = 'guajirago_recientes';
 
-function cargarFavoritos() { try { return JSON.parse(localStorage.getItem(STORAGE_FAVORITOS)) || []; } catch(e) { return []; } }
-function guardarFavoritos(f) { try { localStorage.setItem(STORAGE_FAVORITOS, JSON.stringify(f)); } catch(e) {} }
 function cargarRecientes() { try { return JSON.parse(localStorage.getItem(STORAGE_RECIENTES)) || []; } catch(e) { return []; } }
 function guardarReciente(destino) {
   try {
@@ -169,9 +125,7 @@ function Home({ nombre, onCerrarSesion, onVolver, onCambiarNegocio }) {
   const [verPromociones, setVerPromociones] = useState(false);
   const [tipoSeleccionado, setTipoSeleccionado] = useState('');
   const [destinoPredefinido, setDestinoPredefinido] = useState('');
-  const [favoritos, setFavoritos] = useState(cargarFavoritos());
   const [, setRecientes] = useState(cargarRecientes());
-  const [mostrarModalFavorito, setMostrarModalFavorito] = useState(false);
 
   const [fotoUsuario, setFotoUsuario] = useState(null);
 
@@ -197,13 +151,6 @@ function Home({ nombre, onCerrarSesion, onVolver, onCambiarNegocio }) {
 
   // G51: la tabla decide qué abre «Mis viajes» y «Ganancias»; antes «Ganancias» aquí decía «muy pronto».
   const abrirDelMenu = (opcion) => setPantalla(pantallaDelMenu(opcion, 'pasajero'));
-
-  const agregarFavorito = ({ nombre, direccion, icono }) => {
-    const nuevos = [...favoritos, { nombre, direccion, icono }];
-    setFavoritos(nuevos);
-    guardarFavoritos(nuevos);
-    setMostrarModalFavorito(false);
-  };
 
   if (pantalla === 'solicitar') {
     return <Solicitar tipo={tipoSeleccionado} destinoInicial={destinoPredefinido} onVolver={() => setPantalla('home')} />;
@@ -241,8 +188,6 @@ function Home({ nombre, onCerrarSesion, onVolver, onCambiarNegocio }) {
 
   return (
     <div style={{ backgroundColor: '#FFFFFF', minHeight: '100vh', fontFamily: 'Arial, sans-serif' }}>
-      {mostrarModalFavorito && <ModalFavorito onGuardar={agregarFavorito} onCerrar={() => setMostrarModalFavorito(false)} />}
-
       <LlamadoAtencion />
 
       <div style={{ background: '#FFFFFF', padding: '24px 20px', position: 'relative' }}>

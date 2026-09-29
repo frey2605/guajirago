@@ -16,7 +16,7 @@
  *  4. Cuántos `setBounds(...)` que repiten el marco que ya se le dio al crearlo. Antes: 3.
  *  5. Si las copias de aliados siguen atadas: la pieza, byte a byte; su `riohacha.js`
  *     (que lleva solo los dos marcos), con los mismos valores que el de la app.
- *  6. Qué hace CADA uno de los cinco sitios, sacando su efecto del archivo y CORRIÉNDOLO:
+ *  6. Qué hace CADA uno de los sitios (cinco; cuatro desde G67, que quitó la ventanita muerta de favoritos), sacando su efecto del archivo y CORRIÉNDOLO:
  *       · con qué opciones crea el cuadro (país, marco, si es estricto, tipos, campos),
  *       · con qué marco queda al final, y
  *       · qué le queda a la pantalla cuando se escoge una sugerencia.
@@ -37,7 +37,8 @@ const GEOGRAFIAS = ['guajirago/src/riohacha.js', 'guajirago-aliados/src/riohacha
 
 const SITIOS = [
   { nombre: 'app · pedir el viaje (Solicitar.js, AutocompleteInput)', archivo: 'guajirago/src/Solicitar.js', desde: 'function AutocompleteInput' },
-  { nombre: 'app · lugar favorito (Home.js, ModalFavorito)', archivo: 'guajirago/src/Home.js', desde: 'function ModalFavorito' },
+  // El quinto, «app · lugar favorito (Home.js, ModalFavorito)», se quitó con G67 (29-sep-2026): la ventanita guardaba
+  // en el teléfono y nadie la abría. El careo con el código de antes de G61 mira los cuatro que siguen vivos.
   { nombre: 'app · dirección de entrega del domicilio (Restaurantes.js)', archivo: 'guajirago/src/Restaurantes.js', desde: null },
   { nombre: 'aliados · perfil del restaurante (PerfilRestaurante.js)', archivo: 'guajirago-aliados/src/PerfilRestaurante.js', desde: null },
   { nombre: 'aliados · perfil de la agencia (PerfilAgencia.js)', archivo: 'guajirago-aliados/src/PerfilAgencia.js', desde: null },
