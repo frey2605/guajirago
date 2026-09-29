@@ -10,7 +10,9 @@ import Configuracion from './Configuracion';
 import Promociones from './Promociones';
 import Logo from './Logo';
 import { auth, db } from './firebase';
-import { collection, query, where, orderBy, limit, getDocs, doc, getDoc, onSnapshot, updateDoc } from 'firebase/firestore';
+import { collection, query, where, orderBy, limit, getDocs, doc, getDoc } from 'firebase/firestore';
+// G37: el llamado de atención lo muestra y lo atiende UNA pieza, la misma de la pantalla del conductor.
+import LlamadoAtencion from './LlamadoAtencion';
 // G21: qué viajes salen en el historial y cómo terminó cada uno salen de UNA pieza, la misma de las otras dos pantallas.
 import { ESTADOS_TERMINADOS, comoTermino } from './estadosViaje';
 // El marco de Riohacha vive en riohacha.js (SEGUNDA LEY): un solo sitio para la geografía.
@@ -173,37 +175,8 @@ function Home({ nombre, onCerrarSesion, onVolver, onCambiarNegocio }) {
   const [favoritos, setFavoritos] = useState(cargarFavoritos());
   const [, setRecientes] = useState(cargarRecientes());
   const [mostrarModalFavorito, setMostrarModalFavorito] = useState(false);
-  const [llamadoAtención, setLlamadoAtencion] = useState(null);
-  const [puedeCerrarLlamado, setPuedeCerrarLlamado] = useState(false);
 
   const [fotoUsuario, setFotoUsuario] = useState(null);
-
-  // Listener de llamado de atención
-  useEffect(() => {
-    const user = auth.currentUser;
-    if (!user) return;
-    
-    const unsub = onSnapshot(doc(db, 'usuarios', user.uid), (snap) => {
-      if (!snap.exists()) return;
-      const data = snap.data();
-      if (data.llamadoPendiente && pantalla === 'home') {
-        setLlamadoAtencion(data.llamadoPendiente);
-        setPuedeCerrarLlamado(false);
-        setTimeout(() => setPuedeCerrarLlamado(true), 8000);
-      }
-    });
-    return () => unsub();
-  }, [pantalla]);
-
-  const cerrarLlamado = async () => {
-    if (!puedeCerrarLlamado) return;
-    try {
-      const user = auth.currentUser;
-      
-      await updateDoc(doc(db, 'usuarios', user.uid), { llamadoPendiente: null });
-    } catch(e) {}
-    setLlamadoAtencion(null);
-  };
 
   useEffect(() => {
     const cargar = async () => {
@@ -266,35 +239,7 @@ function Home({ nombre, onCerrarSesion, onVolver, onCambiarNegocio }) {
     <div style={{ backgroundColor: '#FFFFFF', minHeight: '100vh', fontFamily: 'Arial, sans-serif' }}>
       {mostrarModalFavorito && <ModalFavorito onGuardar={agregarFavorito} onCerrar={() => setMostrarModalFavorito(false)} />}
 
-      {llamadoAtención && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.92)', zIndex: 99999, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
-          <div style={{ background: '#FFFFFF', borderRadius: '28px', padding: '32px 24px', width: '100%', maxWidth: '420px', border: '3px solid #FF7A2F', textAlign: 'center' }}>
-            <div style={{ fontSize: '60px', marginBottom: '16px' }}>📢</div>
-            <p style={{ color: '#FF7A2F', fontSize: '12px', letterSpacing: '3px', fontWeight: 'bold', margin: '0 0 12px' }}>MENSAJE DE GUAJIRAGO</p>
-            <p style={{ color: '#1A1A1E', fontSize: '16px', lineHeight: '1.6', margin: '0 0 28px' }}>{llamadoAtención}</p>
-            <button onClick={cerrarLlamado} disabled={!puedeCerrarLlamado} style={{ width: '100%', padding: '16px', background: puedeCerrarLlamado ? 'linear-gradient(135deg, #FFCF4D, #FF7A2F)' : '#2A2A2E', border: 'none', borderRadius: '16px', color: puedeCerrarLlamado ? '#FFFFFF' : '#6B7280', fontSize: '16px', fontWeight: '900', cursor: puedeCerrarLlamado ? 'pointer' : 'default', transition: 'all 0.5s' }}>
-              {puedeCerrarLlamado ? 'Entendido ✓' : 'Lee el mensaje completo...'}
-            </button>
-          </div>
-        </div>
-      )}
-
-      {llamadoAtención && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.92)', zIndex: 99999, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
-          <div style={{ background: '#FFFFFF', borderRadius: '28px', padding: '32px 24px', width: '100%', maxWidth: '420px', border: '3px solid #FF7A2F', textAlign: 'center' }}>
-            <div style={{ fontSize: '60px', marginBottom: '16px' }}>📢</div>
-            <p style={{ color: '#FF7A2F', fontSize: '12px', letterSpacing: '3px', fontWeight: 'bold', margin: '0 0 12px' }}>MENSAJE DE GUAJIRAGO</p>
-            <p style={{ color: '#1A1A1E', fontSize: '16px', lineHeight: '1.6', margin: '0 0 28px' }}>{llamadoAtención}</p>
-            <button
-              onClick={cerrarLlamado}
-              disabled={!puedeCerrarLlamado}
-              style={{ width: '100%', padding: '16px', background: puedeCerrarLlamado ? 'linear-gradient(135deg, #FFCF4D, #FF7A2F)' : '#2A2A2E', border: 'none', borderRadius: '16px', color: puedeCerrarLlamado ? '#FFFFFF' : '#6B7280', fontSize: '16px', fontWeight: '900', cursor: puedeCerrarLlamado ? 'pointer' : 'default', transition: 'all 0.5s' }}
-            >
-              {puedeCerrarLlamado ? 'Entendido ✓' : 'Lee el mensaje completo...'}
-            </button>
-          </div>
-        </div>
-      )}
+      <LlamadoAtencion />
 
       <div style={{ background: '#FFFFFF', padding: '24px 20px', position: 'relative' }}>
         <MenuLateral nombre={nombre} foto={fotoUsuario} onIrPerfil={() => setVerPerfil(true)} onIrViajes={() => setPantalla('historial')} onIrCreditos={() => setVerCreditos(true)} onIrSeguridad={() => setVerSeguridad(true)} onIrAyuda={() => setVerAyuda(true)} onIrConfig={() => setVerConfig(true)} onIrPromociones={() => setVerPromociones(true)} onCerrarSesion={onCerrarSesion} onCambiarNegocio={onCambiarNegocio} />

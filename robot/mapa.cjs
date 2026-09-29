@@ -258,6 +258,14 @@ const RECORRIDOS = [
     archivo: 'limite-favoritos.cjs',
     vigila: ['guajirago/src/AyudaSoporte.js', 'guajirago/src/configApp.js', 'guajirago/src/Solicitar.js'],
   },
+  {
+    nombre: 'llamado-atencion',
+    que: 'con un llamado de atención sin ver (puesto como admin en pruebas), el pasajero ve «MENSAJE DE GUAJIRAGO» UNA vez; sin señal «Entendido» no lo cierra y dice «No se pudo confirmar» dentro; con señal entra y se cierra solo (G37; ~1 min)',
+    archivo: 'llamado-atencion.cjs',
+    // La pantalla del conductor (AppConductor.js) pone la MISMA pieza, pero verla pide entrar como conductor sin viaje:
+    // este recorrido no la abre. Que la ponga (y solo sin viaje en curso) lo vigila pruebas/llamadoAtencion.test.js.
+    vigila: ['guajirago/src/LlamadoAtencion.js', 'guajirago/src/Home.js', 'guajirago/src/AppConductor.js'],
+  },
 ];
 
 // Los archivos de pantalla: los que, si cambian, el robot debería poder probar. Todo lo que esté en

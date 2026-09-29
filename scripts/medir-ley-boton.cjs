@@ -346,7 +346,6 @@ const PENDIENTES = {
   'guajirago/src/App.js': [1, 1],
   'guajirago/src/Calificacion.js': [1, 1],
   'guajirago/src/Configuracion.js': [4, 0],
-  'guajirago/src/Home.js': [2, 0],
   'guajirago/src/Llamada.js': [3, 0],
   'guajirago/src/Login.js': [3, 3],
   'guajirago/src/MiPerfil.js': [1, 1],

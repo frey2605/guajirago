@@ -14,6 +14,7 @@ import { consultaDeGanancias, resumenDeGanancias } from './gananciasConductor';
 // archivo que usan el panel y aliados, copia idéntica byte a byte.
 import { motivoDeRechazo, apuntarRechazo } from './avisoRechazo';
 import AvisoModal from './AvisoModal';
+import LlamadoAtencion from './LlamadoAtencion';
 // LA LEY DEL BOTÓN (26-sep-2026): todo lo que guarda en la app del conductor pasa por el candado.
 import { useAccion } from './useAccion';
 import { calcularDistanciaKm } from './distancia';
@@ -456,8 +457,6 @@ function AppConductor({ nombre, telefono, placa, vehiculo, tipoVehiculo, onCerra
   const solicitudesIdsRef = useRef(new Set());
   const ubicacionRef = useRef(null);
   const [refrescoListener, setRefrescoListener] = useState(0);
-  const [llamadoAtencion, setLlamadoAtencion] = useState(null);
-  const [puedeCerrarLlamado, setPuedeCerrarLlamado] = useState(false);
   const [sancionActiva, setSancionActiva] = useState(null);
   const [contadorSancion, setContadorSancion] = useState('');
   const [saldoVirtualRecibido, setSaldoVirtualRecibido] = useState(null);
@@ -480,32 +479,6 @@ function AppConductor({ nombre, telefono, placa, vehiculo, tipoVehiculo, onCerra
     };
     cargarConfigApp();
   }, []);
-
-  useEffect(() => {
-    const user = auth.currentUser;
-    if (!user) return;
-    const unsub = onSnapshot(doc(db, 'usuarios', user.uid), (snap) => {
-      if (!snap.exists()) return;
-      const data = snap.data();
-      if (data.llamadoPendiente && !faseRef.current) {
-        setLlamadoAtencion(data.llamadoPendiente);
-        setPuedeCerrarLlamado(false);
-        setTimeout(() => setPuedeCerrarLlamado(true), 8000);
-      }
-    });
-    return () => unsub();
-  }, []);
-
-  const cerrarLlamado = async () => {
-    if (!puedeCerrarLlamado) return;
-    // Antes: `catch(e) {}` y el llamado se cerraba igual; si no se borraba en el servidor, volvía a salir sin que
-    // nadie dijera por qué. Ahora se cierra solo cuando entró, y si falla lo dice el candado.
-    const r = await correr(async () => {
-      const user = auth.currentUser;
-      await updateDoc(doc(db, 'usuarios', user.uid), { llamadoPendiente: null });
-    }, 'llamado', 'Listo.', 'marcar el llamado como leído');
-    if (r && r.ok) setLlamadoAtencion(null);
-  };
 
   const [textoApelacion, setTextoApelacion] = useState('');
   const [mensajesApelacion, setMensajesApelacion] = useState([]);
@@ -1493,18 +1466,6 @@ if (sancionActiva) return (
     </div>
   );
 
-if (llamadoAtencion && !fase) return (  
-    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.92)', zIndex: 99999, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
-      <div style={{ background: '#FFFFFF', borderRadius: '28px', padding: '32px 24px', width: '100%', maxWidth: '420px', border: '3px solid #FF7A2F', textAlign: 'center' }}>
-        <div style={{ fontSize: '60px', marginBottom: '16px' }}>📢</div>
-        <p style={{ color: '#FF7A2F', fontSize: '12px', letterSpacing: '3px', fontWeight: 'bold', margin: '0 0 12px' }}>MENSAJE DE GUAJIRAGO</p>
-        <p style={{ color: '#1A1A1E', fontSize: '16px', lineHeight: '1.6', margin: '0 0 28px' }}>{llamadoAtencion}</p>
-        <button onClick={cerrarLlamado} disabled={!puedeCerrarLlamado || !!ocupado} style={{ width: '100%', padding: '16px', background: puedeCerrarLlamado ? 'linear-gradient(135deg, #FFCF4D, #FF7A2F)' : '#ECECEF', border: 'none', borderRadius: '16px', color: puedeCerrarLlamado ? '#FFFFFF' : '#6B7280', fontSize: '16px', fontWeight: '900', cursor: puedeCerrarLlamado ? 'pointer' : 'default', transition: 'all 0.5s' }}>
-          {texto('llamado', 'Un momento…', puedeCerrarLlamado ? 'Entendido ✓' : 'Lee el mensaje completo...')}
-        </button>
-      </div>
-    </div>
-  );
   return (
     <div style={{ backgroundColor: '#FFFFFF', minHeight: '100vh', fontFamily: 'Arial, sans-serif' }}>
       {/* REGLA 9 · esta es la pantalla de la lista de solicitudes: aquí es donde el
@@ -1513,6 +1474,8 @@ if (llamadoAtencion && !fase) return (
           igual. Va aquí arriba, sin condición delante: `{algo && <MensajeGrande` lo
           haría depender de que ese «algo» se cumpla. */}
       <AvisoModal aviso={aviso} onCerrar={() => setAviso(null)} />
+      {/* G37: el llamado de atención, con la MISMA pieza de la pantalla del pasajero. Como antes, solo sin viaje en curso. */}
+      {!fase && <LlamadoAtencion />}
         {mensajeGrande && <MensajeGrande mensaje={mensajeGrande} onCerrar={() => setMensajeGrande(null)} />}
       <div style={{ background: '#FFFFFF', borderBottom: '1.5px solid #ECECEF', padding: '24px 20px', position: 'relative' }}>
         <Logo size={30} style={{ position: 'absolute', top: '14px', right: '16px', zIndex: 6 }} />
