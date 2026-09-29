@@ -6,6 +6,7 @@ import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { deleteUser, reauthenticateWithCredential, EmailAuthProvider } from 'firebase/auth';
 import { useAccion } from './useAccion';
 import { mandarCorreoDeRecuperacion } from './recuperarContrasena';
+import { avisoEnUnaLinea } from './avisoRechazo';
 import TerminosCondiciones from './TerminosCondiciones';
 import PoliticaPrivacidad from './PoliticaPrivacidad';
 
@@ -84,11 +85,8 @@ function Configuracion({ onVolver, onCerrarSesion }) {
       const salio = await onCerrarSesion(() => deleteUser(user));
       if (!salio) setErrorEliminar('No se pudo cancelar tu viaje en curso, así que la cuenta no se eliminó. Inténtalo de nuevo');
     } catch (e) {
-      if (e.code === 'auth/wrong-password' || e.code === 'auth/invalid-credential') {
-        setErrorEliminar('Contraseña incorrecta. Inténtalo de nuevo');
-      } else {
-        setErrorEliminar('Error al eliminar. Intenta más tarde');
-      }
+      // G72: el texto de cada fallo de la cuenta lo dice avisoRechazo.js, el mismo en las tres apps.
+      setErrorEliminar(avisoEnUnaLinea(e, 'eliminar la cuenta'));
     }
   };
 

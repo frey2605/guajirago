@@ -101,11 +101,48 @@ function clasificar(codigo, queIba) {
       texto: 'El correo no está bien escrito. Revísalo y vuelve a intentar.',
     };
   }
+  // G72 (29-sep-2026): los fallos de ENTRAR y de CREAR una cuenta, que antes traducía cada pantalla a mano (siete
+  // sitios en las tres apps). «La contraseña está mal» y «ese correo no tiene cuenta» dicen LO MISMO a propósito: si
+  // dijeran distinto, cualquiera podría averiguar qué correos están registrados probando. Hoy el servidor ya contesta
+  // «invalid-credential» para los dos; los otros dos códigos son los de un servidor sin esa protección.
+  if (codigo === 'invalid-credential' || codigo === 'wrong-password' || codigo === 'user-not-found') {
+    return {
+      clave: 'otro',
+      titulo: 'No se pudo ' + queIba,
+      texto: 'El correo o la contraseña no son correctos. Revísalos y vuelve a intentar.',
+    };
+  }
+  if (codigo === 'email-already-in-use') {
+    return {
+      clave: 'otro',
+      titulo: 'No se pudo ' + queIba,
+      texto: 'Ese correo ya tiene una cuenta en GuajiraGo. Usa otro correo, o inicia sesión si la cuenta es tuya.',
+    };
+  }
+  if (codigo === 'weak-password') {
+    return {
+      clave: 'otro',
+      titulo: 'No se pudo ' + queIba,
+      texto: 'La contraseña es muy débil: debe tener mínimo 6 caracteres.',
+    };
+  }
   return {
     clave: 'otro',
     titulo: 'No se pudo ' + queIba,
     texto: 'Algo falló por el camino y el cambio no se hizo. Inténtalo otra vez.',
   };
+}
+
+/**
+ * El mismo motivo en UN renglón, para las pantallas que enseñan el fallo en una sola línea (el renglón rojo del
+ * inicio de sesión, del registro, de crear un empleado). G72, 29-sep-2026.
+ *
+ * Si el título es «No se pudo …», va delante para que se sepa qué falló; si no («Sin conexión», «Demasiados
+ * intentos»), el texto ya dice qué se intentaba y el título sobra.
+ */
+export function avisoEnUnaLinea(e, accion) {
+  const m = motivoDeRechazo(e, accion);
+  return /^No se pudo /.test(m.titulo) ? m.titulo + '. ' + m.texto : m.texto;
 }
 
 /**

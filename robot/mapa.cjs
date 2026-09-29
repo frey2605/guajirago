@@ -423,6 +423,15 @@ const RECORRIDOS = [
     // recorrido. Lo SACA del archivo y lo EJECUTA, con cada respuesta del servidor, pruebas/recuperarContrasena.test.js.
     vigila: ['guajirago/src/Login.js', 'guajirago/src/recuperarContrasena.js'],
   },
+  {
+    nombre: 'errores-de-cuenta',
+    que: 'entrar con una contraseña que no es, en las tres apps (y en aliados con un correo que existe y con uno que no): sale la misma frase de avisoRechazo.js, «No se pudo iniciar sesión. El correo o la contraseña no son correctos…», y no delata qué correos existen (G72; no escribe nada)',
+    archivo: 'errores-de-cuenta.cjs',
+    // Crear cuenta, eliminar la cuenta y crear un empleado crean o borran cuentas de verdad: sus catch los SACA del
+    // archivo y los EJECUTA, con cada error de Firebase, pruebas/erroresDeCuenta.test.js.
+    vigila: ['guajirago/src/Login.js', 'guajirago/src/avisoRechazo.js', 'guajirago-admin/src/App.js',
+      'guajirago-admin/src/avisoRechazo.js', 'guajirago-aliados/src/Login.js', 'guajirago-aliados/src/avisoRechazo.js'],
+  },
 ];
 
 // Los archivos de pantalla: los que, si cambian, el robot debería poder probar. Todo lo que esté en

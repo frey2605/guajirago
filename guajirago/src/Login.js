@@ -14,6 +14,7 @@ import { telefonoSirve, celularDiezCifras } from './telefonoValido';
 import { cop } from './moneda';
 import { useAccion } from './useAccion';
 import { mandarCorreoDeRecuperacion, CORREO_DE_RECUPERACION_ENVIADO } from './recuperarContrasena';
+import { avisoEnUnaLinea } from './avisoRechazo';
 
 // Identificador único de este navegador/dispositivo (persiste en localStorage)
 function obtenerDeviceId() {
@@ -157,10 +158,8 @@ function Login({ onEntrar }) {
         onEntrar('', nombre, celularLimpio, '', '');
       }
     } catch (err) {
-      if (err.code === 'auth/email-already-in-use') setError('Este correo ya está registrado');
-      else if (err.code === 'auth/weak-password') setError('La contraseña debe tener mínimo 6 caracteres');
-      else if (err.code === 'auth/invalid-email') setError('El correo no es válido');
-      else setError('Error al registrarse. Intenta de nuevo');
+      // G72: el texto de cada fallo de la cuenta lo dice avisoRechazo.js, el mismo en las tres apps.
+      setError(avisoEnUnaLinea(err, 'crear la cuenta'));
     }
     setEnviando(false);
   };
@@ -176,9 +175,8 @@ function Login({ onEntrar }) {
         onEntrar(datos.tipo || '', datos.nombre, telefonoDe(datos), datos.placa || '', datos.vehiculo || '');
       } else { onEntrar('', '', '', '', ''); }
     } catch (err) {
-      if (err.code === 'auth/invalid-credential') setError('Correo o contraseña incorrectos');
-      else if (err.code === 'auth/invalid-email') setError('El correo no es válido');
-      else setError('Error al ingresar. Intenta de nuevo');
+      // G72: el texto lo dice avisoRechazo.js («contraseña mala» y «correo sin cuenta» dicen lo mismo).
+      setError(avisoEnUnaLinea(err, 'iniciar sesión'));
     }
     setCargando(false);
   };

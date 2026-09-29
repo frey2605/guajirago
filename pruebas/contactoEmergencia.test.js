@@ -115,6 +115,8 @@ describe('G10 · los formularios no guardan un contacto que no sirve', () => {
       setError: (t) => { escrito.error = t; }, setEnviando: () => {},
       auth: {},
       createUserWithEmailAndPassword: async () => { escrito.creo = true; throw llego; },
+      // G72: el catch del registro pide el texto a avisoRechazo.js; se le da el de verdad.
+      avisoEnUnaLinea: cargarDeLaApp('guajirago/src/avisoRechazo.js').avisoEnUnaLinea,
     };
   }
 
