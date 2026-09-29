@@ -364,6 +364,15 @@ const RECORRIDOS = [
     vigila: ['guajirago-admin/src/aprobarNegocio.js', 'guajirago-admin/src/Restaurantes.js', 'guajirago-admin/src/Turismo.js',
       'guajirago-admin/src/AliadosPendientes.js'],
   },
+  {
+    nombre: 'estado-aprobacion',
+    que: 'con el Restaurante de Prueba suspendido, 🤝 Aliados pendientes del panel lo enseña «SUSPENDIDO» con «Reactivar y aprobar», no como un registro nuevo con «Rechazar» (G50; cambia dos campos del restaurante de PRUEBAS y los devuelve)',
+    archivo: 'estado-aprobacion.cjs',
+    // La etiqueta y la pestaña «Pendientes» de Restaurantes y Turismo, y la tarjeta de Aliados pendientes, las SACA de
+    // su archivo y las EJECUTA pruebas/estadoAprobacion.test.js.
+    vigila: ['guajirago-admin/src/aprobarNegocio.js', 'guajirago-admin/src/AliadosPendientes.js', 'guajirago-admin/src/Restaurantes.js',
+      'guajirago-admin/src/Turismo.js'],
+  },
 ];
 
 // Los archivos de pantalla: los que, si cambian, el robot debería poder probar. Todo lo que esté en

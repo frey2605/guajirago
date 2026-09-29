@@ -37,7 +37,8 @@ describe('G49 · aprobar un negocio: una sola escritura que no pisa lo de Cobros
     for (const [ruta] of LOS_BOTONES) {
       const archivo = 'guajirago-admin/' + ruta;
       const t = soloCodigo(leer(archivo)).replace(/\r\n/g, '\n');
-      assert.match(t, /^import\s*\{\s*aprobarNegocio\s*\}\s*from\s*'\.\/aprobarNegocio';/m, archivo + ' no importa la pieza única');
+      // G50: la misma pieza trae también estadoDeAprobacion, así que el import puede nombrar más de una cosa.
+      assert.match(t, /^import\s*\{[^}]*\baprobarNegocio\b[^}]*\}\s*from\s*'\.\/aprobarNegocio';/m, archivo + ' no importa la pieza única');
       const i = t.search(/const aprobar\s*=\s*async\s*\(/);
       assert.ok(i >= 0, 'no encuentro aprobar en ' + archivo);
       const cuerpo = cuerpoDeLaFuncion(t, i).texto;

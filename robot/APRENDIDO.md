@@ -552,6 +552,16 @@ la placa de `conductores/{uid}` (la escribe su GPS con la misma placa que va en 
 - Con el panel VIEJO publicado en pruebas (2df3503) `activo` vuelve a true; con el nuevo (6d06be8) se queda en false.
 - Los 403 de la consola salen igual que en los demás recorridos.
 
+### estado-aprobacion · el suspendido no sale como pendiente (G50, 29-sep-2026)
+- 🤝 Aliados pendientes NO está en el menú de abajo del panel: está DENTRO de 👑 Superadmin, en su lista de secciones con
+  su nombre («Aliados pendientes»). Buscar el ícono 🤝 suelto se queda esperando 30 s.
+- La tarjeta de un negocio se agarra como «el último div que tiene el nombre Y algún botón»: la cabecera tiene el nombre
+  sin botones y la fila de botones no tiene el nombre; solo la tarjeta tiene las dos cosas.
+- No hace falta pulsar nada: lo que se prueba es cómo se ENSEÑA. Solo se cambian `aprobado` y `estadoAprobacion` del
+  Restaurante de Prueba y se le devuelven.
+- Con el panel VIEJO publicado en pruebas (6d06be8) la tarjeta del suspendido sale sin etiqueta y con «Rechazar /
+  ✅ Aprobar»; con el nuevo, «SUSPENDIDO» y «Reactivar y aprobar».
+
 ## Lo que el robot dejó creado en pruebas
 
 - 27-sep-2026: «Robot Taxi De Prueba» (robot.taxi.1790508222079@gg.test) y
