@@ -4,8 +4,7 @@ import { db, auth } from './firebase';
 import { collection, getDocs, doc, getDoc } from 'firebase/firestore';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import Logo from './Logo';
-import { motivoPorLaPromocion } from './reglaPromocion';
-import { cop } from './moneda';
+import { motivoPorLaPromocion, valorDelBeneficio, textoDelBeneficio, categoriaDePromocion } from './reglaPromocion';
 import { fechaDeCalendario } from './fechaCalendario';
 import { useAccion } from './useAccion';
 import AvisoModal from './AvisoModal';
@@ -37,14 +36,6 @@ function CelebracionPromo({ codigo, textoValor, onCerrar }) {
   );
 }
 
-const CATEGORIAS = [
-  { id: 'transporte', label: 'Transporte', icono: '🚗' },
-  { id: 'domicilios', label: 'Domicilios', icono: '🛵' },
-  { id: 'restaurantes', label: 'Restaurantes', icono: '🍽️' },
-  { id: 'turismo', label: 'Turismo', icono: '🌴' },
-  { id: 'general', label: 'General', icono: '🎉' },
-];
-
 function Promociones({ onVolver }) {
   const [promos, setPromos] = useState([]);
   // El tipo de cuenta ya no se guarda aquí: solo servía para reclamar la
@@ -70,7 +61,7 @@ function Promociones({ onVolver }) {
           tipo = snapU.data().tipo || '';
           const descPend = snapU.data().descuentoPendiente;
           if (descPend) {
-            const texto = descPend.tipoBeneficio === 'credito' ? cop(descPend.valorBeneficio || 0) : `${descPend.valorBeneficio}%`;
+            const texto = valorDelBeneficio(descPend);
             setDescuentoActivo({ codigoVerificacion: descPend.codigoVerificacion, textoValor: texto });
           }
         }
@@ -89,8 +80,6 @@ function Promociones({ onVolver }) {
 
   useEffect(() => { cargar(); }, [cargar]);
 
-  const categoriaInfo = (id) => CATEGORIAS.find(c => c.id === id) || { label: id, icono: '🎁' };
-
   const aplicarCodigo = () => correr(async () => {
     setMensaje('');
     const cod = codigo.trim().toUpperCase();
@@ -105,7 +94,7 @@ function Promociones({ onVolver }) {
     const respuesta = await reclamar({ codigo: cod });
     const resultado = respuesta.data;
 
-    const textoValor = resultado.tipo === 'credito' ? cop(resultado.valor) : `${resultado.valor}%`;
+    const textoValor = valorDelBeneficio({ tipoBeneficio: resultado.tipo, valorBeneficio: resultado.valor });
     setCelebrandoPromo({ codigo: resultado.codigoVerificacion, textoValor });
     setDescuentoActivo({ codigoVerificacion: resultado.codigoVerificacion, textoValor });
     setCodigo('');
@@ -170,13 +159,13 @@ function Promociones({ onVolver }) {
           <div>
             <p style={{ color: '#6B7280', fontSize: '11px', letterSpacing: '3px', margin: '0 0 12px' }}>OFERTAS DISPONIBLES</p>
             {promos.map(p => {
-              const cat = categoriaInfo(p.categoria);
+              const cat = categoriaDePromocion(p.categoria);
               return (
                 <div key={p.id} style={{ background: 'linear-gradient(135deg, #FFFFFF, #ECECEF)', borderRadius: '20px', padding: '20px', marginBottom: '12px', border: '1px solid #FF7A2F' }}>
                   <span style={{ fontSize: '10px', fontWeight: 'bold', padding: '3px 10px', borderRadius: '20px', background: 'rgba(255,122,47,0.15)', color: '#FF7A2F' }}>{cat.icono} {cat.label}</span>
                   <p style={{ color: '#1A1A1E', fontSize: '17px', fontWeight: '900', margin: '10px 0 6px' }}>{p.nombre}</p>
                   <p style={{ color: '#2ECC71', fontSize: '20px', fontWeight: '900', margin: '0 0 8px' }}>
-                    {p.tipoBeneficio === 'descuento' ? `${p.valorBeneficio}% de descuento` : `${cop(p.valorBeneficio || 0)} de crédito`}
+                    {textoDelBeneficio(p)}
                   </p>
                   {p.descripcion && <p style={{ color: '#6B7280', fontSize: '13px', margin: '0 0 10px', lineHeight: '1.5' }}>{p.descripcion}</p>}
                   {p.requiereCodigo ? (

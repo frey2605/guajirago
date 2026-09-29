@@ -9,6 +9,8 @@
  * aparato. La usan también los anuncios y las promos de restaurante: «¿esta fecha AAAA-MM-DD está vigente hoy?».
  */
 
+import { cop } from './moneda';
+
 /**
  * COPIA de `hoyEnColombia` (guajirago/functions/cobros.cjs), que es la fuente: la fecha de hoy, AAAA-MM-DD, en hora
  * de Colombia. pruebas/vigenciaHoy.test.js exige que sea la misma función, letra por letra, y la ejecuta.
@@ -120,6 +122,37 @@ export function apunteEnLaPromocion(promo, usuarioId, fecha, pesos) {
     inversionTotal: (p.inversionTotal || 0) + pesos,
     historialUsos: [...(p.historialUsos || []), { usuarioId, fecha, valor: pesos }],
   };
+}
+
+/**
+ * G52 · EL BENEFICIO EN PALABRAS. Lo pintaban seis pantallas a mano, y unas preguntaban «¿es de crédito?» y otras
+ * «¿es de descuento?»: con un tipo vacío o raro, unas decían «$ 15 de crédito» mientras el cobro restaba un 15 %.
+ * La condición es la del que COBRA (descuentos.cjs, aplicarDescuento): 'credito' resta pesos; cualquier otro, un
+ * porcentaje. `valorDelBeneficio` = lo corto («$ 8.000» / «20%»); `textoDelBeneficio` = con su coletilla.
+ */
+export function valorDelBeneficio(beneficio) {
+  const b = beneficio || {};
+  const v = b.valorBeneficio || 0;
+  return b.tipoBeneficio === 'credito' ? cop(v) : v + '%';
+}
+
+export function textoDelBeneficio(beneficio) {
+  const b = beneficio || {};
+  return valorDelBeneficio(b) + (b.tipoBeneficio === 'credito' ? ' de crédito' : ' de descuento');
+}
+
+/** G52 · Las categorías de una promoción: una sola lista para el formulario del panel y las tarjetas de las dos apps. */
+export const CATEGORIAS_PROMOCION = [
+  { id: 'transporte', label: 'Transporte', icono: '🚗' },
+  { id: 'domicilios', label: 'Domicilios', icono: '🛵' },
+  { id: 'restaurantes', label: 'Restaurantes', icono: '🍽️' },
+  { id: 'turismo', label: 'Turismo', icono: '🌴' },
+  { id: 'general', label: 'General', icono: '🎉' },
+];
+
+/** La categoría para pintar; si no está en la lista, su nombre tal cual con 🎁. */
+export function categoriaDePromocion(id) {
+  return CATEGORIAS_PROMOCION.find((c) => c.id === id) || { label: id, icono: '🎁' };
 }
 
 // ── FIN DE LA REGLA ──

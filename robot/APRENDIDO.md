@@ -617,3 +617,5 @@ la placa de `conductores/{uid}` (la escribe su GPS con la misma placa que va en 
   `fecha-pedido.cjs` (dos jugos de corozo, «Calle Robot G48 #1-2»), ya `cancelado` por el cliente.
 - 29-sep-2026 en adelante: el Restaurante de Prueba lleva `fechaAprobacion` (lo escribe cada corrida de
   `aprobar-negocio.cjs`; antes no tenía el campo). `aprobado`, `estadoAprobacion` y `activo` se le devuelven como estaban.
+- 29-sep-2026 en adelante: una promoción `promociones/ROBOT-G52-<hora>` sin tipo de beneficio y valor 15, de un solo día,
+  por cada corrida de `texto-beneficio.cjs`, ya apagada.

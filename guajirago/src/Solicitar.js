@@ -11,6 +11,7 @@ import { getFunctions, httpsCallable } from 'firebase/functions';
 import { calcularTarifaMinima } from './tarifas';
 import { RESPALDO_CONFIG, leerConfig, segundosDeEspera, BUSQUEDA, marcaDelVencido, maximoDeFavoritos, lugaresFavoritos } from './configApp';
 import { cop } from './moneda';
+import { valorDelBeneficio } from './reglaPromocion';
 import { aplicarDescuento, armarDescuentoInfo, tarifaParaPasajero } from './descuentos';
 import { generarCodigoSeguridad, guardarCodigoDeViaje, cargarCodigoDeViaje } from './codigoSeguridad';
 import { armarViajeNuevo } from './viajeNuevo';
@@ -1740,7 +1741,7 @@ const PanelEmergencia = () => (
             <span style={{ fontSize: '28px' }}>🎁</span>
             <div>
               <p style={{ color: '#FFFFFF', fontWeight: '900', fontSize: '15px', margin: '0' }}>
-                Tienes un descuento activo de {descuentoPendiente.tipoBeneficio === 'credito' ? cop(descuentoPendiente.valorBeneficio) : `${descuentoPendiente.valorBeneficio}%`}
+                Tienes un descuento activo de {valorDelBeneficio(descuentoPendiente)}
               </p>
               <p style={{ color: 'rgba(255,255,255,0.85)', fontSize: '12px', margin: '2px 0 0' }}>Se aplicará automáticamente a este viaje</p>
             </div>

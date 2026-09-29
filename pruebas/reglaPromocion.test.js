@@ -29,7 +29,7 @@ function trozo(ruta) {
   const a = t.indexOf(MARCA_A);
   const b = t.indexOf(MARCA_B);
   assert.ok(a >= 0 && b > a, 'no están las marcas de la regla en ' + ruta);
-  return t.slice(a, b).replace(/^export function /gm, 'function ');
+  return t.slice(a, b).replace(/^export (function|const) /gm, '$1 ');
 }
 
 const HOY = new Date('2026-09-28T15:00:00');
@@ -131,7 +131,7 @@ describe('G12 · el servidor decide con la regla', () => {
 describe('G12 · la lista de ofertas de la app usa la regla', () => {
   it('filtra con motivoPorLaPromocion, y deja fuera la vencida, la apagada y la de otro tipo de cuenta', () => {
     const f = leer('guajirago/src/Promociones.js').replace(/\r\n/g, '\n');
-    assert.match(f, /import \{ motivoPorLaPromocion \} from '\.\/reglaPromocion';/, 'la app no importa la copia de la regla');
+    assert.match(f, /import \{ motivoPorLaPromocion(, valorDelBeneficio, textoDelBeneficio, categoriaDePromocion)? \} from '\.\/reglaPromocion';/, 'la app no importa la copia de la regla');
     const m = f.match(/\.filter\((p => !motivoPorLaPromocion\(p, tipo === 'conductor', ahora\))\)/);
     assert.ok(m, 'la lista de la app no filtra con la regla');
     // eslint-disable-next-line no-new-func
@@ -147,7 +147,8 @@ function elBotonAsignar() {
   const f = leer('guajirago-admin/src/Promociones.js');
   // G16: el panel también pide de ahí `etapaDeVigencia` (las pestañas Activas/Próximas/Vencidas).
   // G17: y la receta del uso (pesosDelUso, apunteDeLaPersona, apunteEnLaPromocion).
-  assert.match(f, /import \{ motivoParaNoUsar(, etapaDeVigencia)?(, pesosDelUso, apunteDeLaPersona, apunteEnLaPromocion)? \} from '\.\/reglaPromocion';/, 'el panel no importa la copia de la regla');
+  // G52: y el texto del beneficio y las categorías (textoDelBeneficio, CATEGORIAS_PROMOCION, categoriaDePromocion).
+  assert.match(f, /import \{ motivoParaNoUsar(, etapaDeVigencia)?(, pesosDelUso, apunteDeLaPersona, apunteEnLaPromocion)?(, textoDelBeneficio, CATEGORIAS_PROMOCION, categoriaDePromocion)? \} from '\.\/reglaPromocion';/, 'el panel no importa la copia de la regla');
   const desde = f.indexOf('const asignarPromoManual');
   assert.ok(desde >= 0, 'no está asignarPromoManual');
   const cuerpo = cuerpoDeLaFuncion(f, desde).texto;

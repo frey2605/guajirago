@@ -160,7 +160,8 @@ function lasPestanasDelPanel() {
 
 function laCargaDelSuperadmin(nombre, setters) {
   const f = sinCR(leer('guajirago-admin/src/Superadmin.js'));
-  assert.match(f, /import \{ etapaDeVigencia \} from '\.\/reglaPromocion';/, 'Superadmin.js no pide la regla');
+  // G52: también pide de ahí el texto del beneficio (textoDelBeneficio).
+  assert.match(f, /import \{ etapaDeVigencia(, textoDelBeneficio)? \} from '\.\/reglaPromocion';/, 'Superadmin.js no pide la regla');
   const d = f.indexOf('const ' + nombre + ' = useCallback(');
   assert.ok(d >= 0, 'no está ' + nombre);
   // eslint-disable-next-line no-new-func

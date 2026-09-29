@@ -106,6 +106,16 @@ const RECORRIDOS = [
       'guajirago-admin/src/Promociones.js', 'guajirago-admin/src/reglaPromocion.js', 'guajirago-admin/src/fechaCalendario.js'],
   },
   {
+    nombre: 'texto-beneficio',
+    que: 'una promoción sin tipo de beneficio (el cobro la trata como un 15 %) dice «15% de descuento» en la app y en «Activas» del panel, no «$ 15 de crédito» (G52; crea una promoción de mentira en pruebas y la apaga)',
+    archivo: 'texto-beneficio.cjs',
+    // El Superadmin, «Tienes un descuento activo de…» (Solicitar.js) y la lista de categorías usan la misma pieza: los
+    // EJECUTA pruebas/textoBeneficio.test.js con scripts/medir-texto-beneficio.cjs.
+    vigila: ['guajirago/src/Promociones.js', 'guajirago/src/reglaPromocion.js', 'guajirago/src/Solicitar.js',
+      'guajirago-admin/src/Promociones.js', 'guajirago-admin/src/reglaPromocion.js', 'guajirago-admin/src/Superadmin.js',
+      'guajirago/functions/promociones.cjs'],
+  },
+  {
     nombre: 'candado-recarga',
     que: 'el candado de la ley del botón no se traba en el navegador: un código de recarga inventado dice «no existe» y el botón vuelve a quedar tocable, dos veces',
     archivo: 'candado-recarga.cjs',
