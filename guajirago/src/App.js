@@ -1,18 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import Splash from './Splash';
 import Login from './Login';
-import Home from './Home';
+import Home, { Historial } from './Home';
 // La pantalla de pedir es UNA sola desde el 5-sep-2026: eran dos archivos gemelos
 // al 94%. El tipo decide si pide un viaje o un mandado (SEGUNDA LEY).
 import Solicitar from './Solicitar';
 import Restaurantes from './Restaurantes';
 import Turismo from './Turismo';
-import AppConductor from './AppConductor';
+import AppConductor, { HistorialConductor } from './AppConductor';
 import MenuLateral from './MenuLateral';
 import MiPerfil from './MiPerfil';
 import Ganancias from './Ganancias';
 import Seguridad from './Seguridad';
 import MisViajes from './MisViajes';
+// G51: adónde llevan «Mis viajes» y «Ganancias» del menú lo dice UNA tabla, según quién es la persona.
+import { pantallaDelMenu } from './navegacionMenu';
 import AyudaSoporte from './AyudaSoporte';
 import Configuracion from './Configuracion';
 import Promociones from './Promociones';
@@ -476,10 +478,10 @@ function App() {
   const [vehiculoUsuario, setVehiculoUsuario] = useState('');
   const [tipoVehiculoUsuario, setTipoVehiculoUsuario] = useState('');
   const [verPerfil, setVerPerfil] = useState(false);
-  const [verGanancias, setVerGanancias] = useState(false);
   const [verSeguridad, setVerSeguridad] = useState(false);
   const [fotoUsuario, setFotoUsuario] = useState(null);
-  const [verMisViajes, setVerMisViajes] = useState(false);
+  // G51: la pantalla que abrió «Mis viajes» o «Ganancias» del menú (una clave de navegacionMenu.js), o null.
+  const [verDelMenu, setVerDelMenu] = useState(null);
   const [verCreditos, setVerCreditos] = useState(false);
   const [verAyuda, setVerAyuda] = useState(false);
   const [verConfig, setVerConfig] = useState(false);
@@ -619,25 +621,31 @@ function App() {
     return true;
   };
 
+  // G51: «Mis viajes» y «Ganancias» del menú abren lo que diga la tabla para el papel de ahora (pasajero, conductor
+  // o ninguno todavía), desde cualquiera de estas pantallas.
+  const abrirDelMenu = (opcion) => setVerDelMenu(pantallaDelMenu(opcion, tipoUsuario));
+
   if (celebracionCreditosConductor) return <CelebracionBienvenidaConductor monto={celebracionCreditosConductor} tipoVehiculo={tipoVehiculoUsuario} onContinuar={() => { setCelebracionCreditosConductor(null); setScreen('home'); }} />;
   if (verPerfil) return <MiPerfil onVolver={() => setVerPerfil(false)} />;
-  if (verGanancias) return <Ganancias onVolver={() => setVerGanancias(false)} />;
+  if (verDelMenu === 'ganancias') return <Ganancias onVolver={() => setVerDelMenu(null)} />;
   if (verSeguridad) return <Seguridad onVolver={() => setVerSeguridad(false)} />;
-  if (verMisViajes) return <MisViajes onVolver={() => setVerMisViajes(false)} />;
+  if (verDelMenu === 'misViajes') return <MisViajes onVolver={() => setVerDelMenu(null)} />;
+  if (verDelMenu === 'historialPasajero') return <Historial onVolver={() => setVerDelMenu(null)} />;
+  if (verDelMenu === 'historialConductor') return <HistorialConductor onVolver={() => setVerDelMenu(null)} />;
   if (verCreditos) return <Creditos onVolver={() => setVerCreditos(false)} />;
   if (verAyuda) return <AyudaSoporte onVolver={() => setVerAyuda(false)} />;
   if (verConfig) return <Configuracion onVolver={() => setVerConfig(false)} onCerrarSesion={handleCerrarSesion} />;
   if (verPromociones) return <Promociones onVolver={() => setVerPromociones(false)} />;
   if (screen === 'splash') return <Splash onFinish={() => {}} />;
   if (screen === 'login') return <Login onEntrar={handleEntrar} />;
-  if (screen === 'modulos') return <><PantallaModulos nombre={nombreUsuario} foto={fotoUsuario} onSeleccionar={handleSeleccionarModulo} onVolver={() => setScreen('login')} onCerrarSesion={handleCerrarSesion} onIrPerfil={() => setVerPerfil(true)} onIrGanancias={() => setVerGanancias(true)} onIrSeguridad={() => setVerSeguridad(true)} onIrViajes={() => setVerMisViajes(true)} onIrCreditos={() => setVerCreditos(true)} onIrAyuda={() => setVerAyuda(true)} onIrConfig={() => setVerConfig(true)} onIrPromociones={() => setVerPromociones(true)} /><Anuncio tipoUsuario={tipoUsuario} /></>;
-  if (screen === 'rol') return <PantallaRol nombre={nombreUsuario} foto={fotoUsuario} onSeleccionar={handleSeleccionarRol} onVolver={() => setScreen('modulos')} onCerrarSesion={handleCerrarSesion} onIrPerfil={() => setVerPerfil(true)} onIrGanancias={() => setVerGanancias(true)} onIrSeguridad={() => setVerSeguridad(true)} onIrViajes={() => setVerMisViajes(true)} onIrCreditos={() => setVerCreditos(true)} onIrAyuda={() => setVerAyuda(true)} onIrConfig={() => setVerConfig(true)} onIrPromociones={() => setVerPromociones(true)} />;
-  if (screen === 'mensajeria') return <PantallaMensajeria nombre={nombreUsuario} foto={fotoUsuario} onVolver={() => setScreen('modulos')} onEnviar={() => setScreen('enviar')} onDomiciliario={() => handleSeleccionarRol('conductor')} onCerrarSesion={handleCerrarSesion} onIrPerfil={() => setVerPerfil(true)} onIrGanancias={() => setVerGanancias(true)} onIrSeguridad={() => setVerSeguridad(true)} onIrViajes={() => setVerMisViajes(true)} onIrCreditos={() => setVerCreditos(true)} onIrAyuda={() => setVerAyuda(true)} onIrConfig={() => setVerConfig(true)} onIrPromociones={() => setVerPromociones(true)} />;
+  if (screen === 'modulos') return <><PantallaModulos nombre={nombreUsuario} foto={fotoUsuario} onSeleccionar={handleSeleccionarModulo} onVolver={() => setScreen('login')} onCerrarSesion={handleCerrarSesion} onIrPerfil={() => setVerPerfil(true)} onIrGanancias={() => abrirDelMenu('ganancias')} onIrSeguridad={() => setVerSeguridad(true)} onIrViajes={() => abrirDelMenu('viajes')} onIrCreditos={() => setVerCreditos(true)} onIrAyuda={() => setVerAyuda(true)} onIrConfig={() => setVerConfig(true)} onIrPromociones={() => setVerPromociones(true)} /><Anuncio tipoUsuario={tipoUsuario} /></>;
+  if (screen === 'rol') return <PantallaRol nombre={nombreUsuario} foto={fotoUsuario} onSeleccionar={handleSeleccionarRol} onVolver={() => setScreen('modulos')} onCerrarSesion={handleCerrarSesion} onIrPerfil={() => setVerPerfil(true)} onIrGanancias={() => abrirDelMenu('ganancias')} onIrSeguridad={() => setVerSeguridad(true)} onIrViajes={() => abrirDelMenu('viajes')} onIrCreditos={() => setVerCreditos(true)} onIrAyuda={() => setVerAyuda(true)} onIrConfig={() => setVerConfig(true)} onIrPromociones={() => setVerPromociones(true)} />;
+  if (screen === 'mensajeria') return <PantallaMensajeria nombre={nombreUsuario} foto={fotoUsuario} onVolver={() => setScreen('modulos')} onEnviar={() => setScreen('enviar')} onDomiciliario={() => handleSeleccionarRol('conductor')} onCerrarSesion={handleCerrarSesion} onIrPerfil={() => setVerPerfil(true)} onIrGanancias={() => abrirDelMenu('ganancias')} onIrSeguridad={() => setVerSeguridad(true)} onIrViajes={() => abrirDelMenu('viajes')} onIrCreditos={() => setVerCreditos(true)} onIrAyuda={() => setVerAyuda(true)} onIrConfig={() => setVerConfig(true)} onIrPromociones={() => setVerPromociones(true)} />;
   if (screen === 'enviar') return <Solicitar tipo="Mensajería" onVolver={() => setScreen('mensajeria')} />;
-  if (screen === 'restaurantes') return <Restaurantes nombre={nombreUsuario} foto={fotoUsuario} onVolver={() => setScreen('modulos')} onCerrarSesion={handleCerrarSesion} onIrPerfil={() => setVerPerfil(true)} onIrGanancias={() => setVerGanancias(true)} onIrSeguridad={() => setVerSeguridad(true)} onIrViajes={() => setVerMisViajes(true)} onIrCreditos={() => setVerCreditos(true)} onIrAyuda={() => setVerAyuda(true)} onIrConfig={() => setVerConfig(true)} onIrPromociones={() => setVerPromociones(true)} />;
-  if (screen === 'turismo') return <Turismo nombre={nombreUsuario} foto={fotoUsuario} onVolver={() => setScreen('modulos')} onCerrarSesion={handleCerrarSesion} onIrPerfil={() => setVerPerfil(true)} onIrGanancias={() => setVerGanancias(true)} onIrSeguridad={() => setVerSeguridad(true)} onIrViajes={() => setVerMisViajes(true)} onIrCreditos={() => setVerCreditos(true)} onIrAyuda={() => setVerAyuda(true)} onIrConfig={() => setVerConfig(true)} onIrPromociones={() => setVerPromociones(true)} />;
+  if (screen === 'restaurantes') return <Restaurantes nombre={nombreUsuario} foto={fotoUsuario} onVolver={() => setScreen('modulos')} onCerrarSesion={handleCerrarSesion} onIrPerfil={() => setVerPerfil(true)} onIrGanancias={() => abrirDelMenu('ganancias')} onIrSeguridad={() => setVerSeguridad(true)} onIrViajes={() => abrirDelMenu('viajes')} onIrCreditos={() => setVerCreditos(true)} onIrAyuda={() => setVerAyuda(true)} onIrConfig={() => setVerConfig(true)} onIrPromociones={() => setVerPromociones(true)} />;
+  if (screen === 'turismo') return <Turismo nombre={nombreUsuario} foto={fotoUsuario} onVolver={() => setScreen('modulos')} onCerrarSesion={handleCerrarSesion} onIrPerfil={() => setVerPerfil(true)} onIrGanancias={() => abrirDelMenu('ganancias')} onIrSeguridad={() => setVerSeguridad(true)} onIrViajes={() => abrirDelMenu('viajes')} onIrCreditos={() => setVerCreditos(true)} onIrAyuda={() => setVerAyuda(true)} onIrConfig={() => setVerConfig(true)} onIrPromociones={() => setVerPromociones(true)} />;
   if (screen === 'mantenimiento') return <PantallaMantenimiento mensaje={mensajeMantenimiento} onVolver={() => setScreen('rol')} />;
-  if (screen === 'datos_conductor') return <PantallaDatosConductor nombre={nombreUsuario} foto={fotoUsuario} celular={telefonoUsuario} onGuardar={handleDatosConductor} onVolver={() => setScreen('rol')} onCerrarSesion={handleCerrarSesion} onIrPerfil={() => setVerPerfil(true)} onIrGanancias={() => setVerGanancias(true)} onIrSeguridad={() => setVerSeguridad(true)} onIrViajes={() => setVerMisViajes(true)} onIrCreditos={() => setVerCreditos(true)} onIrAyuda={() => setVerAyuda(true)} onIrConfig={() => setVerConfig(true)} />;
+  if (screen === 'datos_conductor') return <PantallaDatosConductor nombre={nombreUsuario} foto={fotoUsuario} celular={telefonoUsuario} onGuardar={handleDatosConductor} onVolver={() => setScreen('rol')} onCerrarSesion={handleCerrarSesion} onIrPerfil={() => setVerPerfil(true)} onIrGanancias={() => abrirDelMenu('ganancias')} onIrSeguridad={() => setVerSeguridad(true)} onIrViajes={() => abrirDelMenu('viajes')} onIrCreditos={() => setVerCreditos(true)} onIrAyuda={() => setVerAyuda(true)} onIrConfig={() => setVerConfig(true)} />;
 
   if (screen === 'home') {
     if (tipoUsuario === 'conductor') {

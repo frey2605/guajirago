@@ -30,6 +30,8 @@ import AyudaSoporte from './AyudaSoporte';
 import Configuracion from './Configuracion';
 import Promociones from './Promociones';
 import MenuLateral from './MenuLateral';
+// G51: adónde llevan «Mis viajes» y «Ganancias» lo dice UNA tabla; aquí, con el papel de conductor.
+import { pantallaDelMenu } from './navegacionMenu';
 import { fotoDe } from './fotoUsuario';
 import Logo from './Logo';
 // Pedirle el GPS al teléfono, con sus tiempos en un solo sitio (G28).
@@ -430,10 +432,11 @@ function AppConductor({ nombre, telefono, placa, vehiculo, tipoVehiculo, onCerra
   const [errorCodigo, setErrorCodigo] = useState('');
   const [destinoCoords, setDestinoCoords] = useState(null);
   const [contador, setContador] = useState(segundosDeEspera(CONFIG_APP_DEFECTO));
-  const [verHistorial, setVerHistorial] = useState(false);
+  // G51: la pantalla que abrió «Mis viajes» o «Ganancias» (una clave de navegacionMenu.js), o null.
+  const [verDelMenu, setVerDelMenu] = useState(null);
+  const abrirDelMenu = (opcion) => setVerDelMenu(pantallaDelMenu(opcion, 'conductor'));
   const [verCreditos, setVerCreditos] = useState(false);
   const [verPerfil, setVerPerfil] = useState(false);
-  const [verGanancias, setVerGanancias] = useState(false);
   const [verSeguridad, setVerSeguridad] = useState(false);
   const [verAyuda, setVerAyuda] = useState(false);
   const [verConfig, setVerConfig] = useState(false);
@@ -1213,10 +1216,10 @@ useEffect(() => {
     </div>
   );
   if (datosCalificacion) return <Calificacion tipo={null} viajeId={datosCalificacion.viajeId} nombreCalificado={datosCalificacion.nombrePasajero} calificadoId={datosCalificacion.pasajeroId} quienCalifica="conductor" onFinalizar={() => setDatosCalificacion(null)} />;
-  if (verHistorial) return <HistorialConductor onVolver={() => setVerHistorial(false)} />;
+  if (verDelMenu === 'historialConductor') return <HistorialConductor onVolver={() => setVerDelMenu(null)} />;
   if (verCreditos) return <Creditos onVolver={() => setVerCreditos(false)} />;
   if (verPerfil) return <MiPerfil onVolver={() => setVerPerfil(false)} />;
-  if (verGanancias) return <Ganancias onVolver={() => setVerGanancias(false)} />;
+  if (verDelMenu === 'ganancias') return <Ganancias onVolver={() => setVerDelMenu(null)} />;
   if (verSeguridad) return <Seguridad onVolver={() => setVerSeguridad(false)} />;
   if (verAyuda) return <AyudaSoporte onVolver={() => setVerAyuda(false)} />;
   if (verConfig) return <Configuracion onVolver={() => setVerConfig(false)} onCerrarSesion={cerrarSesion} />;
@@ -1481,7 +1484,7 @@ if (sancionActiva) return (
         {mensajeGrande && <MensajeGrande mensaje={mensajeGrande} onCerrar={() => setMensajeGrande(null)} />}
       <div style={{ background: '#FFFFFF', borderBottom: '1.5px solid #ECECEF', padding: '24px 20px', position: 'relative' }}>
         <Logo size={30} style={{ position: 'absolute', top: '14px', right: '16px', zIndex: 6 }} />
-        <MenuLateral nombre={nombre} foto={fotoConductor} onIrPerfil={() => setVerPerfil(true)} onIrCreditos={() => setVerCreditos(true)} onIrViajes={() => setVerHistorial(true)} onIrGanancias={() => setVerGanancias(true)} onIrSeguridad={() => setVerSeguridad(true)} onIrAyuda={() => setVerAyuda(true)} onIrConfig={() => setVerConfig(true)} onIrPromociones={() => setVerPromociones(true)} onCerrarSesion={cerrarSesion} />
+        <MenuLateral nombre={nombre} foto={fotoConductor} onIrPerfil={() => setVerPerfil(true)} onIrCreditos={() => setVerCreditos(true)} onIrViajes={() => abrirDelMenu('viajes')} onIrGanancias={() => abrirDelMenu('ganancias')} onIrSeguridad={() => setVerSeguridad(true)} onIrAyuda={() => setVerAyuda(true)} onIrConfig={() => setVerConfig(true)} onIrPromociones={() => setVerPromociones(true)} onCerrarSesion={cerrarSesion} />
         <div onClick={onVolver} style={{ position: 'absolute', top: '18px', left: '120px', display: 'flex', alignItems: 'center', gap: '4px', background: '#ECECEF', borderRadius: '12px', color: '#1A1A1E', fontSize: '14px', fontWeight: '500', padding: '8px 16px', cursor: 'pointer', zIndex: 5 }}><span style={{ fontSize: '20px', fontWeight: '900', lineHeight: '1' }}>‹</span> Volver</div>
         <div style={{ marginTop: '48px' }}>
           <p style={{ color: '#6B7280', fontSize: '11px', margin: '0', letterSpacing: '2px' }}>CONDUCTOR</p>
@@ -1522,7 +1525,7 @@ if (sancionActiva) return (
           </div>
         )}
         {!activo && (
-          <div onClick={() => setVerHistorial(true)} style={{ background: '#FFFFFF', borderRadius: '20px', padding: '20px', display: 'flex', alignItems: 'center', gap: '16px', border: '1px solid #ECECEF', cursor: 'pointer', marginTop: '4px' }}>
+          <div onClick={() => abrirDelMenu('viajes')} style={{ background: '#FFFFFF', borderRadius: '20px', padding: '20px', display: 'flex', alignItems: 'center', gap: '16px', border: '1px solid #ECECEF', cursor: 'pointer', marginTop: '4px' }}>
             <span style={{ fontSize: '36px' }}>🕐</span>
             <div><p style={{ color: '#1A1A1E', fontWeight: '900', fontSize: '16px', margin: '0' }}>Mis viajes</p><p style={{ color: '#6B7280', fontSize: '12px', margin: '4px 0 0' }}>Ver historial y ganancias</p></div>
           </div>
@@ -1558,4 +1561,6 @@ if (sancionActiva) return (
   );
 }
 
+// G51: App.js también la abre, cuando la persona es conductor y toca «Mis viajes» antes de entrar (navegacionMenu.js).
+export { HistorialConductor };
 export default AppConductor;

@@ -8,6 +8,9 @@ import Creditos from './Creditos';
 import AyudaSoporte from './AyudaSoporte';
 import Configuracion from './Configuracion';
 import Promociones from './Promociones';
+import Ganancias from './Ganancias';
+// G51: adónde llevan «Mis viajes» y «Ganancias» del menú lo dice UNA tabla; aquí, con el papel de pasajero.
+import { pantallaDelMenu } from './navegacionMenu';
 import Logo from './Logo';
 import { auth, db } from './firebase';
 import { collection, query, where, orderBy, limit, getDocs, doc, getDoc } from 'firebase/firestore';
@@ -199,6 +202,9 @@ function Home({ nombre, onCerrarSesion, onVolver, onCambiarNegocio }) {
     setPantalla('solicitar');
   };
 
+  // G51: la tabla decide qué abre «Mis viajes» y «Ganancias»; antes «Ganancias» aquí decía «muy pronto».
+  const abrirDelMenu = (opcion) => setPantalla(pantallaDelMenu(opcion, 'pasajero'));
+
   const agregarFavorito = ({ nombre, direccion, icono }) => {
     const nuevos = [...favoritos, { nombre, direccion, icono }];
     setFavoritos(nuevos);
@@ -210,8 +216,12 @@ function Home({ nombre, onCerrarSesion, onVolver, onCambiarNegocio }) {
     return <Solicitar tipo={tipoSeleccionado} destinoInicial={destinoPredefinido} onVolver={() => setPantalla('home')} />;
   }
 
-  if (pantalla === 'historial') {
+  if (pantalla === 'historialPasajero') {
     return <Historial onVolver={() => setPantalla('home')} />;
+  }
+
+  if (pantalla === 'ganancias') {
+    return <Ganancias onVolver={() => setPantalla('home')} />;
   }
 
   if (pantalla === 'restaurantes') {
@@ -243,7 +253,7 @@ function Home({ nombre, onCerrarSesion, onVolver, onCambiarNegocio }) {
       <LlamadoAtencion />
 
       <div style={{ background: '#FFFFFF', padding: '24px 20px', position: 'relative' }}>
-        <MenuLateral nombre={nombre} foto={fotoUsuario} onIrPerfil={() => setVerPerfil(true)} onIrViajes={() => setPantalla('historial')} onIrCreditos={() => setVerCreditos(true)} onIrSeguridad={() => setVerSeguridad(true)} onIrAyuda={() => setVerAyuda(true)} onIrConfig={() => setVerConfig(true)} onIrPromociones={() => setVerPromociones(true)} onCerrarSesion={onCerrarSesion} onCambiarNegocio={onCambiarNegocio} />
+        <MenuLateral nombre={nombre} foto={fotoUsuario} onIrPerfil={() => setVerPerfil(true)} onIrViajes={() => abrirDelMenu('viajes')} onIrGanancias={() => abrirDelMenu('ganancias')} onIrCreditos={() => setVerCreditos(true)} onIrSeguridad={() => setVerSeguridad(true)} onIrAyuda={() => setVerAyuda(true)} onIrConfig={() => setVerConfig(true)} onIrPromociones={() => setVerPromociones(true)} onCerrarSesion={onCerrarSesion} onCambiarNegocio={onCambiarNegocio} />
         <Logo size={34} style={{ position: 'absolute', top: '16px', right: '16px', zIndex: 5 }} />
         <div onClick={onVolver} style={{ position: 'absolute', top: '18px', left: '120px', display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(0,0,0,0.06)', borderRadius: '12px', color: '#1A1A1E', fontSize: '14px', fontWeight: '500', padding: '8px 16px', cursor: 'pointer', zIndex: 5 }}><span style={{ fontSize: '20px', fontWeight: '900', lineHeight: '1' }}>‹</span> Volver</div>
         <div style={{ marginTop: '48px' }}>
@@ -286,4 +296,6 @@ function Home({ nombre, onCerrarSesion, onVolver, onCambiarNegocio }) {
   );
 }
 
+// G51: App.js también la abre, cuando la persona es pasajero y toca «Mis viajes» antes de entrar (navegacionMenu.js).
+export { Historial };
 export default Home;

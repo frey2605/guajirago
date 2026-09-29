@@ -562,6 +562,19 @@ la placa de `conductores/{uid}` (la escribe su GPS con la misma placa que va en 
 - Con el panel VIEJO publicado en pruebas (6d06be8) la tarjeta del suspendido sale sin etiqueta y con «Rechazar /
   ✅ Aprobar»; con el nuevo, «SUSPENDIDO» y «Reactivar y aprobar».
 
+### menu-navegacion · «Mis viajes» y «Ganancias» abren lo mismo desde cualquier sitio (G51, 29-sep-2026)
+- «La misma pantalla» se compara con una FIRMA de lo pintado: el texto entero y cuántos logos
+  (`svg[aria-label="GuajiraGo"]`) lleva. La del conductor no lleva logo y la de los dos lados sí: con un conductor sin
+  viajes, las dos dicen el mismo «Aún no tienes viajes» y solo el logo las separa.
+- La de los dos lados se reconoce por las etiquetas «Como pasajero / Como conductor» de cada tarjeta.
+- El «muy pronto» del menú es un `alert()`: el motor lo apunta en los errores como «ALERTA: …», y el recorrido además
+  escucha `dialog` para contarlo. Si no se abre nada, NO se puede pulsar «Volver» a ciegas: en el menú del pasajero
+  ese «Volver» es el de la pantalla y saca a «rol».
+- taxi@gg.test entra EN TURNO, así que la tarjeta «Mis viajes / Ver historial y ganancias» (solo sale fuera de turno)
+  no aparece; esa tarjeta la ejecuta pruebas/menuNavegacion.test.js.
+- Con la app VIEJA publicada en pruebas: pasajero, módulos → la de los dos lados (50 etiquetas) y su menú → la suya;
+  «Ganancias» del pasajero → «muy pronto»; taxista, módulos → la de los dos lados (39 etiquetas) y su menú → la suya.
+
 ## Lo que el robot dejó creado en pruebas
 
 - 27-sep-2026: «Robot Taxi De Prueba» (robot.taxi.1790508222079@gg.test) y

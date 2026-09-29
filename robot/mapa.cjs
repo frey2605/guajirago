@@ -373,6 +373,15 @@ const RECORRIDOS = [
     vigila: ['guajirago-admin/src/aprobarNegocio.js', 'guajirago-admin/src/AliadosPendientes.js', 'guajirago-admin/src/Restaurantes.js',
       'guajirago-admin/src/Turismo.js'],
   },
+  {
+    nombre: 'menu-navegacion',
+    que: '«Mis viajes» y «Ganancias» del menú abren la misma pantalla desde módulos y desde el menú de pasajero y conductor, y ninguna dice «muy pronto» (G51; solo mira)',
+    archivo: 'menu-navegacion.cjs',
+    // Cada botón (41 combinaciones de entrada, papel y opción) lo SACA de su archivo y lo EJECUTA
+    // pruebas/menuNavegacion.test.js, también la tarjeta «Mis viajes» del conductor fuera de turno.
+    vigila: ['guajirago/src/navegacionMenu.js', 'guajirago/src/MenuLateral.js', 'guajirago/src/App.js', 'guajirago/src/Home.js',
+      'guajirago/src/AppConductor.js'],
+  },
 ];
 
 // Los archivos de pantalla: los que, si cambian, el robot debería poder probar. Todo lo que esté en
