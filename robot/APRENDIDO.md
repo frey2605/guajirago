@@ -416,6 +416,20 @@ la placa de `conductores/{uid}` (la escribe su GPS con la misma placa que va en 
   diría 3 y el recorrido lo pillaría. En pruebas config/global tenía 3 y el pasajero 0 favoritos: se devuelven al final.
   Con el mismo `403` de siempre en la consola, que no es de esto.
 
+### llamado-atencion (G37, 28-sep-2026)
+- El llamado se pone como lo pone el panel: `admin@gg.test` escribe `usuarios/<uid>.llamadoPendiente` con `cambiar`
+  (el pasajero de prueba no puede escribírselo a sí mismo como si fuera el panel, y así no hace falta abrir el panel).
+- 🔑 **Para probar el «no se pudo» del candado sin romper nada: `pagina.context().setOffline(true)`.** La escritura se
+  queda esperando, a los 20 s el candado dice «Sin confirmar · No se pudo confirmar…» y, al devolver la señal con
+  `setOffline(false)`, la escritura entra sola y el aviso se corrige: la ventanita se cierra. Los `ERR_FAILED` de la
+  consola en ese rato son del corte, no de la app.
+- Careo en pantalla ANTES de publicar: con el código viejo el robot vio **2** ventanitas «MENSAJE DE GUAJIRAGO» y el
+  clic en «Entendido» se quedó 30 s sin poder darse (una tapaba a la otra). Con el nuevo: 1, y el clic entra.
+- El aviso del fallo tiene que ir DENTRO de la ventanita del llamado: ésta va a `zIndex 99999` y AvisoModal a 10000,
+  así que puesto fuera quedaría tapado. En la captura se ve el aviso encima, con el borde naranja del llamado detrás.
+- Al final el campo queda en `null` si no lo tenía (el robot no sabe borrar un campo; la app lee `null` y «no está»
+  igual).
+
 ## Lo que el robot dejó creado en pruebas
 
 - 27-sep-2026: «Robot Taxi De Prueba» (robot.taxi.1790508222079@gg.test) y
