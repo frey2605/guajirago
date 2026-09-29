@@ -10,28 +10,8 @@ import { apuntarRechazo } from './avisoRechazo';
 import { guardarRechazo } from './guardarRechazo';
 import AvisoModal from './AvisoModal';
 
-const OPCIONES_PASAJERO = [
-  { texto: 'Llegó rápido', buena: true },
-  { texto: 'Buen trato', buena: true },
-  { texto: 'Conducción segura', buena: true },
-  { texto: 'Vehículo limpio', buena: true },
-  { texto: 'Llegó tarde', buena: false },
-  { texto: 'Mal trato', buena: false },
-  { texto: 'Conducción peligrosa', buena: false },
-  { texto: 'Vehículo sucio', buena: false },
-  { texto: 'Canceló sin avisar', buena: false },
-];
-
-const OPCIONES_CONDUCTOR = [
-  { texto: 'Pasajero puntual', buena: true },
-  { texto: 'Trato respetuoso', buena: true },
-  { texto: 'Buen comunicador', buena: true },
-  { texto: 'Sin contratiempos', buena: true },
-  { texto: 'Hizo esperar mucho', buena: false },
-  { texto: 'Trato grosero', buena: false },
-  { texto: 'Dirección incorrecta', buena: false },
-  { texto: 'Canceló sin avisar', buena: false },
-];
+// G73: las etiquetas (y cuáles son buenas) salen de UNA pieza; el panel lleva su copia atada.
+import { OPCIONES_PASAJERO, OPCIONES_CONDUCTOR } from './etiquetasCalificacion';
 
 function Calificacion({ tipo, viajeId, nombreCalificado, calificadoId, quienCalifica, onFinalizar }) {
   const [estrellas, setEstrellas] = useState(0);
