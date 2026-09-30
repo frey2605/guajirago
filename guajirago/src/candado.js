@@ -12,18 +12,20 @@
 //      abre y dice que NO SE PUDO CONFIRMAR — no que falló, porque eso no se sabe, y con plata de por medio decir
 //      «falló» cuando sí entró invita a hacerlo dos veces. Si la respuesta llega tarde, el aviso se corrige solo.
 //
-// Sin React y sin importar nada: así las pruebas la cargan y la EJECUTAN tal cual (pruebas/leyBoton.test.js).
-// El panel y aliados llevan una copia byte a byte, atada por esa misma prueba.
+// Sin React, y lo único que importa es avisoRechazo.js, otra pieza pura: así las pruebas la cargan y la EJECUTAN tal
+// cual (pruebas/leyBoton.test.js). El panel y aliados llevan una copia byte a byte, atada por esa misma prueba.
 // ─────────────────────────────────────────────────────────────────────────────
+import { motivoDeRechazo } from './avisoRechazo';
+
 export const TOPE_MS = 20000;
-export const MENSAJE_FALLA = 'No se pudo completar. Revisa la señal y vuelve a intentar.';
 export const NO_CONFIRMADO = 'No se pudo confirmar. Revisa si quedó hecho antes de volver a intentar.';
 
 // EL MOTIVO DEL FALLO NO SE CALCULA AQUÍ (SEGUNDA LEY). Lo calcula `motivoDeRechazo` de avisoRechazo.js, la única pieza
 // que convierte un fallo en un aviso para la gente, con copia atada en las tres apps. El 26-sep-2026 este archivo trajo
 // su propia tabla de errores y ya decía cosas distintas que aquélla: se quitó el mismo día. El gancho useAccion se la
-// pasa como `traducir(e, accion)` → { clave, titulo, texto }.
-const TRADUCIR_POR_DEFECTO = (e, accion) => ({ clave: 'otro', titulo: 'No se pudo ' + (accion || 'completar'), texto: MENSAJE_FALLA });
+// pasa como `traducir(e, accion)` → { clave, titulo, texto }. G76 (29-sep-2026): quedaba un texto propio, «Revisa la
+// señal y vuelve a intentar», para cuando nadie pasaba `traducir` y para un `{ ok: false }` sin motivo; ahora los dos
+// salen también de motivoDeRechazo. El ÚNICO texto que dice el candado es el del tope (NO_CONFIRMADO), y es ley.
 
 // alCambiar(cual | false): cuál acción está corriendo. alAviso({ ok, titulo, texto, icono, cual }): la verdad del
 // final, lista para la ventanita. reloj: se cambia en las pruebas para no esperar 20 segundos de verdad.
@@ -31,7 +33,7 @@ const TRADUCIR_POR_DEFECTO = (e, accion) => ({ clave: 'otro', titulo: 'No se pud
 // setTimeout llamado como método de otro objeto revienta con «Illegal invocation» (en Node no), y eso dejaba el botón
 // trabado para siempre desde el 26-sep-2026 hasta el 27-sep-2026. Lo vigila pruebas/leyBoton.test.js.
 const RELOJ = { poner: (fn, ms) => setTimeout(fn, ms), quitar: (id) => clearTimeout(id) };
-export function crearCandado({ alCambiar = () => {}, alAviso = () => {}, tope = TOPE_MS, reloj = RELOJ, traducir = TRADUCIR_POR_DEFECTO } = {}) {
+export function crearCandado({ alCambiar = () => {}, alAviso = () => {}, tope = TOPE_MS, reloj = RELOJ, traducir = motivoDeRechazo } = {}) {
   let cerrado = false;
   let vuelta = 0; // cuál fue la última acción: un aviso tardío solo corrige el suyo
   return {
@@ -57,10 +59,11 @@ export function crearCandado({ alCambiar = () => {}, alAviso = () => {}, tope = 
         alAviso(r.ok ? { ok: true, titulo: '¡Listo!', texto: dicho(r.valor), icono: '✅', cual } : { ok: false, titulo: r.titulo, texto: r.error, icono: '⚠️', cual });
       };
       const fallo = (m) => ({ ok: false, titulo: m.titulo, error: m.texto, clave: m.clave });
+      // `{ ok: false }` es una negativa sin excepción: el título y, si la pantalla no dio su `error`, el texto, los da
+      // la pieza única (sin código de error: «Algo falló…»), no un texto de aquí.
+      const negativa = (v) => { const m = motivoDeRechazo(null, accion); return { ok: false, titulo: m.titulo, error: v.error || m.texto, clave: 'otro', ...(v.avisado ? { avisado: true } : {}) }; };
       const trabajo = Promise.resolve().then(fn).then(
-        (v) => (v && v.ok === false
-          ? { ok: false, titulo: 'No se pudo ' + (accion || 'completar'), error: v.error || MENSAJE_FALLA, clave: 'otro', ...(v.avisado ? { avisado: true } : {}) }
-          : { ok: true, valor: v }),
+        (v) => (v && v.ok === false ? negativa(v) : { ok: true, valor: v }),
         (e) => fallo(traducir(e, accion)),
       );
       let timer;

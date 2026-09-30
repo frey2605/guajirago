@@ -101,7 +101,7 @@ describe('LA LEY DEL BOTÓN · el candado, ejecutado', () => {
   it('una respuesta { ok: false } del servidor es una falla, no un éxito', async () => {
     const { c, avisos } = candado();
     assert.deepStrictEqual(await c.correr(async () => ({ ok: false, error: 'Saldo insuficiente.' }), 'recargar', 'Recargado.'),
-      { ok: false, titulo: 'No se pudo completar', error: 'Saldo insuficiente.', clave: 'otro' });
+      { ok: false, titulo: RZ.motivoDeRechazo(null).titulo, error: 'Saldo insuficiente.', clave: 'otro' });
     assert.strictEqual(avisos[0].texto, 'Saldo insuficiente.');
   });
 
@@ -172,9 +172,13 @@ function candadoComoEnElNavegador() {
   const fuente = leer('guajirago/src/candado.js');
   const nombres = [...fuente.matchAll(/^export\s+(?:const|function)\s+([A-Za-z0-9_]+)/gm)].map((m) => m[1]);
   const quejas = [];
+  // G76: el candado pide motivoDeRechazo a avisoRechazo.js; ese import se quita y se le pasa la pieza de verdad.
+  const imports = (fuente.match(/^import .*$/gm) || []);
+  assert.ok(imports.every((l) => /^import \{ motivoDeRechazo \} from '\.\/avisoRechazo';?\r?$/.test(l)), 'el candado importa algo más que motivoDeRechazo: ' + imports.join(' | '));
+  const sinImport = fuente.replace(/^import .*$/gm, '');
   // eslint-disable-next-line no-new-func
-  const C2 = new Function('setTimeout', 'clearTimeout', fuente.replace(/^export\s+/gm, '') + '\nreturn { ' + nombres.join(', ') + ' };')(
-    comoNavegador(setTimeout, 'setTimeout', quejas), comoNavegador(clearTimeout, 'clearTimeout', quejas));
+  const C2 = new Function('setTimeout', 'clearTimeout', 'motivoDeRechazo', sinImport.replace(/^export\s+/gm, '') + '\nreturn { ' + nombres.join(', ') + ' };')(
+    comoNavegador(setTimeout, 'setTimeout', quejas), comoNavegador(clearTimeout, 'clearTimeout', quejas), RZ.motivoDeRechazo);
   return { C2, quejas };
 }
 
