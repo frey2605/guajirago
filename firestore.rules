@@ -574,11 +574,41 @@ service cloud.firestore {
       // después solo el servidor (confirmarConductor la rehace entera; el cobro la
       // marca consumida). MEDIDO: ninguna de las tres apps la escribe en un update
       // (solo `viajeNuevo.js` al crear); el panel no escribe viajes.
+      // ── P03 · LA TARJETA DEL CONDUCTOR NO SE REESCRIBE (30-sep-2026) ─────────
+      // Nombre, teléfono, placa, vehículo, foto y color del conductor: lo que ve
+      // la pasajera para saber a qué carro subirse y lo que va en su mensaje de
+      // emergencia. Desde P03 los escribe `confirmarConductor` sacándolos de la
+      // FICHA del conductor (conductorDeLaFicha.cjs), no de su oferta. Pero este
+      // `update` dejaba que el conductor del viaje (esMio) se los reescribiera
+      // después: la misma tarjeta falsa, entrando por la puerta de al lado.
+      // Ahora solo se pueden dejar como están, o borrar (null o quitarlos) al
+      // SOLTAR al conductor (conductorId a null, que conductorIntacto() ya limita
+      // a los dos del viaje). MEDIDO: en las tres apps la única escritura de estos
+      // campos en un viaje es la de soltar (`sinConductor()` de
+      // conductorDelViaje.js, todos a null); el panel no escribe viajes.
+      function tarjetaSeQuedaONull(campo) {
+        return !request.resource.data.diff(resource.data).affectedKeys().hasAny([campo])
+          || request.resource.data.get(campo, null) == null;
+      }
+      function tarjetaIntacta() {
+        return !request.resource.data.diff(resource.data).affectedKeys().hasAny(
+                 ['conductorNombre', 'conductorTelefono', 'conductorPlaca',
+                  'conductorVehiculo', 'conductorFoto', 'conductorColor'])
+          || (request.resource.data.get('conductorId', null) == null
+              && tarjetaSeQuedaONull('conductorNombre')
+              && tarjetaSeQuedaONull('conductorTelefono')
+              && tarjetaSeQuedaONull('conductorPlaca')
+              && tarjetaSeQuedaONull('conductorVehiculo')
+              && tarjetaSeQuedaONull('conductorFoto')
+              && tarjetaSeQuedaONull('conductorColor'));
+      }
+
       allow update: if request.auth != null
         && (esMio() || esAdmin())
         && request.resource.data.get('pasajeroId', '') == resource.data.get('pasajeroId', '')
         && request.resource.data.get('descuentoInfo', null) == resource.data.get('descuentoInfo', null)
-        && conductorIntacto();
+        && conductorIntacto()
+        && tarjetaIntacta();
 
       allow delete: if false;
       // ── REGLAS 5 y 11 · EL CAJON PRIVADO DEL VIAJE ─────────────────────────

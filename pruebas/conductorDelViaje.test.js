@@ -117,8 +117,9 @@ describe('G59 · el medidor no se puede ablandar', () => {
   });
 
   it('ve un campo nuevo del conductor en el servidor', () => {
-    const roto = INDEX.replace('conductorColor: of.conductorColor || "",',
-      'conductorColor: of.conductorColor || "",\n        conductorApodo: of.conductorApodo || "",');
+    // P03: la tarjeta sale de la ficha (`tarjeta.…`), ya no de la oferta (`of.…`).
+    const roto = INDEX.replace('conductorColor: tarjeta.conductorColor,',
+      'conductorColor: tarjeta.conductorColor,\n        conductorApodo: tarjeta.conductorApodo,');
     assert.notStrictEqual(roto, INDEX, 'el ancla del servidor no calzó');
     assert.ok(M.camposDelServidor(roto).delConductor.includes('conductorApodo'));
   });

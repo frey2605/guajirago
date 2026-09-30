@@ -8,7 +8,7 @@
 //  leerse de SOBRE_REF, para que cada uno use su propia variable.
 //
 //  · baseDeMentira(datos): Firestore en memoria ({ coleccion: { id: {campos} } }) con doc().get(), where().get()
-//    y getAll().
+//    y getAll(); y (P03) subcolecciones y runTransaction, que apunta lo que se escribiría en `escrituras`.
 //  · mensajeroDeMentira(fallan): apunta lo que Google recibiría, un mensaje por token; los tokens de `fallan`
 //    contestan con ese código de error.
 //  · cargarIndex(datos, fallan, ref): carga index.js (el de hoy, o el del commit `ref`) con las dos de arriba, y
@@ -23,12 +23,22 @@ const { leer } = require('./cargar.cjs');
 const RAIZ = path.resolve(__dirname, '..');
 const DIR = path.join(RAIZ, 'guajirago', 'functions');
 
-function baseDeMentira(datos) {
+function baseDeMentira(datos, escrituras = []) {
   const snap = (col, id) => {
     const d = (datos[col] || {})[id];
     return { id, exists: !!d, data: () => d, updateTime: { toMillis: () => Date.now() - 60 * 1000 } };
   };
-  const ref = (col, id) => ({ col, id, get: async () => snap(col, id) });
+  // P03: `ref.collection(sub)` para las subcolecciones (viajes/{id}/contraofertas/{c}), con la ruta entera como nombre.
+  const ref = (col, id) => ({
+    col, id, get: async () => snap(col, id),
+    collection: (sub) => ({ doc: (id2) => ref(col + '/' + id + '/' + sub, id2) }),
+  });
+  // P03: una transacción de mentira. Lee de `datos` y APUNTA lo que se escribiría en `escrituras` (no cambia `datos`).
+  const runTransaction = async (fn) => fn({
+    get: (r) => r.get(),
+    update: (r, campos) => { escrituras.push({ que: 'update', ruta: r.col + '/' + r.id, campos }); },
+    set: (r, campos, opciones) => { escrituras.push({ que: 'set', ruta: r.col + '/' + r.id, campos, opciones }); },
+  });
   const consulta = (col, filtros) => ({
     where: (campo, op, valor) => consulta(col, [...filtros, [campo, valor]]),
     get: async () => {
@@ -40,6 +50,7 @@ function baseDeMentira(datos) {
   return {
     collection: (col) => ({ doc: (id) => ref(col, id), where: (c, o, v) => consulta(col, [[c, v]]) }),
     getAll: async (...refs) => refs.map((r) => snap(r.col, r.id)),
+    runTransaction,
   };
 }
 
@@ -68,7 +79,8 @@ function mensajeroDeMentira(fallan = {}) {
 /** Carga index.js (el de hoy, o el del commit `ref`) con la nube de mentira, y deja a mano sus funciones internas. */
 function cargarIndex(datos, fallan, ref) {
   const mensajero = mensajeroDeMentira(fallan);
-  const admin = { initializeApp() {}, firestore: () => baseDeMentira(datos), messaging: () => mensajero };
+  const escrituras = [];
+  const admin = { initializeApp() {}, firestore: () => baseDeMentira(datos, escrituras), messaging: () => mensajero };
   const tal = (a, b) => (typeof b === 'function' ? b : a);
   class HttpsError extends Error {}
   const funciones = {
@@ -91,7 +103,7 @@ function cargarIndex(datos, fallan, ref) {
     m.filename = archivo;
     m.paths = Module._nodeModulePaths(DIR);
     m._compile(fuente, archivo);
-    return { fx: m.exports, mensajero };
+    return { fx: m.exports, mensajero, escrituras };
   } finally {
     Module._load = original;
   }

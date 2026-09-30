@@ -59,6 +59,8 @@ const { regaloDelConductorNuevo } = require('./regaloConductorNuevo.cjs');
 const { ESTADOS_MERCADO, ESTADO_ACEPTADO, ESTADOS_EN_CURSO } = require('./estadosViaje.cjs');
 // G64: a qué EMPLEADOS del negocio les llega cada aviso (pedido, reserva, cobro) sale de UNA tabla.
 const { tokensDeLosEmpleados } = require('./quienRecibeElAviso.cjs');
+// P03: la tarjeta del conductor que lleva el viaje sale de su ficha (copias atadas de la app, pruebas/tarjetaDelConductor.test.js).
+const { tarjetaDelConductor } = require('./conductorDeLaFicha.cjs');
 
 // Distancia en km entre dos coordenadas (Haversine)
 function distanciaKm(lat1, lng1, lat2, lng2) {
@@ -323,6 +325,8 @@ exports.confirmarConductor = onCall(async (request) => {
       const cfg = configSnap.exists ? configSnap.data() : {};
       const comision = comisionSegunTipoDeViaje(viaje.tipo, cfg);
       const creditosActuales = (usuarioSnap.exists ? usuarioSnap.data().creditos : 0) || 0;
+      // P03: `usuarioRef` es la ficha del CONDUCTOR (usuarios/{conductorId}): de ahí sale su tarjeta.
+      const tarjeta = tarjetaDelConductor(usuarioSnap.exists ? usuarioSnap.data() : null);
       // G01 — la tarifa que se cobra la fija ESTA línea (la oferta aceptada). La ficha del descuento se armó en el
       // celular con la oferta de antes, así que se rehace aquí, en la misma operación, sobre la tarifa aceptada:
       // así el pasajero, el conductor y el abono del descuento dicen la misma cifra. Las pantallas solo la leen.
@@ -356,12 +360,14 @@ exports.confirmarConductor = onCall(async (request) => {
       t.update(viajeRef, {
         estado: ESTADO_ACEPTADO,
         conductorId,
-        conductorNombre: of.conductorNombre || "",
-        conductorTelefono: of.conductorTelefono || "",
-        conductorPlaca: of.conductorPlaca || "",
-        conductorVehiculo: of.conductorVehiculo || "",
-        conductorFoto: of.conductorFoto || null,
-        conductorColor: of.conductorColor || "",
+        // P03: la tarjeta del conductor (lo que ve el pasajero y va en su mensaje de emergencia) sale de SU FICHA, no de
+        // la oferta que escribe su teléfono. La oferta solo aporta el precio. Ver conductorDeLaFicha.cjs.
+        conductorNombre: tarjeta.conductorNombre,
+        conductorTelefono: tarjeta.conductorTelefono,
+        conductorPlaca: tarjeta.conductorPlaca,
+        conductorVehiculo: tarjeta.conductorVehiculo,
+        conductorFoto: tarjeta.conductorFoto,
+        conductorColor: tarjeta.conductorColor,
         // G13: el texto sale del NÚMERO aceptado con el formateador único, no del texto que armó el teléfono.
         tarifa: Number.isFinite(tarifaValorAceptada) ? cop(tarifaValorAceptada) : (of.monto || viaje.tarifa),
         tarifaValor: tarifaValorAceptada,

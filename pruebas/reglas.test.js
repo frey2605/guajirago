@@ -767,6 +767,80 @@ describe('P02 · la ficha del descuento del viaje no se toca después de pedir',
   });
 });
 
+// ── P03 · LA TARJETA DEL CONDUCTOR NO SE REESCRIBE (30-sep-2026) ──
+// confirmarConductor pone en el viaje la tarjeta del conductor sacada de su FICHA. Aquí se comprueba que después nadie
+// la cambia por la puerta del `update` (el conductor del viaje, la pasajera, el panel), y que soltar al conductor
+// (todo a null, sinConductor()) y el resto del viaje siguen funcionando.
+describe('P03 · la tarjeta del conductor en el viaje no se reescribe', () => {
+  const TARJETA = {
+    conductorNombre: 'LUIS PEREZ', conductorTelefono: '3001234567', conductorPlaca: 'ABC123',
+    conductorVehiculo: 'Chevrolet 2015', conductorFoto: 'https://fotos/luis.jpg', conductorColor: 'Blanco',
+  };
+  const MENTIRA = {
+    conductorNombre: 'CARLOS GOMEZ', conductorTelefono: '3110000000', conductorPlaca: 'XYZ999',
+    conductorVehiculo: 'Mazda 2022', conductorFoto: 'https://fotos/otro.jpg', conductorColor: 'Rojo',
+  };
+  beforeEach(async () => {
+    await entorno.withSecurityRulesDisabled(async (ctx) => {
+      const { doc, setDoc } = FS;
+      await setDoc(doc(ctx.firestore(), 'viajes/vtarjeta'), {
+        pasajeroId: 'pasajero1', conductorId: 'conductor1', estado: 'aceptado', fase: 'recogiendo', tarifaValor: 12000,
+        ...TARJETA,
+      });
+      await setDoc(doc(ctx.firestore(), 'viajes/vlibre'), { pasajeroId: 'pasajero1', estado: 'esperando', tarifaValor: 9000 });
+    });
+  });
+
+  for (const campo of Object.keys(MENTIRA)) {
+    it('EL ATAQUE · el conductor del viaje NO se cambia ' + campo, async () => {
+      const { doc, updateDoc } = FS;
+      await RUT.assertFails(updateDoc(doc(como('conductor1'), 'viajes/vtarjeta'), { [campo]: MENTIRA[campo] }));
+    });
+  }
+
+  it('EL ATAQUE · ni toda la tarjeta de una vez, ni borrándola con el conductor puesto', async () => {
+    const { doc, updateDoc, deleteField } = FS;
+    await RUT.assertFails(updateDoc(doc(como('conductor1'), 'viajes/vtarjeta'), { ...MENTIRA, fase: 'en_punto' }));
+    await RUT.assertFails(updateDoc(doc(como('conductor1'), 'viajes/vtarjeta'), { conductorPlaca: deleteField() }));
+    await RUT.assertFails(updateDoc(doc(como('conductor1'), 'viajes/vtarjeta'), { conductorPlaca: null }));
+  });
+
+  it('EL ATAQUE · ni la pasajera, ni el panel', async () => {
+    const { doc, updateDoc } = FS;
+    await RUT.assertFails(updateDoc(doc(como('pasajero1'), 'viajes/vtarjeta'), { conductorPlaca: 'XYZ999' }));
+    await RUT.assertFails(updateDoc(doc(como('eladmin'), 'viajes/vtarjeta'), { conductorNombre: 'OTRO' }));
+  });
+
+  it('EL ATAQUE · soltarse y dejar una tarjeta falsa escrita a la vez', async () => {
+    const { doc, updateDoc } = FS;
+    await RUT.assertFails(updateDoc(doc(como('conductor1'), 'viajes/vtarjeta'),
+      { estado: 'esperando', conductorId: null, conductorPlaca: 'XYZ999' }));
+  });
+
+  it('EL ATAQUE · la pasajera no le pone tarjeta a su viaje sin conductor', async () => {
+    const { doc, updateDoc } = FS;
+    await RUT.assertFails(updateDoc(doc(como('pasajero1'), 'viajes/vlibre'), { conductorPlaca: 'XYZ999' }));
+  });
+
+  it('el camino bueno: soltar al conductor con sinConductor() (los siete a null)', async () => {
+    const { doc, updateDoc } = FS;
+    await RUT.assertSucceeds(updateDoc(doc(como('conductor1'), 'viajes/vtarjeta'), {
+      estado: 'esperando', conductorId: null, conductorNombre: null, conductorTelefono: null, conductorPlaca: null,
+      conductorVehiculo: null, conductorFoto: null, conductorColor: null,
+    }));
+  });
+
+  it('el camino bueno: con la tarjeta puesta el viaje avanza, se termina y se califica igual', async () => {
+    const { doc, updateDoc } = FS;
+    await RUT.assertSucceeds(updateDoc(doc(como('conductor1'), 'viajes/vtarjeta'),
+      { conductorEnPunto: true, fase: 'en_punto', tiempoEspera: '2026-09-30T12:00:00.000Z' }));
+    await RUT.assertSucceeds(updateDoc(doc(como('conductor1'), 'viajes/vtarjeta'), { fase: 'en_viaje' }));
+    await RUT.assertSucceeds(updateDoc(doc(como('conductor1'), 'viajes/vtarjeta'), { estado: 'finalizado' }));
+    // Reenviar la tarjeta IGUAL no molesta (se compara el valor).
+    await RUT.assertSucceeds(updateDoc(doc(como('pasajero1'), 'viajes/vtarjeta'), { ...TARJETA, calificado: true }));
+  });
+});
+
 describe('REGLA 2 · la oferta la firma su conductor', () => {
   it('un conductor SÍ puede dejar su propia oferta (AppConductor.js:353)', async () => {
     const { doc, setDoc } = FS;

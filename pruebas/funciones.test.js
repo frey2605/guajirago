@@ -1089,3 +1089,53 @@ describe('P02 · el abono del descuento lo decide el servidor, no el viaje', () 
     assert.strictEqual(await pedirConDescuento('vs4', 'condS'), undefined, 'se aceptó una promoción sin firma con otro valor');
   });
 });
+
+// ── P03 · LA TARJETA DEL CONDUCTOR SALE DE SU FICHA (30-sep-2026) ──
+// confirmarConductor copiaba al viaje el nombre, teléfono, placa, vehículo, foto y color que escribía la OFERTA (el
+// teléfono del conductor). Ahora salen de la ficha usuarios/{conductorId}; la oferta solo aporta el precio.
+describe('P03 · confirmarConductor pone en el viaje la tarjeta de la FICHA del conductor', () => {
+  const FICHA = {
+    tipo: txt('conductor'), creditos: num(SALDO_INICIAL), nombre: txt('LUIS PEREZ'), telefono: txt('3001234567'),
+    placa: txt('ABC123'), vehiculo: txt('Chevrolet 2015'), fotoConductor: txt('https://fotos/luis.jpg'), color: txt('Blanco'),
+  };
+  const DE_LA_FICHA = {
+    conductorNombre: 'LUIS PEREZ', conductorTelefono: '3001234567', conductorPlaca: 'ABC123',
+    conductorVehiculo: 'Chevrolet 2015', conductorFoto: 'https://fotos/luis.jpg', conductorColor: 'Blanco',
+  };
+  const tarjetaDe = (v) => Object.fromEntries(Object.keys(DE_LA_FICHA).map((k) => [k, v[k] && (v[k].stringValue ?? null)]));
+  const pedir = async (id, oferta, ficha = FICHA) => {
+    await sembrar('config/global', { comisionTaxi: num(COMISION_TAXI) });
+    await sembrar('conductores/condT', { ocupado: { booleanValue: false } });
+    await sembrar('usuarios/condT', ficha);
+    await sembrar('viajes/' + id, { pasajeroId: txt('pasaT'), estado: txt('esperando'), tipo: txt('Taxi'),
+      tarifa: txt('$12.000'), tarifaValor: num(12000) });
+    await sembrar('viajes/' + id + '/contraofertas/condT', { monto: txt('$12.000'), montoValor: num(12000),
+      tipoOferta: txt('acepta'), ...Object.fromEntries(Object.entries(oferta).map(([k, v]) => [k, txt(v)])) });
+    const r = await llamar('pasaT', { viajeId: id, conductorId: 'condT' });
+    assert.strictEqual(r.cuerpo?.result?.ok, true, JSON.stringify(r.cuerpo));
+    return leer('viajes/' + id);
+  };
+
+  test('EL ATAQUE · una oferta con placa, nombre y teléfono ajenos deja en el viaje los de la ficha', async () => {
+    const v = await pedir('vt1', {
+      conductorNombre: 'CARLOS GOMEZ', conductorTelefono: '3110000000', conductorPlaca: 'XYZ999',
+      conductorVehiculo: 'Mazda 2022', conductorFoto: 'https://fotos/otro.jpg', conductorColor: 'Rojo',
+    });
+    assert.deepStrictEqual(tarjetaDe(v), DE_LA_FICHA, 'el viaje lleva los datos que escribió el teléfono del conductor');
+    assert.strictEqual(v.conductorId.stringValue, 'condT');
+  });
+
+  test('una oferta honrada deja el viaje igual que antes', async () => {
+    const v = await pedir('vt2', DE_LA_FICHA);
+    assert.deepStrictEqual(tarjetaDe(v), DE_LA_FICHA);
+  });
+
+  test('ficha vieja sin foto ni color: el viaje va sin ellos, aunque la oferta los traiga', async () => {
+    const { fotoConductor: _f, color: _c, ...vieja } = FICHA;
+    const v = await pedir('vt3', { ...DE_LA_FICHA }, vieja);
+    const t = tarjetaDe(v);
+    assert.strictEqual(t.conductorPlaca, 'ABC123');
+    assert.strictEqual(t.conductorFoto, null, 'la foto salió de la oferta');
+    assert.strictEqual(t.conductorColor, '', 'el color salió de la oferta');
+  });
+});
