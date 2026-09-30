@@ -532,6 +532,12 @@ describe('REGLA 7 · creditosDeBienvenida', () => {
 
 describe('REGLA 7 · consumirDescuentoViaje', () => {
   const DESCUENTO = 8000;
+  // P02: el valor y el código salen de la FICHA del pasajero (firmada por el servidor), no del viaje. Cada viaje de
+  // aquí lleva al lado el descuento de la ficha que le corresponde, y una tarifa sobre la que calcularlo.
+  const darDescuento = (promoId, valor, codigo) => sembrar('usuarios/elpasa', { tipo: txt(''), descuentoPendiente: { mapValue: { fields: {
+    ...(promoId ? { promoId: txt(promoId) } : {}), tipoBeneficio: txt('credito'), valorBeneficio: num(valor),
+    codigoVerificacion: txt(codigo), fabricadoPor: txt('servidor'),
+  } } } });
 
   beforeEach(async () => {
     await sembrar('usuarios/condA', { tipo: txt('conductor'), creditos: num(SALDO_INICIAL) });
@@ -539,8 +545,9 @@ describe('REGLA 7 · consumirDescuentoViaje', () => {
     await sembrar('promociones/PROMO1', {
       usosTotales: num(4), inversionTotal: num(32000), activa: { booleanValue: true },
     });
+    await darDescuento('PROMO1', DESCUENTO, '7391');
     await sembrar('viajes/vd1', {
-      pasajeroId: txt('elpasa'), conductorId: txt('condA'), estado: txt('aceptado'),
+      pasajeroId: txt('elpasa'), conductorId: txt('condA'), estado: txt('aceptado'), tarifaValor: num(20000),
       descuentoInfo: { mapValue: { fields: {
         promoId: txt('PROMO1'), descuentoAplicado: num(DESCUENTO),
         codigoVerificacion: txt('7391'), consumido: { booleanValue: false },
@@ -610,7 +617,7 @@ describe('REGLA 7 · consumirDescuentoViaje', () => {
     // las reglas dejan escribir cualquier viaje (eso es la REGLA 9), asi que
     // este freno vive en el servidor.
     await sembrar('viajes/vyo', {
-      pasajeroId: txt('condA'), conductorId: txt('condA'), estado: txt('aceptado'),
+      pasajeroId: txt('condA'), conductorId: txt('condA'), estado: txt('aceptado'), tarifaValor: num(20000),
       descuentoInfo: { mapValue: { fields: {
         promoId: txt('PROMO1'), descuentoAplicado: num(999999),
         codigoVerificacion: txt('1111'), consumido: { booleanValue: false },
@@ -622,8 +629,9 @@ describe('REGLA 7 · consumirDescuentoViaje', () => {
   });
 
   test('el descuento SIN promoId tambien se cobra (el de bienvenida no tiene promo)', async () => {
+    await darDescuento(null, 3000, '5555');
     await sembrar('viajes/vbien', {
-      pasajeroId: txt('elpasa'), conductorId: txt('condA'), estado: txt('aceptado'),
+      pasajeroId: txt('elpasa'), conductorId: txt('condA'), estado: txt('aceptado'), tarifaValor: num(20000),
       descuentoInfo: { mapValue: { fields: {
         descuentoAplicado: num(3000), codigoVerificacion: txt('5555'),
         consumido: { booleanValue: false },
@@ -635,8 +643,9 @@ describe('REGLA 7 · consumirDescuentoViaje', () => {
   });
 
   test('una promo que no existe no estorba: se cobra y se cuenta igual', async () => {
+    await darDescuento('FANTASMA', 4000, '2222');
     await sembrar('viajes/vsp', {
-      pasajeroId: txt('elpasa'), conductorId: txt('condA'), estado: txt('aceptado'),
+      pasajeroId: txt('elpasa'), conductorId: txt('condA'), estado: txt('aceptado'), tarifaValor: num(20000),
       descuentoInfo: { mapValue: { fields: {
         promoId: txt('FANTASMA'), descuentoAplicado: num(4000),
         codigoVerificacion: txt('2222'), consumido: { booleanValue: false },
@@ -662,8 +671,9 @@ describe('REGLA 7 · consumirDescuentoViaje', () => {
     // promo, 1 MB — no se puede simular aqui; lo cubre que la analitica viva
     // FUERA de la transaccion, con su propio try. Comprobado con un mutante:
     // quitando el filtro del id, la analitica revienta y el cobro sobrevive.)
+    await darDescuento('PRO/MO', 6000, '3333');
     await sembrar('viajes/vrota', {
-      pasajeroId: txt('elpasa'), conductorId: txt('condA'), estado: txt('aceptado'),
+      pasajeroId: txt('elpasa'), conductorId: txt('condA'), estado: txt('aceptado'), tarifaValor: num(20000),
       descuentoInfo: { mapValue: { fields: {
         promoId: txt('PRO/MO'), descuentoAplicado: num(6000),
         codigoVerificacion: txt('3333'), consumido: { booleanValue: false },
@@ -685,8 +695,9 @@ describe('REGLA 7 · consumirDescuentoViaje', () => {
     // Un viaje cuyo descuento apunta a una promo que no existe. Todo va en una
     // sola transaccion, asi que o cuadra entero o no cuadra: el conductor debe
     // cobrar igual (la promo que falta no es su culpa) y quedar todo marcado.
+    await darDescuento('NOEXISTE', 5000, '1234');
     await sembrar('viajes/vd2', {
-      pasajeroId: txt('elpasa'), conductorId: txt('condA'), estado: txt('aceptado'),
+      pasajeroId: txt('elpasa'), conductorId: txt('condA'), estado: txt('aceptado'), tarifaValor: num(20000),
       descuentoInfo: { mapValue: { fields: {
         promoId: txt('NOEXISTE'), descuentoAplicado: num(5000),
         codigoVerificacion: txt('1234'), consumido: { booleanValue: false },
@@ -712,6 +723,11 @@ describe('G01 · confirmarConductor rehace el descuento sobre la tarifa aceptada
     await sembrar('config/global', { comisionTaxi: num(COMISION_TAXI) });
     await sembrar('conductores/condG', { ocupado: { booleanValue: false } });
     await sembrar('usuarios/condG', { creditos: num(SALDO_INICIAL), tipo: txt('conductor') });
+    // P02: el valor sale de la ficha del pasajero (la bienvenida que le dio el servidor), no del viaje.
+    await sembrar('usuarios/pasaG', { tipo: txt(''), descuentoPendiente: ficha({
+      promoId: txt('BIENVENIDA'), tipoBeneficio: txt('credito'), valorBeneficio: num(8000),
+      codigoVerificacion: txt('4455'), fabricadoPor: txt('servidor'),
+    }) });
     await sembrar('viajes/vg1', {
       pasajeroId: txt('pasaG'), estado: txt('esperando'), tipo: txt('Taxi'),
       tarifa: txt('$10.000'), tarifaValor: num(10000),
@@ -747,6 +763,10 @@ describe('G01 · confirmarConductor rehace el descuento sobre la tarifa aceptada
   });
 
   test('un porcentaje se aplica sobre la tarifa aceptada', async () => {
+    await sembrar('usuarios/pasaG', { tipo: txt(''), descuentoPendiente: ficha({
+      promoId: txt('P10'), tipoBeneficio: txt('descuento'), valorBeneficio: num(10),
+      codigoVerificacion: txt('1111'), fabricadoPor: txt('servidor'),
+    }) });
     await sembrar('viajes/vg1', {
       pasajeroId: txt('pasaG'), estado: txt('esperando'), tipo: txt('Taxi'),
       tarifa: txt('$10.000'), tarifaValor: num(10000),
@@ -887,5 +907,185 @@ describe('G18 · descuentoDeBienvenida', () => {
     const conPromo = await nuevo({ descuentoPendiente: { mapValue: { fields: { promoId: txt('VIVA'), codigoVerificacion: txt('5555') } } } });
     assert.strictEqual((await llamarA('descuentoDeBienvenida', conPromo, { deviceId: 'dev_' + conPromo })).cuerpo?.result?.motivo, 'ya_tiene_descuento');
     assert.strictEqual((await pendienteDe(conPromo)).codigoVerificacion.stringValue, '5555', 'se le piso la promocion que tenia');
+  });
+});
+
+// ── P02 · EL ABONO DEL DESCUENTO NO SALE DEL NÚMERO QUE TRAIGA EL VIAJE ──────────
+// Hallazgo del P01 (30-sep-2026): el dinero que se le abona al conductor salía de `descuentoInfo.descuentoAplicado`,
+// escrito DENTRO del viaje, y las reglas de `viajes` dejaban que el pasajero y el conductor del viaje lo cambiaran.
+// Y `confirmarConductor` rehacía la cuenta con el `valorBeneficio` que había escrito el teléfono. Ahora la cuenta la
+// hace el servidor con la ficha del pasajero (el descuento que firmó él), la quema al cobrar y las reglas congelan la
+// ficha del viaje. Estas pruebas ENCIENDEN el ataque tal como lo haría un teléfono: escriben por la red, con su carnet,
+// pasando por las reglas.
+describe('P02 · el abono del descuento lo decide el servidor, no el viaje', () => {
+  const ficha = (campos) => ({ mapValue: { fields: campos } });
+  const numDe = (f) => Number(f?.integerValue ?? f?.doubleValue);
+  const firmado = (codigo, extra = {}) => ficha({
+    promoId: txt('BIENVENIDA'), tipoBeneficio: txt('credito'), valorBeneficio: num(8000),
+    codigoVerificacion: txt(codigo), fabricadoPor: txt('servidor'), ...extra,
+  });
+  const infoHonrada = (codigo, tarifa = 15000, aplicado = 8000) => ficha({
+    tarifaOriginal: num(tarifa), tarifaPasajeroPaga: num(tarifa - aplicado), descuentoAplicado: num(aplicado),
+    promoId: txt('BIENVENIDA'), tipoBeneficio: txt('credito'), valorBeneficio: num(8000),
+    codigoVerificacion: txt(codigo), consumido: { booleanValue: false },
+  });
+  const pendienteDe = async (uid) => (await leer('usuarios/' + uid))?.descuentoPendiente?.mapValue?.fields;
+
+  /** Escribe unos campos de un documento COMO un teléfono: con su carnet, así que pasa por las reglas. */
+  async function escribirComo(uid, ruta, campos) {
+    const mascara = Object.keys(campos).map((k) => 'updateMask.fieldPaths=' + encodeURIComponent(k)).join('&');
+    const r = await fetch(BD + '/' + ruta + '?' + mascara, {
+      method: 'PATCH',
+      headers: { Authorization: 'Bearer ' + carnet(uid), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fields: campos }),
+    });
+    return r.status;
+  }
+
+  beforeEach(async () => {
+    await sembrar('config/global', { comisionTaxi: num(COMISION_TAXI) });
+    await sembrar('conductores/condP', { ocupado: { booleanValue: false } });
+    await sembrar('usuarios/condP', { creditos: num(SALDO_INICIAL), tipo: txt('conductor') });
+    await sembrar('usuarios/pasaP', { tipo: txt(''), descuentoPendiente: firmado('4455') });
+    // Un viaje honrado, ya aceptado: la ficha del descuento es la que escribe confirmarConductor.
+    await sembrar('viajes/vp1', {
+      pasajeroId: txt('pasaP'), conductorId: txt('condP'), estado: txt('aceptado'), tipo: txt('Taxi'),
+      tarifa: txt('$ 15.000'), tarifaValor: num(15000), descuentoInfo: infoHonrada('4455'),
+    });
+  });
+
+  test('EL ATAQUE · el conductor NO puede reescribir el descuento de su viaje (las reglas lo niegan)', async () => {
+    const estado = await escribirComo('condP', 'viajes/vp1', {
+      descuentoInfo: ficha({ descuentoAplicado: num(999999), codigoVerificacion: txt('1'), consumido: { booleanValue: false } }),
+    });
+    assert.strictEqual(estado, 403, 'las reglas dejaron que el conductor se escribiera un descuento de $999.999');
+    const f = (await leer('viajes/vp1')).descuentoInfo.mapValue.fields;
+    assert.strictEqual(numDe(f.descuentoAplicado), 8000);
+  });
+
+  test('EL ATAQUE · el pasajero tampoco puede cambiarlo con el viaje en marcha', async () => {
+    const estado = await escribirComo('pasaP', 'viajes/vp1', {
+      descuentoInfo: ficha({ descuentoAplicado: num(15000), tarifaPasajeroPaga: num(0), codigoVerificacion: txt('4455') }),
+    });
+    assert.strictEqual(estado, 403, 'las reglas dejaron que el pasajero cambiara su descuento con el viaje en marcha');
+  });
+
+  test('EL ATAQUE · aunque el viaje traiga $999.999 y otro código, el servidor NO lo abona', async () => {
+    // Como si el número hubiera llegado igual al viaje (por la puerta que sea): el servidor no se lo cree.
+    await sembrar('viajes/vp1', {
+      pasajeroId: txt('pasaP'), conductorId: txt('condP'), estado: txt('aceptado'), tipo: txt('Taxi'),
+      tarifa: txt('$ 15.000'), tarifaValor: num(15000),
+      descuentoInfo: ficha({ descuentoAplicado: num(999999), codigoVerificacion: txt('1'), consumido: { booleanValue: false },
+        tarifaOriginal: num(15000) }),
+    });
+    const r = await llamarA('consumirDescuentoViaje', 'condP', { viajeId: 'vp1', codigo: '1' });
+    assert.notStrictEqual(r.cuerpo?.result?.monto, 999999, 'se abonaron los $999.999 que escribió el viaje');
+    assert.ok(r.cuerpo?.error, 'con el código inventado se cobró algo: ' + JSON.stringify(r.cuerpo));
+    assert.strictEqual(await saldoDe('condP'), SALDO_INICIAL, 'el saldo del conductor se movió');
+    // Con el código DE LA FICHA se abona lo de la ficha ($8.000), no lo del viaje.
+    const bueno = await llamarA('consumirDescuentoViaje', 'condP', { viajeId: 'vp1', codigo: '4455' });
+    assert.strictEqual(bueno.cuerpo?.result?.monto, 8000, JSON.stringify(bueno.cuerpo));
+    assert.strictEqual(await saldoDe('condP'), SALDO_INICIAL + 8000);
+  });
+
+  test('EL ATAQUE · un pasajero SIN descuento que se lo inventa al pedir no lo recibe', async () => {
+    await sembrar('usuarios/pasaP', { tipo: txt('') });
+    await sembrar('viajes/vp2', {
+      pasajeroId: txt('pasaP'), estado: txt('esperando'), tipo: txt('Taxi'), tarifa: txt('$ 15.000'), tarifaValor: num(15000),
+      descuentoInfo: ficha({ tarifaOriginal: num(15000), tarifaPasajeroPaga: num(0), descuentoAplicado: num(15000),
+        promoId: txt('BIENVENIDA'), tipoBeneficio: txt('credito'), valorBeneficio: num(999999),
+        codigoVerificacion: txt('1234'), consumido: { booleanValue: false } }),
+    });
+    await sembrar('viajes/vp2/contraofertas/condP', { monto: txt('$ 15.000'), montoValor: num(15000), tipoOferta: txt('acepta') });
+    const c = await llamar('pasaP', { viajeId: 'vp2', conductorId: 'condP' });
+    assert.strictEqual(c.cuerpo?.result?.ok, true, JSON.stringify(c.cuerpo));
+    const v = await leer('viajes/vp2');
+    assert.ok(!('descuentoInfo' in v), 'el viaje se quedó con un descuento que la ficha no tiene');
+    const saldo = await saldoDe('condP');
+    const r = await llamarA('consumirDescuentoViaje', 'condP', { viajeId: 'vp2', codigo: '1234' });
+    assert.ok(r.cuerpo?.error, 'se cobró un descuento inventado: ' + JSON.stringify(r.cuerpo));
+    assert.strictEqual(await saldoDe('condP'), saldo);
+  });
+
+  test('EL ATAQUE · confirmarConductor no se cree el valorBeneficio que escribió el teléfono', async () => {
+    await sembrar('viajes/vp3', {
+      pasajeroId: txt('pasaP'), estado: txt('esperando'), tipo: txt('Taxi'), tarifa: txt('$ 15.000'), tarifaValor: num(15000),
+      descuentoInfo: ficha({ tarifaOriginal: num(15000), tarifaPasajeroPaga: num(0), descuentoAplicado: num(15000),
+        promoId: txt('BIENVENIDA'), tipoBeneficio: txt('credito'), valorBeneficio: num(15000),
+        codigoVerificacion: txt('4455'), consumido: { booleanValue: false } }),
+    });
+    await sembrar('viajes/vp3/contraofertas/condP', { monto: txt('$ 15.000'), montoValor: num(15000), tipoOferta: txt('acepta') });
+    const c = await llamar('pasaP', { viajeId: 'vp3', conductorId: 'condP' });
+    assert.strictEqual(c.cuerpo?.result?.ok, true, JSON.stringify(c.cuerpo));
+    const f = (await leer('viajes/vp3')).descuentoInfo.mapValue.fields;
+    assert.strictEqual(numDe(f.descuentoAplicado), 8000, 'se rehízo la cuenta con el valor del teléfono');
+    assert.strictEqual(numDe(f.tarifaPasajeroPaga), 7000);
+    assert.strictEqual(numDe(f.valorBeneficio), 8000);
+  });
+
+  test('EL HERMANO · el cobro QUEMA el descuento de la ficha: no se puede reusar en otro viaje', async () => {
+    const r = await llamarA('consumirDescuentoViaje', 'condP', { viajeId: 'vp1', codigo: '4455' });
+    assert.strictEqual(r.cuerpo?.result?.monto, 8000, JSON.stringify(r.cuerpo));
+    assert.strictEqual(await pendienteDe('pasaP'), undefined, 'el descuento sigue en la ficha: el pasajero lo puede volver a usar');
+    // Un segundo viaje con el mismo descuento (el teléfono no lo quemó): ya no da plata.
+    await sembrar('viajes/vp4', {
+      pasajeroId: txt('pasaP'), conductorId: txt('condP'), estado: txt('aceptado'), tipo: txt('Taxi'),
+      tarifa: txt('$ 15.000'), tarifaValor: num(15000), descuentoInfo: infoHonrada('4455'),
+    });
+    const r2 = await llamarA('consumirDescuentoViaje', 'condP', { viajeId: 'vp4', codigo: '4455' });
+    assert.ok(r2.cuerpo?.error, 'el mismo descuento se cobró dos veces: ' + JSON.stringify(r2.cuerpo));
+    assert.strictEqual(await saldoDe('condP'), SALDO_INICIAL + 8000);
+  });
+
+  /** Un viaje en el mercado que pide usar el descuento, con la oferta de `cond` lista para aceptar. */
+  async function pedirConDescuento(id, cond) {
+    await sembrar('conductores/' + cond, { ocupado: { booleanValue: false } });
+    await sembrar('usuarios/' + cond, { creditos: num(SALDO_INICIAL), tipo: txt('conductor') });
+    await sembrar('viajes/' + id, {
+      pasajeroId: txt('pasaP'), estado: txt('esperando'), tipo: txt('Taxi'), tarifa: txt('$ 15.000'), tarifaValor: num(15000),
+      descuentoInfo: infoHonrada('4455'),
+    });
+    await sembrar('viajes/' + id + '/contraofertas/' + cond, { monto: txt('$ 15.000'), montoValor: num(15000), tipoOferta: txt('acepta') });
+    const c = await llamar('pasaP', { viajeId: id, conductorId: cond });
+    assert.strictEqual(c.cuerpo?.result?.ok, true, JSON.stringify(c.cuerpo));
+    return (await leer('viajes/' + id)).descuentoInfo?.mapValue?.fields;
+  }
+
+  test('APARTADO · el mismo descuento no se pone a la vez en dos viajes en curso', async () => {
+    const f1 = await pedirConDescuento('vp5', 'condP');
+    assert.strictEqual(numDe(f1?.descuentoAplicado), 8000);
+    assert.strictEqual((await pendienteDe('pasaP')).enViajeId?.stringValue, 'vp5', 'el descuento no quedó apartado');
+    const f2 = await pedirConDescuento('vp6', 'condQ');
+    assert.strictEqual(f2, undefined, 'el mismo descuento quedó puesto en dos viajes en curso a la vez');
+    // Y aunque otro viaje traiga la ficha del descuento (escrita a mano), no lo cobra: está apartado para vp5.
+    await sembrar('viajes/vp8', {
+      pasajeroId: txt('pasaP'), conductorId: txt('condQ'), estado: txt('aceptado'), tipo: txt('Taxi'),
+      tarifa: txt('$ 15.000'), tarifaValor: num(15000), descuentoInfo: infoHonrada('4455'),
+    });
+    const ajeno = await llamarA('consumirDescuentoViaje', 'condQ', { viajeId: 'vp8', codigo: '4455' });
+    assert.ok(ajeno.cuerpo?.error, 'se cobró en otro viaje un descuento apartado para vp5: ' + JSON.stringify(ajeno.cuerpo));
+    // Si el primero se cancela, el descuento se libera para el siguiente.
+    await sembrar('viajes/vp5', { pasajeroId: txt('pasaP'), estado: txt('cancelado'), descuentoInfo: infoHonrada('4455') });
+    const f3 = await pedirConDescuento('vp7', 'condR');
+    assert.strictEqual(numDe(f3?.descuentoAplicado), 8000, 'el descuento de un viaje cancelado no se liberó');
+  });
+
+  test('SIN FIRMA · vale solo si es exactamente lo de su origen; si no, no da nada (no se paga de más)', async () => {
+    // Bienvenida sin firma de $8.000 (las de antes de G18): vale.
+    await sembrar('usuarios/pasaP', { tipo: txt(''), descuentoPendiente: ficha({
+      promoId: txt('BIENVENIDA'), tipoBeneficio: txt('credito'), valorBeneficio: num(8000), codigoVerificacion: txt('4455') }) });
+    assert.strictEqual(numDe((await pedirConDescuento('vs1', 'condP'))?.descuentoAplicado), 8000);
+    // Bienvenida sin firma de $50.000: no cuadra con su origen, el viaje va sin descuento.
+    await sembrar('usuarios/pasaP', { tipo: txt(''), descuentoPendiente: ficha({
+      promoId: txt('BIENVENIDA'), tipoBeneficio: txt('credito'), valorBeneficio: num(50000), codigoVerificacion: txt('4455') }) });
+    assert.strictEqual(await pedirConDescuento('vs2', 'condQ'), undefined, 'se aceptó una bienvenida sin firma de $50.000');
+    // Promoción sin firma: vale si su tipo y valor son los de la promoción de hoy.
+    await sembrar('promociones/PROMO-P02', { tipoBeneficio: txt('credito'), valorBeneficio: num(5000) });
+    await sembrar('usuarios/pasaP', { tipo: txt(''), descuentoPendiente: ficha({
+      promoId: txt('PROMO-P02'), tipoBeneficio: txt('credito'), valorBeneficio: num(5000), codigoVerificacion: txt('4455') }) });
+    assert.strictEqual(numDe((await pedirConDescuento('vs3', 'condR'))?.descuentoAplicado), 5000);
+    await sembrar('usuarios/pasaP', { tipo: txt(''), descuentoPendiente: ficha({
+      promoId: txt('PROMO-P02'), tipoBeneficio: txt('credito'), valorBeneficio: num(9000), codigoVerificacion: txt('4455') }) });
+    assert.strictEqual(await pedirConDescuento('vs4', 'condS'), undefined, 'se aceptó una promoción sin firma con otro valor');
   });
 });

@@ -46,7 +46,7 @@ const { porQueNoLeToca } = require('./leTocaElViaje.cjs');
 const { cop } = require('./moneda.cjs');
 // G18: el descuento pendiente y su código de 4 cifras se fabrican AQUÍ, con una sola receta (la bienvenida del
 // pasajero la fabricaba el teléfono). La receta del código está atada por prueba a la de la app (codigoSeguridad.js).
-const { CREDITO_BIENVENIDA_PASAJERO, PROMO_BIENVENIDA, armarDescuentoPendiente, porQueNoLaBienvenida, aparatoSano } = require('./descuentoPendiente.cjs');
+const { CREDITO_BIENVENIDA_PASAJERO, PROMO_BIENVENIDA, armarDescuentoPendiente, porQueNoLaBienvenida, aparatoSano, descuentoQueVale } = require('./descuentoPendiente.cjs');
 // G32: el sobre de cada aviso al celular y el envío salen de UNA pieza, que siempre mira si el aviso llegó y lo anota.
 const { sobreDelAviso, sobreSencillo, mandarAviso } = require('./avisos.cjs');
 // G33: qué aviso le toca al cliente cuando su pedido cambia, por PASO DEL CLIENTE (copia atada de la app).
@@ -305,6 +305,9 @@ exports.confirmarConductor = onCall(async (request) => {
       ]);
       if (!viajeSnap.exists) return { ok: false, motivo: "viaje_no_existe" };
       const viaje = viajeSnap.data();
+      // P02: la ficha del PASAJERO (su descuento, el que firmó el servidor). Se lee aquí, antes de cualquier escritura.
+      const fichaPasajeroRef = db.collection("usuarios").doc(request.auth.uid);
+      const fichaPasajeroSnap = await t.get(fichaPasajeroRef);
       // Solo el DUEÑO del viaje confirma. Va dentro de la transacción a propósito:
       // fuera, alguien podría cambiar el pasajeroId entre la lectura y el cobro.
       // Medido el 23-ago-2026: los 91 viajes de la base tienen pasajeroId. Ni una
@@ -324,7 +327,31 @@ exports.confirmarConductor = onCall(async (request) => {
       // celular con la oferta de antes, así que se rehace aquí, en la misma operación, sobre la tarifa aceptada:
       // así el pasajero, el conductor y el abono del descuento dicen la misma cifra. Las pantallas solo la leen.
       const tarifaValorAceptada = of.montoValor || viaje.tarifaValor;
-      const descuentoInfo = descuentoSobreTarifaAceptada(viaje.descuentoInfo, tarifaValorAceptada);
+      // P02 — y el VALOR del descuento ya no sale del viaje (lo escribió el teléfono: podía decir $999.999), sino de
+      // la ficha del pasajero, con `descuentoQueVale` (descuentoPendiente.cjs). Que el viaje traiga `descuentoInfo`
+      // solo dice que el pasajero QUIERE usar su descuento; cuánto vale lo decide el servidor. Si la ficha no tiene
+      // uno que valga —o ya lo tiene apartado otro viaje suyo en curso—, el viaje va sin descuento.
+      const intencion = viaje.descuentoInfo && typeof viaje.descuentoInfo === "object" && viaje.descuentoInfo.consumido !== true;
+      let descuentoInfo = null;
+      let apartar = false;
+      if (intencion) {
+        const pendiente = fichaPasajeroSnap.exists ? fichaPasajeroSnap.data().descuentoPendiente : null;
+        const idPromo = pendiente && pendiente.promoId;
+        const promoSnap = pendiente && pendiente.fabricadoPor !== "servidor" && typeof idPromo === "string" && idPromo && !idPromo.includes("/")
+          ? await t.get(db.collection("promociones").doc(idPromo)) : null;
+        const vale = descuentoQueVale(pendiente, promoSnap && promoSnap.exists ? promoSnap.data() : null);
+        let apartadoPorOtro = false;
+        const otroId = pendiente && pendiente.enViajeId;
+        if (vale && typeof otroId === "string" && otroId && otroId !== viajeId && !otroId.includes("/")) {
+          const otro = await t.get(db.collection("viajes").doc(otroId));
+          const o = otro.exists ? otro.data() : null;
+          apartadoPorOtro = !!(o && ESTADOS_EN_CURSO.includes(o.estado) && o.descuentoInfo && o.descuentoInfo.consumido !== true);
+        }
+        if (vale && !apartadoPorOtro) {
+          descuentoInfo = descuentoSobreTarifaAceptada({ ...vale, consumido: false }, tarifaValorAceptada);
+          apartar = !!descuentoInfo;
+        }
+      }
 
       t.update(viajeRef, {
         estado: ESTADO_ACEPTADO,
@@ -340,8 +367,12 @@ exports.confirmarConductor = onCall(async (request) => {
         tarifaValor: tarifaValorAceptada,
         fechaAceptacion: new Date().toISOString(),
         comisionCobrada: comision,
-        ...(descuentoInfo ? { descuentoInfo } : {}),
+        // P02: la ficha del descuento la escribe ENTERA el servidor; si el viaje pedía una que no vale, se quita.
+        ...(descuentoInfo ? { descuentoInfo } : (intencion ? { descuentoInfo: require("firebase-admin/firestore").FieldValue.delete() } : {})),
       });
+      // P02: el descuento queda APARTADO para este viaje (no se quema aún: se quema al cobrarlo). Así no se puede
+      // usar a la vez en dos viajes en curso.
+      if (apartar) t.update(fichaPasajeroRef, { "descuentoPendiente.enViajeId": viajeId });
       t.set(condRef, { enViajeId: viajeId, ocupado: true }, { merge: true });
       t.set(usuarioRef, { creditos: creditosActuales - comision }, { merge: true });
       return { ok: true };
@@ -834,15 +865,15 @@ exports.creditosDeBienvenida = onCall(async (request) => {
  * Ahora el cobro ocurre aquí, de una pieza: o se marca Y se cobra, o no pasa
  * nada. Quien cobra es el conductor ASIGNADO al viaje, no quien llame.
  *
- * ⚠ LO QUE ESTO **NO** ARREGLA — Y HAY QUE DECIRLO CLARO:
+ * ✅ P02 (30-sep-2026) — EL MONTO YA NO SALE DEL VIAJE. Hasta ese día salía de
+ *    `descuentoInfo.descuentoAplicado`, escrito DENTRO del viaje, que el
+ *    pasajero y el conductor podían cambiar: un conductor se escribía
+ *    `descuentoAplicado: 999999` y se lo abonaba (demostrado en el emulador).
+ *    Ahora el valor y el código salen de la ficha del pasajero (`descuentoQueVale`,
+ *    la misma pieza que usa confirmarConductor), se quema al cobrarlo, y las
+ *    reglas no dejan cambiar `descuentoInfo` después de pedir.
  *
- * 1. El monto sale de `descuentoInfo.descuentoAplicado`, que vive DENTRO del
- *    viaje… y hoy `firestore.rules` deja que cualquiera con sesión escriba
- *    CUALQUIER viaje («allow create, update: if request.auth != null»). O sea:
- *    un conductor puede fabricarse un viaje con el descuento que quiera y
- *    cobrarlo. Esta función pone dos frenos baratos (que el viaje sea suyo y
- *    que no sea su propio pasajero), pero la raíz es la REGLA 9 — los viajes y
- *    pedidos sin dueño — y se cierra allí, no aquí.
+ * ⚠ LO QUE ESTO **NO** ARREGLA — Y HAY QUE DECIRLO CLARO:
  *
  * 2. El código del descuento NO es secreto para el conductor: viaja dentro del
  *    viaje, que él puede leer. Mover la comparación al servidor evita que se
@@ -886,28 +917,54 @@ exports.consumirDescuentoViaje = onCall(async (request) => {
         throw new HttpsError("already-exists", "Ese descuento ya se cobró");
       }
 
-      // Mismo trato del código que hacía la app: solo las cifras.
-      const guardado = String(info.codigoVerificacion || "").trim().replace(/\D/g, "");
-      const escrito = String(codigo).trim().replace(/\D/g, "");
-      if (!guardado || guardado !== escrito) {
+      // P02 — CUÁNTO SE ABONA NO LO DICE EL VIAJE. Hasta el 30-sep-2026 el monto era `info.descuentoAplicado` y el
+      // código era `info.codigoVerificacion`: los dos escritos dentro del viaje, que el conductor y el pasajero podían
+      // cambiar. Ahora la verdad es la ficha del PASAJERO (el descuento que firmó el servidor), leída con la misma
+      // pieza que usa confirmarConductor (`descuentoQueVale`). El viaje solo aporta la tarifa sobre la que
+      // confirmarConductor armó la cuenta. Y al cobrarlo se QUEMA de la ficha, aquí mismo: ya no depende de que el
+      // teléfono del pasajero lo borre (podía no hacerlo y reusarlo).
+      const idSanoPasajero = typeof viaje.pasajeroId === "string" && viaje.pasajeroId && !viaje.pasajeroId.includes("/");
+      if (!idSanoPasajero) throw new HttpsError("failed-precondition", "Este viaje no tiene pasajero");
+      const refFichaPasajero = db.collection("usuarios").doc(viaje.pasajeroId);
+      const snapFichaPasajero = await t.get(refFichaPasajero);
+      const pendiente = snapFichaPasajero.exists ? snapFichaPasajero.data().descuentoPendiente : null;
+      const idPromoFicha = pendiente && pendiente.promoId;
+      const snapPromoFicha = pendiente && pendiente.fabricadoPor !== "servidor" && typeof idPromoFicha === "string"
+        && idPromoFicha && !idPromoFicha.includes("/") ? await t.get(db.collection("promociones").doc(idPromoFicha)) : null;
+      const vale = descuentoQueVale(pendiente, snapPromoFicha && snapPromoFicha.exists ? snapPromoFicha.data() : null);
+      const cifras = (v) => String(v == null ? "" : v).trim().replace(/\D/g, "");
+      // Tiene que valer y, si confirmarConductor lo dejó apartado para un viaje, tiene que ser para ÉSTE. (Los viajes
+      // aceptados antes de P02 no lo tienen apartado: pasan, y el quemado de abajo impide cobrarlo dos veces.) Lo que
+      // el viaje diga de código o de promoción no cuenta: lo pudieron escribir los dos que van en él.
+      const esElDelViaje = vale && (!pendiente.enViajeId || pendiente.enViajeId === viajeId);
+      if (!esElDelViaje) {
+        throw new HttpsError("failed-precondition", "El descuento de este viaje ya no está vigente en la cuenta del pasajero");
+      }
+
+      // Mismo trato del código que hacía la app: solo las cifras. Se compara con el de la FICHA.
+      const escrito = cifras(codigo);
+      if (escrito !== vale.codigoVerificacion) {
         throw new HttpsError("permission-denied", "Código incorrecto. Verifícalo con el pasajero");
       }
 
-      const monto = info.descuentoAplicado || 0;
+      // La tarifa sobre la que se armó la cuenta al aceptar (la escribe confirmarConductor); si falta, la del viaje.
+      const tarifaDeLaCuenta = [Number(info.tarifaOriginal), Number(viaje.tarifaValor)].find((n) => Number.isFinite(n) && n > 0);
+      if (!tarifaDeLaCuenta) throw new HttpsError("failed-precondition", "Este viaje no tiene una tarifa con que calcular el descuento");
+      const monto = descuentoSobreTarifaAceptada(vale, tarifaDeLaCuenta).descuentoAplicado;
 
       // Todas las lecturas ANTES de escribir: lo exige la transacción.
       const snapConductor = await t.get(refConductor);
       const saldoActual = snapConductor.exists ? (snapConductor.data().creditos || 0) : 0;
 
-      // El promoId y el pasajeroId salen del viaje, y hoy el viaje lo puede
-      // escribir cualquiera (REGLA 9). Un id con una barra dentro revienta la
+      // El promoId (desde P02, el de la ficha) y el pasajeroId pueden venir
+      // raros (datos viejos). Un id con una barra dentro revienta la
       // ruta del documento — y si eso pasara aquí, se llevaría por delante el
       // COBRO del conductor. Lo cazó una prueba el 24-ago-2026. Si el id viene
       // raro, no se cuenta el uso, pero el conductor cobra igual.
       const idSano = (v) => typeof v === "string" && v.length > 0 && !v.includes("/");
       let refUso = null; let usoPrevio = null;
-      if (idSano(info.promoId) && idSano(viaje.pasajeroId)) {
-        refUso = db.collection("promociones").doc(info.promoId).collection("usos").doc(viaje.pasajeroId);
+      if (idSano(vale.promoId) && idSano(viaje.pasajeroId)) {
+        refUso = db.collection("promociones").doc(vale.promoId).collection("usos").doc(viaje.pasajeroId);
         const snapUso = await t.get(refUso);
         usoPrevio = snapUso.exists ? snapUso.data() : null;
       }
@@ -916,6 +973,8 @@ exports.consumirDescuentoViaje = onCall(async (request) => {
 
       t.update(refViaje, { "descuentoInfo.consumido": true });
       t.set(refConductor, { creditos: saldoActual + monto }, { merge: true });
+      // P02: se quema en la MISMA operación que se abona: o las dos cosas, o ninguna.
+      t.update(refFichaPasajero, { descuentoPendiente: require("firebase-admin/firestore").FieldValue.delete() });
 
       if (refUso) {
         // Este contador es el que hace de verdad el tope por persona: lo lee
@@ -924,7 +983,7 @@ exports.consumirDescuentoViaje = onCall(async (request) => {
         t.set(refUso, apunteDeLaPersona(usoPrevio, fechaUso), { merge: true });
       }
 
-      return { monto, saldo: saldoActual + monto, promoId: refUso ? info.promoId : null, pasajeroId: viaje.pasajeroId, fechaUso };
+      return { monto, saldo: saldoActual + monto, promoId: refUso ? vale.promoId : null, pasajeroId: viaje.pasajeroId, fechaUso };
     });
   } catch (e) {
     if (e instanceof HttpsError) throw e;

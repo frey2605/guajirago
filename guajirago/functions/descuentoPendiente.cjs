@@ -59,6 +59,40 @@ function porQueNoLaBienvenida({ config, ficha, aparatoYaUsado, yaLaRecibio, viaj
   return null;
 }
 
+/**
+ * ¿CUÁNTO VALE DE VERDAD el descuento pendiente de esta ficha? — pendiente P02 (30-sep-2026). FUNCIÓN PURA.
+ *
+ * Es la ÚNICA fuente del valor del descuento de un viaje: la usan `confirmarConductor` (para armar la ficha del viaje)
+ * y `consumirDescuentoViaje` (para saber cuánto abonarle al conductor). Antes las dos se creían el número escrito
+ * DENTRO del viaje (`descuentoInfo`), que el pasajero y el conductor podían cambiar: un conductor se escribía
+ * `descuentoAplicado: 999999` y se lo abonaba.
+ *
+ * Devuelve { promoId, tipoBeneficio, valorBeneficio, codigoVerificacion } si vale, o null si no vale nada:
+ *   · con la firma del servidor (`fabricadoPor: 'servidor'`, G18) vale lo que dice: desde P01 el teléfono ya no puede
+ *     escribir la ficha, así que esa cifra la puso el servidor (o el panel);
+ *   · SIN firma (los de antes de G18) solo vale si es EXACTAMENTE lo de su origen: la bienvenida ($8.000 de crédito) o
+ *     el tipo y valor que tiene hoy su promoción (`promo`, el documento de `promociones/{promoId}`, o null). Si no
+ *     cuadra, NO vale: se escoge lo que no paga de más. Ejemplo: una ficha sin firma que diga «BIENVENIDA, $50.000»
+ *     no da descuento (el viaje se cobra entero); una sin firma de «BIENVENIDA, $8.000» sí da sus $8.000.
+ *   · en los dos casos: un crédito tiene que ser un número mayor que 0, un porcentaje entre 1 y 100 (más de 100 daría
+ *     una tarifa negativa, hallazgo del G01), y tiene que traer su código de cifras.
+ */
+function descuentoQueVale(desc, promo) {
+  if (!desc || typeof desc !== 'object') return null;
+  const { promoId, tipoBeneficio, valorBeneficio } = desc;
+  if (typeof valorBeneficio !== 'number' || !Number.isFinite(valorBeneficio) || valorBeneficio <= 0) return null;
+  if (tipoBeneficio !== 'credito' && !(tipoBeneficio === 'descuento' && valorBeneficio <= 100)) return null;
+  const codigo = String(desc.codigoVerificacion == null ? '' : desc.codigoVerificacion).replace(/\D/g, '');
+  if (!codigo) return null;
+  if (desc.fabricadoPor !== 'servidor') {
+    const cuadra = promoId === PROMO_BIENVENIDA
+      ? tipoBeneficio === 'credito' && valorBeneficio === CREDITO_BIENVENIDA_PASAJERO
+      : !!promo && promo.tipoBeneficio === tipoBeneficio && (promo.valorBeneficio || 0) === valorBeneficio;
+    if (!cuadra) return null;
+  }
+  return { promoId, tipoBeneficio, valorBeneficio, codigoVerificacion: codigo };
+}
+
 /** El identificador del aparato que manda el teléfono, si sirve como nombre de documento; si no, null. */
 function aparatoSano(v) {
   return typeof v === 'string' && v.length > 0 && v.length <= 100 && !v.includes('/') && v !== '.' && v !== '..'
@@ -67,5 +101,5 @@ function aparatoSano(v) {
 
 module.exports = {
   codigoDeCuatroCifras, CREDITO_BIENVENIDA_PASAJERO, PROMO_BIENVENIDA,
-  armarDescuentoPendiente, porQueNoLaBienvenida, aparatoSano,
+  armarDescuentoPendiente, porQueNoLaBienvenida, aparatoSano, descuentoQueVale,
 };

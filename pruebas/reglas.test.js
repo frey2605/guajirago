@@ -713,6 +713,60 @@ describe('P01 · el descuento lo fabrica el servidor', () => {
   });
 });
 
+// ── P02 · LA FICHA DEL DESCUENTO DEL VIAJE NO SE TOCA DESPUÉS DE PEDIR (30-sep-2026) ──
+// `descuentoInfo` era de donde salía lo que consumirDescuentoViaje le abona al conductor, y el `update` de viajes
+// dejaba que los dos que van en él lo cambiaran. Ahora el teléfono la escribe una vez, al crear, y después solo el
+// servidor (que no pasa por estas reglas).
+describe('P02 · la ficha del descuento del viaje no se toca después de pedir', () => {
+  const INFO = {
+    tarifaOriginal: 15000, tarifaPasajeroPaga: 7000, descuentoAplicado: 8000, promoId: 'BIENVENIDA',
+    tipoBeneficio: 'credito', valorBeneficio: 8000, codigoVerificacion: '4455', consumido: false,
+  };
+  beforeEach(async () => {
+    await entorno.withSecurityRulesDisabled(async (ctx) => {
+      const { doc, setDoc } = FS;
+      await setDoc(doc(ctx.firestore(), 'viajes/vdesc'), {
+        pasajeroId: 'pasajero1', conductorId: 'conductor1', estado: 'aceptado', fase: 'recogiendo', tarifaValor: 15000,
+        descuentoInfo: INFO,
+      });
+    });
+  });
+
+  it('EL ATAQUE · el conductor NO se escribe un descuento de $999.999 en su viaje', async () => {
+    const { doc, updateDoc } = FS;
+    await RUT.assertFails(updateDoc(doc(como('conductor1'), 'viajes/vdesc'),
+      { descuentoInfo: { descuentoAplicado: 999999, codigoVerificacion: '1', consumido: false } }));
+    await RUT.assertFails(updateDoc(doc(como('conductor1'), 'viajes/vdesc'), { 'descuentoInfo.descuentoAplicado': 999999 }));
+    await RUT.assertFails(updateDoc(doc(como('conductor1'), 'viajes/vdesc'), { 'descuentoInfo.consumido': true }));
+  });
+
+  it('EL ATAQUE · el pasajero tampoco la cambia ni la borra con el viaje en marcha', async () => {
+    const { doc, updateDoc, deleteField } = FS;
+    await RUT.assertFails(updateDoc(doc(como('pasajero1'), 'viajes/vdesc'), { 'descuentoInfo.tarifaPasajeroPaga': 0 }));
+    await RUT.assertFails(updateDoc(doc(como('pasajero1'), 'viajes/vdesc'), { descuentoInfo: deleteField() }));
+  });
+
+  it('ni el panel (no escribe viajes; el que la rehace es el servidor)', async () => {
+    const { doc, updateDoc } = FS;
+    await RUT.assertFails(updateDoc(doc(como('eladmin'), 'viajes/vdesc'), { 'descuentoInfo.descuentoAplicado': 1 }));
+  });
+
+  it('el camino bueno sigue: el pasajero pide CON su descuento (lo escribe al crear)', async () => {
+    const { doc, setDoc } = FS;
+    await RUT.assertSucceeds(setDoc(doc(como('pasajero1'), 'viajes/vnuevo'),
+      { pasajeroId: 'pasajero1', estado: 'esperando', tarifaValor: 15000, descuentoInfo: INFO }));
+  });
+
+  it('el camino bueno sigue: con la ficha puesta, el viaje avanza, se cancela y se califica igual', async () => {
+    const { doc, updateDoc } = FS;
+    await RUT.assertSucceeds(updateDoc(doc(como('conductor1'), 'viajes/vdesc'), { fase: 'en_viaje' }));
+    await RUT.assertSucceeds(updateDoc(doc(como('conductor1'), 'viajes/vdesc'), { estado: 'finalizado' }));
+    await RUT.assertSucceeds(updateDoc(doc(como('pasajero1'), 'viajes/vdesc'), { calificado: true }));
+    // Reenviarla IGUAL no molesta (se compara el valor, no las claves).
+    await RUT.assertSucceeds(updateDoc(doc(como('pasajero1'), 'viajes/vdesc'), { descuentoInfo: INFO, estado: 'cancelado' }));
+  });
+});
+
 describe('REGLA 2 · la oferta la firma su conductor', () => {
   it('un conductor SÍ puede dejar su propia oferta (AppConductor.js:353)', async () => {
     const { doc, setDoc } = FS;

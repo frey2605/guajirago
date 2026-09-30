@@ -564,9 +564,20 @@ service cloud.firestore {
       //     armaba la lista de ofertas leyendo el DOCUMENTO del viaje. Hoy esa
       //     lista solo se llena desde el listener de la subcolección
       //     (`Solicitar.js:684-706`), que es el mercado de verdad.
+      // ── P02 · LA FICHA DEL DESCUENTO NO SE TOCA DESPUÉS DE PEDIR (30-sep-2026) ──
+      // `descuentoInfo` es PLATA: de ahí salía lo que `consumirDescuentoViaje` le
+      // abona al conductor, y este `update` dejaba que el pasajero y el conductor
+      // del viaje la cambiaran. Demostrado en el emulador: el conductor se escribía
+      // `descuentoAplicado: 999999` y se lo abonaba. Desde P02 el valor lo decide el
+      // servidor con la ficha del pasajero, y además aquí se congela: la escribe
+      // el teléfono UNA vez al pedir (solo dice «quiero usar mi descuento»), y
+      // después solo el servidor (confirmarConductor la rehace entera; el cobro la
+      // marca consumida). MEDIDO: ninguna de las tres apps la escribe en un update
+      // (solo `viajeNuevo.js` al crear); el panel no escribe viajes.
       allow update: if request.auth != null
         && (esMio() || esAdmin())
         && request.resource.data.get('pasajeroId', '') == resource.data.get('pasajeroId', '')
+        && request.resource.data.get('descuentoInfo', null) == resource.data.get('descuentoInfo', null)
         && conductorIntacto();
 
       allow delete: if false;

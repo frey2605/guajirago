@@ -101,8 +101,12 @@ describe('G01 · el servidor rehace la ficha sobre la tarifa aceptada', () => {
     assert.ok(ini > 0 && fin > ini, 'no encontré confirmarConductor');
     const cuerpo = fuente.slice(ini, fin);
     assert.match(fuente, /require\(['"]\.\/descuentos\.cjs['"]\)/, 'el servidor no carga su cuenta del descuento');
-    const m = cuerpo.match(/descuentoSobreTarifaAceptada\(\s*viaje\.descuentoInfo\s*,\s*(\w+)\s*\)/);
-    assert.ok(m, 'confirmarConductor no rehace la ficha desde viaje.descuentoInfo');
+    // P02 (30-sep-2026): la ficha se rehace con el descuento que VALE según la ficha del pasajero (`vale`, de
+    // descuentoQueVale), no con el número que traiga el viaje (lo escribía el teléfono).
+    const m = cuerpo.match(/descuentoSobreTarifaAceptada\(\s*\{\s*\.\.\.vale\s*,\s*consumido:\s*false\s*\}\s*,\s*(\w+)\s*\)/);
+    assert.ok(m, 'confirmarConductor no rehace la ficha desde el descuento de la ficha del pasajero');
+    assert.doesNotMatch(cuerpo, /descuentoSobreTarifaAceptada\(\s*viaje\.descuentoInfo/, 'confirmarConductor vuelve a creerse el número del viaje');
+    assert.match(cuerpo, /descuentoQueVale\(/, 'confirmarConductor no mira cuánto vale de verdad el descuento');
     assert.match(cuerpo, new RegExp('tarifaValor:\\s*' + m[1] + '\\s*,'), 'la tarifa que se guarda no es la misma sobre la que se rehace el descuento');
     assert.match(cuerpo, /t\.update\(viajeRef,[\s\S]*descuentoInfo[\s\S]*\}\);/, 'la ficha rehecha no se escribe en el viaje');
   });
