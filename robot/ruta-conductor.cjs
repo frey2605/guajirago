@@ -13,10 +13,10 @@
 //   5. en las DOS apps, ya con la ruta pintada, mide dónde quedan los marcadores 🚗 y 📍 del mapa y dónde empieza la
 //      tarjeta de abajo y acaba la barra de arriba, y exige que los dos marcadores queden en el hueco que se ve.
 // Al final: el taxista cancela el viaje y su ficha queda como estaba.
-// Deja en pruebas UN viaje `cancelado_conductor` y le cuesta al taxista de prueba UNA comisión de sus créditos de
-// prueba (la cobra el servidor al confirmar, como en me-aceptaron).
+// Deja en pruebas UN viaje `cancelado_conductor` y
+// los créditos del taxista de prueba quedan como estaban (saldoDePrueba de comun.cjs le da saldo para ofertar y al final le devuelve el suyo, P04).
 //   node robot/ruta-conductor.cjs
-const { abrir, claveDePruebas, entrarALaBase } = require('./comun.cjs');
+const { abrir, claveDePruebas, entrarALaBase, saldoDePrueba } = require('./comun.cjs');
 
 const CARRO = { lat: 11.5444, lng: -72.9072 };
 const RECOGIDA = { lat: 11.5324, lng: -72.9072 };
@@ -78,6 +78,8 @@ function juzgar(quien, h, fallos) {
   const fallos = [];
   const pas = await entrarALaBase('pasajero@gg.test');
   const tax = await entrarALaBase('taxi@gg.test');
+  // P04: sin saldo para la comisión la base no deja ofertar; se le da saldo de PRUEBA y al final se le devuelve el suyo.
+  const saldo = await saldoDePrueba(tax.uid);
   const ficha = 'conductores/' + tax.uid;
   const fichaAntes = await tax.leer(ficha).catch(() => ({}));
   let idViaje = null;
@@ -162,6 +164,7 @@ function juzgar(quien, h, fallos) {
     console.log('CAPTURAS:', rc.carpeta, '·', rp.carpeta);
   } finally {
     if (rc) await rc.cerrar();
+    await saldo.devolver().catch((e) => console.log('⚠ no pude devolver los créditos del taxista:', e.message));
     if (rp) await rp.cerrar();
     if (idViaje) {
       await tax.cambiar('viajes/' + idViaje, { estado: 'cancelado_conductor', canceladoPor: 'conductor', razonCancelacion: 'ROBOT G29: fin del recorrido' })

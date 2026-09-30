@@ -854,3 +854,10 @@ la placa de `conductores/{uid}` (la escribe su GPS con la misma placa que va en 
   la página, no una imagen, y la `<img>` falla. Nunca escribir la dirección a mano: `pruebas/elRobot.test.js` lo caza.
   Corrido con a261efd publicado en pruebas: 6 pantallas ✓ (buena → foto; rota y sin foto → 👤); probar-cambio 30 ✓.
   Los 403 de la consola salen como en los demás recorridos.
+- **saldo del taxista de prueba (P04, 30-sep-2026):** desde P04 las reglas no dejan ofertar sin saldo para la comisión
+  de ESE viaje, y el taxista de PRUEBAS (taxi@gg.test) tenía **-$33.200** (cada recorrido que confirmaba le cobraba y
+  nada lo frenaba). Los recorridos que dejan una oferta (`me-aceptaron`, `espera-conductor`, `chat-del-viaje`,
+  `ruta-conductor`, `sin-saldo-confirmar`) usan `saldoDePrueba(uid)` de `comun.cjs`: como admin@ le sube los créditos
+  a 10.000 si tiene menos y al final `devolver()` los deja EXACTAMENTE como estaban. En `sin-saldo-confirmar`, la
+  tarjeta del taxista se ancla por «✗ Rechazar»: «✅ Aceptar viaje» cambia a «💬 Enviar contraoferta» al tocar «+», y
+  un ancla en ese botón deja de encontrar la tarjeta (el clic se queda esperando 30 s).

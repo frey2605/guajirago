@@ -113,8 +113,28 @@ async function entrarALaBase(correo) {
   };
 }
 
+/**
+ * P04 (30-sep-2026): desde que las reglas no dejan ofertar sin saldo para la comisión, el conductor de prueba necesita
+ * créditos para dejar una oferta. Como superadmin de prueba, se los sube a `minimo` si tiene menos, y `devolver()` los
+ * deja EXACTAMENTE como estaban (lo que cobró el servidor en el recorrido también se deshace). `poner(n)` los cambia.
+ * Es la única forma en que un recorrido toca los créditos (las reglas no dejan al propio conductor).
+ */
+async function saldoDePrueba(uid, minimo = 10000) {
+  const adm = await entrarALaBase('admin@gg.test');
+  const ruta = 'usuarios/' + uid;
+  const antes = (await adm.leer(ruta)).creditos;
+  if (!(antes >= minimo)) await adm.cambiar(ruta, { creditos: minimo });
+  return {
+    antes,
+    poner: (n) => adm.cambiar(ruta, { creditos: n }),
+    leer: async () => (await adm.leer(ruta)).creditos,
+    devolver: async () => { await adm.cambiar(ruta, { creditos: antes ?? 0 }); return (await adm.leer(ruta)).creditos; },
+  };
+}
+
 module.exports = {
   SITIOS,
+  saldoDePrueba,
   MOTOR,
   entrarComoRestaurante,
   baseDePruebas,

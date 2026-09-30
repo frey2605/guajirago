@@ -18,7 +18,7 @@
 // Al final: el pasajero cancela su viaje, y los créditos y la ficha del taxista quedan EXACTAMENTE como estaban.
 // Deja en pruebas UN viaje `cancelado`. No cuesta comisión (ese es el punto).
 //   node robot/sin-saldo-confirmar.cjs
-const { abrir, claveDePruebas, entrarALaBase } = require('./comun.cjs');
+const { abrir, claveDePruebas, entrarALaBase, saldoDePrueba } = require('./comun.cjs');
 
 const LAT = 11.5444;
 const LNG = -72.9072;
@@ -61,19 +61,16 @@ async function cerrarVentanita(p) {
 
 (async () => {
   const fallos = [];
-  const adm = await entrarALaBase('admin@gg.test');
   const pas = await entrarALaBase('pasajero@gg.test');
   const tax = await entrarALaBase('taxi@gg.test');
-  const fichaUsuario = 'usuarios/' + tax.uid;
   const fichaCond = 'conductores/' + tax.uid;
-  const creditosAntes = (await adm.leer(fichaUsuario)).creditos;
+  const saldo = await saldoDePrueba(tax.uid); // con saldo para ponerse disponible y dejar la oferta de antes
+  const creditosAntes = saldo.antes;
   const condAntes = await tax.leer(fichaCond).catch(() => ({}));
   let idViaje = null;
   let rc = null;
   let rp = null;
   try {
-    // Con saldo para poder ponerse disponible y dejar la oferta de antes (si en pruebas ya no le quedaba, se le da).
-    if (!(creditosAntes >= 10000)) await adm.cambiar(fichaUsuario, { creditos: 10000 });
     await tax.cambiar(fichaCond, { enViajeId: null, ocupado: false });
 
     // 1: el taxista, disponible.
@@ -126,7 +123,7 @@ async function cerrarVentanita(p) {
     await tax.cambiar('viajes/' + idViaje + '/contraofertas/' + tax.uid, oferta);
 
     // 4: sin saldo.
-    await adm.cambiar(fichaUsuario, { creditos: 0 });
+    await saldo.poner(0);
     console.log('CRÉDITOS DEL TAXISTA DE PRUEBA:', creditosAntes, '→ 0');
     await c.waitForTimeout(3000);
 
@@ -136,14 +133,15 @@ async function cerrarVentanita(p) {
     if (!veViaje) fallos.push('el taxista sin saldo no ve el viaje en su lista (tiene que poder VER)');
     await rc.captura('taxista-ve-el-viaje');
     if (veViaje) {
-      const tarjeta = c.locator('div', { hasText: ORIGEN }).filter({ has: c.getByRole('button', { name: /Aceptar viaje/ }) }).last();
+      const tarjeta = c.locator('div', { hasText: ORIGEN }).filter({ has: c.getByRole('button', { name: /Rechazar/ }) }).last(); // «Rechazar» no cambia al contraofertar
       await tarjeta.getByRole('button', { name: /Aceptar viaje/ }).click();
       const avisoAceptar = await esperarTexto(rc, TE_FALTA, 10);
       await rc.captura('taxista-aceptar');
       console.log('AL ACEPTAR:', avisoAceptar ? 'ventanita «' + TE_FALTA + '»' : 'SIN ventanita');
       if (!avisoAceptar) fallos.push('al tocar «Aceptar viaje» sin saldo no salió «' + TE_FALTA + '»');
       await cerrarVentanita(c);
-      await tarjeta.getByRole('button', { name: '+' }).click();
+      await rc.captura('taxista-cerro-la-ventanita');
+      await tarjeta.locator('button', { hasText: /^\+$/ }).first().click({ timeout: 10000 });
       await c.waitForTimeout(500);
       await tarjeta.getByRole('button', { name: /Enviar contraoferta/ }).click();
       const avisoContra = await esperarTexto(rc, TE_FALTA, 10);
@@ -175,7 +173,7 @@ async function cerrarVentanita(p) {
     await rp.captura('sin-la-oferta');
 
     const viaje = await pas.leer('viajes/' + idViaje);
-    const creditos = (await adm.leer(fichaUsuario)).creditos;
+    const creditos = await saldo.leer();
     console.log('VIAJE EN LA BASE:', JSON.stringify({ estado: viaje.estado, conductorId: viaje.conductorId ?? null }), '· CRÉDITOS DEL TAXISTA:', creditos);
     if (viaje.estado !== 'esperando') fallos.push('el viaje salió del mercado: ' + viaje.estado);
     if (viaje.conductorId) fallos.push('el viaje quedó con conductor');
@@ -191,11 +189,9 @@ async function cerrarVentanita(p) {
         .catch((e) => console.log('⚠ no pude cancelar el viaje del robot:', e.message));
       await new Promise((ok) => setTimeout(ok, 3000));
     }
-    await adm.cambiar(fichaUsuario, { creditos: creditosAntes ?? 0 })
-      .catch((e) => console.log('⚠ no pude devolver los créditos del taxista:', e.message));
     await tax.cambiar(fichaCond, { enViajeId: condAntes.enViajeId ?? null, ocupado: condAntes.ocupado ?? false, activo: condAntes.activo ?? false })
       .catch((e) => console.log('⚠ no pude dejar la ficha del taxista como estaba:', e.message));
-    const quedo = (await adm.leer(fichaUsuario).catch(() => ({}))).creditos;
+    const quedo = await saldo.devolver().catch((e) => { console.log('⚠ no pude devolver los créditos del taxista:', e.message); return null; });
     console.log('CRÉDITOS DEL TAXISTA DE PRUEBA QUEDARON EN:', quedo, quedo === creditosAntes ? '(como estaban)' : '🔴 (antes ' + creditosAntes + ')');
     if (quedo !== creditosAntes) fallos.push('los créditos del taxista no quedaron como estaban');
   }

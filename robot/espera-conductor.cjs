@@ -12,10 +12,10 @@
 //   5. en la app del taxista aprieta «📍 Llegué al punto»;
 //   6. lee los DOS relojes y exige que los dos arranquen de 5:00 (más de 4:30 al leerlos) y a menos de 10 s uno de otro.
 // Al final: el taxista cancela el viaje, su ficha y config/global quedan como estaban.
-// Deja en pruebas UN viaje `cancelado_conductor`, y le cuesta al taxista de prueba UNA comisión de sus créditos de prueba
-// (la cobra el servidor al confirmar, como en me-aceptaron).
+// Deja en pruebas UN viaje `cancelado_conductor`, y
+// los créditos del taxista de prueba quedan como estaban (saldoDePrueba de comun.cjs le da saldo para ofertar y al final le devuelve el suyo, P04).
 //   node robot/espera-conductor.cjs
-const { abrir, claveDePruebas, entrarALaBase } = require('./comun.cjs');
+const { abrir, claveDePruebas, entrarALaBase, saldoDePrueba } = require('./comun.cjs');
 
 const SEGUNDOS = 300;
 const LAT = 11.5444;
@@ -52,6 +52,8 @@ async function entrar(p, correo) {
   const adm = await entrarALaBase('admin@gg.test');
   const pas = await entrarALaBase('pasajero@gg.test');
   const tax = await entrarALaBase('taxi@gg.test');
+  // P04: sin saldo para la comisión la base no deja ofertar; se le da saldo de PRUEBA y al final se le devuelve el suyo.
+  const saldo = await saldoDePrueba(tax.uid);
   const config = await adm.leer('config/global');
   const esperaAntes = config.tiempoEsperaConductor;
   const ficha = 'conductores/' + tax.uid;
@@ -142,6 +144,7 @@ async function entrar(p, correo) {
     console.log('CAPTURAS:', rc.carpeta, '·', rp.carpeta);
   } finally {
     if (rc) await rc.cerrar();
+    await saldo.devolver().catch((e) => console.log('⚠ no pude devolver los créditos del taxista:', e.message));
     if (rp) await rp.cerrar();
     if (idViaje) {
       await tax.cambiar('viajes/' + idViaje, { estado: 'cancelado_conductor', canceladoPor: 'conductor', razonCancelacion: 'ROBOT G26: fin del recorrido' })

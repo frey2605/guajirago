@@ -11,9 +11,9 @@
 //   6. exige que cada uno vea los DOS mensajes, que el campo quede vacío tras enviar y que no salga ninguna ventanita
 //      de error.
 // Al final: el taxista cancela el viaje y su ficha queda como estaba. Deja en pruebas UN viaje `cancelado_conductor` con
-// dos mensajes, y le cuesta al taxista de prueba UNA comisión de sus créditos de prueba (como en espera-conductor).
+// dos mensajes, y los créditos del taxista de prueba quedan como estaban (saldoDePrueba de comun.cjs le da saldo para ofertar y al final le devuelve el suyo, P04).
 //   node robot/chat-del-viaje.cjs
-const { abrir, claveDePruebas, entrarALaBase } = require('./comun.cjs');
+const { abrir, claveDePruebas, entrarALaBase, saldoDePrueba } = require('./comun.cjs');
 
 const LAT = 11.5444;
 const LNG = -72.9072;
@@ -53,6 +53,8 @@ async function esperarTexto(r, texto, veces = 30) {
   const fallos = [];
   const pas = await entrarALaBase('pasajero@gg.test');
   const tax = await entrarALaBase('taxi@gg.test');
+  // P04: sin saldo para la comisión la base no deja ofertar; se le da saldo de PRUEBA y al final se le devuelve el suyo.
+  const saldo = await saldoDePrueba(tax.uid);
   const ficha = 'conductores/' + tax.uid;
   const fichaAntes = await tax.leer(ficha).catch(() => ({}));
   let idViaje = null;
@@ -155,6 +157,7 @@ async function esperarTexto(r, texto, veces = 30) {
     console.log('CAPTURAS:', rc.carpeta, '·', rp.carpeta);
   } finally {
     if (rc) await rc.cerrar();
+    await saldo.devolver().catch((e) => console.log('⚠ no pude devolver los créditos del taxista:', e.message));
     if (rp) await rp.cerrar();
     if (idViaje) {
       await tax.cambiar('viajes/' + idViaje, { estado: 'cancelado_conductor', canceladoPor: 'conductor', razonCancelacion: 'ROBOT G96: fin del recorrido' })

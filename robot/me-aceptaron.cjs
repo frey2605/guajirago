@@ -11,10 +11,10 @@
 //   4. el pasajero acepta la oferta llamando a `confirmarConductor` (la única que escribe un viaje aceptado);
 //   5. exige que la app del taxista diga «¡Trato hecho!» y pase a «YENDO A RECOGER» con el origen de ESTE viaje.
 // Al final el taxista cancela el viaje (el servidor le quita la marca) y su ficha se deja como estaba.
-// Deja en pruebas UN viaje `cancelado_conductor`, y le cuesta al taxista de prueba UNA comisión de sus créditos de
-// prueba (la cobra el servidor al confirmar; el robot no puede devolverla: las reglas no dejan tocar los créditos).
+// Deja en pruebas UN viaje `cancelado_conductor`, y
+// los créditos del taxista de prueba quedan como estaban (saldoDePrueba de comun.cjs le da saldo para ofertar y al final le devuelve el suyo, P04).
 //   node robot/me-aceptaron.cjs
-const { abrir, claveDePruebas, entrarALaBase } = require('./comun.cjs');
+const { abrir, claveDePruebas, entrarALaBase, saldoDePrueba } = require('./comun.cjs');
 
 const MIN = 60 * 1000;
 const ORIGEN = 'Calle 1 # 1-1 robot G24 ' + Date.now().toString().slice(-5);
@@ -36,6 +36,8 @@ const antesDeCargar = '(' + ((lat, lng) => {
   const fallos = [];
   const pas = await entrarALaBase('pasajero@gg.test');
   const tax = await entrarALaBase('taxi@gg.test');
+  // P04: sin saldo para la comisión la base no deja ofertar; se le da saldo de PRUEBA y al final se le devuelve el suyo.
+  const saldo = await saldoDePrueba(tax.uid);
   const ficha = 'conductores/' + tax.uid;
   const antes = await tax.leer(ficha).catch(() => ({}));
   // Libre para que el servidor lo deje confirmar (con una marca de otro viaje contestaría «ocupado»).
@@ -102,6 +104,7 @@ const antesDeCargar = '(' + ((lat, lng) => {
     console.log('CAPTURAS:', r.carpeta);
   } finally {
     await r.cerrar();
+    await saldo.devolver().catch((e) => console.log('⚠ no pude devolver los créditos del taxista:', e.message));
     // El taxista lo cancela (el servidor, `onViajeCerrado`, le quita la marca) y la ficha queda como estaba.
     await tax.cambiar('viajes/' + ID, { estado: 'cancelado_conductor', canceladoPor: 'conductor', razonCancelacion: 'ROBOT G24: fin del recorrido' })
       .catch((e) => console.log('⚠ no pude cancelar el viaje del robot:', e.message));
