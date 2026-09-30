@@ -1139,3 +1139,38 @@ describe('P03 · confirmarConductor pone en el viaje la tarjeta de la FICHA del 
     assert.strictEqual(t.conductorColor, '', 'el color salió de la oferta');
   });
 });
+
+// ── P04 · SIN SALDO PARA LA COMISIÓN NO SE CONFIRMA (30-sep-2026) ──
+// Decisión del dueño: si al conductor no le alcanza el saldo para la comisión, el servidor no lo confirma, el viaje
+// sigue en el mercado sin conductor, no se cobra nada y el saldo nunca queda negativo. Aquí por la red, de verdad.
+describe('P04 · confirmarConductor no confirma si al conductor no le alcanza el saldo', () => {
+  const pedir = async (id, saldo) => {
+    await sembrar('config/global', { comisionTaxi: num(COMISION_TAXI) });
+    await sembrar('conductores/condS', { ocupado: { booleanValue: false } });
+    await sembrar('usuarios/condS', { tipo: txt('conductor'), nombre: txt('LUIS PEREZ'), creditos: num(saldo) });
+    await sembrar('viajes/' + id, { pasajeroId: txt('pasaS'), estado: txt('esperando'), tipo: txt('Taxi'),
+      tarifa: txt('$12.000'), tarifaValor: num(12000) });
+    await sembrar('viajes/' + id + '/contraofertas/condS', { monto: txt('$12.000'), montoValor: num(12000), tipoOferta: txt('acepta') });
+    return llamar('pasaS', { viajeId: id, conductorId: 'condS' });
+  };
+
+  test('un peso menos que la comisión: se rechaza con su frase y NADA cambia', async () => {
+    const r = await pedir('vs1', COMISION_TAXI - 1);
+    assert.strictEqual(r.cuerpo?.error?.status, 'FAILED_PRECONDITION', JSON.stringify(r.cuerpo));
+    assert.match(r.cuerpo.error.message, /Escoge otra oferta/);
+    assert.deepStrictEqual(r.cuerpo.error.details, { motivo: 'sin_saldo' });
+    assert.strictEqual(await saldoDe('condS'), COMISION_TAXI - 1, 'se le cobró la comisión');
+    const v = await leer('viajes/vs1');
+    assert.strictEqual(v.estado.stringValue, 'esperando', 'el viaje salió del mercado');
+    assert.ok(v.conductorId === undefined, 'el viaje quedó con conductor');
+    const c = await leer('conductores/condS');
+    assert.ok(!c.enViajeId, 'el conductor quedó marcado en el viaje');
+  });
+
+  test('saldo justo igual a la comisión: se confirma y queda en 0', async () => {
+    const r = await pedir('vs2', COMISION_TAXI);
+    assert.strictEqual(r.cuerpo?.result?.ok, true, JSON.stringify(r.cuerpo));
+    assert.strictEqual(await saldoDe('condS'), 0);
+    assert.strictEqual((await leer('viajes/vs2')).estado.stringValue, 'aceptado');
+  });
+});

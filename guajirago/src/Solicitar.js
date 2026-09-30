@@ -1165,11 +1165,18 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
     // El candado: una sola aceptación aunque se toque dos (el «celebrando» de antes hacía de bloqueo a mano). La
     // respuesta del servidor se envuelve: que el conductor ya esté ocupado NO es un fallo de la conexión, y ése lo
     // dice esta pantalla con su propio aviso, como antes.
+    // P04: si al conductor no le alcanza el saldo para la comisión, el servidor no lo confirma: lanza su frase (la dice
+    // la ventanita del candado) con `motivo: 'sin_saldo'`, y aquí solo se quita esa oferta de la lista.
+    let sinSaldo = false;
     const res = await correr(async () => {
       const fn = httpsCallable(getFunctions(), 'confirmarConductor');
-      const resp = await fn({ viajeId, conductorId: oferta.conductorId });
+      const resp = await fn({ viajeId, conductorId: oferta.conductorId }).catch((e) => {
+        sinSaldo = !!(e && e.details && e.details.motivo === 'sin_saldo');
+        throw e;
+      });
       return { respuesta: (resp && resp.data) || {} };
     }, 'aceptar', 'Oferta aceptada.', 'aceptar la oferta');
+    if (sinSaldo) setContraofertas(prev => prev.filter(c => c.conductorId !== oferta.conductorId));
     if (!res || !res.ok) return; // el candado ya dijo el motivo
     const r = res.valor.respuesta;
     if (r.ok) {

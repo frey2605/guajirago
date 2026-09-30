@@ -325,6 +325,14 @@ exports.confirmarConductor = onCall(async (request) => {
       const cfg = configSnap.exists ? configSnap.data() : {};
       const comision = comisionSegunTipoDeViaje(viaje.tipo, cfg);
       const creditosActuales = (usuarioSnap.exists ? usuarioSnap.data().creditos : 0) || 0;
+      // P04 (30-sep-2026, decisión del dueño): si al conductor no le alcanza el saldo para la comisión, NO se confirma.
+      // Se lanza DENTRO de la transacción y antes de cualquier escritura: el viaje sigue en el mercado sin conductor y
+      // no se cobra nada. El saldo nunca queda negativo. La frase es para el pasajero (avisoRechazo.js la respeta) y
+      // `motivo` le dice a la app que quite esa oferta de la lista.
+      if (!(creditosActuales >= comision)) {
+        throw new HttpsError("failed-precondition", "Este conductor no puede tomar el viaje ahora. Escoge otra oferta.",
+          { motivo: "sin_saldo" });
+      }
       // P03: `usuarioRef` es la ficha del CONDUCTOR (usuarios/{conductorId}): de ahí sale su tarjeta.
       const tarjeta = tarjetaDelConductor(usuarioSnap.exists ? usuarioSnap.data() : null);
       // G01 — la tarifa que se cobra la fija ESTA línea (la oferta aceptada). La ficha del descuento se armó en el

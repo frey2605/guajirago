@@ -82,7 +82,8 @@ function cargarIndex(datos, fallan, ref) {
   const escrituras = [];
   const admin = { initializeApp() {}, firestore: () => baseDeMentira(datos, escrituras), messaging: () => mensajero };
   const tal = (a, b) => (typeof b === 'function' ? b : a);
-  class HttpsError extends Error {}
+  // P04: como el de verdad, guarda el código, la frase y los detalles (antes la frase quedaba en el código).
+  class HttpsError extends Error { constructor(code, message, details) { super(message); this.code = code; this.details = details; } }
   const funciones = {
     'firebase-functions/v2/firestore': { onDocumentCreated: tal, onDocumentUpdated: tal },
     'firebase-functions/v2/https': { onCall: tal, HttpsError },

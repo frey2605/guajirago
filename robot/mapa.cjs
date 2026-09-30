@@ -228,6 +228,13 @@ const RECORRIDOS = [
     vigila: ['guajirago/src/AppConductor.js', 'guajirago/src/estadosViaje.js', 'guajirago/src/TratoHecho.js'],
   },
   {
+    nombre: 'sin-saldo-confirmar',
+    que: 'con el taxista de prueba en 0 créditos, el pasajero acepta su oferta y ve «Este conductor no puede tomar el viaje ahora. Escoge otra oferta.»; la oferta sale de la lista, el viaje sigue libre y no se cobra nada (P04; le devuelve los créditos)',
+    archivo: 'sin-saldo-confirmar.cjs',
+    // Qué hace el servidor con cada saldo (de sobra, justo, de menos) lo EJECUTA pruebas/saldoAlConfirmar.test.js.
+    vigila: ['guajirago/src/Solicitar.js', 'guajirago/src/avisoRechazo.js'],
+  },
+  {
     nombre: 'espera-conductor',
     que: 'con 300 s en config/global de pruebas, el taxista aprieta «📍 Llegué al punto» y su reloj «Esperando al pasajero...» y el del pasajero «Sal pronto…» arrancan los dos de 5:00 (G26)',
     archivo: 'espera-conductor.cjs',
