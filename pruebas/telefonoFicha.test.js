@@ -21,7 +21,7 @@ const { describe, it } = require('node:test');
 const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
-const { RAIZ, leer, cargarDeLaApp, soloCodigo, sinTextos } = require('./cargar.cjs');
+const { RAIZ, leer, cargarDeLaApp, soloCodigo, sinTextos, copiaIdentica } = require('./cargar.cjs');
 
 const APP = 'guajirago/src/telefonoUsuario.js';
 const PANEL = 'guajirago-admin/src/telefonoUsuario.js';
@@ -96,7 +96,7 @@ describe('G08 · ¿cuál es el teléfono de esta persona?', () => {
   }
 
   it('la copia del panel es idéntica a la de la app', () => {
-    assert.strictEqual(leer(PANEL), leer(APP), PANEL + ' se separó de ' + APP + ': copia la de la app tal cual.');
+    copiaIdentica(PANEL, APP, PANEL + ' se separó de ' + APP + ': copia la de la app tal cual.');
   });
 
   for (const ruta of LEEN_LA_FICHA) {

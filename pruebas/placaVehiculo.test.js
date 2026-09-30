@@ -21,7 +21,7 @@ const { describe, it } = require('node:test');
 const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
-const { RAIZ, leer, cargarDeLaApp, soloCodigo } = require('./cargar.cjs');
+const { RAIZ, leer, cargarDeLaApp, soloCodigo, copiaIdentica } = require('./cargar.cjs');
 const { correrEdicionDelPanel, correrPlacaDelRegistro, PLACAS } = require('../scripts/medir-placa-vehiculo.cjs');
 
 const APP = 'guajirago/src/vehiculoConductor.js';
@@ -70,7 +70,7 @@ describe('G45 · ¿esta placa y este vehículo sirven?', () => {
   }
 
   it('la copia del panel es idéntica a la de la app', () => {
-    assert.strictEqual(leer(PANEL), leer(APP), PANEL + ' se separó de ' + APP + ': copia la de la app tal cual.');
+    copiaIdentica(PANEL, APP, PANEL + ' se separó de ' + APP + ': copia la de la app tal cual.');
   });
 
   it('EL QUE MUERDE · el panel no guarda una placa que no sirve (guardarEdicion, corrido)', async () => {

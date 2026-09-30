@@ -19,7 +19,7 @@ const { describe, it } = require('node:test');
 const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
-const { RAIZ, leer, cargarDeLaApp, soloCodigo } = require('./cargar.cjs');
+const { RAIZ, leer, cargarDeLaApp, soloCodigo, copiaIdentica } = require('./cargar.cjs');
 const { SITIOS, tablaDe } = require('../scripts/medir-numero-whatsapp.cjs');
 
 const APP = 'guajirago/src/telefonoValido.js';
@@ -55,8 +55,8 @@ describe('G41 · la pieza: el número para WhatsApp', () => {
 
 describe('G41 · las copias del panel y de aliados son la misma pieza', () => {
   for (const copia of COPIAS) {
-    it(copia + ' es byte a byte ' + APP, () => {
-      assert.strictEqual(leer(copia), leer(APP),
+    it(copia + ' es idéntica a ' + APP, () => {
+      copiaIdentica(copia, APP,
         copia + ' se separó de ' + APP + ': se cambia allá primero y se copia IGUAL (son repos aparte y no pueden importar)');
     });
   }

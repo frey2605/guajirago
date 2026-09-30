@@ -16,7 +16,7 @@
  */
 const { describe, it } = require('node:test');
 const assert = require('node:assert');
-const { leer, cargarDeLaApp } = require('./cargar.cjs');
+const { leer, cargarDeLaApp, copiaIdentica } = require('./cargar.cjs');
 const { medir, carear, contarGuardados, bloque, ANTES, PIEZA_APP, PIEZA_ALIADOS, SITIOS } = require('../scripts/medir-metodos-pago.cjs');
 
 // Los nombres que YA están guardados en los pedidos (metodoPago y pagos[].metodo): cambiarlos deja los viejos en
@@ -29,7 +29,8 @@ describe('G85 · los métodos de pago de un pedido salen de UNA pieza', () => {
   it('el bloque de la pieza es IGUAL en la app (estadosPedido.js) y en aliados (flujoPedidos.js)', () => {
     const app = bloque(leer(PIEZA_APP));
     assert.ok(app, 'no encuentro el bloque de METODOS_PAGO en ' + PIEZA_APP);
-    assert.strictEqual(bloque(leer(PIEZA_ALIADOS)), app, 'la copia de aliados se separó de ' + PIEZA_APP);
+    copiaIdentica({ nombre: 'el bloque de ' + PIEZA_ALIADOS, texto: bloque(leer(PIEZA_ALIADOS)) }, { nombre: 'el bloque de ' + PIEZA_APP, texto: app },
+      'la copia de aliados se separó de ' + PIEZA_APP);
   });
 
   it('la pieza, ejecutada, da los nombres que guardan los pedidos (en la app y en aliados)', () => {

@@ -20,7 +20,7 @@ const assert = require('node:assert');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { leer, cargarDeLaApp, soloCodigo } = require('./cargar.cjs');
+const { leer, cargarDeLaApp, soloCodigo, copiaIdentica } = require('./cargar.cjs');
 const M = require('../scripts/medir-ambientes.cjs');
 
 describe('EL AMBIENTE (fase 0) · la app de transporte deduce si es PRUEBAS o PRODUCCIÓN', () => {
@@ -225,9 +225,9 @@ for (const { app, que, target, sitios } of HERMANAS) {
   describe('EL AMBIENTE (fase 0) · ' + que + ' (' + app + ') deduce igual, con la misma pieza', () => {
     const P = app + '/';
 
-    it('ambiente.js y CartelAmbiente.js son byte a byte los de transporte: la copia está atada', () => {
+    it('ambiente.js y CartelAmbiente.js son idénticos a los de transporte: la copia está atada', () => {
       for (const f of ['src/ambiente.js', 'src/CartelAmbiente.js']) {
-        assert.strictEqual(leer(P + f), leer('guajirago/' + f),
+        copiaIdentica(P + f, 'guajirago/' + f,
           '⛔ ' + P + f + ' se separó de guajirago/' + f + ': la copia se cambia en los dos sitios o se saca a una casa común');
       }
     });

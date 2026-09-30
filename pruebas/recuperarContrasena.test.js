@@ -10,7 +10,7 @@
  */
 const { describe, it } = require('node:test');
 const assert = require('node:assert');
-const { leer } = require('./cargar.cjs');
+const { leer, copiaIdentica } = require('./cargar.cjs');
 const M = require('../scripts/medir-recuperar-contrasena.cjs');
 
 const ANTES = '21aa0e0'; // el último commit con Login culpando al correo de todo.
@@ -81,9 +81,8 @@ describe('G71 · recuperar la contraseña sale de UNA pieza', () => {
   });
 
   it('las tres copias de avisoRechazo.js siguen idénticas (la clase del fallo se decide igual en las tres apps)', () => {
-    const app = leer('guajirago/src/avisoRechazo.js');
-    assert.strictEqual(leer('guajirago-admin/src/avisoRechazo.js'), app);
-    assert.strictEqual(leer('guajirago-aliados/src/avisoRechazo.js'), app);
+    copiaIdentica('guajirago-admin/src/avisoRechazo.js', 'guajirago/src/avisoRechazo.js');
+    copiaIdentica('guajirago-aliados/src/avisoRechazo.js', 'guajirago/src/avisoRechazo.js');
   });
 
   it('careo: con el código de ANTES el medidor ve las 5 mentiras, que delata, y 0 verdades', async () => {

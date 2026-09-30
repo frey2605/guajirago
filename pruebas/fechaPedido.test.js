@@ -15,7 +15,7 @@
  */
 const { describe, it } = require('node:test');
 const assert = require('node:assert');
-const { leer, cargarDeLaApp } = require('./cargar.cjs');
+const { leer, cargarDeLaApp, copiaIdentica } = require('./cargar.cjs');
 const { elPanel, laCaja, conReloj, timestampDe } = require('../scripts/medir-fecha-pedido.cjs');
 
 const APP = 'guajirago/src/fechaGuardada.js';
@@ -71,9 +71,9 @@ describe('G48 · la fecha guardada de un pedido se lee con UNA pieza', () => {
     });
   }
 
-  it('las copias de aliados y del panel son la de la app, byte a byte', () => {
-    assert.strictEqual(leer(ALIADOS), leer(APP), 'se separaron: guajirago-aliados/src/fechaGuardada.js tiene que ser la de la app');
-    assert.strictEqual(leer(PANEL), leer(APP), 'se separaron: guajirago-admin/src/fechaGuardada.js tiene que ser la de la app');
+  it('las copias de aliados y del panel son la de la app, idénticas', () => {
+    copiaIdentica(ALIADOS, APP, 'se separaron: guajirago-aliados/src/fechaGuardada.js tiene que ser la de la app');
+    copiaIdentica(PANEL, APP, 'se separaron: guajirago-admin/src/fechaGuardada.js tiene que ser la de la app');
   });
 
   it('el panel: «pedidos hoy» cuenta el domicilio (Timestamp) y la mesa (texto), con el día de Colombia', () => {

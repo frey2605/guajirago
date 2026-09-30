@@ -29,7 +29,7 @@
 const path = require('node:path');
 const fs = require('node:fs');
 const { execFileSync } = require('node:child_process');
-const { RAIZ, soloCodigo, sinTextos, cuerpoDeLaFuncion } = require('../pruebas/cargar.cjs');
+const { RAIZ, soloCodigo, sinTextos, cuerpoDeLaFuncion, sonLaMismaCopia } = require('../pruebas/cargar.cjs');
 
 const CARPETAS = ['guajirago/src', 'guajirago-admin/src', 'guajirago-aliados/src'];
 const PIEZAS = ['guajirago/src/sugerenciasDeDirecciones.js', 'guajirago-aliados/src/sugerenciasDeDirecciones.js'];
@@ -206,7 +206,7 @@ function medir(leerDe) {
   const copias = lasCopias(leerDe);
   const pApp = leerDe('guajirago/src/sugerenciasDeDirecciones.js');
   const pAli = leerDe('guajirago-aliados/src/sugerenciasDeDirecciones.js');
-  const atadas = [{ n: 'sugerenciasDeDirecciones.js', estado: !pAli ? 'no existe en aliados' : pAli === pApp ? 'byte a byte igual' : 'DISTINTA' }];
+  const atadas = [{ n: 'sugerenciasDeDirecciones.js', estado: !pAli ? 'no existe en aliados' : sonLaMismaCopia(pAli, pApp) ? 'idéntica (G100: salvo el final de línea)' : 'DISTINTA' }];
   // riohacha.js de aliados lleva SOLO los marcos: se comparan sus valores, uno por uno.
   const gAli = leerDe('guajirago-aliados/src/riohacha.js');
   if (!gAli) atadas.push({ n: 'riohacha.js', estado: 'no existe en aliados' });

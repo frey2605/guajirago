@@ -13,7 +13,7 @@
  */
 const { describe, it } = require('node:test');
 const assert = require('node:assert');
-const { leer, cargarDeLaApp, cuerpoDeLaFuncion } = require('./cargar.cjs');
+const { leer, cargarDeLaApp, cuerpoDeLaFuncion, copiaIdentica } = require('./cargar.cjs');
 
 const NUBE_RUTA = 'guajirago/functions/promociones.cjs';
 const APP_RUTA = 'guajirago/src/reglaPromocion.js';
@@ -55,11 +55,11 @@ const PERSONAS = [
 const MOMENTOS = [HOY, new Date('2026-09-30T23:00:00'), new Date('2026-10-01T00:30:00'), new Date('2026-08-31T23:59:00')];
 
 describe('G12 · la regla de la promoción es UNA, en el servidor, la app y el panel', () => {
-  it('el trozo entre las marcas es igual en los tres archivos, y las dos copias son iguales byte a byte', () => {
-    const nube = trozo(NUBE_RUTA);
-    assert.strictEqual(trozo(APP_RUTA), nube, 'la copia de la APP se separó de la regla del servidor');
-    assert.strictEqual(trozo(PANEL_RUTA), nube, 'la copia del PANEL se separó de la regla del servidor');
-    assert.strictEqual(leer(APP_RUTA), leer(PANEL_RUTA), 'las copias de la app y del panel no son iguales');
+  it('el trozo entre las marcas es igual en los tres archivos, y las dos copias son idénticas', () => {
+    const nube = { nombre: 'el trozo de ' + NUBE_RUTA, texto: trozo(NUBE_RUTA) };
+    copiaIdentica({ nombre: 'el trozo de ' + APP_RUTA, texto: trozo(APP_RUTA) }, nube, 'la copia de la APP se separó de la regla del servidor');
+    copiaIdentica({ nombre: 'el trozo de ' + PANEL_RUTA, texto: trozo(PANEL_RUTA) }, nube, 'la copia del PANEL se separó de la regla del servidor');
+    copiaIdentica(PANEL_RUTA, APP_RUTA, 'las copias de la app y del panel no son iguales');
   });
 
   it('las tres dicen lo mismo con los mismos casos, ejecutándolas', () => {

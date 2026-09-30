@@ -32,7 +32,7 @@ const { describe, it } = require('node:test');
 const assert = require('node:assert');
 const {
   leer, soloCodigo, sinTextos, cuerpoDelCatch, cuerpoDeLaFuncion,
-  dentroDeTry, catchPropioDe,
+  dentroDeTry, catchPropioDe, copiaIdentica,
 } = require('./cargar.cjs');
 
 const APP = 'guajirago/src/AppConductor.js';
@@ -326,10 +326,10 @@ describe('SEGUNDA LEY · las copias compartidas no se separan', () => {
     // formato Windows y el del panel en Unix. Comparando byte a byte, esta prueba
     // se ponía ROJA sobre código idéntico — el peor fallo de una prueba, porque
     // enseña a desconfiar de ella. Lo que importa es que digan lo mismo.
-    const mismoTexto = (s) => s.split('\r\n').join('\n');
-    const textos = COPIAS.map((f) => mismoTexto(leer(f)));
+    // G100: esa vara vive ahora en UN sitio, copiaIdentica de cargar.cjs.
+    const textos = COPIAS.map((f) => leer(f));
     for (let i = 1; i < textos.length; i += 1) {
-      assert.strictEqual(textos[i], textos[0],
+      copiaIdentica(COPIAS[i], COPIAS[0],
         COPIAS[i] + ' se separó de ' + COPIAS[0] + '. Los tres repos son APARTE y no '
         + 'hay forma de importar de uno a otro: si una copia cambia sola, dos apps '
         + 'empiezan a decir cosas distintas del mismo fallo.');
@@ -349,10 +349,9 @@ describe('SEGUNDA LEY · las copias compartidas no se separan', () => {
     // Ignorando el final de línea, por lo mismo que arriba: git los convierte al
     // sacar los archivos y no igual en los dos repos. Este par fue justo el que lo
     // destapó.
-    const mismoTexto = (s) => s.split('\r\n').join('\n');
-    assert.strictEqual(
-      mismoTexto(leer('guajirago/src/AvisoModal.js')),
-      mismoTexto(leer('guajirago-admin/src/AvisoModal.js')),
+    copiaIdentica(
+      'guajirago-admin/src/AvisoModal.js',
+      'guajirago/src/AvisoModal.js',
       'la ventanita del conductor se separó de la del panel. Las pruebas que le '
       + 'miran el cuerpo están en el panel: si son distintas, esta no la comprueba nadie.');
   });

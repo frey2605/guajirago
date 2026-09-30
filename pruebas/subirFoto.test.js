@@ -11,7 +11,7 @@
  */
 const { describe, it } = require('node:test');
 const assert = require('node:assert');
-const { leer } = require('./cargar.cjs');
+const { leer, copiaIdentica } = require('./cargar.cjs');
 const M = require('../scripts/medir-subir-foto.cjs');
 
 // Un almacén de mentira que apunta cada llamada, como el SDK en lo que importa aquí.
@@ -29,10 +29,10 @@ function sdkDeMentira({ falla = false } = {}) {
 }
 
 describe('G82 · la pieza subirAlAlmacen', () => {
-  it('las tres copias (app, panel, aliados) son IDÉNTICAS, byte a byte', () => {
-    const [a, b, c] = M.PIEZAS.map((r) => leer(r));
-    assert.strictEqual(b, a, 'la copia del PANEL se separó de la de la app');
-    assert.strictEqual(c, a, 'la copia de ALIADOS se separó de la de la app');
+  it('las tres copias (app, panel, aliados) son IDÉNTICAS', () => {
+    const [a, b, c] = M.PIEZAS;
+    copiaIdentica(b, a, 'la copia del PANEL se separó de la de la app');
+    copiaIdentica(c, a, 'la copia de ALIADOS se separó de la de la app');
   });
 
   for (const r of M.PIEZAS) {

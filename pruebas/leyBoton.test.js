@@ -14,7 +14,7 @@
 // ═══════════════════════════════════════════════════════════════════════════
 const { describe, it } = require('node:test');
 const assert = require('node:assert');
-const { leer, cargarDeLaApp } = require('./cargar.cjs');
+const { leer, cargarDeLaApp, copiaIdentica } = require('./cargar.cjs');
 const V = require('../scripts/medir-ley-boton.cjs');
 
 const C = cargarDeLaApp('guajirago/src/candado.js');
@@ -220,9 +220,9 @@ describe('LA LEY DEL BOTÓN · el candado con su reloj de VERDAD, como en el nav
 
 describe('LA LEY DEL BOTÓN · una sola pieza en las tres apps', () => {
   for (const app of ['guajirago-admin', 'guajirago-aliados']) {
-    it(app + ' lleva el candado y su gancho byte a byte como transporte', () => {
+    it(app + ' lleva el candado y su gancho idénticos a los de transporte', () => {
       for (const f of ['src/candado.js', 'src/useAccion.js', 'src/avisoRechazo.js']) {
-        assert.strictEqual(leer(app + '/' + f), leer('guajirago/' + f),
+        copiaIdentica(app + '/' + f, 'guajirago/' + f,
           '⛔ ' + app + '/' + f + ' se separó de guajirago/' + f + ': la copia se cambia en los tres sitios');
       }
     });

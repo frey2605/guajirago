@@ -18,7 +18,7 @@ const { describe, it } = require('node:test');
 const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
-const { RAIZ, leer, cargarDeLaApp, soloCodigo } = require('./cargar.cjs');
+const { RAIZ, leer, cargarDeLaApp, soloCodigo, copiaIdentica } = require('./cargar.cjs');
 const MEDIDOR = require('../scripts/medir-pedir-ahora.cjs');
 
 const PIEZA = 'guajirago/src/horarioNegocio.js';
@@ -74,7 +74,6 @@ describe('G47 · la regla de «¿me pueden pedir ahora?»', () => {
 });
 
 describe('G47 · las copias de aliados y del panel son la MISMA pieza', () => {
-  const norm = (t) => t.replace(/\r\n/g, '\n');
   const COPIAS = [
     ['guajirago-aliados/src/horarioNegocio.js', PIEZA],
     ['guajirago-aliados/src/escaparate.js', 'guajirago/src/escaparate.js'],
@@ -84,7 +83,7 @@ describe('G47 · las copias de aliados y del panel son la MISMA pieza', () => {
     ['guajirago-admin/src/reglaPromocion.js', 'guajirago/src/reglaPromocion.js'],
   ];
   it('letra por letra (se cambia en la app y se copia, o la tanda se pone roja)', () => {
-    for (const [copia, fuente] of COPIAS) assert.strictEqual(norm(leer(copia)), norm(leer(fuente)), copia + ' ya no es igual a ' + fuente);
+    for (const [copia, fuente] of COPIAS) copiaIdentica(copia, fuente, copia + ' ya no es igual a ' + fuente);
   });
   it('y corridas con los mismos casos', () => {
     comprobarPieza(cargarDeLaApp('guajirago-aliados/src/horarioNegocio.js'), 'aliados');

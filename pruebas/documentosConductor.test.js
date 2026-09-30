@@ -12,7 +12,7 @@
 // ═══════════════════════════════════════════════════════════════════════════
 const { describe, it } = require('node:test');
 const assert = require('node:assert');
-const { leer, cargarDeLaApp, soloCodigo } = require('./cargar.cjs');
+const { leer, cargarDeLaApp, soloCodigo, copiaIdentica } = require('./cargar.cjs');
 const { contar } = require('../scripts/medir-documentos-conductor.cjs');
 
 const D = cargarDeLaApp('guajirago/src/documentosConductor.js');
@@ -58,8 +58,8 @@ describe('LOS DOCUMENTOS DEL CONDUCTOR · la lista', () => {
     assert.strictEqual(D.iconoDelVehiculo(''), '🚗', 'antes de escoger vehículo se ve el carro, como antes');
   });
 
-  it('el panel lleva la MISMA lista, byte a byte', () => {
-    assert.strictEqual(leer('guajirago-admin/src/documentosConductor.js'), leer('guajirago/src/documentosConductor.js'),
+  it('el panel lleva la MISMA lista, idéntica', () => {
+    copiaIdentica('guajirago-admin/src/documentosConductor.js', 'guajirago/src/documentosConductor.js',
       '⛔ la lista del panel se separó de la del registro: el panel enseñaría huecos');
   });
 });

@@ -17,7 +17,7 @@ const { describe, it } = require('node:test');
 const assert = require('node:assert');
 const { execFileSync } = require('node:child_process');
 const path = require('node:path');
-const { RAIZ, leer, cargarDeLaApp } = require('./cargar.cjs');
+const { RAIZ, leer, cargarDeLaApp, copiaIdentica } = require('./cargar.cjs');
 const { medir, lector } = require('../scripts/medir-sugerencias.cjs');
 
 const APP = 'guajirago/src/sugerenciasDeDirecciones.js';
@@ -84,8 +84,8 @@ describe('G61 · la pieza arma el cuadro de cada uso, con sus diferencias a prop
 });
 
 describe('G61 · las copias de aliados siguen atadas', () => {
-  it(COPIA + ' es byte a byte ' + APP, () => {
-    assert.strictEqual(leer(COPIA), leer(APP),
+  it(COPIA + ' es idéntica a ' + APP, () => {
+    copiaIdentica(COPIA, APP,
       COPIA + ' se separó de ' + APP + ': se cambia allá primero y se copia IGUAL (son repos aparte y no pueden importar)');
   });
 

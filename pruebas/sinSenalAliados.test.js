@@ -13,7 +13,7 @@
 // ═══════════════════════════════════════════════════════════════════════════
 const { describe, it } = require('node:test');
 const assert = require('node:assert');
-const { leer, cargarDeLaApp, soloCodigo } = require('./cargar.cjs');
+const { leer, cargarDeLaApp, soloCodigo, copiaIdentica } = require('./cargar.cjs');
 
 const A = 'guajirago-aliados/src/';
 const S = cargarDeLaApp(A + 'sinSenal.js');
@@ -65,8 +65,7 @@ describe('ALIADOS SIN SEÑAL · el cableado', () => {
   });
 
   it('es LA MISMA ventanita de transporte y del panel (copia atada, no una nueva)', () => {
-    const quitaCR = (s) => s.replace(/\r/g, '');
-    assert.strictEqual(quitaCR(leer(A + 'AvisoModal.js')), quitaCR(leer('guajirago/src/AvisoModal.js')),
+    copiaIdentica(A + 'AvisoModal.js', 'guajirago/src/AvisoModal.js',
       '⛔ la ventanita de aliados se separó de la de transporte: se cambia en los tres sitios');
   });
 });

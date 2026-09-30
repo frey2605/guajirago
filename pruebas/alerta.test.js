@@ -7,7 +7,7 @@
 //  Ahora: guajirago/src/alerta.js, con copia IDÉNTICA en guajirago-aliados/src/alerta.js.
 //
 //  Esta prueba:
-//    1. exige que la copia de aliados sea byte a byte la de transporte;
+//    1. exige que la copia de aliados sea idéntica a la de transporte (copiaIdentica, G100);
 //    2. CORRE las dos copias en un celular de mentira (iPhone y Android, con y sin toque, con el tono roto) y exige
 //       lo mismo de las dos: suena si hubo toque, y si no suena lo dice;
 //    3. corre el medidor (scripts/medir-alarma.cjs), que saca del archivo lo que cada pantalla llama en el toque;
@@ -15,7 +15,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 const { describe, it } = require('node:test');
 const assert = require('node:assert');
-const { leer } = require('./cargar.cjs');
+const { leer, copiaIdentica } = require('./cargar.cjs');
 const { medir, celular, cargar, correrCaso, CASOS } = require('../scripts/medir-alarma.cjs');
 
 const APP = 'guajirago/src/alerta.js';
@@ -24,8 +24,8 @@ const ANTES = '66ef894'; // el último commit de la raíz con la alarma vieja en
 
 // Con tope: una alarma que se queda esperando al motor para siempre tiene que salir ROJA, no colgar la tanda.
 describe('G63 · la alarma de un aviso nuevo sale de UNA pieza', { timeout: 10000 }, () => {
-  it(COPIA + ' es byte a byte ' + APP, () => {
-    assert.strictEqual(leer(COPIA).replace(/\r\n/g, '\n'), leer(APP).replace(/\r\n/g, '\n'),
+  it(COPIA + ' es idéntica a ' + APP, () => {
+    copiaIdentica(COPIA, APP,
       '⛔ la copia de aliados se separó de la de transporte: se copia ENTERA, no se arregla a mano en un solo lado');
   });
 

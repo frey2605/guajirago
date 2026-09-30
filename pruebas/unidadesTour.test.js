@@ -17,7 +17,7 @@
  */
 const { describe, it } = require('node:test');
 const assert = require('node:assert');
-const { leer, cargarDeLaApp } = require('./cargar.cjs');
+const { leer, cargarDeLaApp, copiaIdentica } = require('./cargar.cjs');
 const { medir, carear, contarGuardados, ANTES, PIEZA_APP, PIEZA_ALIADOS, TURISMO, TOURS, CASOS } = require('../scripts/medir-unidades-tour.cjs');
 
 // Los valores que se GUARDAN en `unidadPrecio` (tours de los negocios y reservasTurismo): cambiarlos deja sin nombre a
@@ -28,7 +28,7 @@ const SITIOS = ['APP · la tarjeta del tour', 'ALIADOS · la lista de tours', 'A
 
 describe('G86 · la unidad del precio del tour sale de UNA pieza', () => {
   it('las dos copias de la pieza son IDÉNTICAS (app y aliados)', () => {
-    assert.strictEqual(leer(PIEZA_ALIADOS).replace(/\r\n/g, '\n'), leer(PIEZA_APP).replace(/\r\n/g, '\n'), 'la copia de aliados se separó de ' + PIEZA_APP);
+    copiaIdentica(PIEZA_ALIADOS, PIEZA_APP, 'la copia de aliados se separó de ' + PIEZA_APP);
   });
 
   it('la pieza, ejecutada, da los valores guardados y cómo se dicen (en la app y en aliados)', () => {

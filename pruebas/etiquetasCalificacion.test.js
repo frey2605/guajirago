@@ -17,7 +17,7 @@ const { describe, it } = require('node:test');
 const assert = require('node:assert');
 const { execFileSync } = require('node:child_process');
 const path = require('node:path');
-const { RAIZ, leer, cargarDeLaApp } = require('./cargar.cjs');
+const { RAIZ, leer, cargarDeLaApp, copiaIdentica } = require('./cargar.cjs');
 const { medir, lector, PIEZA, PIEZA_PANEL, CALIFICACION, CONDUCTORES, DESCONOCIDAS } = require('../scripts/medir-etiquetas-calificacion.cjs');
 
 const { OPCIONES_PASAJERO, OPCIONES_CONDUCTOR, ETIQUETAS_BUENAS, esEtiquetaBuena } = cargarDeLaApp(PIEZA);
@@ -47,8 +47,8 @@ describe('G73 · la pieza: las etiquetas de la calificación', () => {
 });
 
 describe('G73 · la copia del panel es la misma pieza', () => {
-  it(PIEZA_PANEL + ' es byte a byte ' + PIEZA, () => {
-    assert.strictEqual(leer(PIEZA_PANEL), leer(PIEZA),
+  it(PIEZA_PANEL + ' es idéntica a ' + PIEZA, () => {
+    copiaIdentica(PIEZA_PANEL, PIEZA,
       PIEZA_PANEL + ' se separó de ' + PIEZA + ': se cambia allá primero y se copia IGUAL (son repos aparte y no pueden importar)');
   });
 });

@@ -19,7 +19,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
-const { leer } = require('./cargar.cjs');
+const { leer, copiaIdentica } = require('./cargar.cjs');
 const { leerEnv } = require('../scripts/medir-ambientes.cjs');
 const M = require('../scripts/medir-service-worker.cjs');
 
@@ -120,7 +120,7 @@ for (const app of APPS) {
 describe('G31 · la copia de aliados es la de transporte (dos repos, una sola pieza)', () => {
   for (const f of [GENERADOR, PLANTILLA]) {
     it(f + ' es igual en guajirago y en guajirago-aliados', () => {
-      assert.strictEqual(sinCR(leer('guajirago-aliados/' + f)), sinCR(leer('guajirago/' + f)),
+      copiaIdentica('guajirago-aliados/' + f, 'guajirago/' + f,
         '⛔ la copia de aliados se separó de la de transporte: se cambia en las dos o en ninguna');
     });
   }

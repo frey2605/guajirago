@@ -16,7 +16,7 @@
  */
 const { describe, it } = require('node:test');
 const assert = require('node:assert');
-const { leer, cargarDeLaApp } = require('./cargar.cjs');
+const { leer, cargarDeLaApp, copiaIdentica } = require('./cargar.cjs');
 const { medir, carear, contarGuardados, ANTES, PIEZA_APP, PIEZA_ALIADOS, RESTAURANTES, PROMOCIONES, CASOS } = require('../scripts/medir-dias-promocion.cjs');
 
 // Lo que se GUARDA en `dias` (el número de Date.getDay()) y cómo se dice. Cambiar un número cambia de día las promos
@@ -27,7 +27,7 @@ const SELECTOR = 'ALIADOS · el selector de días';
 
 describe('G87 · los días de la promoción salen de UNA pieza', () => {
   it('las dos copias de la pieza son IDÉNTICAS (app y aliados)', () => {
-    assert.strictEqual(leer(PIEZA_ALIADOS).replace(/\r\n/g, '\n'), leer(PIEZA_APP).replace(/\r\n/g, '\n'), 'la copia de aliados se separó de ' + PIEZA_APP);
+    copiaIdentica(PIEZA_ALIADOS, PIEZA_APP, 'la copia de aliados se separó de ' + PIEZA_APP);
   });
 
   it('la pieza, ejecutada, da cada día con su número, su nombre y su letra (en la app y en aliados)', () => {

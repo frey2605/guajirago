@@ -18,7 +18,7 @@ const { describe, it } = require('node:test');
 const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
-const { RAIZ, leer, cargarDeLaApp, soloCodigo } = require('./cargar.cjs');
+const { RAIZ, leer, cargarDeLaApp, soloCodigo, copiaIdentica } = require('./cargar.cjs');
 const { medir, verCasos, carear, CASOS, ANTES, PIEZA_APP, PIEZA_ALIADOS, RESTAURANTES, ALIADOS } = require('../scripts/medir-quien-cancelo.cjs');
 
 const MARCA = '// ¿QUIÉN CANCELÓ EL PEDIDO, Y POR QUÉ?';
@@ -36,7 +36,8 @@ describe('G84 · quién canceló el pedido sale de UNA pieza', () => {
   it('el bloque de la pieza es IGUAL en la app (estadosPedido.js) y en aliados (flujoPedidos.js)', () => {
     const app = bloque(leer(PIEZA_APP));
     assert.ok(app, 'no encuentro el bloque de quienCanceloElPedido en ' + PIEZA_APP);
-    assert.strictEqual(bloque(leer(PIEZA_ALIADOS)), app, 'la copia de aliados se separó de ' + PIEZA_APP);
+    copiaIdentica({ nombre: 'el bloque de ' + PIEZA_ALIADOS, texto: bloque(leer(PIEZA_ALIADOS)) }, { nombre: 'el bloque de ' + PIEZA_APP, texto: app },
+      'la copia de aliados se separó de ' + PIEZA_APP);
   });
 
   it('la pieza: canceladoPor manda; sin él, el motivo dice quién; sin nada, no se inventa', () => {

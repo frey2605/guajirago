@@ -14,7 +14,7 @@
  */
 const { describe, it } = require('node:test');
 const assert = require('node:assert');
-const { leer, cargarDeLaApp } = require('./cargar.cjs');
+const { leer, cargarDeLaApp, copiaIdentica } = require('./cargar.cjs');
 const { medir, carear, bloque, ANTES, PIEZA_APP, PIEZA_ALIADOS, SITIOS, IDS_DE_MENTIRA } = require('../scripts/medir-numero-pedido.cjs');
 
 const RESTAURANTES = 'guajirago/src/Restaurantes.js';
@@ -26,7 +26,8 @@ describe('G94 · el número del pedido sale de UNA pieza', () => {
   it('el bloque de la pieza es IGUAL en la app (estadosPedido.js) y en aliados (flujoPedidos.js)', () => {
     const app = bloque(leer(PIEZA_APP));
     assert.ok(app, 'no encuentro el bloque de numeroDelPedido en ' + PIEZA_APP);
-    assert.strictEqual(bloque(leer(PIEZA_ALIADOS)), app, 'la copia de aliados se separó de ' + PIEZA_APP);
+    copiaIdentica({ nombre: 'el bloque de ' + PIEZA_ALIADOS, texto: bloque(leer(PIEZA_ALIADOS)) }, { nombre: 'el bloque de ' + PIEZA_APP, texto: app },
+      'la copia de aliados se separó de ' + PIEZA_APP);
   });
 
   it('la pieza, ejecutada: las 5 últimas letras en mayúsculas; sin id, vacío (en la app y en aliados)', () => {

@@ -19,7 +19,7 @@ const { describe, it } = require('node:test');
 const assert = require('node:assert');
 // El cargador vive en cargar.cjs: un solo sitio para todas las pruebas (SEGUNDA LEY).
 const { RAIZ, leer, cargarDeLaApp, soloCodigo, sinTextos, trozoDelTry, cuerpoDeLaFuncion,
-  elRespaldoDelGps } = require('./cargar.cjs');
+  elRespaldoDelGps, copiaIdentica } = require('./cargar.cjs');
 
 describe('AMARRES · la app y el servidor miden la distancia IGUAL', () => {
   it('las dos calculadoras dan los mismos kilómetros en los mismos puntos', () => {
@@ -1753,13 +1753,11 @@ describe('AMARRES · REGLA 9 · las tres apps clasifican IGUAL un rechazo', () =
     }
   });
 
-  it('los DOS GEMELOS (aliados y panel) son el mismo archivo, byte a byte', () => {
+  it('los DOS GEMELOS (aliados y panel) son el mismo archivo, idénticos', () => {
     // Estos dos sí tienen que ser idénticos: son la misma pieza copiada porque los
     // repos no pueden compartir archivo. El de la app del pasajero NO entra aquí:
     // su texto es distinto a propósito, y lo que lo amarra es la prueba de arriba.
-    const a = leer('guajirago-aliados/src/avisoRechazo.js');
-    const p = leer('guajirago-admin/src/avisoRechazo.js');
-    assert.strictEqual(a, p,
+    copiaIdentica('guajirago-aliados/src/avisoRechazo.js', 'guajirago-admin/src/avisoRechazo.js',
       'avisoRechazo.js se separó entre aliados y el panel. Son gemelos: se tocan los dos ' +
       'o ninguno.');
   });
@@ -1773,13 +1771,11 @@ describe('AMARRES · REGLA 9 · las tres apps clasifican IGUAL un rechazo', () =
 });
 
 describe('AMARRES · REGLA 9 · la bandeja de rechazos', () => {
-  it('los DOS guardarRechazo.js (app y aliados) son el mismo archivo, byte a byte', () => {
+  it('los DOS guardarRechazo.js (app y aliados) son el mismo archivo, idénticos', () => {
     // Son la misma pieza copiada porque los repos no pueden compartir archivo. Si
     // se separan, una app apunta en la bandeja con un formato y la otra con otro,
     // y el candado anti-vertedero deja de valer en una de las dos.
-    const app = leer('guajirago/src/guardarRechazo.js');
-    const aliados = leer('guajirago-aliados/src/guardarRechazo.js');
-    assert.strictEqual(app, aliados,
+    copiaIdentica('guajirago-aliados/src/guardarRechazo.js', 'guajirago/src/guardarRechazo.js',
       'guardarRechazo.js se separó entre la app del pasajero y aliados. Son gemelos: ' +
       'se tocan los dos o ninguno.');
   });

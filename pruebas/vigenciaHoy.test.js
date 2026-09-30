@@ -19,7 +19,7 @@ const { describe, it } = require('node:test');
 const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
-const { RAIZ, leer, cargarDeLaApp, cuerpoDeLaFuncion } = require('./cargar.cjs');
+const { RAIZ, leer, cargarDeLaApp, cuerpoDeLaFuncion, copiaIdentica } = require('./cargar.cjs');
 
 const COBROS = require('../guajirago/functions/cobros.cjs');
 const NUBE = require('../guajirago/functions/promociones.cjs');
@@ -63,7 +63,10 @@ describe('G16 · hoyEnColombia es UNA', () => {
       return cuerpoDeLaFuncion(t, d).texto;
     };
     const fuente = cuerpo('guajirago/functions/cobros.cjs');
-    for (const ruta of Object.values(COPIAS)) assert.strictEqual(cuerpo(ruta), fuente, ruta + ' se separó de cobros.cjs');
+    for (const ruta of Object.values(COPIAS)) {
+      copiaIdentica({ nombre: 'hoyEnColombia de ' + ruta, texto: cuerpo(ruta) },
+        { nombre: 'hoyEnColombia de guajirago/functions/cobros.cjs', texto: fuente }, ruta + ' se separó de cobros.cjs');
+    }
   });
 
   it('y ejecutándolas dicen lo mismo, en cualquier zona', () => {

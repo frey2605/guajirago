@@ -21,7 +21,7 @@ const { describe, it } = require('node:test');
 const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
-const { RAIZ, leer, cargarDeLaApp } = require('./cargar.cjs');
+const { RAIZ, leer, cargarDeLaApp, copiaIdentica } = require('./cargar.cjs');
 const { elPintorDe, diaDelTexto, PANTALLAS } = require('../scripts/medir-fecha-reserva.cjs');
 
 const APP = 'guajirago/src/fechaCalendario.js';
@@ -60,10 +60,10 @@ describe('G11 · la fecha de calendario se pinta con UNA pieza', () => {
     });
   }
 
-  it('la copia de aliados es la de la app, byte a byte', () => {
-    assert.strictEqual(leer(ALIADOS), leer(APP),
+  it('la copia de aliados es la de la app, idéntica', () => {
+    copiaIdentica(ALIADOS, APP,
       'se separaron: se cambian LOS DOS (guajirago/src y guajirago-aliados/src fechaCalendario.js)');
-    assert.strictEqual(leer(PANEL), leer(APP),
+    copiaIdentica(PANEL, APP,
       'se separaron: la copia del panel (guajirago-admin/src/fechaCalendario.js) tiene que ser la de la app');
   });
 

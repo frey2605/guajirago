@@ -19,7 +19,7 @@ const { describe, it } = require('node:test');
 const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
-const { leer, cargarDeLaApp } = require('./cargar.cjs');
+const { leer, cargarDeLaApp, copiaIdentica } = require('./cargar.cjs');
 const { medir, correr, lector, APPS, AMBIENTES } = require('../scripts/medir-conexion-firebase.cjs');
 const { leerEnv } = require('../scripts/medir-ambientes.cjs');
 
@@ -30,8 +30,8 @@ const ANTES = { raiz: '87a5a11', admin: '6d0411f', aliados: 'f0951e9' };
 
 describe('G65 · la conexión a Firebase sale de UNA pieza', { timeout: 20000 }, () => {
   for (const a of APPS.filter((x) => x.carpeta !== 'guajirago')) {
-    it(a.carpeta + '/src/firebase.js es byte a byte ' + PIEZA, () => {
-      assert.strictEqual(sinCR(leer(a.carpeta + '/src/firebase.js')), sinCR(leer(PIEZA)),
+    it(a.carpeta + '/src/firebase.js es idéntica a ' + PIEZA, () => {
+      copiaIdentica(a.carpeta + '/src/firebase.js', PIEZA,
         '⛔ la conexión de ' + a.nombre + ' se separó de la de transporte: se copia ENTERA a las tres, no se arregla en un solo lado');
     });
   }

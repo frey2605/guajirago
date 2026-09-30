@@ -9,7 +9,7 @@
  */
 const { describe, it } = require('node:test');
 const assert = require('node:assert');
-const { leer, cargarDeLaApp } = require('./cargar.cjs');
+const { leer, cargarDeLaApp, copiaIdentica } = require('./cargar.cjs');
 const M = require('../scripts/medir-errores-de-cuenta.cjs');
 
 // El último commit de cada repo con las tablitas a mano (antes de G72).
@@ -64,9 +64,8 @@ describe('G72 · los errores de las cuentas salen de UNA pieza en las tres apps'
   });
 
   it('las tres copias de avisoRechazo.js siguen idénticas', () => {
-    const app = leer('guajirago/src/avisoRechazo.js');
-    assert.strictEqual(leer('guajirago-admin/src/avisoRechazo.js'), app);
-    assert.strictEqual(leer('guajirago-aliados/src/avisoRechazo.js'), app);
+    copiaIdentica('guajirago-admin/src/avisoRechazo.js', 'guajirago/src/avisoRechazo.js');
+    copiaIdentica('guajirago-aliados/src/avisoRechazo.js', 'guajirago/src/avisoRechazo.js');
   });
 
   it('careo: con el código de ANTES el medidor ve las 7 tablas a mano, 9/9 fallos con palabras distintas y 14/34 verdades', () => {

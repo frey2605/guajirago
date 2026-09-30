@@ -17,12 +17,12 @@ const { describe, it } = require('node:test');
 const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
-const { RAIZ, leer, cargarDeLaApp, soloCodigo } = require('./cargar.cjs');
+const { RAIZ, leer, cargarDeLaApp, soloCodigo, copiaIdentica } = require('./cargar.cjs');
 const { medir, verCasos, carear, CASOS, ANTES, PIEZA_APP, PIEZA_ALIADOS, RESTAURANTES, ALIADOS, SIN } = require('../scripts/medir-promedio-restaurante.cjs');
 
 describe('G83 · el promedio de estrellas del restaurante sale de UNA pieza', () => {
   it('las dos copias de la pieza son IDÉNTICAS (app y aliados)', () => {
-    assert.strictEqual(leer(PIEZA_ALIADOS), leer(PIEZA_APP), 'la copia de aliados se separó de ' + PIEZA_APP);
+    copiaIdentica(PIEZA_ALIADOS, PIEZA_APP, 'la copia de aliados se separó de ' + PIEZA_APP);
   });
 
   it('la pieza cuenta solo las de clientes, del negocio, sin reportar y con 1 a 5 estrellas', () => {

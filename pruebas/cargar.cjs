@@ -490,8 +490,61 @@ function elEmulador(config) {
   };
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════════════════════════════════════
+//  G100 (30-sep-2026) · «ESTA COPIA ES IDÉNTICA A AQUELLA», CON UNA SOLA VARA
+//
+//  Los tres repos son APARTE y no pueden importar entre sí: una pieza compartida se COPIA a cada app y una prueba
+//  la ATA. Hasta G100 cada prueba decidía a su manera qué es «idéntica» —medido con
+//  `node scripts/medir-copias-atadas.cjs --commit d483d58`: 38 comparaciones, 23 byte a byte, 14 quitando el \r\n
+//  y 1 quitando TODO \r—. Tres varas para la misma pregunta: con la de byte a byte, dos copias con el mismo código
+//  se ponían rojas si git les dejaba un final de línea distinto; con la de «todo \r», un \r suelto pasaba.
+//
+//  LA VARA: iguales carácter por carácter, SALVO EL FINAL DE LÍNEA. Un «\r\n» (Windows) vale lo mismo que un «\n»
+//  (Unix), porque git (core.autocrlf=true y sin .gitattributes en los tres repos) los cambia al sacar los archivos,
+//  y no igual en los tres: hoy guajirago/src/AvisoModal.js sale en formato Windows y la del panel en Unix, con el
+//  mismo código. Todo lo demás cuenta:
+//    · "a\r\nb" contra "a\nb"         → IGUALES (solo el final de línea)
+//    · "a\nb"   contra "a\nc"         → DISTINTAS (un carácter)
+//    · "a\n b"  contra "a\nb"         → DISTINTAS (un espacio de más también es otra copia)
+//    · "a\r b"  contra "a b"          → DISTINTAS (un \r suelto no es un final de línea)
+//    · "﻿a" contra "a"           → DISTINTAS (la marca BOM rompe JSON.parse; ver TRAMPAS en CLAUDE.md)
+//  Lo que NO es esta vara: comparar lo que una copia HACE (ejecutarla con los mismos casos). Eso se sigue haciendo
+//  aparte donde el texto es distinto a propósito (p. ej. la clasificación de un rechazo en las tres apps).
+// ═══════════════════════════════════════════════════════════════════════════════════════════════════════════════
+const conFinalUnix = (t) => t.replace(/\r\n/g, '\n');
+
+/** La vara, sin reventar: ¿estos dos textos son la misma copia? Dos textos, o false si alguno no es texto. */
+function sonLaMismaCopia(a, b) {
+  return typeof a === 'string' && typeof b === 'string' && conFinalUnix(a) === conFinalUnix(b);
+}
+
+/**
+ * Exige que `copia` sea idéntica a `fuente` con la vara de arriba. Cada una es una RUTA (se lee de cualquiera de los
+ * tres repos) o `{ nombre, texto }` para un trozo ya sacado (el bloque de una pieza dentro de un archivo más grande).
+ * Si se separan, dice en qué renglón y qué pone cada una, y después el `porQue` de quien la llama.
+ */
+function copiaIdentica(copia, fuente, porQue) {
+  const lado = (x) => (typeof x === 'string' ? { nombre: x, texto: leer(x) } : x || {});
+  const c = lado(copia);
+  const f = lado(fuente);
+  for (const x of [c, f]) {
+    assert.ok(typeof x.texto === 'string',
+      'no encuentro el texto de «' + (x.nombre || '(sin nombre)') + '» para compararlo' + (porQue ? '. ' + porQue : ''));
+  }
+  if (sonLaMismaCopia(c.texto, f.texto)) return;
+  const rc = conFinalUnix(c.texto).split('\n');
+  const rf = conFinalUnix(f.texto).split('\n');
+  let i = 0;
+  while (i < rc.length && i < rf.length && rc[i] === rf[i]) i += 1;
+  const ver = (r) => (r === undefined ? '(ahí se acaba el archivo)' : JSON.stringify(r).replace(/﻿/g, '\\uFEFF'));
+  assert.fail('⛔ ' + c.nombre + ' se separó de ' + f.nombre + ' en el renglón ' + (i + 1) + ':\n'
+    + '     ' + f.nombre + ': ' + ver(rf[i]) + '\n'
+    + '     ' + c.nombre + ': ' + ver(rc[i])
+    + (porQue ? '\n   ' + porQue : ''));
+}
+
 module.exports = {
-  RAIZ, leer, cargarDeLaApp, soloCodigo, sinTextos, cuerpoDeLaFuncion, cuerpoDelCatch,
+  RAIZ, leer, cargarDeLaApp, soloCodigo, sinTextos, cuerpoDeLaFuncion, cuerpoDelCatch, sonLaMismaCopia, copiaIdentica,
   trozoDelTry, dentroDeTry, tieneCatchPropio, catchPropioDe, catchQueProtege,
   intentosDelGps, elRespaldoDelGps, elEmulador,
 };

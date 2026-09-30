@@ -22,7 +22,7 @@
 const path = require('node:path');
 const fs = require('node:fs');
 const { execFileSync } = require('node:child_process');
-const { RAIZ, cargarDeLaApp, soloCodigo } = require('../pruebas/cargar.cjs');
+const { RAIZ, cargarDeLaApp, soloCodigo, sonLaMismaCopia } = require('../pruebas/cargar.cjs');
 
 const APPS = ['guajirago/src', 'guajirago-admin/src', 'guajirago-aliados/src'];
 const TOPE_LEY = 'No se pudo confirmar. Revisa si quedó hecho antes de volver a intentar.';
@@ -106,7 +106,7 @@ async function medir({ commit = null, fuente = null } = {}) {
   }
   const C = cargarDeLaApp('guajirago/src/candado.js', src);
   const copias = fuente == null && !commit
-    ? APPS.slice(1).filter((a) => fs.existsSync(path.join(RAIZ, a, 'candado.js'))).map((a) => ({ app: a, igual: fs.readFileSync(path.join(RAIZ, a, 'candado.js'), 'utf8') === src }))
+    ? APPS.slice(1).filter((a) => fs.existsSync(path.join(RAIZ, a, 'candado.js'))).map((a) => ({ app: a, igual: sonLaMismaCopia(fs.readFileSync(path.join(RAIZ, a, 'candado.js'), 'utf8'), src) }))
     : null;
   return {
     textosPropios: propios,

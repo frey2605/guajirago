@@ -22,7 +22,7 @@ const { describe, it } = require('node:test');
 const assert = require('node:assert');
 const fs = require('node:fs');
 const path = require('node:path');
-const { RAIZ, leer, cargarDeLaApp, soloCodigo, cuerpoDeLaFuncion } = require('./cargar.cjs');
+const { RAIZ, leer, cargarDeLaApp, soloCodigo, cuerpoDeLaFuncion, copiaIdentica } = require('./cargar.cjs');
 
 const APP = 'guajirago/src/fotoUsuario.js';
 const PANEL = 'guajirago-admin/src/fotoUsuario.js';
@@ -96,7 +96,7 @@ describe('G43 · ¿cuál es la foto de esta persona?', () => {
   }
 
   it('la copia del panel es idéntica a la de la app', () => {
-    assert.strictEqual(leer(PANEL), leer(APP), PANEL + ' se separó de ' + APP + ': copia la de la app tal cual.');
+    copiaIdentica(PANEL, APP, PANEL + ' se separó de ' + APP + ': copia la de la app tal cual.');
   });
 
   for (const [ruta, cuantas] of [['guajirago-admin/src/Pasajeros.js', 1], ['guajirago-admin/src/Conductores.js', 2]]) {
