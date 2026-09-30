@@ -38,7 +38,7 @@ import {
   where,
 } from 'firebase/firestore';
 import { subirAlAlmacen } from './subirAlAlmacen';
-import Logo from './Logo';
+import { LogoEsquina } from './Logo';
 // LA LEY DEL BOTÓN (26-sep-2026): lo que guarda en esta pantalla pasa por el candado; su aviso, en ventanita.
 import { useAccion } from './useAccion';
 import AvisoModal from './AvisoModal';
@@ -1108,7 +1108,7 @@ function Restaurantes({ nombre, onVolver, foto, onCerrarSesion, onIrPerfil, onIr
         position: 'relative',
       }}>
         <MenuLateral nombre={nombre} foto={foto} onIrPerfil={onIrPerfil} onIrCreditos={onIrCreditos} onIrViajes={onIrViajes} onIrGanancias={onIrGanancias} onIrSeguridad={onIrSeguridad} onIrAyuda={onIrAyuda} onIrConfig={onIrConfig} onIrPromociones={onIrPromociones} onCerrarSesion={onCerrarSesion} />
-        <Logo size={28} style={{ position: 'absolute', top: '14px', right: '16px', zIndex: 6 }} />
+        <LogoEsquina />
         <BotonVolver alVolver={onVolver} lugar="trasMenu" />
         <div>
           <p style={{ color: '#1A1A1E', fontWeight: '900', fontSize: '20px', margin: '0' }}>

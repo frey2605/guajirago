@@ -41,7 +41,7 @@ import { fotoDe } from './fotoUsuario';
 import { saldoDe } from './saldoUsuario';
 import { sinConductor } from './conductorDelViaje';
 import { puntoDeDireccion, geocodificadorDe } from './direccionDePunto';
-import Logo from './Logo';
+import { LogoEsquina } from './Logo';
 // Pedirle el GPS al teléfono, con sus tiempos en un solo sitio (G28).
 import { pedirGps, seguirGps } from './pedirGps';
 // El mapa con ruta es UNO para el conductor y el pasajero (G29).
@@ -1472,7 +1472,7 @@ if (sancionActiva) return (
       {!fase && <LlamadoAtencion />}
         {mensajeGrande && <MensajeGrande mensaje={mensajeGrande} onCerrar={() => setMensajeGrande(null)} />}
       <div style={{ background: '#FFFFFF', borderBottom: '1.5px solid #ECECEF', padding: '24px 20px', position: 'relative' }}>
-        <Logo size={30} style={{ position: 'absolute', top: '14px', right: '16px', zIndex: 6 }} />
+        <LogoEsquina tamano="portada" />
         <MenuLateral nombre={nombre} foto={fotoConductor} onIrPerfil={() => setVerPerfil(true)} onIrCreditos={() => setVerCreditos(true)} onIrViajes={() => abrirDelMenu('viajes')} onIrGanancias={() => abrirDelMenu('ganancias')} onIrSeguridad={() => setVerSeguridad(true)} onIrAyuda={() => setVerAyuda(true)} onIrConfig={() => setVerConfig(true)} onIrPromociones={() => setVerPromociones(true)} onCerrarSesion={cerrarSesion} />
         <BotonVolver alVolver={onVolver} lugar="flotante" />
         <div style={{ marginTop: '48px' }}>

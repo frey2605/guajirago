@@ -24,11 +24,18 @@ export default function Logo({ size = 40, variante = 'color', style }) {
   );
 }
 
-// Logo en esquina superior derecha (para pantallas con espacio).
-export function LogoEsquina({ size = 36 }) {
-  return (
-    <div style={{ position: 'absolute', top: '16px', right: '16px', zIndex: 6, lineHeight: 0 }}>
-      <Logo size={size} />
-    </div>
-  );
+// EL LOGO DE ARRIBA A LA DERECHA — UNA sola pieza (gemelo G92, 30-sep-2026).
+// Se escribía a mano en cada pantalla (14 veces en 13 archivos, con 5 formas: tamaño 26, 28, 30 o 34; arriba 12, 14
+// o 16; zIndex 5, 6 o ninguno) y esta pieza no la usaba nadie. Ahora el sitio es UNO (arriba 14, derecha 16, encima
+// con zIndex 6: el de 8 de las 14) y la pantalla solo dice qué tamaño lleva:
+//   · 'encabezado' (28) — el encabezado de una pantalla con «‹ Volver» (lo normal);
+//   · 'portada'    (34) — la pantalla de entrada de un papel, con el ☰ Menú (pasajero, conductor, mensajería).
+// El pin se pinta directo, sin caja alrededor (como lo pintaban las 14). Lo mide `node scripts/medir-logo-esquina.cjs`
+// y lo vigila `pruebas/logoEsquina.test.js`.
+export const TAMANOS_ESQUINA = { encabezado: 28, portada: 34 };
+
+export function LogoEsquina({ tamano = 'encabezado' }) {
+  const size = TAMANOS_ESQUINA[tamano];
+  if (!size) throw new Error('LogoEsquina: no conozco el tamaño «' + tamano + '»');
+  return <Logo size={size} style={{ position: 'absolute', top: '14px', right: '16px', zIndex: 6 }} />;
 }

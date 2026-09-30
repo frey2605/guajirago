@@ -20,7 +20,7 @@ import Configuracion from './Configuracion';
 import Promociones from './Promociones';
 import Creditos from './Creditos';
 import Anuncio from './Anuncio';
-import Logo from './Logo';
+import Logo, { LogoEsquina } from './Logo';
 import AvisoModal from './AvisoModal';
 import { motivoDeRechazo, apuntarRechazo } from './avisoRechazo';
 import { auth, db, storage } from './firebase';
@@ -182,7 +182,7 @@ function PantallaMensajeria({ nombre, foto, onEnviar, onDomiciliario, onVolver, 
     <div style={{ backgroundColor: '#FFFFFF', minHeight: '100vh', fontFamily: 'Arial, sans-serif', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px 24px', position: 'relative' }}>
       <MenuLateral nombre={nombre} foto={foto} onIrPerfil={onIrPerfil} onIrCreditos={onIrCreditos} onIrViajes={onIrViajes} onIrGanancias={onIrGanancias} onIrSeguridad={onIrSeguridad} onIrAyuda={onIrAyuda} onIrConfig={onIrConfig} onIrPromociones={onIrPromociones} onCerrarSesion={onCerrarSesion} />
       <BotonVolver alVolver={onVolver} lugar="flotante" />
-      <Logo size={34} style={{ position: 'absolute', top: '16px', right: '16px', zIndex: 5 }} />
+      <LogoEsquina tamano="portada" />
       <span style={{ fontSize: '52px', marginBottom: '8px' }}>📦</span>
       <h2 style={{ color: '#1A1A1E', fontSize: '26px', fontWeight: '900', margin: '0 0 4px', textAlign: 'center' }}>Mensajería y Mandados</h2>
       <p style={{ color: '#6B7280', fontSize: '14px', letterSpacing: '2px', margin: '0 0 28px', textAlign: 'center' }}>¿QUÉ QUIERES HACER?</p>

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from './firebase';
-import Logo from './Logo';
+import { LogoEsquina } from './Logo';
 import { RESPALDO_CONFIG, leerConfig, lugaresFavoritos } from './configApp';
 import { CORREO_SOPORTE } from './correoSoporte';
 import BotonVolver from './BotonVolver';
@@ -68,7 +68,7 @@ function AyudaSoporte({ onVolver }) {
       <div style={{ background: 'linear-gradient(135deg, #FFFFFF, #ECECEF)', padding: '24px 20px', position: 'relative', display: 'flex', alignItems: 'center' }}>
         <BotonVolver alVolver={onVolver} />
         <h2 style={{ color: '#1A1A1E', margin: '0 auto', fontSize: '20px', fontWeight: '900' }}>Ayuda y soporte</h2>
-        <Logo size={28} style={{ position: 'absolute', top: '14px', right: '16px', zIndex: 6 }} />
+        <LogoEsquina />
       </div>
 
       <div style={{ padding: '24px 20px' }}>

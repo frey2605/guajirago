@@ -3,7 +3,7 @@ import { db, auth } from './firebase';
 // runTransaction salió con la REGLA 7: el reclamo lo hace el servidor.
 import { collection, getDocs, doc, getDoc } from 'firebase/firestore';
 import { getFunctions, httpsCallable } from 'firebase/functions';
-import Logo from './Logo';
+import { LogoEsquina } from './Logo';
 import { motivoPorLaPromocion, valorDelBeneficio, textoDelBeneficio, categoriaDePromocion } from './reglaPromocion';
 import { fechaDeCalendario } from './fechaCalendario';
 import { useAccion } from './useAccion';
@@ -102,7 +102,7 @@ function Promociones({ onVolver }) {
       <div style={{ background: 'linear-gradient(135deg, #FFFFFF, #ECECEF)', padding: '24px 20px', position: 'relative', display: 'flex', alignItems: 'center' }}>
         <BotonVolver alVolver={onVolver} />
         <h2 style={{ color: '#1A1A1E', margin: '0 auto', fontSize: '20px', fontWeight: '900' }}>Promociones</h2>
-        <Logo size={28} style={{ position: 'absolute', top: '14px', right: '16px', zIndex: 6 }} />
+        <LogoEsquina />
       </div>
 
       <div style={{ padding: '20px' }}>

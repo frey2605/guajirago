@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { auth, db, storage } from './firebase';
-import Logo from './Logo';
+import { LogoEsquina } from './Logo';
 import { telefonoDe } from './telefonoUsuario';
 import { fotoDe } from './fotoUsuario';
 import { telefonoSirve, celularDiezCifras } from './telefonoValido';
@@ -112,7 +112,7 @@ function MiPerfil({ onVolver }) {
       <div style={{ background: '#FFFFFF', padding: '24px 20px', position: 'relative', display: 'flex', alignItems: 'center' }}>
         <BotonVolver alVolver={onVolver} />
         <h2 style={{ color: '#1A1A1E', margin: '0 auto', fontSize: '20px', fontWeight: '900' }}>Mi perfil</h2>
-        <Logo size={28} style={{ position: 'absolute', top: '16px', right: '16px' }} />
+        <LogoEsquina />
       </div>
 
       {cargando ? (

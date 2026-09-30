@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { db, auth, storage } from './firebase';
-import Logo from './Logo';
+import { LogoEsquina } from './Logo';
 // runTransaction salió con la REGLA 7: el canje del código lo hace el servidor.
 import { doc, getDoc, updateDoc, onSnapshot, arrayUnion } from 'firebase/firestore';
 import { getFunctions, httpsCallable } from 'firebase/functions';
@@ -150,7 +150,7 @@ function Creditos({ onVolver }) {
             {saldo === null ? '...' : cop(saldo)}
           </p>
         </div>
-        <Logo size={28} style={{ position: 'absolute', top: '14px', right: '16px', zIndex: 6 }} />
+        <LogoEsquina />
       </div>
 
       <div style={{ padding: '16px 20px' }}>

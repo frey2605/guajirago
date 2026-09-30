@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { db, auth } from './firebase';
-import Logo from './Logo';
+import { LogoEsquina } from './Logo';
 // setDoc salió con la extracción del código de seguridad: el único que escribía
 // con él era el cajón privado, y eso ahora lo hace codigoSeguridad.js.
 import { collection, addDoc, doc, onSnapshot, updateDoc, getDoc, query, orderBy } from 'firebase/firestore';
@@ -1533,7 +1533,7 @@ const PanelEmergencia = () => (
       <div style={{ background: '#FFFFFF', padding: '12px 20px', display: 'flex', alignItems: 'center', gap: '16px', position: 'relative', borderBottom: '1px solid #ECECEF' }}>
         <BotonVolver alVolver={onVolver} />
         <h2 style={{ color: '#1A1A1E', margin: '0', fontSize: '20px' }}>{esMensajeria ? 'Pedir mandado 📦' : `Solicitar ${tipo}`}</h2>
-        <Logo size={26} style={{ position: 'absolute', top: '12px', right: '16px' }} />
+        <LogoEsquina />
       </div>
       <div style={{ padding: '12px 20px 24px' }}>
         <AutocompleteInput value={origen} onChange={(v) => { setOrigen(v); pinActivoRef.current = false; }} placeholder={esMensajeria ? '¿Dónde se recoge? (Riohacha)' : '¿Dónde estás? (Riohacha)'} icon="origen" onPlaceCoords={(coords) => { setPuntoRecogida(coords); setCentroMapa(coords); pinActivoRef.current = true; }} />

@@ -11,7 +11,7 @@ import Promociones from './Promociones';
 import Ganancias from './Ganancias';
 // G51: adónde llevan «Mis viajes» y «Ganancias» del menú lo dice UNA tabla; aquí, con el papel de pasajero.
 import { pantallaDelMenu } from './navegacionMenu';
-import Logo from './Logo';
+import { LogoEsquina } from './Logo';
 import { auth, db } from './firebase';
 import { collection, query, where, orderBy, limit, getDocs, doc, getDoc } from 'firebase/firestore';
 // G37: el llamado de atención lo muestra y lo atiende UNA pieza, la misma de la pantalla del conductor.
@@ -57,7 +57,7 @@ function Historial({ onVolver }) {
       <div style={{ background: '#FFFFFF', padding: '24px 20px', position: 'relative', display: 'flex', alignItems: 'center' }}>
         <BotonVolver alVolver={onVolver} />
         <h2 style={{ color: '#1A1A1E', margin: '0 auto', fontSize: '20px', fontWeight: '900' }}>Mis viajes</h2>
-        <Logo size={28} style={{ position: 'absolute', top: '16px', right: '16px' }} />
+        <LogoEsquina />
       </div>
       <div style={{ padding: '20px' }}>
         {cargando && <p style={{ color: '#6B7280', textAlign: 'center', marginTop: '40px' }}>Cargando...</p>}
@@ -193,7 +193,7 @@ function Home({ nombre, onCerrarSesion, onVolver, onCambiarNegocio }) {
 
       <div style={{ background: '#FFFFFF', padding: '24px 20px', position: 'relative' }}>
         <MenuLateral nombre={nombre} foto={fotoUsuario} onIrPerfil={() => setVerPerfil(true)} onIrViajes={() => abrirDelMenu('viajes')} onIrGanancias={() => abrirDelMenu('ganancias')} onIrCreditos={() => setVerCreditos(true)} onIrSeguridad={() => setVerSeguridad(true)} onIrAyuda={() => setVerAyuda(true)} onIrConfig={() => setVerConfig(true)} onIrPromociones={() => setVerPromociones(true)} onCerrarSesion={onCerrarSesion} onCambiarNegocio={onCambiarNegocio} />
-        <Logo size={34} style={{ position: 'absolute', top: '16px', right: '16px', zIndex: 5 }} />
+        <LogoEsquina tamano="portada" />
         <BotonVolver alVolver={onVolver} lugar="flotante" />
         <div style={{ marginTop: '48px' }}>
           <p style={{ color: '#6B7280', fontSize: '12px', margin: '0', letterSpacing: '2px' }}>UBICACIÓN</p>

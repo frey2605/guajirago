@@ -553,6 +553,18 @@ const RECORRIDOS = [
       'guajirago/src/AyudaSoporte.js', 'guajirago/src/Configuracion.js', 'guajirago/src/PaginaLegal.js', 'guajirago/src/App.js',
       'guajirago/src/Restaurantes.js', 'guajirago/src/Turismo.js'],
   },
+  {
+    nombre: 'logo-esquina',
+    que: 'el logo de arriba a la derecha es el mismo pin de GuajiraGo (arriba 14, derecha 16) en 12 pantallas: de 28 en el encabezado (menú de módulos, Restaurantes, pedir mandado) y de 34 en las portadas (pasajero, mensajería) (G92; solo mira)',
+    archivo: 'logo-esquina.cjs',
+    // Que cada uno de los 14 logos esté en la misma pantalla que antes de G92, y cuáles cambiaron de forma, lo SACA de
+    // su archivo, lo pinta con React y lo carea scripts/medir-logo-esquina.cjs (pruebas/logoEsquina.test.js). El del
+    // conductor (AppConductor.js) no lo mira este robot (ser conductor es otro recorrido), ni el de MisViajes.js, que
+    // solo sale a quien no ha escogido papel (pasajero@gg.test ya es pasajero: ve el de Home.js).
+    vigila: ['guajirago/src/Logo.js', 'guajirago/src/MiPerfil.js', 'guajirago/src/Home.js', 'guajirago/src/Creditos.js',
+      'guajirago/src/Ganancias.js', 'guajirago/src/Seguridad.js', 'guajirago/src/Promociones.js', 'guajirago/src/AyudaSoporte.js',
+      'guajirago/src/Configuracion.js', 'guajirago/src/App.js', 'guajirago/src/Restaurantes.js', 'guajirago/src/Solicitar.js'],
+  },
 ];
 
 // Los archivos de pantalla: los que, si cambian, el robot debería poder probar. Todo lo que esté en
