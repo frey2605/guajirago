@@ -20,9 +20,20 @@
   "storage": {
     "rules": "storage.rules"
   },
-  "functions": {
-    "source": "guajirago/functions"
-  },
+  "functions": [
+    {
+      "source": "guajirago/functions",
+      "codebase": "default",
+      "disallowLegacyRuntimeConfig": true,
+      "ignore": [
+        "node_modules",
+        ".git",
+        "firebase-debug.log",
+        "firebase-debug.*.log",
+        "*.local"
+      ]
+    }
+  ],
   "emulators": {
     "firestore": { "port": 18085 },
     "functions": { "port": 15001 },
