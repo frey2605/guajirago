@@ -30,6 +30,7 @@
 | `node robot/espera-conductor.cjs` | con 300 s en el panel de pruebas, el taxista aprieta «Llegué al punto» y su reloj y el del pasajero arrancan los dos de 5:00 (G26) |
 | `node robot/vencer-busqueda.cjs` | el pasajero pide un taxi, se acaba el plazo de 2 min: «No encontramos conductor» y el viaje queda vencido con fecha, quién y por qué (G27) |
 | `node robot/limite-favoritos.cjs` | con el tope de favoritos en 2 en el panel de pruebas, la Ayuda y la ventanita «Llegaste al límite» dicen 2 lugares y no se guarda un tercero (G35) |
+| `node robot/chat-del-viaje.cjs` | con un viaje aceptado, el taxista escribe en el chat con Enter, el pasajero lo ve y contesta con ➤, y los dos ven los dos mensajes (G96) |
 
 ## Pantallas: cómo se manejan (27-sep-2026)
 
@@ -717,6 +718,17 @@ la placa de `conductores/{uid}` (la escribe su GPS con la misma placa que va en 
   corrido; es de la siembra, no de G86).
 - Con el código de ANTES publicado sale ✓ igual (G86 no cambia lo que se ve: la lista era la misma en los dos lados).
 
+### chat-del-viaje · el taxista y el pasajero se escriben (G96, 30-sep-2026)
+- Mismo arranque que `espera-conductor` (dos apps, pedir por pantalla, oferta por la base, `confirmarConductor`). Con
+  «YENDO A RECOGER» ya se ve el chat del taxista: es el `input[placeholder="Escribe un mensaje..."]` VISIBLE (hay dos en
+  el archivo, uno compacto y otro de la otra fase; se toma `:visible`). Se manda con la tecla Enter (`press('Enter')`).
+- En el pasajero el chat está cerrado: botón «💬 Chat con el conductor (N)», donde N es cuántos mensajes hay; al llegar
+  el del taxista dice «(1)». Al abrirlo sale el campo con el botón ➤ justo al lado (`following-sibling::button[1]`).
+- Tras enviar, el campo queda vacío en los dos (lo vacía la pantalla cuando la escritura entra). A los 2,5 s cada
+  mensaje ya se ve en la otra app. Los 403 de la consola salen también aquí.
+- Corrido en pruebas con aa7203a publicado: ✓, y dentro de `probar-cambio` (29 recorridos ✓). No se corrió con el
+  código de antes: G96 no cambia lo que se ve; que se escriba lo mismo en la base lo carea el medidor ejecutándolo.
+
 ## Lo que el robot dejó creado en pruebas
 
 - 27-sep-2026: «Robot Taxi De Prueba» (robot.taxi.1790508222079@gg.test) y
@@ -789,6 +801,9 @@ la placa de `conductores/{uid}` (la escribe su GPS con la misma placa que va en 
   `misReservasGuajira` (una lista JSON), así que el robot los mete con `page.evaluate` ANTES de entrar. Para volver a
   leer «Mis reservas» basta «‹ Volver» y otra vez «📋 Mis reservas» (la lista se relee al abrirla); «Mis pedidos» la
   lee al entrar a esa pantalla.
+- 30-sep-2026 en adelante: un viaje de Taxi de pasajero@gg.test por cada corrida de `chat-del-viaje.cjs`, aceptado por
+  el taxista, con dos mensajes en `mensajes` («Voy en camino …» y «Te espero en la puerta …») y ya
+  `cancelado_conductor` (el primero: gbCWcwME6s8NE63HYfiT). Cuesta una comisión de los créditos de prueba del taxista.
 - **pantallas-negocios (G89, 30-sep-2026):** 🍽️ Restaurantes y 🧭 Turismo del panel son UNA pantalla
   (`NegociosDeUnTipo.js`). El menú de cada módulo es `.gg-mod-navitems > div` en orden Resumen / Todos(as) /
   Pendientes, y el contenido es `.gg-mod > div` número 2. Solo mira: no aprieta nada que escriba. Con
