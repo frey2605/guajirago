@@ -4,6 +4,7 @@ import { collection, query, where, orderBy, limit, getDocs } from 'firebase/fire
 import { LogoEsquina } from './Logo';
 // G21: qué viajes salen en el historial y cómo terminó cada uno salen de UNA pieza, la misma de las otras dos pantallas.
 import { ESTADOS_TERMINADOS, comoTermino } from './estadosViaje';
+import { fechaDelViaje } from './tiempoDelViaje';
 import BotonVolver from './BotonVolver';
 
 function MisViajes({ onVolver }) {
@@ -64,7 +65,7 @@ function MisViajes({ onVolver }) {
           </div>
         )}
         {viajes.map((v) => {
-          const fecha = v.fechaSolicitud ? new Date(v.fechaSolicitud).toLocaleDateString('es-CO', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
+          const fecha = fechaDelViaje(v.fechaSolicitud);
           const user = auth.currentUser;
           const fuiConductor = v.conductorId === user?.uid;
           const fin = comoTermino(v, fuiConductor ? 'conductor' : 'pasajero');

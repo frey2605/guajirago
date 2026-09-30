@@ -47,6 +47,7 @@ import { pedirGps, seguirGps } from './pedirGps';
 // El mapa con ruta es UNO para el conductor y el pasajero (G29).
 import MapaConRuta from './MapaConRuta';
 import BotonVolver from './BotonVolver';
+import { fechaDelViaje, minutosSegundos } from './tiempoDelViaje';
 
 // Valores por defecto (respaldo). Se reemplazan por los de config/global cuando cargan.
 // G36/G66: el respaldo ENTERO sale de configApp.js (tarifas, comisiones, números y módulos), el mismo de toda la app,
@@ -209,7 +210,7 @@ function HistorialConductor({ onVolver }) {
           </div>
         )}
         {viajes.map((v) => {
-          const fecha = v.fechaSolicitud ? new Date(v.fechaSolicitud).toLocaleDateString('es-CO', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
+          const fecha = fechaDelViaje(v.fechaSolicitud);
           // 🔴 ESTA BANDERA DECIDE SI EL VIAJE SALE VERDE «Completado» CON SU
           // TARIFA, o rojo. Decía `estado === 'cancelado'` a secas, así que
           // cualquier otra forma de no terminar salía EN VERDE: el conductor
@@ -1322,7 +1323,7 @@ useEffect(() => {
                   <p style={{ color: '#6B7280', fontSize: '11px', margin: '0' }}>TIEMPO DE ESPERA</p>
                   <p style={{ color: contador <= 60 ? '#FF4444' : '#FF7A2F', fontSize: '11px', margin: '4px 0 0' }}>{contador === 0 ? '⚠️ Tiempo agotado' : 'Esperando al pasajero...'}</p>
                 </div>
-                <p style={{ color: contador <= 60 ? '#FF4444' : '#FF7A2F', fontSize: '36px', fontWeight: '900', margin: '0', fontVariantNumeric: 'tabular-nums' }}>{Math.floor(contador / 60)}:{String(contador % 60).padStart(2, '0')}</p>
+                <p style={{ color: contador <= 60 ? '#FF4444' : '#FF7A2F', fontSize: '36px', fontWeight: '900', margin: '0', fontVariantNumeric: 'tabular-nums' }}>{minutosSegundos(contador)}</p>
               </div>
               {respuestaPasajero && (
                 <div onClick={() => setMensajeGrande(respuestaPasajero)} style={{ background: 'rgba(255,122,47,0.15)', borderRadius: '12px', padding: '12px 16px', marginBottom: '12px', border: '1px solid #FF7A2F', cursor: 'pointer' }}>

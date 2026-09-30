@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { db } from './firebase';
 import { doc, setDoc, getDoc, onSnapshot, updateDoc } from 'firebase/firestore';
+import { minutosSegundos } from './tiempoDelViaje';
 
 const ICE_SERVERS = {
   iceServers: [
@@ -226,8 +227,6 @@ function Llamada({ viajeId, miRol, nombreOtro, onCerrar }) {
     setAltavoz(!altavoz);
   };
 
-  const formatDuracion = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
-
   const colorEstado = estado === 'activa' ? '#2ECC71' : estado === 'terminada' || estado === 'error' ? '#FF4444' : '#FFCF4D';
   const textoEstado = estado === 'llamando' ? 'Llamando...' : estado === 'entrante' ? 'Llamada entrante' : estado === 'conectando' ? 'Conectando...' : estado === 'activa' ? 'En llamada' : estado === 'terminada' ? 'Llamada terminada' : 'Error de conexión';
 
@@ -246,7 +245,7 @@ function Llamada({ viajeId, miRol, nombreOtro, onCerrar }) {
       <p style={{ color: colorEstado, fontSize: '15px', margin: '0 0 8px', fontWeight: 'bold' }}>{textoEstado}</p>
 
       {estado === 'activa' && (
-        <p style={{ color: '#2ECC71', fontSize: '22px', fontWeight: '900', margin: '0 0 48px', fontVariantNumeric: 'tabular-nums' }}>{formatDuracion(duracion)}</p>
+        <p style={{ color: '#2ECC71', fontSize: '22px', fontWeight: '900', margin: '0 0 48px', fontVariantNumeric: 'tabular-nums' }}>{minutosSegundos(duracion)}</p>
       )}
       {estado !== 'activa' && <div style={{ height: '74px' }} />}
 

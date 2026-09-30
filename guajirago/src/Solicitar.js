@@ -47,6 +47,7 @@ import { numeroWhatsApp, telefonoSirve, celularDiezCifras, cifrasMientrasEscribe
 // La tarjeta roja «Llamar al 123» y el número salen de UNA pieza, la misma de Ajustes › Seguridad (G70).
 import { TarjetaLlamar123 } from './LlamarAl123';
 import BotonVolver from './BotonVolver';
+import { minutosSegundos } from './tiempoDelViaje';
 
 /**
  * EL AVISO DE «NO SÉ DÓNDE RECOGERTE» — ESCRITO UNA SOLA VEZ.
@@ -1320,7 +1321,7 @@ const PanelEmergencia = () => (
             )}
             <div style={{ background: contador <= 60 ? 'rgba(255,68,68,0.15)' : 'rgba(255,207,77,0.1)', borderRadius: '12px', padding: '10px 16px', marginBottom: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: `1px solid ${contador <= 60 ? '#FF4444' : '#FFCF4D'}` }}>
               <p style={{ color: '#6B7280', fontSize: '12px', margin: '0' }}>{contador === 0 ? '⚠️ Tiempo agotado' : 'Sal pronto o el conductor puede cancelar'}</p>
-              <p style={{ color: contador <= 60 ? '#FF4444' : '#FFCF4D', fontSize: '28px', fontWeight: '900', margin: '0', fontVariantNumeric: 'tabular-nums' }}>{Math.floor(contador / 60)}:{String(contador % 60).padStart(2, '0')}</p>
+              <p style={{ color: contador <= 60 ? '#FF4444' : '#FFCF4D', fontSize: '28px', fontWeight: '900', margin: '0', fontVariantNumeric: 'tabular-nums' }}>{minutosSegundos(contador)}</p>
             </div>
             <p style={{ color: '#6B7280', fontSize: '13px', margin: '0 0 12px', textAlign: 'center' }}>Responde rápido:</p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -1479,7 +1480,7 @@ const PanelEmergencia = () => (
             <div style={{ flex: 1, height: '8px', background: '#ECECEF', borderRadius: '4px', overflow: 'hidden' }}>
               <div style={{ height: '100%', width: `${(tiempoBusqueda / BUSQUEDA.segundos) * 100}%`, background: tiempoBusqueda > 60 ? '#2ECC71' : tiempoBusqueda > 30 ? '#FFCF4D' : '#FF4444', borderRadius: '4px', transition: 'width 1s linear, background 0.5s' }} />
             </div>
-            <span style={{ color: tiempoBusqueda > 60 ? '#2ECC71' : tiempoBusqueda > 30 ? '#FFCF4D' : '#FF4444', fontSize: '15px', fontWeight: '900', fontVariantNumeric: 'tabular-nums', minWidth: '42px', textAlign: 'right' }}>{Math.floor(tiempoBusqueda / 60)}:{String(tiempoBusqueda % 60).padStart(2, '0')}</span>
+            <span style={{ color: tiempoBusqueda > 60 ? '#2ECC71' : tiempoBusqueda > 30 ? '#FFCF4D' : '#FF4444', fontSize: '15px', fontWeight: '900', fontVariantNumeric: 'tabular-nums', minWidth: '42px', textAlign: 'right' }}>{minutosSegundos(tiempoBusqueda)}</span>
           </div>
         )}
         {buscandoAgotado && (

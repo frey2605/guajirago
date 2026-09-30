@@ -18,6 +18,7 @@ import { collection, query, where, orderBy, limit, getDocs, doc, getDoc } from '
 import LlamadoAtencion from './LlamadoAtencion';
 // G21: qué viajes salen en el historial y cómo terminó cada uno salen de UNA pieza, la misma de las otras dos pantallas.
 import { ESTADOS_TERMINADOS, comoTermino } from './estadosViaje';
+import { fechaDelViaje } from './tiempoDelViaje';
 import { fotoDe } from './fotoUsuario';
 import BotonVolver from './BotonVolver';
 
@@ -68,7 +69,7 @@ function Historial({ onVolver }) {
           </div>
         )}
         {viajes.map((v) => {
-          const fecha = v.fechaSolicitud ? new Date(v.fechaSolicitud).toLocaleDateString('es-CO', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
+          const fecha = fechaDelViaje(v.fechaSolicitud);
           const fin = comoTermino(v, 'pasajero');
           return (
             <div key={v.id} style={{ background: '#FFFFFF', borderRadius: '20px', padding: '20px', marginBottom: '12px', border: '1px solid #ECECEF' }}>
