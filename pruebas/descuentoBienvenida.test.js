@@ -216,14 +216,9 @@ describe('G18 · el registro (Login.js) ya no fabrica el descuento: se lo pide a
   });
 
   it('ninguna pantalla de la app escribe un descuento pendiente con contenido (solo lo borra al usarlo)', () => {
-    const dir = path.join(RAIZ, 'guajirago/src');
-    const culpables = [];
-    for (const f of fs.readdirSync(dir).filter((x) => x.endsWith('.js'))) {
-      const t = leer('guajirago/src/' + f).replace(/\/\/.*$/gm, '');
-      for (const m of t.matchAll(/descuentoPendiente\s*:\s*([^,}\s]+)/g)) {
-        if (m[1] !== 'null') culpables.push(f + ' → descuentoPendiente: ' + m[1]);
-      }
-    }
+    // P01: la vara es UNA, la del medidor (scripts/medir-descuento-telefono.cjs), que mira las tres apps.
+    const { escritoresEnCodigo } = require('../scripts/medir-descuento-telefono.cjs');
+    const culpables = escritoresEnCodigo().cliente.filter((s) => s.tipo === 'valor').map((s) => s.archivo + ':' + s.renglon);
     assert.deepStrictEqual(culpables, [], '⛔ el teléfono vuelve a escribir un descuento pendiente: ' + culpables.join(' · '));
   });
 });

@@ -370,7 +370,8 @@ describe('REGLA 1 · lo que la app hace hoy NO se rompe', () => {
         contactoConfianzaNombre: 'Mamá', contactoConfianzaNumero: '3007654321',
         tipo: '', placa: '', vehiculo: '',
         fechaRegistro: '2026-08-23T10:00:00.000Z', ipRegistro: '181.0.0.1',
-        descuentoPendiente: { promoId: 'BIENVENIDA', valorBeneficio: 8000 },
+        // P01 (30-sep-2026): el registro ya NO trae `descuentoPendiente` (desde G18 la bienvenida la da el
+        // servidor, descuentoDeBienvenida). Que venga dentro se prueba en «P01 · el descuento lo fabrica el servidor».
       })
     );
   });
@@ -445,18 +446,14 @@ describe('REGLA 1 · lo que la app hace hoy NO se rompe', () => {
     );
   });
 
-  // OJO — ESTE AGUJERO SIGUE ABIERTO Y ES A PROPÓSITO. La REGLA 7 cerró el
-  // SALDO ('creditos'), no el descuento. Congelar 'descuentoPendiente' hoy
-  // rompería dos cosas: el registro (Login.js lo escribe al dar el crédito de
-  // bienvenida al pasajero nuevo) y, peor, el borrado que hace el propio
-  // pasajero cuando el conductor consume el descuento (Solicitar.js:551) — sin
-  // ese borrado el descuento se podría volver a usar en otro viaje.
-  // Cerrarlo es su propio trabajo, con su foto: mover a servidor el regalo de
-  // bienvenida Y el consumo (mejor, un disparador que lo limpie solo cuando el
-  // viaje marca 'consumido'). Mientras tanto, esta prueba deja constancia.
-  it('aplicar una promoción sigue pudiendo escribir el descuento (Promociones.js:101) — REGLA 7 pendiente', async () => {
+  // Esta prueba decía lo contrario hasta el 30-sep-2026 (dejaba constancia de que
+  // el agujero seguía abierto). Desde G18 el registro y la promoción los hace el
+  // servidor, así que P01 cerró el valor: el teléfono ya no se escribe un
+  // descuento. El borrado del pasajero (quemarlo con null) sigue pasando: lo
+  // prueba «P01 · el descuento lo fabrica el servidor».
+  it('aplicar una promoción YA NO lo hace el teléfono (P01 cerró el descuento)', async () => {
     const { doc, setDoc } = FS;
-    await RUT.assertSucceeds(
+    await RUT.assertFails(
       setDoc(doc(como('pasajero1'), 'usuarios/pasajero1'),
         { descuentoPendiente: { promoId: 'X', valorBeneficio: 5000 } }, { merge: true })
     );
@@ -631,6 +628,88 @@ describe('REGLA 7 · la plata no la escribe el teléfono', () => {
       vehiculo: 'Bajaj 2020', telefono: '3001112233',
       fotoConductor: 'https://x/c.jpg', fotoCedula: 'https://x/d.jpg',
     }, { merge: true }));
+  });
+});
+
+// ── P01 · EL DESCUENTO LO FABRICA EL SERVIDOR (30-sep-2026) ─────────────────
+// `descuentoPendiente` es plata (consumirDescuentoViaje se lo abona al conductor).
+// Desde G18 lo escriben solo reclamarPromocion y descuentoDeBienvenida, y la huella
+// del aparato (dispositivosBeneficio) también. El teléfono solo lo QUEMA (null) en
+// Solicitar.js cuando el conductor lo cobró.
+describe('P01 · el descuento lo fabrica el servidor', () => {
+  const DEL_SERVIDOR = {
+    promoId: 'BIENVENIDA', tipoBeneficio: 'credito', valorBeneficio: 8000,
+    codigoVerificacion: '4321', fechaActivacion: '2026-09-30T10:00:00.000Z', fabricadoPor: 'servidor',
+  };
+  beforeEach(async () => {
+    await entorno.withSecurityRulesDisabled(async (ctx) => {
+      const { doc, setDoc } = FS;
+      await setDoc(doc(ctx.firestore(), 'usuarios/conDescuento'), { nombre: 'Marta', rol: '', descuentoPendiente: DEL_SERVIDOR });
+      await setDoc(doc(ctx.firestore(), 'dispositivosBeneficio/aparatoDeMarta'), { usado: true, uid: 'conDescuento', fecha: 'x' });
+    });
+  });
+
+  it('el pasajero NO puede escribirse un descuento de $999.999', async () => {
+    const { doc, updateDoc, setDoc } = FS;
+    await RUT.assertFails(updateDoc(doc(como('pasajero1'), 'usuarios/pasajero1'),
+      { descuentoPendiente: { ...DEL_SERVIDOR, valorBeneficio: 999999 } }));
+    await RUT.assertFails(setDoc(doc(como('pasajero1'), 'usuarios/pasajero1'),
+      { descuentoPendiente: { ...DEL_SERVIDOR, valorBeneficio: 999999 } }, { merge: true }));
+  });
+
+  it('ni cambiarle el valor al que le dio el servidor ($8.000 → $80.000, ni a porcentaje)', async () => {
+    const { doc, updateDoc } = FS;
+    await RUT.assertFails(updateDoc(doc(como('conDescuento'), 'usuarios/conDescuento'),
+      { 'descuentoPendiente.valorBeneficio': 80000 }));
+    await RUT.assertFails(updateDoc(doc(como('conDescuento'), 'usuarios/conDescuento'),
+      { 'descuentoPendiente.tipoBeneficio': 'porcentaje' }));
+  });
+
+  it('ni registrarse con el descuento dentro (lo que hacía el Login de antes de G18)', async () => {
+    const { doc, setDoc } = FS;
+    await RUT.assertFails(setDoc(doc(como('nuevo8'), 'usuarios/nuevo8'),
+      { nombre: 'Ana', email: 'ana8@ejemplo.com', tipo: '', descuentoPendiente: DEL_SERVIDOR }));
+  });
+
+  it('el camino bueno sigue: el pasajero QUEMA su descuento con null (Solicitar.js) o lo quita', async () => {
+    const { doc, updateDoc, deleteField } = FS;
+    await RUT.assertSucceeds(updateDoc(doc(como('conDescuento'), 'usuarios/conDescuento'), { descuentoPendiente: null }));
+    await RUT.assertSucceeds(updateDoc(doc(como('conDescuento'), 'usuarios/conDescuento'), { descuentoPendiente: deleteField() }));
+  });
+
+  it('el camino bueno sigue: con un descuento puesto, guardar el perfil no lo toca y pasa', async () => {
+    const { doc, updateDoc, setDoc } = FS;
+    await RUT.assertSucceeds(setDoc(doc(como('conDescuento'), 'usuarios/conDescuento'), { nombre: 'Marta Gómez' }, { merge: true }));
+    await RUT.assertSucceeds(updateDoc(doc(como('conDescuento'), 'usuarios/conDescuento'), { favoritos: [] }));
+  });
+
+  it('el camino bueno sigue: el registro de hoy (sin descuento) pasa', async () => {
+    const { doc, setDoc } = FS;
+    await RUT.assertSucceeds(setDoc(doc(como('nuevo9'), 'usuarios/nuevo9'), { nombre: 'Ana', email: 'ana9@ejemplo.com', tipo: '' }));
+  });
+
+  it('el PANEL sí puede poner o quitar un descuento', async () => {
+    const { doc, updateDoc } = FS;
+    await RUT.assertSucceeds(updateDoc(doc(como('eladmin'), 'usuarios/pasajero1'), { descuentoPendiente: DEL_SERVIDOR }));
+    await RUT.assertSucceeds(updateDoc(doc(como('eladmin'), 'usuarios/conDescuento'), { descuentoPendiente: null }));
+  });
+
+  it('nadie le quema el descuento a OTRO', async () => {
+    const { doc, updateDoc } = FS;
+    await RUT.assertFails(updateDoc(doc(como('pasajero1'), 'usuarios/conDescuento'), { descuentoPendiente: null }));
+  });
+
+  it('dispositivosBeneficio: el teléfono NO crea huellas (ni la suya ni la de otro aparato)', async () => {
+    const { doc, setDoc } = FS;
+    await RUT.assertFails(setDoc(doc(como('pasajero1'), 'dispositivosBeneficio/aparatoDeOtro'),
+      { usado: true, uid: 'pasajero1', fecha: '2026-09-30' }));
+    await RUT.assertFails(setDoc(doc(como('eladmin'), 'dispositivosBeneficio/aparatoNuevo'), { usado: true }));
+  });
+
+  it('dispositivosBeneficio: sigue sin poderse cambiar ni borrar', async () => {
+    const { doc, updateDoc, deleteDoc } = FS;
+    await RUT.assertFails(updateDoc(doc(como('conDescuento'), 'dispositivosBeneficio/aparatoDeMarta'), { usado: false }));
+    await RUT.assertFails(deleteDoc(doc(como('conDescuento'), 'dispositivosBeneficio/aparatoDeMarta')));
   });
 });
 
