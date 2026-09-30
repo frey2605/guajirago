@@ -192,7 +192,8 @@ const RECORRIDOS = [
     archivo: 'bienvenida-pasajero.cjs',
     // «Una sola vez por persona y por aparato» y «el teléfono no pide el valor» los EJECUTA pruebas/funciones.test.js
     // (G18 · descuentoDeBienvenida) con el emulador: aquí cada cuenta es nueva y el navegador también.
-    vigila: ['guajirago/src/Login.js'],
+    // El marco de la celebración (fondo y confeti) es PantallaFiesta.js desde G80: cómo se ve lo PINTA pruebas/pantallasFiesta.test.js.
+    vigila: ['guajirago/src/Login.js', 'guajirago/src/PantallaFiesta.js'],
   },
   {
     nombre: 'valor-viaje-panel',

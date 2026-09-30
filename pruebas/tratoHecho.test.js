@@ -39,10 +39,14 @@ describe('G74 · «¡Trato hecho!» sale de UNA pieza', () => {
   });
 
   it('dura lo mismo que antes (3 s) y el resto de cada pantalla no se movió', () => {
+    // «El resto no se movió» es el careo DEL ARREGLO de G74: se compara el commit del arreglo (863466e) con el de antes,
+    // no el disco de hoy. Comparar el disco lo ponía rojo con cualquier arreglo posterior de otra parte de esas
+    // pantallas (le pasó a G80, que cambió CelebracionConductor de AppConductor.js).
+    const arreglo = medir('863466e');
     for (const [i, p] of hoy.pantallas.entries()) {
       assert.deepStrictEqual(p.duraciones, antes.pantallas[i].duraciones, p.nombre + ': cambió cuánto dura la ventanita');
       assert.ok(p.duraciones.length > 0 && p.duraciones.every((d) => d === 3000), p.nombre + ': duraciones ' + p.duraciones.join(', '));
-      assert.strictEqual(p.resto, antes.pantallas[i].resto, p.nombre + ': se movió algo de la pantalla que no era la ventanita');
+      assert.strictEqual(arreglo.pantallas[i].resto, antes.pantallas[i].resto, p.nombre + ': el arreglo de G74 movió algo de la pantalla que no era la ventanita');
     }
   });
 

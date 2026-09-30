@@ -9,6 +9,7 @@ import { porQueNoLeToca } from './leTocaElViaje';
 import { calcularTarifaMinima } from './tarifas';
 import { RESPALDO_CONFIG, leerConfig, segundosDeEspera, BUSQUEDA } from './configApp';
 import { cop } from './moneda';
+import PantallaFiesta from './PantallaFiesta';
 import { ESTADOS_MERCADO, ESTADO_ACEPTADO, ESTADOS_TERMINADOS, ESTADOS_QUE_CIERRA_EL_SERVIDOR, avisoDelCierre, comoTermino, meAceptaronEsteViaje } from './estadosViaje';
 import { consultaDeGanancias, resumenDeGanancias } from './gananciasConductor';
 // REGLA 9 · qué se le dice al conductor cuando el servidor dice que no. Mismo
@@ -73,19 +74,10 @@ const TARIFA_MINIMA = calcularTarifaMinima(undefined, CONFIG_APP_DEFECTO);
 
 // Las razones de cancelación viven en textosViaje.js (SEGUNDA LEY). Se importan arriba.
 
+// El fondo y el confeti salen del marco común PantallaFiesta.js (gemelo G80); lo de dentro es de esta pantalla.
 function CelebracionConductor({ monto, onCerrar }) {
-  const confeti = Array.from({ length: 30 }, (_, i) => i);
-  const coloresConfeti = ['#FFCF4D', '#FF7A2F', '#D6357E', '#2ECC71', '#1C8EF9'];
   return (
-    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: '#FFFFFF', zIndex: 99999, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px', overflow: 'hidden' }}>
-      {confeti.map(i => (
-        <span key={i} style={{
-          position: 'absolute', top: '-20px', left: `${Math.random() * 100}%`,
-          fontSize: `${14 + Math.random() * 14}px`,
-          color: coloresConfeti[i % coloresConfeti.length],
-          animation: `caer ${2 + Math.random() * 2}s linear ${Math.random() * 1.5}s infinite`,
-        }}>●</span>
-      ))}
+    <PantallaFiesta estilo="saldo">
       <div style={{ fontSize: '70px', marginBottom: '12px' }}>🎉</div>
       <h2 style={{ color: '#1A1A1E', fontSize: '24px', fontWeight: '900', margin: '0 0 6px', textAlign: 'center' }}>¡Recibiste tu saldo!</h2>
       <p style={{ color: '#FF7A2F', fontSize: '16px', margin: '0 0 24px', textAlign: 'center', fontWeight: 'bold' }}>El descuento del pasajero es tuyo 🎁</p>
@@ -95,8 +87,7 @@ function CelebracionConductor({ monto, onCerrar }) {
         <p style={{ color: '#6B7280', fontSize: '13px', margin: '16px 0 0', lineHeight: '1.5' }}>Ya está sumado a tu saldo de créditos. ¡Gracias por rodar con GuajiraGo!</p>
       </div>
       <button onClick={onCerrar} style={{ marginTop: '28px', width: '100%', maxWidth: '420px', padding: '18px', background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)', border: 'none', borderRadius: '16px', color: '#FFFFFF', fontSize: '17px', fontWeight: '900', cursor: 'pointer', zIndex: 2 }}>Continuar</button>
-      <style>{`@keyframes caer { from { transform: translateY(-20px) rotate(0deg); opacity: 1; } to { transform: translateY(100vh) rotate(360deg); opacity: 0.3; } }`}</style>
-    </div>
+    </PantallaFiesta>
   );
 }
 

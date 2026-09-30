@@ -8,20 +8,12 @@ import { motivoPorLaPromocion, valorDelBeneficio, textoDelBeneficio, categoriaDe
 import { fechaDeCalendario } from './fechaCalendario';
 import { useAccion } from './useAccion';
 import AvisoModal from './AvisoModal';
+import PantallaFiesta from './PantallaFiesta';
 
+// El fondo y el confeti salen del marco común PantallaFiesta.js (gemelo G80); lo de dentro es de esta pantalla.
 function CelebracionPromo({ codigo, textoValor, onCerrar }) {
-  const confeti = Array.from({ length: 30 }, (_, i) => i);
-  const coloresConfeti = ['#FFCF4D', '#FF7A2F', '#D6357E', '#2ECC71', '#1C8EF9'];
   return (
-    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: '#FFFFFF', zIndex: 99999, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px', overflow: 'hidden' }}>
-      {confeti.map(i => (
-        <span key={i} style={{
-          position: 'absolute', top: '-20px', left: `${Math.random() * 100}%`,
-          fontSize: `${14 + Math.random() * 14}px`,
-          color: coloresConfeti[i % coloresConfeti.length],
-          animation: `caer ${2 + Math.random() * 2}s linear ${Math.random() * 1.5}s infinite`,
-        }}>●</span>
-      ))}
+    <PantallaFiesta estilo="saldo">
       <div style={{ fontSize: '70px', marginBottom: '12px' }}>🎉</div>
       <h2 style={{ color: '#1A1A1E', fontSize: '24px', fontWeight: '900', margin: '0 0 6px', textAlign: 'center' }}>¡Código activado!</h2>
       <p style={{ color: '#FF7A2F', fontSize: '16px', margin: '0 0 24px', textAlign: 'center', fontWeight: 'bold' }}>Tendrás {textoValor} de descuento 🎁</p>
@@ -31,8 +23,7 @@ function CelebracionPromo({ codigo, textoValor, onCerrar }) {
         <p style={{ color: '#6B7280', fontSize: '13px', margin: '16px 0 0', lineHeight: '1.5' }}>Dáselo al conductor cuando finalice tu viaje para recibir el descuento</p>
       </div>
       <button onClick={onCerrar} style={{ marginTop: '28px', width: '100%', maxWidth: '420px', padding: '18px', background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)', border: 'none', borderRadius: '16px', color: '#FFFFFF', fontSize: '17px', fontWeight: '900', cursor: 'pointer', zIndex: 2 }}>Entendido</button>
-      <style>{`@keyframes caer { from { transform: translateY(-20px) rotate(0deg); opacity: 1; } to { transform: translateY(100vh) rotate(360deg); opacity: 0.3; } }`}</style>
-    </div>
+    </PantallaFiesta>
   );
 }
 

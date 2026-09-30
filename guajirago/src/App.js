@@ -35,6 +35,7 @@ import { fotoDe } from './fotoUsuario';
 import { telefonoSirve, celularDiezCifras } from './telefonoValido';
 import { placaLimpia, placaMientrasEscribe, vehiculoDe } from './vehiculoConductor';
 import { cop } from './moneda';
+import PantallaFiesta, { REBOTE } from './PantallaFiesta';
 import { leerConfig, modulosDe, mensajeDeMantenimiento } from './configApp';
 const MARCAS_VEHICULO = [
   'AKT', 'Auteco', 'Bajaj', 'BMW', 'BYD', 'Chery', 'Chevrolet',
@@ -436,21 +437,12 @@ function PantallaMantenimiento({ mensaje, onVolver }) {
   );
 }
 
+// El fondo y el confeti salen del marco común PantallaFiesta.js (gemelo G80); lo de dentro es de esta pantalla.
 function CelebracionBienvenidaConductor({ monto, tipoVehiculo, onContinuar }) {
-  const confeti = Array.from({ length: 40 }, (_, i) => i);
-  const colores = ['#FFCF4D', '#FF7A2F', '#D6357E', '#2ECC71', '#4DA3FF', '#1C8EF9'];
   return (
-    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: '#FFFFFF', zIndex: 999999, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px', overflow: 'hidden' }}>
-      {confeti.map(i => (
-        <span key={i} style={{
-          position: 'absolute', top: '-24px', left: `${Math.random() * 100}%`,
-          fontSize: `${16 + Math.random() * 18}px`,
-          color: colores[i % colores.length],
-          animation: `caerBienvenidaC ${2.2 + Math.random() * 2}s linear ${Math.random() * 1.2}s infinite`,
-        }}>●</span>
-      ))}
-      <div style={{ fontSize: '30px', marginBottom: '4px', animation: 'rebotarBienvenidaC 0.6s infinite alternate', zIndex: 2 }}>🎉🎊🎉</div>
-      <div style={{ fontSize: '90px', margin: '8px 0 4px', animation: 'rebotarBienvenidaC 0.6s infinite alternate', zIndex: 2 }}>{iconoDelVehiculo(tipoVehiculo)}💰</div>
+    <PantallaFiesta estilo="bienvenida" colores={['#FFCF4D', '#FF7A2F', '#D6357E', '#2ECC71', '#4DA3FF', '#1C8EF9']}>
+      <div style={{ fontSize: '30px', marginBottom: '4px', animation: REBOTE, zIndex: 2 }}>🎉🎊🎉</div>
+      <div style={{ fontSize: '90px', margin: '8px 0 4px', animation: REBOTE, zIndex: 2 }}>{iconoDelVehiculo(tipoVehiculo)}💰</div>
       <h1 style={{ color: '#1A1A1E', fontSize: '26px', fontWeight: '900', margin: '8px 0 4px', textAlign: 'center', zIndex: 2 }}>¡Bienvenido, conductor!</h1>
       <p style={{ color: '#FF7A2F', fontSize: '15px', margin: '0 0 24px', textAlign: 'center', fontWeight: 'bold', zIndex: 2 }}>Empiezas con saldo en tu cuenta 🥳</p>
       <div style={{ background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)', borderRadius: '28px', padding: '32px 28px', width: '100%', maxWidth: '420px', textAlign: 'center', zIndex: 2, boxShadow: '0 8px 32px rgba(255,122,47,0.4)' }}>
@@ -459,11 +451,7 @@ function CelebracionBienvenidaConductor({ monto, tipoVehiculo, onContinuar }) {
         <p style={{ color: 'rgba(255,255,255,0.9)', fontSize: '13px', margin: '14px 0 0', lineHeight: '1.5', fontWeight: 'bold' }}>Ya está en tu saldo. Úsalo para pagar tus primeras comisiones 🚀</p>
       </div>
       <button onClick={onContinuar} style={{ marginTop: '28px', width: '100%', maxWidth: '420px', padding: '18px', background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)', border: 'none', borderRadius: '16px', color: '#FFFFFF', fontSize: '18px', fontWeight: '900', cursor: 'pointer', zIndex: 2 }}>¡A rodar! 🎉</button>
-      <style>{`
-        @keyframes caerBienvenidaC { from { transform: translateY(-24px) rotate(0deg); opacity: 1; } to { transform: translateY(100vh) rotate(360deg); opacity: 0.2; } }
-        @keyframes rebotarBienvenidaC { from { transform: scale(1); } to { transform: scale(1.12); } }
-      `}</style>
-    </div>
+    </PantallaFiesta>
   );
 }
 
