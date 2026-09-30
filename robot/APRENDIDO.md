@@ -812,3 +812,15 @@ la placa de `conductores/{uid}` (la escribe su GPS con la misma placa que va en 
   En el `probar-cambio` de G91 salió rojo `registrar-conductor` dos veces seguidas («locator.click: Timeout»): la
   captura se quedó en «Creando cuenta…» a los 6 s (Login.js, que G91 no toca). Careo: con 9dca917 publicado pasó, y
   con 42cbb25 publicado otra vez pasó dos de dos. Es la creación de la cuenta que a ratos tarda más de 6 s, no el cambio.
+- **logo-esquina (G92, 30-sep-2026):** el logo de arriba a la derecha de la app de transporte es UNA pieza
+  (`LogoEsquina` de `Logo.js`): un `svg[aria-label="GuajiraGo"]` con `position: absolute` (un `path` y un rombo), sin
+  caja alrededor. Para saber dónde está se mide contra su primer antepasado que no es `static` (el encabezado o la
+  página): arriba 14 y derecha 16, zIndex 6; 28 px en las pantallas con «‹ Volver» y 34 en las portadas con el ☰
+  (pasajero, mensajería). Los logos centrados (entrar, escoger rol) y el de la fila de Turismo no son `absolute`, así
+  que el filtro los deja fuera solo. Mensajería se abre desde módulos con «Mensajería y Mandados», y «Quiero enviar
+  algo» abre la pantalla de pedir (`Solicitar.js`) sin crear nada. OJO: en pruebas la franja naranja «PRUEBAS · datos
+  de mentira» va encima de lo alto de la página y tapa la mitad del logo en la captura; en producción no existe.
+  Corrido en pruebas con e403e95 publicado: 12 pantallas ✓. Solo mira: no escribe nada.
+  En el `probar-cambio` de G92 (43 ✓ y 1 rojo) volvió a salir rojo `registrar-conductor` («locator.click: Timeout», la
+  captura en «Creando cuenta…»), y repetido solo, otra vez rojo. Careo: con 236586d publicado pasó, y con e403e95
+  publicado de nuevo pasó dos de dos. Es la creación de la cuenta que a ratos tarda, no el cambio.
