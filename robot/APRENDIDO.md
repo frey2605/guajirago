@@ -776,3 +776,9 @@ la placa de `conductores/{uid}` (la escribe su GPS con la misma placa que va en 
 - 30-sep-2026 en adelante: un pedido de MESA FIJO del Restaurante de Prueba, `pedidos/robotG85MESA1` (Mesa 1, un jugo de
   $ 5.000), que cada corrida de `metodos-pago.cjs` reabre y cierra en Efectivo desde «💳 Cerrar mesa»: suma $ 5.000 al corte de
   caja de pruebas de ese día y un jugo a `ventasPorPlato`. El número de mesas del restaurante se devuelve como estaba.
+- 30-sep-2026 (G87, `dias-promocion.cjs`): al Restaurante de Prueba se le ponen dos promociones fijas «por días»
+  («Robot G87 semana», 10 %, los siete días y encendida; «Robot G87 tres», lunes-miércoles-viernes y apagada) y al final
+  se le devuelven las que tenía (hoy: ninguna). La de los siete días es a propósito: la app solo enseña la etiqueta
+  «🏷️ … · días» de una promo que vale HOY, y lo decide con el día del teléfono (`new Date().getDay()`), así que con un
+  solo día la prueba dependería del día en que se corra. Los botones L M M J V S D son los de la fila que sigue al botón
+  «Días» del formulario «+ Crear promoción» (se abre y no se guarda). Los 403 de la consola salen también aquí.
