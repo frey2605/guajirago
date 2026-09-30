@@ -52,6 +52,8 @@ import { ponerSugerencias } from './sugerenciasDeDirecciones';
 import { PASOS_DEL_CLIENTE, indiceDelPaso, yaLlegoAlCliente, terminadoParaElCliente, etiquetaParaElCliente, quienCanceloElPedido, METODOS_PAGO } from './estadosPedido';
 // G83: qué calificaciones cuentan y cuánto da el promedio del negocio, en una sola pieza (copia idéntica en aliados).
 import { lasQueCuentan, promedioDelNegocio, promediosPorNegocio } from './estrellasNegocio';
+// G88: «Mis pedidos» se recuerda en el teléfono con la pieza única (la misma de «Mis reservas»).
+import { MIS_PEDIDOS, leerRecordados, recordar } from './recordadosEnTelefono';
 
 // G30: Google no dio el nombre de la calle. Lo dice la ventanita de la ubicación, con su propio título.
 const SIN_NOMBRE_DE_CALLE = 'Encontramos tu ubicación, pero no el nombre de la calle. Dejamos tus coordenadas en la dirección: agrégale la calle, el barrio o una referencia para que el domiciliario te encuentre.';
@@ -64,10 +66,8 @@ const SIN_NOMBRE_DE_CALLE = 'Encontramos tu ubicación, pero no el nombre de la 
 //  esa NO se renombró, tiene cero archivos y es cosmético)
 // ============================================================
 
-// Pedidos que este dispositivo ha hecho (para la pantalla "Mis pedidos")
-const LS_MIS_PEDIDOS = 'misPedidosGuajira';
-const leerMisPedidosIds = () => { try { return JSON.parse(localStorage.getItem(LS_MIS_PEDIDOS) || '[]'); } catch (e) { return []; } };
-const guardarMiPedidoId = (id) => { try { const arr = leerMisPedidosIds().filter(x => x !== id); arr.unshift(id); localStorage.setItem(LS_MIS_PEDIDOS, JSON.stringify(arr.slice(0, 40))); } catch (e) {} };
+// Pedidos que este dispositivo ha hecho (para la pantalla "Mis pedidos"). G88: los recuerda la pieza única del teléfono,
+// la misma de «Mis reservas»; aquí solo se dice cuál lista (su clave y su tope de 40).
 
 // Botón de volver del módulo de restaurantes (azul, claro)
 const backBtn = { display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#EAF2FF', border: '1px solid #1C8EF9', borderRadius: '12px', padding: '9px 16px', color: '#1C8EF9', fontSize: '14px', fontWeight: 'bold', cursor: 'pointer' };
@@ -160,7 +160,7 @@ function Restaurantes({ nombre, onVolver, foto, onCerrarSesion, onIrPerfil, onIr
   // Cargar en vivo "Mis pedidos" (los que este dispositivo ha hecho)
   useEffect(() => {
     if (pantalla !== 'misPedidos') return;
-    const ids = leerMisPedidosIds();
+    const ids = leerRecordados(MIS_PEDIDOS);
     if (ids.length === 0) { setMisPedidos([]); return; }
     const unsubs = ids.map((id) => onSnapshot(doc(db, 'pedidos', id), (snap) => {
       if (!snap.exists()) return;
@@ -350,7 +350,7 @@ function Restaurantes({ nombre, onVolver, foto, onCerrarSesion, onIrPerfil, onIr
       });
       pegarToken(ref);
       setNumeroPedido(ref.id.slice(-5).toUpperCase());
-      guardarMiPedidoId(ref.id);
+      recordar(MIS_PEDIDOS, ref.id);
       // Registrar el uso de las promociones (por dispositivo y por teléfono)
       if (promosEnCarrito.length > 0) {
         const nuevosUsos = { ...usosPromo };

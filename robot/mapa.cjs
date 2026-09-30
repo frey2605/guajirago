@@ -521,6 +521,14 @@ const RECORRIDOS = [
     vigila: ['guajirago/src/diasSemana.js', 'guajirago-aliados/src/diasSemana.js', 'guajirago-aliados/src/Promociones.js',
       'guajirago/src/Restaurantes.js'],
   },
+  {
+    nombre: 'recordados-telefono',
+    que: '«Mis pedidos» y «Mis reservas» leen lo ya guardado en el teléfono (forma de siempre, con basura dentro o roto) sin caerse ni quedarse cargando (G88; deja un pedido y una reserva fijos, cancelados, en PRUEBAS)',
+    archivo: 'recordados-telefono.cjs',
+    // Qué lee y guarda cada pantalla en 15 casos (y el careo con el código de antes) lo SACA de cada archivo y lo
+    // EJECUTA pruebas/recordadosTelefono.test.js.
+    vigila: ['guajirago/src/recordadosEnTelefono.js', 'guajirago/src/Restaurantes.js', 'guajirago/src/Turismo.js'],
+  },
 ];
 
 // Los archivos de pantalla: los que, si cambian, el robot debería poder probar. Todo lo que esté en

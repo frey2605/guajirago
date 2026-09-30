@@ -176,7 +176,7 @@ describe('G42 · cada formulario guarda las 10 cifras limpias, y no guarda lo qu
       await enviar({ ...APP, ...r.b, carrito: [{ precio: 1000, cantidad: 1 }], direccion: 'Calle 1', telefono, metodoPago: 'efectivo',
         correr: async (fn) => fn(), restauranteActivo: { id: 'r1', nombre: 'R', promociones: [] }, auth: { currentUser: { uid: 'u1' } },
         nombre: 'Ana', totalCarrito: 1000, serverTimestamp: () => 'ahora', prepararTokenDeAvisos: () => () => {},
-        guardarMiPedidoId: () => {}, usosPromo: {} });
+        recordar: () => {}, MIS_PEDIDOS: {}, usosPromo: {} }); // G88: el id se recuerda con la pieza del teléfono
       return r;
     };
     assert.strictEqual((await correr('300 123 4567')).b.escritos.find((e) => e.ref === 'pedidos').datos.telefono, '3001234567');
@@ -189,7 +189,7 @@ describe('G42 · cada formulario guarda las 10 cifras limpias, y no guarda lo qu
       const r = { b: base() };
       await enviar({ ...APP, ...r.b, fecha: '2026-10-01', cliente: 'Ana', telefono, personas: '1', notas: '', auth: { currentUser: { uid: 'u1' } },
         agenciaActiva: { id: 'a1', nombre: 'A' }, tourReserva: { id: 't1', nombre: 'T', precio: 1, unidadPrecio: 'persona' },
-        totalReserva: () => 1, prepararTokenDeAvisos: () => () => {}, guardarReserva: () => {}, setAviso: (t) => { r.aviso = t; } });
+        totalReserva: () => 1, prepararTokenDeAvisos: () => () => {}, recordar: () => {}, MIS_RESERVAS: {}, setAviso: (t) => { r.aviso = t; } });
       return r;
     };
     assert.strictEqual((await correr('+57 300 123 4567')).b.escritos[0].datos.telefono, '3001234567');
