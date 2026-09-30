@@ -329,7 +329,7 @@ const RECORRIDOS = [
     // datos: esa rama la SACA del archivo y la EJECUTA scripts/medir-numero-whatsapp.cjs (pruebas/numeroWhatsApp.test.js),
     // igual que el enlace de la agencia en la app, el de pedidos y reservas de aliados y enviarWhatsApp de Codigos
     // (que nadie llama); por eso esos archivos no se nombran aquí.
-    vigila: ['guajirago-admin/src/Restaurantes.js', 'guajirago-admin/src/Turismo.js', 'guajirago-admin/src/telefonoValido.js'],
+    vigila: ['guajirago-admin/src/NegociosDeUnTipo.js', 'guajirago-admin/src/tiposDeNegocio.js', 'guajirago-admin/src/telefonoValido.js'],
   },
   {
     nombre: 'telefono-unico',
@@ -369,7 +369,7 @@ const RECORRIDOS = [
     archivo: 'pedir-ahora.cjs',
     // La regla entera (candado, escaparate, pausa, horario) la SACA de cada pantalla y la EJECUTA pruebas/pedirAhora.test.js.
     vigila: ['guajirago-aliados/src/App.js', 'guajirago-aliados/src/horarioNegocio.js', 'guajirago-aliados/src/escaparate.js',
-      'guajirago-aliados/src/reglaPromocion.js', 'guajirago-admin/src/Restaurantes.js', 'guajirago-admin/src/horarioNegocio.js',
+      'guajirago-aliados/src/reglaPromocion.js', 'guajirago-admin/src/NegociosDeUnTipo.js', 'guajirago-admin/src/tiposDeNegocio.js', 'guajirago-admin/src/horarioNegocio.js',
       'guajirago-admin/src/escaparate.js', 'guajirago-aliados/src/alerta.js'],
   },
   {
@@ -378,7 +378,7 @@ const RECORRIDOS = [
     archivo: 'fecha-pedido.cjs',
     // La pieza, cada convertidor de aliados y el «hoy» de Corte de caja los SACA de su archivo y los EJECUTA
     // pruebas/fechaPedido.test.js.
-    vigila: ['guajirago-admin/src/Restaurantes.js', 'guajirago-admin/src/fechaGuardada.js', 'guajirago/src/fechaGuardada.js',
+    vigila: ['guajirago-admin/src/NegociosDeUnTipo.js', 'guajirago-admin/src/tiposDeNegocio.js', 'guajirago-admin/src/fechaGuardada.js', 'guajirago/src/fechaGuardada.js',
       'guajirago/src/Restaurantes.js'],
   },
   {
@@ -396,7 +396,7 @@ const RECORRIDOS = [
     archivo: 'aprobar-negocio.cjs',
     // Los tres botones (Restaurantes, Turismo y Aliados pendientes) los SACA de su archivo y los EJECUTA
     // pruebas/aprobarNegocio.test.js.
-    vigila: ['guajirago-admin/src/aprobarNegocio.js', 'guajirago-admin/src/Restaurantes.js', 'guajirago-admin/src/Turismo.js',
+    vigila: ['guajirago-admin/src/aprobarNegocio.js', 'guajirago-admin/src/NegociosDeUnTipo.js',
       'guajirago-admin/src/AliadosPendientes.js'],
   },
   {
@@ -405,8 +405,8 @@ const RECORRIDOS = [
     archivo: 'estado-aprobacion.cjs',
     // La etiqueta y la pestaña «Pendientes» de Restaurantes y Turismo, y la tarjeta de Aliados pendientes, las SACA de
     // su archivo y las EJECUTA pruebas/estadoAprobacion.test.js.
-    vigila: ['guajirago-admin/src/aprobarNegocio.js', 'guajirago-admin/src/AliadosPendientes.js', 'guajirago-admin/src/Restaurantes.js',
-      'guajirago-admin/src/Turismo.js'],
+    vigila: ['guajirago-admin/src/aprobarNegocio.js', 'guajirago-admin/src/AliadosPendientes.js', 'guajirago-admin/src/NegociosDeUnTipo.js',
+      'guajirago-admin/src/tiposDeNegocio.js'],
   },
   {
     nombre: 'menu-navegacion',
@@ -528,6 +528,15 @@ const RECORRIDOS = [
     // Qué lee y guarda cada pantalla en 15 casos (y el careo con el código de antes) lo SACA de cada archivo y lo
     // EJECUTA pruebas/recordadosTelefono.test.js.
     vigila: ['guajirago/src/recordadosEnTelefono.js', 'guajirago/src/Restaurantes.js', 'guajirago/src/Turismo.js'],
+  },
+  {
+    nombre: 'pantallas-negocios',
+    que: '🍽️ Restaurantes y 🧭 Turismo del panel, que ahora son UNA pantalla, enseñan cada uno sus textos: menú lateral, lista (el número del título cuadra con las tarjetas), Resumen con sus cinco números, Pendientes y la ficha; y pasar de 🍽️ (con una ficha abierta) a 🧭 por el menú enseña las agencias (G89; solo mira)',
+    archivo: 'pantallas-negocios.cjs',
+    // Que cada paso se vea y escriba IGUAL que antes (HTML, escrituras de Aprobar / Suspender / Rechazar, WhatsApp y
+    // avisos, con datos de mentira) lo PINTA con React y lo carea scripts/medir-pantallas-negocios.cjs
+    // (pruebas/pantallasNegocios.test.js).
+    vigila: ['guajirago-admin/src/NegociosDeUnTipo.js', 'guajirago-admin/src/tiposDeNegocio.js'],
   },
 ];
 

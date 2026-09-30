@@ -359,10 +359,9 @@ const PENDIENTES = {
   'guajirago-admin/src/Codigos.js': [6, 1],
   'guajirago-admin/src/ComentariosReportados.js': [2, 0],
   'guajirago-admin/src/Conductores.js': [14, 0],
+  'guajirago-admin/src/NegociosDeUnTipo.js': [3, 0], // G89: eran Restaurantes.js [3, 0] y Turismo.js [3, 0], la misma pantalla dos veces
   'guajirago-admin/src/Promociones.js': [5, 2],
-  'guajirago-admin/src/Restaurantes.js': [3, 0],
   'guajirago-admin/src/Superadmin.js': [10, 9], // 8→10 el 26-sep: dos estaban escondidos tras un accept="image/*"
-  'guajirago-admin/src/Turismo.js': [3, 0],
   'guajirago-aliados/src/App.js': [2, 1],
   'guajirago-aliados/src/CalificacionesRestaurante.js': [1, 1],
   'guajirago-aliados/src/ConfigFlujos.js': [1, 1],

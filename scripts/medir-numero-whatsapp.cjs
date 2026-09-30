@@ -57,6 +57,11 @@ function hastaCerrar(texto, desde) {
   }
   return null;
 }
+// Lo propio de un tipo de negocio del panel (G89), del disco o del commit. {} si ese código aún no lo tiene.
+function tipoDelPanel(tipo) {
+  const f = fuente('guajirago-admin/src/tiposDeNegocio.js');
+  return f ? cargarDeLaApp('guajirago-admin/src/tiposDeNegocio.js', f).TIPOS_DE_NEGOCIO[tipo] : {};
+}
 const correr = (cuerpo, ambito) => new Function('ambito', 'with (ambito) {' + cuerpo + '\n}')(ambito); // eslint-disable-line no-new-func
 
 // Lo que abre un botón que llama a window.open, o su aviso si no abre nada.
@@ -102,8 +107,10 @@ const SITIOS = [
     if (i < 0) return '¿?';
     return correr(hastaCerrar(texto, texto.indexOf('=>', i)), { ...piezas, r: { telefono: tel, cliente: 'Ana', nombreTour: 'T' }, nombreAgencia: 'A', encodeURIComponent });
   }],
-  ['panel · Restaurantes', 'guajirago-admin/src/Restaurantes.js', porVentana('', 'wa', (tel) => ({ tel }))],
-  ['panel · Turismo', 'guajirago-admin/src/Turismo.js', porVentana('', 'wa', (tel) => ({ tel }))],
+  // G89 (30-sep-2026): 🍽️ y 🧭 son UNA pantalla (NegociosDeUnTipo.js) y el aviso nombra el negocio con su tipo (T, de
+  // tiposDeNegocio.js). El 4.º dato es el archivo de antes de G89, para correr un commit viejo.
+  ['panel · Restaurantes', 'guajirago-admin/src/NegociosDeUnTipo.js', porVentana('', 'wa', (tel) => ({ tel, T: tipoDelPanel('restaurante') })), 'guajirago-admin/src/Restaurantes.js'],
+  ['panel · Turismo', 'guajirago-admin/src/NegociosDeUnTipo.js', porVentana('', 'wa', (tel) => ({ tel, T: tipoDelPanel('turismo') })), 'guajirago-admin/src/Turismo.js'],
   ['panel · Codigos (nadie la llama)', 'guajirago-admin/src/Codigos.js', porVentana('', 'enviarWhatsApp', (tel) => ({ cod: 'C1', val: 1000, tel }))],
 ];
 
@@ -115,8 +122,8 @@ const numeroDe = (u) => { const m = String(u).match(/wa\.me\/(\d*)/); return m ?
 function tablaDe(muestras = MUESTRAS) {
   const piezas = { app: pieza('guajirago'), admin: pieza('guajirago-admin'), aliados: pieza('guajirago-aliados') };
   const tabla = {};
-  for (const [nombre, ruta, hacer] of SITIOS) {
-    const texto = fuente(ruta);
+  for (const [nombre, ruta, hacer, deAntes] of SITIOS) {
+    const texto = fuente(ruta) ?? (deAntes ? fuente(deAntes) : null);
     const p = ruta.startsWith('guajirago-admin') ? piezas.admin : ruta.startsWith('guajirago-aliados') ? piezas.aliados : piezas.app;
     const f = hacer(texto.replace(/\r\n/g, '\n'), p);
     tabla[nombre] = muestras.map((m) => { try { return numeroDe(f(m)); } catch (e) { return '💥 ' + e.message.slice(0, 30); } });

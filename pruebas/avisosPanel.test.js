@@ -37,12 +37,11 @@ const {
 const BOTONES = [
   ['guajirago-admin/src/AliadosPendientes.js', 'aprobar', 'aprobar un negocio pendiente'],
   ['guajirago-admin/src/AliadosPendientes.js', 'rechazar', 'rechazar un negocio pendiente'],
-  ['guajirago-admin/src/Restaurantes.js', 'aprobar', 'aprobar un restaurante'],
-  ['guajirago-admin/src/Restaurantes.js', 'suspender', 'suspender un restaurante'],
-  ['guajirago-admin/src/Restaurantes.js', 'rechazar', 'rechazar un restaurante'],
-  ['guajirago-admin/src/Turismo.js', 'aprobar', 'aprobar una agencia'],
-  ['guajirago-admin/src/Turismo.js', 'suspender', 'suspender una agencia'],
-  ['guajirago-admin/src/Turismo.js', 'rechazar', 'rechazar una agencia'],
+  // G89 (30-sep-2026): 🍽️ Restaurantes y 🧭 Turismo eran dos archivos con los mismos tres botones; ahora son UNA
+  // pantalla, NegociosDeUnTipo.js, y los tres botones sirven a los dos tipos.
+  ['guajirago-admin/src/NegociosDeUnTipo.js', 'aprobar', 'aprobar un restaurante o una agencia'],
+  ['guajirago-admin/src/NegociosDeUnTipo.js', 'suspender', 'suspender un restaurante o una agencia'],
+  ['guajirago-admin/src/NegociosDeUnTipo.js', 'rechazar', 'rechazar un restaurante o una agencia'],
   ['guajirago-admin/src/Promociones.js', 'desactivar', 'desactivar una promoción'],
   ['guajirago-admin/src/Promociones.js', 'reactivar', 'reactivar una promoción'],
   ['guajirago-admin/src/Promociones.js', 'borrar', 'borrar una promoción'],
@@ -404,8 +403,8 @@ describe('REGLA 9 · la ventanita compartida del panel', () => {
     const suyo = Number((M().match(/zIndex: (\d+)/) || [])[1]);
     assert.ok(suyo > 0, 'la ventanita no declara zIndex, o es negativo: no se vería');
     const OTRAS = ['guajirago-admin/src/App.js', 'guajirago-admin/src/Codigos.js',
-      'guajirago-admin/src/Promociones.js', 'guajirago-admin/src/Restaurantes.js',
-      'guajirago-admin/src/Turismo.js', 'guajirago-admin/src/AliadosPendientes.js'];
+      'guajirago-admin/src/Promociones.js', 'guajirago-admin/src/NegociosDeUnTipo.js',
+      'guajirago-admin/src/AliadosPendientes.js'];
     for (const a of OTRAS) {
       for (const m of soloCodigo(leer(a)).matchAll(/zIndex: (\d+)/g)) {
         assert.ok(suyo >= Number(m[1]),

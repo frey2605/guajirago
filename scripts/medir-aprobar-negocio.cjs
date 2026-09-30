@@ -24,15 +24,22 @@ const RAIZ = path.join(__dirname, '..');
 const PANEL = 'guajirago-admin';
 const arg = (n) => { const i = process.argv.indexOf(n); return i >= 0 ? process.argv[i + 1] : null; };
 
+// G89 (30-sep-2026): 🍽️ Restaurantes y 🧭 Turismo son UNA pantalla (NegociosDeUnTipo.js), con UN botón para los dos.
 const LOS_BOTONES = [
-  ['src/Restaurantes.js', '🍽️ Restaurantes'],
-  ['src/Turismo.js', '🧭 Turismo'],
+  ['src/NegociosDeUnTipo.js', '🍽️ Restaurantes y 🧭 Turismo'],
   ['src/AliadosPendientes.js', '🤝 Aliados pendientes'],
 ];
 const LA_PIEZA = 'src/aprobarNegocio.js';
 
+// En un commit de antes de G89 la pantalla única no existe: su botón es el de Restaurantes.js (el de Turismo.js era igual).
+const ANTES_DE_G89 = { 'src/NegociosDeUnTipo.js': 'src/Restaurantes.js' };
+
 /** El texto de un archivo del panel: el del disco, o el de un commit. null si no existe. */
 function textoDe(ruta, commit) {
+  const t = textoTal(ruta, commit);
+  return t == null && ANTES_DE_G89[ruta] ? textoTal(ANTES_DE_G89[ruta], commit) : t;
+}
+function textoTal(ruta, commit) {
   if (!commit) {
     const p = path.join(RAIZ, PANEL, ruta);
     return fs.existsSync(p) ? fs.readFileSync(p, 'utf8') : null;

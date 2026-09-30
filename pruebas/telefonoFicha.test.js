@@ -63,8 +63,7 @@ const LEEN_TELEFONO = {
   'guajirago-admin/src/telefonoUsuario.js': 1,
   'guajirago/src/Turismo.js': 2, // la agencia
   'guajirago-admin/src/AliadosPendientes.js': 1, // el negocio que pide entrar
-  'guajirago-admin/src/Restaurantes.js': 4, // el restaurante
-  'guajirago-admin/src/Turismo.js': 4, // la agencia
+  'guajirago-admin/src/NegociosDeUnTipo.js': 4, // el restaurante o la agencia (G89: eran Restaurantes.js y Turismo.js, 4 y 4)
   'guajirago-aliados/src/HistorialDomicilios.js': 2, // el pedido
   'guajirago-aliados/src/PedidosDomicilio.js': 3, // el pedido
   'guajirago-aliados/src/PerfilAgencia.js': 2, // la agencia

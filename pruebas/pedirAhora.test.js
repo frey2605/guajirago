@@ -119,11 +119,15 @@ describe('G47 · el cliente, el dueño y el panel dicen lo mismo (corridos, no l
     assert.match(t, /setNegocioDoc\(d\);/, 'la tarjeta no recibe el negocio del documento vivo');
   });
 
+  // G89 (30-sep-2026): el chip es de los restaurantes (tiposDeNegocio.js) y lo pinta la pantalla única del panel.
   it('los chips del panel salen de la regla', () => {
-    const t = soloCodigo(leer('guajirago-admin/src/Restaurantes.js')).replace(/\r\n/g, '\n');
+    const t = soloCodigo(leer('guajirago-admin/src/tiposDeNegocio.js')).replace(/\r\n/g, '\n');
     assert.match(t, /const chipAbierto = \(r\) => \{\n\s*const m = motivoParaNoPedir\(r\);/, 'chipAbierto no pregunta a la regla');
-    assert.strictEqual((t.match(/chipAbierto\(r\)\.t/g) || []).length, 2, 'la lista y la ficha del negocio');
+    assert.match(t, /restaurante: \{[\s\S]*?\n\s*chipAbierto,\n[\s\S]*?\n {2}turismo: \{[\s\S]*?\n\s*chipAbierto: null,/, 'el chip ya no es de los restaurantes (y solo de ellos)');
     assert.strictEqual((t.match(/🟢 Abierto/g) || []).length, 1, '«🟢 Abierto» se escribe fuera de chipAbierto');
+    const p = soloCodigo(leer('guajirago-admin/src/NegociosDeUnTipo.js'));
+    assert.strictEqual((p.match(/T\.chipAbierto\(r\)\.t/g) || []).length, 2, 'la lista y la ficha del negocio');
+    assert.strictEqual((p.match(/🟢 Abierto/g) || []).length, 0, '«🟢 Abierto» se escribe en la pantalla');
   });
 });
 

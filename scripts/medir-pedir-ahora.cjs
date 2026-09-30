@@ -108,10 +108,15 @@ function reglas(c = {}, fuentes = {}) {
       r.dueno = { como: expr, correr: (n, h) => !!correrExpresion(expr, 'd', {}, n, h) };
     }
   }
-  // EL PANEL — «ABIERTOS AHORA» del resumen de restaurantes.
+  // EL PANEL — «ABIERTOS AHORA» del resumen de restaurantes. G89 (30-sep-2026): la pantalla es UNA para los dos tipos
+  // (NegociosDeUnTipo.js) y la cuenta propia de los restaurantes vive en tiposDeNegocio.js (`kpiPropio`); en un commit
+  // de antes, en Restaurantes.js.
   {
-    const t = texto('guajirago-admin', 'src/Restaurantes.js', c.panel);
-    const expr = expresion(t, /const abiertos = lista\.filter\(r => (.+)\)\.length;/, 'panel Restaurantes.js');
+    const unida = (fuentes['guajirago-admin/src/tiposDeNegocio.js'] ?? textoDe('guajirago-admin', 'src/tiposDeNegocio.js', c.panel)) != null;
+    const t = unida ? texto('guajirago-admin', 'src/tiposDeNegocio.js', c.panel) : texto('guajirago-admin', 'src/Restaurantes.js', c.panel);
+    const expr = unida
+      ? expresion(t, /texto: 'ABIERTOS AHORA'[^\n]*valor: \(lista\) => lista\.filter\(r => (.+?)\)\.length \}/, 'panel tiposDeNegocio.js')
+      : expresion(t, /const abiertos = lista\.filter\(r => (.+)\)\.length;/, 'panel Restaurantes.js');
     const p = /from '\.\/horarioNegocio'/.test(t) ? pieza('guajirago-admin', 'src', c.panel) : {};
     r.panel = { como: expr, correr: (n, h) => !!correrExpresion(expr, 'r', p, n, h) };
   }

@@ -74,6 +74,26 @@ function conReloj(ms, tz, fn) {
  * Devuelve { pedidosHoyDe(pedidos, rid), fechaTxt(v) }.
  */
 function elPanel(commit, leerTexto = textoDe) {
+  // G89 (30-sep-2026): 🍽️ Restaurantes y 🧭 Turismo son UNA pantalla (NegociosDeUnTipo.js). Allí se sacan `suyosDe`,
+  // `hoyDe` y `fechaTxt` tal cual, y se corren con lo propio de los restaurantes (tiposDeNegocio.js). En un commit de
+  // antes de G89, lo de abajo (Restaurantes.js).
+  const unida = leerTexto('guajirago-admin', 'src/NegociosDeUnTipo.js', commit);
+  if (unida != null) {
+    const u = unida.replace(/\r\n/g, '\n');
+    const bloqueU = u.match(/\n([ \t]*const suyosDe = [\s\S]*?const hoyDe = [\s\S]*?\.length;)\n/);
+    if (!bloqueU) throw new Error('no encuentro suyosDe/hoyDe en el panel');
+    const fechaU = u.match(/\n[ \t]*(const fechaTxt = [^\n]*)\n/);
+    if (!fechaU) throw new Error('no encuentro fechaTxt en el panel');
+    const tipos = leerTexto('guajirago-admin', 'src/tiposDeNegocio.js', commit);
+    if (tipos == null) throw new Error('no está guajirago-admin/src/tiposDeNegocio.js' + (commit ? ' en ' + commit : ''));
+    const T = cargarDeLaApp('guajirago-admin/src/tiposDeNegocio.js', tipos).TIPOS_DE_NEGOCIO.restaurante;
+    // eslint-disable-next-line no-new-func
+    const hacerU = new Function('encargos', 'T', bloqueU[1] + '\n' + fechaU[1] + '\nreturn { hoyDe, fechaTxt };');
+    return {
+      pedidosHoyDe: (pedidos, rid) => hacerU(pedidos, T).hoyDe(rid),
+      fechaTxt: (v) => hacerU([], T).fechaTxt(v),
+    };
+  }
   const texto = leerTexto('guajirago-admin', 'src/Restaurantes.js', commit);
   if (texto == null) throw new Error('no está el panel' + (commit ? ' en ' + commit : ''));
   const t = texto.replace(/\r\n/g, '\n');

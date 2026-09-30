@@ -104,8 +104,9 @@ describe('G11 · la fecha de calendario se pinta con UNA pieza', () => {
     }
     const lectores = archivos.filter((r) => /reservasTurismo/.test(leer(r)));
     // Hoy son tres: el cliente, el panel (que enseña la fecha tal cual, sin new Date) y la agencia.
+    // G89 (30-sep-2026): en el panel, el nombre de la colección y la línea que pinta la .fecha viven en tiposDeNegocio.js.
     assert.deepStrictEqual(lectores.sort(), [
-      'guajirago-admin/src/Turismo.js', 'guajirago-aliados/src/ReservasTurismo.js', 'guajirago/src/Turismo.js',
+      'guajirago-admin/src/tiposDeNegocio.js', 'guajirago-aliados/src/ReservasTurismo.js', 'guajirago/src/Turismo.js',
     ], 'cambió quién lee las reservas: mira si el nuevo pinta la fecha y súmalo aquí');
     for (const ruta of lectores) {
       const fuente = leer(ruta).replace(/\r\n/g, '\n');

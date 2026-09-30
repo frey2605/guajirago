@@ -1595,8 +1595,10 @@ describe('SEGUNDA LEY · el panel y aliados leen el cuarto privado por el MISMO 
   // se había aprendido en el amarre del token, unos renglones más arriba.
   const IMPORTA_EL_MODULO = /from\s*['"]\.\/negocioPrivado['"]/;
 
+  // G89 (30-sep-2026): 🍽️ Restaurantes y 🧭 Turismo son UNA pantalla, NegociosDeUnTipo.js; las tres listas del panel
+  // viven ahora en dos archivos.
   it('las TRES pantallas del panel piden el cuarto, lo guardan y lo juntan', () => {
-    ['Restaurantes', 'Turismo', 'AliadosPendientes'].forEach((pantalla) => {
+    ['NegociosDeUnTipo', 'AliadosPendientes'].forEach((pantalla) => {
       const donde = 'guajirago-admin/src/' + pantalla + '.js';
       const vivo = leer(donde).replace(/\/\/.*$/gm, '');
       assert.ok(IMPORTA_EL_MODULO.test(vivo),
@@ -1967,7 +1969,9 @@ describe('AMARRES · REGLA 9 · la bandeja: la lista de sitios y el modo de escr
 describe('LA MUDANZA DE LOS PEDIDOS · ninguna app se queda con el nombre viejo', () => {
   const PANTALLAS = [
     'guajirago/src/Restaurantes.js',
-    'guajirago-admin/src/Restaurantes.js',
+    // G89 (30-sep-2026): el panel lee los pedidos en la pantalla única de negocios, con la colección que dice el tipo
+    // (`collection(db, T.encargos.coleccion)`); el nombre vive en tiposDeNegocio.js, como `coleccion: 'pedidos'`.
+    'guajirago-admin/src/tiposDeNegocio.js',
     'guajirago-aliados/src/App.js',
     'guajirago-aliados/src/CorteCaja.js',
     'guajirago-aliados/src/HistorialDomicilios.js',
@@ -1983,7 +1987,7 @@ describe('LA MUDANZA DE LOS PEDIDOS · ninguna app se queda con el nombre viejo'
       // Solo las lecturas y escrituras a la BASE. La ruta del ALMACÉN sigue
       // llamándose `pedidosRestaurantes/` a propósito: esa carpeta tiene CERO
       // archivos y renombrarla es cosmético, va aparte.
-      assert.ok(!/\bdb,\s*'pedidosRestaurantes'/.test(t),
+      assert.ok(!/(?:\bdb,|\bcoleccion:)\s*'pedidosRestaurantes'/.test(t),
         archivo + ' sigue pidiéndole los pedidos a `pedidosRestaurantes`, que ya es una '
         + 'lápida. No falla: se queda vacía y nadie se entera.');
     });
@@ -1996,7 +2000,7 @@ describe('LA MUDANZA DE LOS PEDIDOS · ninguna app se queda con el nombre viejo'
     // por eso están en esta lista. Con un suelo flojo («al menos 8») romper una
     // pasaba desapercibido — se cazó con un mutante que le cambiaba el nombre a
     // la colección de UNA pantalla y la prueba seguía verde.
-    const sinLectura = PANTALLAS.filter((a) => !/\bdb,\s*'pedidos'/.test(leer(a)));
+    const sinLectura = PANTALLAS.filter((a) => !/(?:\bdb,|\bcoleccion:)\s*'pedidos'/.test(leer(a)));
     assert.deepStrictEqual(sinLectura, [],
       'estas pantallas ya no le piden los pedidos a `pedidos`: ' + sinLectura.join(', ')
       + '. O se movieron de sitio, o alguien borró la lectura en vez de renombrarla — y una '

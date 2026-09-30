@@ -21,7 +21,7 @@
 const path = require('path');
 const fs = require('fs');
 const { execFileSync } = require('child_process');
-const { cuerpoDeLaFuncion, soloCodigo, sinTextos } = require('../pruebas/cargar.cjs');
+const { cuerpoDeLaFuncion, soloCodigo, sinTextos, cargarDeLaApp } = require('../pruebas/cargar.cjs');
 
 const RAIZ = path.join(__dirname, '..');
 const PANEL = 'guajirago-admin';
@@ -30,8 +30,10 @@ const arg = (n) => { const i = process.argv.indexOf(n); return i >= 0 ? process.
 const LA_PIEZA = 'src/aprobarNegocio.js';
 // Las tres listas: su archivo, su nombre, y qué negocios le llegan (la consulta o el filtro de tipo de cada pantalla).
 const LAS_LISTAS = [
-  { ruta: 'src/Restaurantes.js', nombre: '🍽️ Restaurantes', tipo: 'ficha', llega: (n) => n.tipoNegocio !== 'turismo' },
-  { ruta: 'src/Turismo.js', nombre: '🧭 Turismo', tipo: 'ficha', llega: (n) => n.tipoNegocio === 'turismo' },
+  // G89 (30-sep-2026): 🍽️ y 🧭 son UNA pantalla (NegociosDeUnTipo.js) que recibe el tipo; sus etiquetas salen de
+  // tiposDeNegocio.js. En un commit de antes de G89, cada una en su archivo (rutaVieja).
+  { ruta: 'src/NegociosDeUnTipo.js', rutaVieja: 'src/Restaurantes.js', tipoNegocio: 'restaurante', nombre: '🍽️ Restaurantes', tipo: 'ficha', llega: (n) => n.tipoNegocio !== 'turismo' },
+  { ruta: 'src/NegociosDeUnTipo.js', rutaVieja: 'src/Turismo.js', tipoNegocio: 'turismo', nombre: '🧭 Turismo', tipo: 'ficha', llega: (n) => n.tipoNegocio === 'turismo' },
   { ruta: 'src/AliadosPendientes.js', nombre: '🤝 Aliados pendientes', tipo: 'tarjeta', llega: (n) => n.aprobado === false },
 ];
 const ESTADOS = ['pendiente', 'aprobado', 'suspendido', 'rechazado'];
@@ -91,8 +93,19 @@ function estadoDeEtiqueta(txt) {
  * 🍽️ / 🧭 · `estadoInfo` y el filtro de `pendientes`, SACADOS del archivo y listos para correr:
  * (negocio) => { estado, enPendientes }.
  */
-function laFicha(ruta, commit, pieza, leerTexto = textoDe) {
-  const texto = leerTexto(ruta, commit);
+function laFicha(lista, commit, pieza, leerTexto = textoDe) {
+  let ruta = lista.ruta;
+  let texto = leerTexto(ruta, commit);
+  let T;
+  if (texto == null && lista.rutaVieja) {
+    ruta = lista.rutaVieja;
+    texto = leerTexto(ruta, commit);
+  } else if (texto != null && lista.tipoNegocio) {
+    const tt = leerTexto('src/tiposDeNegocio.js', commit);
+    if (tt == null) throw new Error('no está ' + PANEL + '/src/tiposDeNegocio.js' + (commit ? ' en ' + commit : ''));
+    T = cargarDeLaApp(PANEL + '/src/tiposDeNegocio.js', tt).TIPOS_DE_NEGOCIO[lista.tipoNegocio];
+    if (!T) throw new Error('tiposDeNegocio.js no tiene el tipo «' + lista.tipoNegocio + '»');
+  }
   if (texto == null) throw new Error('no está ' + PANEL + '/' + ruta + (commit ? ' en ' + commit : ''));
   const t = soloCodigo(texto).replace(/\r\n/g, '\n');
   const m = /const estadoInfo\s*=\s*\(\s*([A-Za-z_$][\w$]*)\s*\)\s*=>/.exec(t);
@@ -101,7 +114,7 @@ function laFicha(ruta, commit, pieza, leerTexto = textoDe) {
   const p = /const pendientes\s*=\s*lista\.filter\(/.exec(t);
   if (!p) throw new Error('no encuentro «const pendientes = lista.filter(» en ' + PANEL + '/' + ruta);
   const filtro = entreParentesis(t, p.index + p[0].length - 1);
-  const piezas = { VERDE: 'verde', ROJO: 'rojo', AMBAR: 'ambar', NARANJA: 'naranja', estadoDeAprobacion: pieza.estadoDeAprobacion };
+  const piezas = { VERDE: 'verde', ROJO: 'rojo', AMBAR: 'ambar', NARANJA: 'naranja', estadoDeAprobacion: pieza.estadoDeAprobacion, T };
   const nombres = Object.keys(piezas);
   // eslint-disable-next-line no-new-func
   const hecho = new Function(...nombres, 'return { info: (' + m[1] + ') => {' + cuerpo.texto + '}, filtro: (' + filtro + ') };')(...nombres.map((n) => piezas[n]));
@@ -162,7 +175,7 @@ function lasTresListas(commit, leerTexto = textoDe) {
   const pieza = laPieza(commit, leerTexto);
   return LAS_LISTAS.map((l) => ({
     ...l,
-    ver: l.tipo === 'ficha' ? laFicha(l.ruta, commit, pieza, leerTexto) : laTarjeta(l.ruta, commit, pieza, leerTexto),
+    ver: l.tipo === 'ficha' ? laFicha(l, commit, pieza, leerTexto) : laTarjeta(l.ruta, commit, pieza, leerTexto),
   }));
 }
 
