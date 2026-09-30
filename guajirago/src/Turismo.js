@@ -18,12 +18,13 @@ import { lasDeTurismo } from './escaparate';
 import { sePuedePedirAhora } from './horarioNegocio';
 // El enlace de WhatsApp de la agencia sale de la pieza única (G41): sin número bueno, no hay enlace.
 import { enlaceWhatsApp, telefonoSirve, celularDiezCifras, cifrasMientrasEscribe } from './telefonoValido';
+// G86: «por persona / por grupo / por día / por hora» sale de la pieza única, la misma que usa aliados al crear el tour.
+import { unidadTxt } from './unidadesTour';
 
 const AZUL = '#1C8EF9';
 const NARANJA = '#FF7A2F';
 const VERDE = '#2ECC71';
 
-const unidadTxt = (k) => ({ persona: 'por persona', grupo: 'por grupo', dia: 'por día', hora: 'por hora' }[k] || '');
 const LS_KEY = 'misReservasGuajira';
 const leerReservas = () => { try { return JSON.parse(localStorage.getItem(LS_KEY)) || []; } catch (e) { return []; } };
 const guardarReserva = (id) => { try { const a = leerReservas(); if (!a.includes(id)) localStorage.setItem(LS_KEY, JSON.stringify([id, ...a])); } catch (e) {} };

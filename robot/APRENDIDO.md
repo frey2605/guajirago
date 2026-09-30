@@ -704,6 +704,19 @@ la placa de `conductores/{uid}` (la escribe su GPS con la misma placa que va en 
 - 🪤 Lo que se lee de la base con `base.leer` puede traer los campos de un mapa en otro orden (`pagos` salió una vez
   `{monto, metodo}` y otra `{metodo, monto}`): se compara campo por campo, nunca el JSON como texto.
 
+### unidades-tour · la app y aliados dicen igual «por persona / grupo / día / hora» (G86, 30-sep-2026)
+- La agencia de prueba (`negocios/prueba-agencia`, agencia@gg.test) guarda sus tours en el campo `tours` (una lista
+  dentro del negocio, no una colección). El robot, como la agencia, cambia SOLO ese campo por cuatro tours fijos
+  (`robotG86_persona`, `_grupo`, `_dia`, `_hora`) y al final le devuelve la lista que tenía (tenía 2).
+- En aliados la pantalla es «Tours y alquileres» (menú de la agencia). La unidad es el `span` dentro del `p` del precio
+  que sigue al `p` del nombre; en la app (Turismo → la agencia) la tarjeta tiene la misma forma. El selector se abre con
+  «+ Agregar tour o alquiler» y se lee sin guardar.
+- 🪤 La siembra (`scripts/sembrar-pruebas.cjs`) guarda `incluye` como TEXTO y la tarjeta de la app hace `t.incluye.join`:
+  los tours del robot llevan `incluye: []`. Leído en la base de pruebas el 30-sep-2026: los dos tours sembrados tienen
+  `incluye` como texto, así que con ellos la pantalla de la agencia en la app debería reventar en `.join` (razonado, no
+  corrido; es de la siembra, no de G86).
+- Con el código de ANTES publicado sale ✓ igual (G86 no cambia lo que se ve: la lista era la misma en los dos lados).
+
 ## Lo que el robot dejó creado en pruebas
 
 - 27-sep-2026: «Robot Taxi De Prueba» (robot.taxi.1790508222079@gg.test) y

@@ -503,6 +503,15 @@ const RECORRIDOS = [
     vigila: ['guajirago/src/estadosPedido.js', 'guajirago-aliados/src/flujoPedidos.js', 'guajirago-aliados/src/Mesero.js',
       'guajirago/src/Restaurantes.js'],
   },
+  {
+    nombre: 'unidades-tour',
+    que: 'con cuatro tours fijos (uno por unidad) en la agencia de prueba, la lista de «Tours y alquileres» de aliados, su selector y las tarjetas de la app dicen «por persona / por grupo / por día / por hora» igual (G86; cambia los tours de la agencia de PRUEBAS y se los devuelve)',
+    archivo: 'unidades-tour.cjs',
+    // Que los tres sitios digan lo mismo en todos los casos (y el careo con el código de antes) lo SACA de cada archivo
+    // y lo EJECUTA pruebas/unidadesTour.test.js.
+    vigila: ['guajirago/src/unidadesTour.js', 'guajirago-aliados/src/unidadesTour.js', 'guajirago-aliados/src/Tours.js',
+      'guajirago/src/Turismo.js'],
+  },
 ];
 
 // Los archivos de pantalla: los que, si cambian, el robot debería poder probar. Todo lo que esté en
