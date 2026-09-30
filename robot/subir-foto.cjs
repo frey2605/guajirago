@@ -19,8 +19,29 @@
 //   node robot/subir-foto.cjs [transporte|panel|aliados|agencia]
 const { abrir, claveDePruebas, entrarALaBase, entrarComoRestaurante, fotoDeMentira } = require('./comun.cjs');
 
-// Una foto SIN tipo: la misma imagen de mentira, con un nombre sin extensión y sin decir de qué tipo es.
-const sinTipo = () => ({ ...fotoDeMentira('x'), name: 'foto-sin-tipo', mimeType: '' });
+// Una foto SIN tipo (File.type vacío), como la de un teléfono que no dice qué es. 🪤 setInputFiles NO sirve para esto:
+// con mimeType '' el navegador recibe 'application/octet-stream' (medido el 29-sep). Por eso el archivo se arma DENTRO
+// de la página con new File([...], nombre, { type: '' }), se le pone al campo y se avisa con un evento change, que es
+// lo que escucha React.
+async function ponerFotoSinTipo(campo) {
+  const bytes = [...fotoDeMentira('x').buffer];
+  // Si la página no la ve SIN tipo, la prueba no prueba lo que dice: se para.
+  const tipo = await ponerYAvisar(campo, bytes);
+  if (tipo !== '') throw new Error('la foto de prueba llegó con tipo «' + tipo + '», no sin tipo');
+  return tipo;
+}
+
+function ponerYAvisar(campo, bytes) {
+  // Devuelve el tipo que ve la página ANTES de avisar (después el campo puede desaparecer: la pantalla pone la foto).
+  return campo.evaluate((el, b) => {
+    const dt = new DataTransfer();
+    dt.items.add(new File([new Uint8Array(b)], 'foto-sin-tipo', { type: '' }));
+    el.files = dt.files;
+    const tipo = el.files[0].type;
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+    return tipo;
+  }, bytes);
+}
 
 // Pide la foto por su dirección y dice si abre y con qué tipo la sirve el almacén.
 async function comoLaSirve(url) {
@@ -58,7 +79,7 @@ async function transporte(fallos) {
     await p.waitForTimeout(800);
     await p.getByText('Mi perfil', { exact: true }).first().click();
     await p.waitForTimeout(3000);
-    await p.locator('input[type="file"]').first().setInputFiles(sinTipo());
+    console.log('tipo que ve la página:', JSON.stringify(await ponerFotoSinTipo(p.locator('input[type="file"]').first())));
     await p.waitForTimeout(800);
     await p.getByRole('button', { name: 'Guardar cambios' }).click();
     let listo = false;
@@ -137,7 +158,7 @@ async function aliados(fallos, cuenta = 'restaurante') {
     await p.waitForTimeout(3000);
     const quitar = p.getByText('✕ Quitar', { exact: true }).first();
     if (await quitar.count()) { await quitar.click(); await p.waitForTimeout(500); }
-    await p.locator('input[type="file"]').first().setInputFiles(sinTipo());
+    console.log('tipo que ve la página:', JSON.stringify(await ponerFotoSinTipo(p.locator('input[type="file"]').first())));
     const src = await esperarVista(p, '%2Flogo_');
     await r.captura('logo-subido');
     console.log(A + ' · vista previa:', src ? src.split('?')[0].replace(/.*\/o\//, '') : '(no sale)');

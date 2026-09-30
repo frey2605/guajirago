@@ -645,11 +645,14 @@ la placa de `conductores/{uid}` (la escribe su GPS con la misma placa que va en 
   «Transporte y movilidad» → «Soy conductor»: la sesión aguanta la recarga. No toca el interruptor de disponible.
 
 ### subir-foto · las tres apps suben con la misma pieza (G82, 29-sep-2026)
-- Una foto SIN tipo: `fotoDeMentira` con `name: 'foto-sin-tipo'` y `mimeType: ''` → el `File.type` llega vacío, como
-  con un teléfono que no dice qué es. Para saber con qué tipo quedó se pide la dirección (la URL con token) con `fetch`
-  y se mira el `content-type`: el almacén sirve el tipo con que se guardó.
-- Careo contra lo publicado ANTES de G82 (29-sep): transporte y aliados subían bien, pero la foto sin tipo quedaba como
-  `application/octet-stream`. Con la pieza, `image/jpeg`.
+- 🪤 Una foto SIN tipo NO se hace con `setInputFiles`: con `mimeType: ''` el navegador la recibe como
+  `application/octet-stream` (medido el 29-sep: `files[0].type` = «application/octet-stream»). Se arma DENTRO de la
+  página: `new File([...], 'foto-sin-tipo', { type: '' })` en un `DataTransfer`, `campo.files = dt.files` y un evento
+  `change` que burbujea (React lo escucha). El recorrido exige que la página la vea con tipo «» antes de seguir.
+- Para saber con qué tipo quedó se pide la dirección (la URL con token) con `fetch` y se mira el `content-type`: el
+  almacén sirve el tipo con que se guardó. Con la pieza publicada en pruebas (29-sep): `image/jpeg` en transporte, en el
+  restaurante y en la agencia. (La primera corrida, contra lo de antes, mandaba la foto con `setInputFiles` y por eso
+  llegaba YA como octet-stream: no vale de careo. El careo del tipo lo hacen el medidor y el emulador.)
 - La vista previa del logo (aliados) y del anuncio (panel) es un `img` cuya dirección lleva `firebasestorage` y la
   carpeta con la barra escapada (`restaurantes%2F…%2Flogo_`, `anuncios%2Fanuncio_`).
 - Aliados: Configuración → «Datos del restaurante» (o «Datos de la agencia» con agencia@gg.test). Si ya hay logo, sale
