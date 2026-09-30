@@ -49,7 +49,7 @@ import { pedirGps } from './pedirGps';
 import { direccionDePunto, textoDeCoordenadas } from './direccionDePunto';
 import { ponerSugerencias } from './sugerenciasDeDirecciones';
 // G33: qué paso ve el cliente según el estado que puso el negocio, en una sola tabla.
-import { PASOS_DEL_CLIENTE, indiceDelPaso, yaLlegoAlCliente, terminadoParaElCliente, etiquetaParaElCliente, quienCanceloElPedido, METODOS_PAGO } from './estadosPedido';
+import { PASOS_DEL_CLIENTE, indiceDelPaso, yaLlegoAlCliente, terminadoParaElCliente, etiquetaParaElCliente, quienCanceloElPedido, numeroDelPedido, METODOS_PAGO } from './estadosPedido';
 // G83: qué calificaciones cuentan y cuánto da el promedio del negocio, en una sola pieza (copia idéntica en aliados).
 import { lasQueCuentan, promedioDelNegocio, promediosPorNegocio } from './estrellasNegocio';
 // G88: «Mis pedidos» se recuerda en el teléfono con la pieza única (la misma de «Mis reservas»).
@@ -348,7 +348,7 @@ function Restaurantes({ nombre, onVolver, foto, onCerrarSesion, onIrPerfil, onIr
         creado: serverTimestamp(),
       });
       pegarToken(ref);
-      setNumeroPedido(ref.id.slice(-5).toUpperCase());
+      setNumeroPedido(numeroDelPedido(ref.id));
       recordar(MIS_PEDIDOS, ref.id);
       // Registrar el uso de las promociones (por dispositivo y por teléfono)
       if (promosEnCarrito.length > 0) {
@@ -1066,14 +1066,14 @@ function Restaurantes({ nombre, onVolver, foto, onCerrarSesion, onIrPerfil, onIr
               return (
                 <div
                   key={p.id}
-                  onClick={() => { setPedidoId(p.id); setNumeroPedido((p.id || '').slice(-5).toUpperCase()); setPantalla('seguimiento'); }}
+                  onClick={() => { setPedidoId(p.id); setNumeroPedido(numeroDelPedido(p.id)); setPantalla('seguimiento'); }}
                   style={{ background: 'linear-gradient(135deg, #FFFFFF, #ECECEF)', borderRadius: '16px', padding: '16px', marginBottom: '12px', border: '1px solid #ECECEF', cursor: 'pointer' }}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
                     <p style={{ color: '#1A1A1E', fontWeight: '900', fontSize: '15px', margin: '0' }}>{p.restauranteNombre || 'Restaurante'}</p>
                     <span style={{ background: cancelado ? '#FF4444' : 'linear-gradient(135deg, #FFCF4D, #FF7A2F)', color: '#FFFFFF', fontSize: '12px', fontWeight: '900', borderRadius: '20px', padding: '4px 12px', whiteSpace: 'nowrap' }}>{est}</span>
                   </div>
-                  <p style={{ color: '#6B7280', fontSize: '12px', margin: '0' }}>Pedido #{(p.id || '').slice(-5).toUpperCase()} · {cop(p.total || 0)}</p>
+                  <p style={{ color: '#6B7280', fontSize: '12px', margin: '0' }}>Pedido #{numeroDelPedido(p.id)} · {cop(p.total || 0)}</p>
                   {p.tiempoEstimado && !terminadoParaElCliente(p.estado) && (
                     <p style={{ color: '#FF7A2F', fontSize: '12px', fontWeight: 'bold', margin: '4px 0 0' }}>⏱️ Listo en ~{p.tiempoEstimado} min</p>
                   )}

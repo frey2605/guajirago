@@ -84,3 +84,11 @@ export const quienCanceloElPedido = (pedido) => {
 // El pedido guarda el nombre tal cual (`metodoPago`, y `metodo` en cada renglón de `pagos`), o 'Mixto' si se pagó con
 // varios: cambiar un nombre aquí deja los pedidos viejos en «Sin especificar» del corte de caja.
 export const METODOS_PAGO = ['Efectivo', 'Nequi', 'Daviplata', 'Tarjeta'];
+
+// ¿QUÉ NÚMERO LLEVA EL PEDIDO? — gemelo G94, 30-sep-2026.
+// PIEZA COMPARTIDA: el número corto del pedido («Pedido #ABCDE») son las 5 últimas letras de su id, en mayúsculas.
+// Lo enseñan la app del cliente (Restaurantes.js) y el restaurante (aliados: HistorialDomicilios.js y PedidosDomicilio.js,
+// en la tarjeta, el recibo, la comanda, el WhatsApp y el chat), y cliente y restaurante lo usan para hablar del MISMO pedido.
+// Este bloque está IGUAL, letra por letra, en guajirago/src/estadosPedido.js y en guajirago-aliados/src/flujoPedidos.js
+// (otro repo, no puede importarlo): lo atan pruebas/numeroPedido.test.js y scripts/medir-numero-pedido.cjs.
+export const numeroDelPedido = (id) => (id || '').slice(-5).toUpperCase();

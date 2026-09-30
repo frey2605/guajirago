@@ -22,6 +22,8 @@ const fs = require('fs');
 const path = require('path');
 const { execFileSync } = require('child_process');
 const { cargarDeLaApp } = require('../pruebas/cargar.cjs');
+// G94: la tarjeta del pedido de aliados arma su «pedido #ABCDE» con numeroDelPedido (flujoPedidos.js): se le da la pieza.
+const { numeroDelPedido } = cargarDeLaApp('guajirago-aliados/src/flujoPedidos.js');
 
 const RAIZ = path.resolve(__dirname, '..');
 const args = process.argv.slice(2);
@@ -101,7 +103,7 @@ const SITIOS = [
   ['app · Turismo (WhatsApp de la agencia)', 'guajirago/src/Turismo.js',
     porEnlace((tel) => ({ agenciaActiva: { telefono: tel } }))],
   ['aliados · pedido a domicilio', 'guajirago-aliados/src/PedidosDomicilio.js',
-    porEnlace((tel) => ({ p: { telefono: tel, cliente: 'Ana', id: 'abc12345' }, nombreRestaurante: 'X' }))],
+    porEnlace((tel) => ({ p: { telefono: tel, cliente: 'Ana', id: 'abc12345' }, nombreRestaurante: 'X', numeroDelPedido }))],
   ['aliados · reserva de turismo', 'guajirago-aliados/src/ReservasTurismo.js', (texto, piezas) => (tel) => {
     const i = texto.indexOf('const waLink = ');
     if (i < 0) return '¿?';
