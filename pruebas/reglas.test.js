@@ -55,7 +55,9 @@ beforeEach(async () => {
 
     // Los tres personajes
     await setDoc(doc(db, 'usuarios/pasajero1'), { nombre: 'Ana', rol: '' });
-    await setDoc(doc(db, 'usuarios/conductor1'), { nombre: 'Luis', rol: '', tipo: 'conductor' });
+    // P04: un conductor de verdad tiene saldo; sin él las reglas no le dejan ofertar.
+    await setDoc(doc(db, 'usuarios/conductor1'), { nombre: 'Luis', rol: '', tipo: 'conductor', creditos: 10000 });
+    await setDoc(doc(db, 'usuarios/conductor2'), { nombre: 'Carlos', rol: '', tipo: 'conductor', creditos: 10000 });
     await setDoc(doc(db, 'usuarios/eladmin'), { nombre: 'Admin', rol: 'admin' });
     await setDoc(doc(db, 'usuarios/eljefe'), { nombre: 'Jefe', rol: 'superadmin' });
     // Un conductor castigado: es el que más ganas tiene de tocarse la ficha.
@@ -5074,5 +5076,74 @@ describe('SEGURIDAD · una promoción la escribe solo el administrador', () => {
       t.set(refUso, { veces: 1, ultimoUso: '2026-09-29T00:00:00.000Z', nombreUsuario: 'Ana' }, { merge: true });
       t.update(refPromo, { usosTotales: 1, inversionTotal: 8000 });
     }));
+  });
+});
+
+// ── P04 · SIN SALDO PARA LA COMISIÓN NO SE ENTRA A LA SUBASTA (30-sep-2026) ──
+// Palabras del dueño: «no debería ni dejarlo participar en la subasta, es decir, solo ve las ofertas pero no puede
+// enviar una aceptación, confirmación o contraoferta, solo puede ver». La regla de contraofertas lleva una COPIA de
+// la comisión del servidor (functions/comisiones.cjs): aquí se EJECUTA con los mismos tipos y configuraciones, y el
+// borde (saldo = comisión pasa, un peso menos no) tiene que ser la cifra que da el servidor.
+describe('P04 · sin saldo para la comisión de ESE viaje no se oferta', () => {
+  const { comisionSegunTipoDeViaje } = require('../guajirago/functions/comisiones.cjs');
+  const TIPOS = ['Taxi', 'Mototaxi', 'Mensajería', undefined];
+  const CONFIGS = [null, { comisionTaxi: 500, comisionMototaxi: 250, comisionDomicilio: 1200 }, { comisionTaxi: 900 }];
+  const oferta = { conductorId: 'condP4', tipoOferta: 'acepta', monto: '$ 9.000', montoValor: 9000, vigente: true };
+  const sembrarCaso = async (tipo, cfg, saldo, conOferta = false) => {
+    await entorno.withSecurityRulesDisabled(async (ctx) => {
+      const { doc, setDoc, deleteDoc } = FS;
+      const db = ctx.firestore();
+      if (cfg) await setDoc(doc(db, 'config/global'), cfg); else await deleteDoc(doc(db, 'config/global'));
+      await setDoc(doc(db, 'usuarios/condP4'), { nombre: 'Luis', tipo: 'conductor', creditos: saldo });
+      await setDoc(doc(db, 'viajes/vp4'), { pasajeroId: 'pasajero1', estado: 'esperando', tarifaValor: 9000,
+        ...(tipo === undefined ? {} : { tipo }) });
+      if (conOferta) await setDoc(doc(db, 'viajes/vp4/contraofertas/condP4'), oferta);
+    });
+  };
+
+  for (const cfg of CONFIGS) {
+    for (const tipo of TIPOS) {
+      const c = comisionSegunTipoDeViaje(tipo, cfg || {});
+      it('viaje ' + (tipo || '(sin tipo)') + ', config ' + JSON.stringify(cfg) + ': con ' + c + ' oferta, con ' + (c - 1) + ' no', async () => {
+        const { doc, setDoc } = FS;
+        await sembrarCaso(tipo, cfg, c);
+        await RUT.assertSucceeds(setDoc(doc(como('condP4'), 'viajes/vp4/contraofertas/condP4'), oferta, { merge: true }),
+          'con el saldo justo igual a la comisión del servidor (' + c + ') tiene que poder ofertar');
+        await entorno.withSecurityRulesDisabled(async (ctx) => { await FS.deleteDoc(FS.doc(ctx.firestore(), 'viajes/vp4/contraofertas/condP4')); });
+        await sembrarCaso(tipo, cfg, c - 1);
+        await RUT.assertFails(setDoc(doc(como('condP4'), 'viajes/vp4/contraofertas/condP4'), oferta, { merge: true }),
+          'con un peso menos que la comisión del servidor (' + c + ') ofertó');
+      });
+    }
+  }
+
+  it('sin saldo tampoco puede AJUSTAR (contraofertar) una oferta que ya tenía', async () => {
+    const { doc, setDoc } = FS;
+    await sembrarCaso('Taxi', null, 0, true);
+    await RUT.assertFails(setDoc(doc(como('condP4'), 'viajes/vp4/contraofertas/condP4'),
+      { ...oferta, tipoOferta: 'contraoferta', montoValor: 12000, monto: '$ 12.000' }, { merge: true }));
+  });
+
+  it('sin saldo SÍ puede retirar su oferta, y el pasajero SÍ puede descartarla', async () => {
+    const { doc, updateDoc } = FS;
+    await sembrarCaso('Taxi', null, 0, true);
+    await RUT.assertSucceeds(updateDoc(doc(como('condP4'), 'viajes/vp4/contraofertas/condP4'), { vigente: false }));
+    await RUT.assertSucceeds(updateDoc(doc(como('pasajero1'), 'viajes/vp4/contraofertas/condP4'), { vigente: false }));
+  });
+
+  it('una ficha sin saldo guardado, o sin ficha, no oferta', async () => {
+    const { doc, setDoc } = FS;
+    await sembrarCaso('Taxi', null, 5000);
+    await entorno.withSecurityRulesDisabled(async (ctx) => {
+      await FS.setDoc(FS.doc(ctx.firestore(), 'usuarios/condP4'), { nombre: 'Luis', tipo: 'conductor' });
+    });
+    await RUT.assertFails(setDoc(doc(como('condP4'), 'viajes/vp4/contraofertas/condP4'), oferta, { merge: true }));
+    await RUT.assertFails(setDoc(doc(como('sinFicha'), 'viajes/vp4/contraofertas/sinFicha'), { ...oferta, conductorId: 'sinFicha' }));
+  });
+
+  it('sin saldo sigue VIENDO su oferta', async () => {
+    const { doc, getDoc } = FS;
+    await sembrarCaso('Taxi', null, 0, true);
+    await RUT.assertSucceeds(getDoc(doc(como('condP4'), 'viajes/vp4/contraofertas/condP4')));
   });
 });

@@ -1,15 +1,20 @@
 #!/usr/bin/env node
-// 🤖 SIN SALDO PARA LA COMISIÓN NO SE CONFIRMA — pendiente P04 (30-sep-2026).
-// Decisión del dueño: «si al conductor no le alcanza el saldo para la comisión, el servidor no lo confirma y al pasajero
-// le sale un aviso para escoger otra oferta. El saldo nunca queda negativo.»
+// 🤖 SIN SALDO PARA LA COMISIÓN NO SE ENTRA A LA SUBASTA — pendiente P04 (30-sep-2026).
+// Palabras del dueño: «no debería ni dejarlo participar en la subasta, es decir, solo ve las ofertas pero no puede
+// enviar una aceptación, confirmación o contraoferta, solo puede ver». Y si el saldo le baja DESPUÉS de ofertar,
+// confirmarConductor no lo confirma y el pasajero ve «Escoge otra oferta» (última defensa).
 //
-// Arma el caso en PRUEBAS, por la pantalla del pasajero:
-//   1. como superadmin de prueba (admin@gg.test) guarda los créditos del taxista de prueba (taxi@gg.test) y se los
-//      pone en 0 (la comisión de taxi es mayor que 0);
-//   2. abre la app como el pasajero de prueba (pasajero@gg.test) y pide un Taxi por la pantalla;
-//   3. el taxista deja su oferta en ese viaje, y el pasajero la ve y toca «✅ Aceptar»;
-//   4. exige: la ventanita dice «Este conductor no puede tomar el viaje ahora. Escoge otra oferta.», la oferta sale de
-//      la lista, el viaje sigue `esperando` sin conductor y los créditos del taxista siguen en 0 (no se cobró nada).
+// Arma el caso en PRUEBAS, con dos pantallas:
+//   1. abre la app como el taxista de prueba (taxi@gg.test), con saldo, y se pone disponible;
+//   2. abre OTRA app como el pasajero de prueba (pasajero@gg.test) y pide un Taxi por la pantalla;
+//   3. el taxista deja su oferta mientras TIENE saldo (así el pasajero tiene una oferta que aceptar);
+//   4. como superadmin de prueba (admin@gg.test) le pone los créditos del taxista en 0;
+//   5. LADO DEL CONDUCTOR: sigue VIENDO el viaje en su lista; toca «✅ Aceptar viaje» y ve la ventanita
+//      «Te falta saldo»; toca + y «💬 Enviar contraoferta» y otra vez «Te falta saldo»; y si escribe la oferta
+//      directo en la base (saltándose la app), la base la NIEGA;
+//   6. LADO DEL PASAJERO: toca «✅ Aceptar» en la oferta que dejó antes y ve «Este conductor no puede tomar el viaje
+//      ahora. Escoge otra oferta.»; la oferta sale de la lista, el viaje sigue `esperando` sin conductor y los créditos
+//      del taxista siguen en 0 (no se cobró nada).
 // Al final: el pasajero cancela su viaje, y los créditos y la ficha del taxista quedan EXACTAMENTE como estaban.
 // Deja en pruebas UN viaje `cancelado`. No cuesta comisión (ese es el punto).
 //   node robot/sin-saldo-confirmar.cjs
@@ -19,6 +24,7 @@ const LAT = 11.5444;
 const LNG = -72.9072;
 const ORIGEN = 'Calle 1 # 1-1 robot P04 ' + Date.now().toString().slice(-5);
 const FRASE = 'Este conductor no puede tomar el viaje ahora. Escoge otra oferta.';
+const TE_FALTA = 'Te falta saldo';
 const NOMBRE = 'Robot Sin Saldo';
 
 const antesDeCargar = '(' + ((lat, lng) => {
@@ -31,6 +37,28 @@ const antesDeCargar = '(' + ((lat, lng) => {
   Object.defineProperty(navigator, 'geolocation', { value: geo, configurable: true });
 }) + ')(' + LAT + ',' + LNG + ');';
 
+async function entrar(p, correo) {
+  await p.getByRole('button', { name: 'Ya tengo cuenta' }).click();
+  await p.waitForTimeout(800);
+  await p.fill('input[placeholder="Correo electrónico"]', correo);
+  await p.fill('input[placeholder="Contraseña"]', claveDePruebas());
+  await p.getByRole('button', { name: /Entrar a GuajiraGo/ }).click();
+  await p.waitForTimeout(8000);
+}
+
+async function esperarTexto(r, que, veces = 30) {
+  for (let i = 0; i < veces; i += 1) {
+    if ((await r.texto()).includes(que)) return true;
+    await r.pagina.waitForTimeout(500);
+  }
+  return false;
+}
+
+async function cerrarVentanita(p) {
+  const b = p.getByRole('button', { name: 'Entendido' });
+  if (await b.count()) { await b.last().click().catch(() => {}); await p.waitForTimeout(800); }
+}
+
 (async () => {
   const fallos = [];
   const adm = await entrarALaBase('admin@gg.test');
@@ -41,15 +69,30 @@ const antesDeCargar = '(' + ((lat, lng) => {
   const creditosAntes = (await adm.leer(fichaUsuario)).creditos;
   const condAntes = await tax.leer(fichaCond).catch(() => ({}));
   let idViaje = null;
+  let rc = null;
   let rp = null;
   try {
-    // 1: sin saldo, y libre (con una marca de otro viaje el servidor contestaría «ocupado» y no se vería lo de hoy).
-    await adm.cambiar(fichaUsuario, { creditos: 0 });
+    // Con saldo para poder ponerse disponible y dejar la oferta de antes (si en pruebas ya no le quedaba, se le da).
+    if (!(creditosAntes >= 10000)) await adm.cambiar(fichaUsuario, { creditos: 10000 });
     await tax.cambiar(fichaCond, { enViajeId: null, ocupado: false });
-    console.log('CRÉDITOS DEL TAXISTA DE PRUEBA:', creditosAntes, '→ 0');
+
+    // 1: el taxista, disponible.
+    rc = await abrir('transporte', { nombre: 'sin-saldo-taxista', antesDeCargar });
+    const c = rc.pagina;
+    await entrar(c, 'taxi@gg.test');
+    await c.getByText('Transporte y movilidad').click();
+    await c.waitForTimeout(2000);
+    await c.getByText('Soy conductor').click();
+    await c.waitForTimeout(4000);
+    await cerrarVentanita(c);
+    const estado = c.getByText(/Estoy disponible|No disponible/).first();
+    if (/No disponible/.test(await estado.innerText())) {
+      await estado.locator('xpath=following-sibling::div[1]').click();
+      await c.waitForTimeout(1000);
+    }
 
     // 2: el pasajero pide un Taxi (el id del viaje se saca de lo que la app le manda a Firestore).
-    rp = await abrir('transporte', { nombre: 'sin-saldo-confirmar', antesDeCargar });
+    rp = await abrir('transporte', { nombre: 'sin-saldo-pasajero', antesDeCargar });
     const p = rp.pagina;
     const vistos = new Set();
     p.on('request', (req) => {
@@ -57,12 +100,7 @@ const antesDeCargar = '(' + ((lat, lng) => {
       try { b = decodeURIComponent(req.postData() || ''); } catch (e) { b = req.postData() || ''; }
       for (const m of b.matchAll(/documents\/viajes\/([A-Za-z0-9]{20})/g)) vistos.add(m[1]);
     });
-    await p.getByRole('button', { name: 'Ya tengo cuenta' }).click();
-    await p.waitForTimeout(800);
-    await p.fill('input[placeholder="Correo electrónico"]', 'pasajero@gg.test');
-    await p.fill('input[placeholder="Contraseña"]', claveDePruebas());
-    await p.getByRole('button', { name: /Entrar a GuajiraGo/ }).click();
-    await p.waitForTimeout(8000);
+    await entrar(p, 'pasajero@gg.test');
     for (const paso of ['Transporte y movilidad', 'Soy pasajero']) {
       const x = p.getByText(paso, { exact: true });
       if (await x.count()) { await x.first().click(); await p.waitForTimeout(2500); }
@@ -80,27 +118,57 @@ const antesDeCargar = '(' + ((lat, lng) => {
     idViaje = ids[0];
     console.log('VIAJE:', idViaje);
 
-    // 3: la oferta del taxista, y el pasajero la acepta por la pantalla.
-    await tax.cambiar('viajes/' + idViaje + '/contraofertas/' + tax.uid, {
+    // 3: la oferta de antes, con saldo.
+    const oferta = {
       conductorId: tax.uid, conductorNombre: NOMBRE, conductorTelefono: '', conductorPlaca: 'ROB004', conductorVehiculo: 'Taxi',
       tipoOferta: 'acepta', monto: '$ 8.000', montoValor: 8000, creado: new Date().toISOString(), vigente: true,
-    });
-    let ve = false;
-    for (let i = 0; i < 30 && !ve; i += 1) { await p.waitForTimeout(500); ve = (await rp.texto()).includes(NOMBRE); }
-    if (!ve) throw new Error('la oferta del taxista no apareció en la pantalla del pasajero');
+    };
+    await tax.cambiar('viajes/' + idViaje + '/contraofertas/' + tax.uid, oferta);
+
+    // 4: sin saldo.
+    await adm.cambiar(fichaUsuario, { creditos: 0 });
+    console.log('CRÉDITOS DEL TAXISTA DE PRUEBA:', creditosAntes, '→ 0');
+    await c.waitForTimeout(3000);
+
+    // 5: LADO DEL CONDUCTOR.
+    const veViaje = await esperarTexto(rc, ORIGEN, 40);
+    console.log('EL TAXISTA SIN SALDO:', veViaje ? 'VE el viaje en su lista' : 'NO ve el viaje');
+    if (!veViaje) fallos.push('el taxista sin saldo no ve el viaje en su lista (tiene que poder VER)');
+    await rc.captura('taxista-ve-el-viaje');
+    if (veViaje) {
+      const tarjeta = c.locator('div', { hasText: ORIGEN }).filter({ has: c.getByRole('button', { name: /Aceptar viaje/ }) }).last();
+      await tarjeta.getByRole('button', { name: /Aceptar viaje/ }).click();
+      const avisoAceptar = await esperarTexto(rc, TE_FALTA, 10);
+      await rc.captura('taxista-aceptar');
+      console.log('AL ACEPTAR:', avisoAceptar ? 'ventanita «' + TE_FALTA + '»' : 'SIN ventanita');
+      if (!avisoAceptar) fallos.push('al tocar «Aceptar viaje» sin saldo no salió «' + TE_FALTA + '»');
+      await cerrarVentanita(c);
+      await tarjeta.getByRole('button', { name: '+' }).click();
+      await c.waitForTimeout(500);
+      await tarjeta.getByRole('button', { name: /Enviar contraoferta/ }).click();
+      const avisoContra = await esperarTexto(rc, TE_FALTA, 10);
+      await rc.captura('taxista-contraoferta');
+      console.log('AL CONTRAOFERTAR:', avisoContra ? 'ventanita «' + TE_FALTA + '»' : 'SIN ventanita');
+      if (!avisoContra) fallos.push('al tocar «Enviar contraoferta» sin saldo no salió «' + TE_FALTA + '»');
+      await cerrarVentanita(c);
+    }
+    let negada = false;
+    try {
+      await tax.cambiar('viajes/' + idViaje + '/contraofertas/' + tax.uid, { tipoOferta: 'contraoferta', monto: '$ 9.000', montoValor: 9000, vigente: true });
+    } catch (e) { negada = /rechazó/.test(e.message); }
+    console.log('OFERTA ESCRITA DIRECTO EN LA BASE SIN SALDO:', negada ? 'NEGADA por las reglas' : '🔴 ENTRÓ');
+    if (!negada) fallos.push('la base dejó escribir una contraoferta sin saldo');
+
+    // 6: LADO DEL PASAJERO (la última defensa).
+    const veOferta = await esperarTexto(rp, NOMBRE, 30);
+    if (!veOferta) throw new Error('la oferta del taxista no apareció en la pantalla del pasajero');
     await rp.captura('oferta');
     await p.getByRole('button', { name: '✅ Aceptar' }).first().click();
-
-    // 4: la ventanita con la frase, y la oferta fuera de la lista.
-    let aviso = false;
-    for (let i = 0; i < 40 && !aviso; i += 1) { await p.waitForTimeout(500); aviso = (await rp.texto()).includes(FRASE); }
+    const aviso = await esperarTexto(rp, FRASE, 40);
     await rp.captura('aviso');
-    const texto = await rp.texto();
-    console.log('LA VENTANITA:', aviso ? 'dice «' + FRASE + '»' : 'NO dice la frase');
+    console.log('LA VENTANITA DEL PASAJERO:', aviso ? 'dice «' + FRASE + '»' : 'NO dice la frase');
     if (!aviso) fallos.push('el pasajero no vio «' + FRASE + '»');
-    if (texto.includes('Oferta aceptada')) fallos.push('la pantalla dice «Oferta aceptada»');
-    const entendido = p.getByRole('button', { name: 'Entendido' });
-    if (await entendido.count()) { await entendido.last().click().catch(() => {}); await p.waitForTimeout(1000); }
+    await cerrarVentanita(p);
     const sigue = (await rp.texto()).includes(NOMBRE);
     console.log('LA OFERTA:', sigue ? 'SIGUE en la lista' : 'salió de la lista');
     if (sigue) fallos.push('la oferta del conductor sin saldo sigue ofreciéndose');
@@ -112,9 +180,11 @@ const antesDeCargar = '(' + ((lat, lng) => {
     if (viaje.estado !== 'esperando') fallos.push('el viaje salió del mercado: ' + viaje.estado);
     if (viaje.conductorId) fallos.push('el viaje quedó con conductor');
     if (creditos !== 0) fallos.push('se movieron los créditos del taxista: ' + creditos);
-    console.log('ERRORES DE LA PÁGINA:', rp.errores.join(' || ') || 'ninguno');
-    console.log('CAPTURAS:', rp.carpeta);
+    console.log('ERRORES DE LA PÁGINA (taxista):', rc.errores.join(' || ') || 'ninguno');
+    console.log('ERRORES DE LA PÁGINA (pasajero):', rp.errores.join(' || ') || 'ninguno');
+    console.log('CAPTURAS:', rc.carpeta, '·', rp.carpeta);
   } finally {
+    if (rc) await rc.cerrar();
     if (rp) await rp.cerrar();
     if (idViaje) {
       await pas.cambiar('viajes/' + idViaje, { estado: 'cancelado', canceladoPor: 'pasajero', razonCancelacion: 'ROBOT P04: fin del recorrido' })
@@ -123,7 +193,7 @@ const antesDeCargar = '(' + ((lat, lng) => {
     }
     await adm.cambiar(fichaUsuario, { creditos: creditosAntes ?? 0 })
       .catch((e) => console.log('⚠ no pude devolver los créditos del taxista:', e.message));
-    await tax.cambiar(fichaCond, { enViajeId: condAntes.enViajeId ?? null, ocupado: condAntes.ocupado ?? false })
+    await tax.cambiar(fichaCond, { enViajeId: condAntes.enViajeId ?? null, ocupado: condAntes.ocupado ?? false, activo: condAntes.activo ?? false })
       .catch((e) => console.log('⚠ no pude dejar la ficha del taxista como estaba:', e.message));
     const quedo = (await adm.leer(fichaUsuario).catch(() => ({}))).creditos;
     console.log('CRÉDITOS DEL TAXISTA DE PRUEBA QUEDARON EN:', quedo, quedo === creditosAntes ? '(como estaban)' : '🔴 (antes ' + creditosAntes + ')');
@@ -131,6 +201,6 @@ const antesDeCargar = '(' + ((lat, lng) => {
   }
 
   console.log(fallos.length ? '🔴 FALLÓ:\n  · ' + fallos.join('\n  · ')
-    : '✓ sin saldo para la comisión: el pasajero ve «' + FRASE + '», la oferta sale, el viaje sigue libre y no se cobra nada');
+    : '✓ sin saldo: el taxista ve el viaje pero no puede aceptar ni contraofertar («' + TE_FALTA + '», y la base lo niega); el pasajero ve «' + FRASE + '», la oferta sale y no se cobra nada');
   process.exit(fallos.length ? 1 : 0);
 })().catch((e) => { console.log('🔴 ' + e.message.split('\n')[0]); process.exit(1); });

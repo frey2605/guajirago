@@ -19,6 +19,8 @@
  * 2. DATOS (producción): las fichas de conductor y su saldo contra la comisión de config/global (cuántas en negativo,
  *    cuántas por debajo de la comisión más barata que pueden tomar y de la de taxi), los viajes que cobraron comisión,
  *    y las ofertas VIGENTES en viajes del mercado cuyo conductor hoy no alcanza (las que P04 ya no dejaría confirmar).
+ * 3. QUIÉN ESCRIBE LAS OFERTAS: cada escritura a `contraofertas` en las tres apps (P04: desde la precisión del dueño,
+ *    la regla de Firestore niega la oferta de quien no tiene saldo para la comisión de ESE viaje; ver reglas.test.js).
  * No escribe nada. No imprime nombres: los uid van recortados.
  */
 const { cargarIndex, conRegistro } = require('../pruebas/nubeDeMentira.cjs');
@@ -107,6 +109,24 @@ function revisarDatos({ usuarios, viajes, ofertas = [], config = {} }) {
   return { conductores, negativos, bajoSuMinimo, bajoTaxi, cobrados, plataCobrada, vivas, noAlcanzan, total };
 }
 
+/** Cada renglón de las tres apps que ESCRIBE en la subcolección `contraofertas` (setDoc/updateDoc/addDoc). */
+function escritoresDeOfertas() {
+  const fsx = require('fs');
+  const path = require('path');
+  const raiz = path.resolve(__dirname, '..');
+  const salida = [];
+  for (const app of ['guajirago/src', 'guajirago-admin/src', 'guajirago-aliados/src']) {
+    const dir = path.join(raiz, app);
+    if (!fsx.existsSync(dir)) continue;
+    for (const a of fsx.readdirSync(dir).filter((x) => x.endsWith('.js'))) {
+      fsx.readFileSync(path.join(dir, a), 'utf8').split(/\r?\n/).forEach((l, i) => {
+        if (/contraofertas/.test(l) && /\b(setDoc|updateDoc|addDoc)\(/.test(l)) salida.push({ archivo: app + '/' + a, renglon: i + 1, texto: l.trim() });
+      });
+    }
+  }
+  return salida;
+}
+
 const corto = (id) => String(id).slice(0, 8) + '…';
 const pesos = (n) => '$' + Number(n).toLocaleString('es-CO');
 
@@ -122,6 +142,9 @@ async function main() {
     console.log('      saldo después: ' + (x.saldoDespues === null ? '(no se toca)' : x.saldoDespues)
       + ' · viaje: ' + (x.viaje ? JSON.stringify(x.viaje) : '(no se toca)') + ' · escrituras: ' + x.escrituras);
   }
+  const esc = escritoresDeOfertas();
+  console.log('── QUIÉN ESCRIBE LAS OFERTAS (tres apps) ── ' + esc.length);
+  for (const x of esc) console.log('  · ' + x.archivo + ':' + x.renglon + '  ' + x.texto.slice(0, 110));
   if (process.argv.includes('--sin-red')) return;
   const { traer, doc } = require('./nube.cjs');
   const [u, v, c] = await Promise.all([traer('usuarios'), traer('viajes'), traer('config')]);
@@ -148,6 +171,6 @@ async function main() {
   console.log('OFERTAS VIGENTES EN VIAJES DEL MERCADO: ' + d.vivas.length + ' · de un conductor al que hoy no le alcanza: ' + d.noAlcanzan.length);
 }
 
-module.exports = { medirCodigo, correrCaso, revisarDatos, CASOS, CONFIG };
+module.exports = { medirCodigo, correrCaso, revisarDatos, escritoresDeOfertas, CASOS, CONFIG };
 
 if (require.main === module) main().catch((e) => { console.error(e.message); process.exit(1); });

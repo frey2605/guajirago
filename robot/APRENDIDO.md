@@ -27,7 +27,7 @@
 | `node robot/radio-panel.cjs` | 👑 Superadmin: con el radio de búsqueda borrado (queda en 0) no guarda, lo dice, y config/global no cambia |
 | `node robot/portero.cjs [horas]` | cuántas llamadas llegaron a pruebas con el sello de App Check (solo lectura) |
 | `node robot/me-aceptaron.cjs` | el pasajero acepta a los 12 min de pedir (confirmarConductor en pruebas) y la app del conductor dice «¡Trato hecho!» y va a recoger (G24) |
-| `node robot/sin-saldo-confirmar.cjs` | con el taxista de prueba en 0 créditos (lo pone admin@ y se los devuelve), el pasajero toca «✅ Aceptar» en su oferta y ve «Este conductor no puede tomar el viaje ahora. Escoge otra oferta.»; la oferta sale, el viaje sigue libre y no se cobra nada (P04) |
+| `node robot/sin-saldo-confirmar.cjs` | con el taxista de prueba en 0 créditos (lo pone admin@ y se los devuelve): el taxista VE el viaje, pero «✅ Aceptar viaje» y «💬 Enviar contraoferta» sacan «Te falta saldo» y la base niega la oferta escrita a mano; el pasajero toca «✅ Aceptar» en la oferta que el taxista dejó cuando tenía saldo y ve «Este conductor no puede tomar el viaje ahora. Escoge otra oferta.»; la oferta sale, el viaje sigue libre y no se cobra nada (P04) |
 | `node robot/espera-conductor.cjs` | con 300 s en el panel de pruebas, el taxista aprieta «Llegué al punto» y su reloj y el del pasajero arrancan los dos de 5:00 (G26) |
 | `node robot/vencer-busqueda.cjs` | el pasajero pide un taxi, se acaba el plazo de 2 min: «No encontramos conductor» y el viaje queda vencido con fecha, quién y por qué (G27) |
 | `node robot/limite-favoritos.cjs` | con el tope de favoritos en 2 en el panel de pruebas, la Ayuda y la ventanita «Llegaste al límite» dicen 2 lugares y no se guarda un tercero (G35) |

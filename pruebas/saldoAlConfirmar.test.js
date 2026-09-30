@@ -146,6 +146,16 @@ describe('P04 · el pasajero ve el aviso y la oferta sale de la lista', () => {
   });
 });
 
+describe('P04 · quién escribe las ofertas (la regla de contraofertas cubre a todos)', () => {
+  it('solo tres escrituras en las tres apps: la oferta del conductor, y dos que solo la retiran (vigente: false)', () => {
+    const esc = M.escritoresDeOfertas();
+    assert.strictEqual(esc.length, 3, 'apareció otra escritura a contraofertas: ¿pide saldo la regla para ella?\n'
+      + esc.map((x) => x.archivo + ':' + x.renglon).join('\n'));
+    assert.strictEqual(esc.filter((x) => /setDoc\(/.test(x.texto) && x.archivo === 'guajirago/src/AppConductor.js').length, 1);
+    assert.strictEqual(esc.filter((x) => /updateDoc\(/.test(x.texto) && /vigente: false/.test(x.texto)).length, 2);
+  });
+});
+
 describe('P04 · el medidor de producción cuenta bien', () => {
   it('negativos, por debajo de su comisión, y ofertas vivas que ya no se confirmarían', () => {
     const cfg = { comisionTaxi: 800, comisionMototaxi: 400, comisionDomicilio: 1000 };

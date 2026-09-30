@@ -229,10 +229,10 @@ const RECORRIDOS = [
   },
   {
     nombre: 'sin-saldo-confirmar',
-    que: 'con el taxista de prueba en 0 créditos, el pasajero acepta su oferta y ve «Este conductor no puede tomar el viaje ahora. Escoge otra oferta.»; la oferta sale de la lista, el viaje sigue libre y no se cobra nada (P04; le devuelve los créditos)',
+    que: 'con el taxista de prueba en 0 créditos: VE el viaje pero al aceptar o contraofertar sale «Te falta saldo» y la base niega la oferta escrita a mano; el pasajero acepta la oferta que dejó antes y ve «Este conductor no puede tomar el viaje ahora. Escoge otra oferta.»; la oferta sale, el viaje sigue libre y no se cobra nada (P04; le devuelve los créditos)',
     archivo: 'sin-saldo-confirmar.cjs',
     // Qué hace el servidor con cada saldo (de sobra, justo, de menos) lo EJECUTA pruebas/saldoAlConfirmar.test.js.
-    vigila: ['guajirago/src/Solicitar.js', 'guajirago/src/avisoRechazo.js'],
+    vigila: ['guajirago/src/Solicitar.js', 'guajirago/src/avisoRechazo.js', 'guajirago/src/AppConductor.js', 'guajirago/src/textosViaje.js'],
   },
   {
     nombre: 'espera-conductor',

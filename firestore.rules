@@ -684,15 +684,42 @@ service cloud.firestore {
         // pasajero), así que hoy la app se lo permitiría — pero no hay ni un solo
         // uso legítimo: nadie se lleva a sí mismo. Y en la base viva, medido el
         // 25-ago-2026: 0 contraofertas en los 91 viajes. No hay nada que romper.
+        // ── P04 · SIN SALDO PARA LA COMISIÓN NO SE ENTRA A LA SUBASTA (30-sep-2026) ──
+        // Palabras del dueño: «no debería ni dejarlo participar en la subasta, es
+        // decir, solo ve las ofertas pero no puede enviar una aceptación,
+        // confirmación o contraoferta». La oferta (aceptar el precio o
+        // contraofertar) la escribe el teléfono del conductor aquí, así que se
+        // cierra aquí: su saldo (`creditos` de su ficha) tiene que alcanzar la
+        // comisión de ESTE viaje. Retirarla (`vigente: false`) no pide saldo.
+        //
+        // 🔴 COPIA de la regla del servidor (functions/comisiones.cjs,
+        // `comisionSegunTipoDeViaje`): las reglas no pueden importar nada. La ATA
+        // pruebas/reglas.test.js («P04»), que la EJECUTA con los mismos tipos y
+        // configuraciones y exige que el borde sea la cifra del servidor.
+        function comisionDeEsteViaje() {
+          let cfgRuta = /databases/$(database)/documents/config/global;
+          let cfg = exists(cfgRuta) ? get(cfgRuta).data : {};
+          let tipo = get(/databases/$(database)/documents/viajes/$(viajeId)).data.get('tipo', 'Taxi');
+          return tipo == 'Mototaxi' ? cfg.get('comisionMototaxi', 300)
+            : (tipo == 'Mensajería' ? cfg.get('comisionDomicilio', 1000) : cfg.get('comisionTaxi', 800));
+        }
+        function leAlcanzaElSaldo() {
+          let ficha = /databases/$(database)/documents/usuarios/$(request.auth.uid);
+          return exists(ficha) && get(ficha).data.get('creditos', 0) >= comisionDeEsteViaje();
+        }
         allow create: if request.auth != null
           && request.auth.uid == conductorId
           && get(/databases/$(database)/documents/viajes/$(viajeId)).data.get('pasajeroId', '')
-               != request.auth.uid;
+               != request.auth.uid
+          && leAlcanzaElSaldo();
         // Cambiarla: su conductor (`invalidarMisOtrasOfertas`) o el pasajero DE ESE
         // viaje, que marca como no vigentes las que perdieron
         // (`rechazarContraoferta`). Sin esto último se rompe elegir conductor.
+        // P04: el conductor que la deja VIGENTE (ajustar el precio) necesita saldo;
+        // para retirarla, no.
         allow update: if request.auth != null && (
-          request.auth.uid == conductorId ||
+          (request.auth.uid == conductorId
+            && (request.resource.data.get('vigente', true) == false || leAlcanzaElSaldo())) ||
           request.auth.uid == get(/databases/$(database)/documents/viajes/$(viajeId)).data.pasajeroId
         );
         allow delete: if false;
