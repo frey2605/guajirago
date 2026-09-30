@@ -47,7 +47,7 @@ import { pedirGps } from './pedirGps';
 import { direccionDePunto, textoDeCoordenadas } from './direccionDePunto';
 import { ponerSugerencias } from './sugerenciasDeDirecciones';
 // G33: qué paso ve el cliente según el estado que puso el negocio, en una sola tabla.
-import { PASOS_DEL_CLIENTE, indiceDelPaso, yaLlegoAlCliente, terminadoParaElCliente, etiquetaParaElCliente, quienCanceloElPedido } from './estadosPedido';
+import { PASOS_DEL_CLIENTE, indiceDelPaso, yaLlegoAlCliente, terminadoParaElCliente, etiquetaParaElCliente, quienCanceloElPedido, METODOS_PAGO } from './estadosPedido';
 // G83: qué calificaciones cuentan y cuánto da el promedio del negocio, en una sola pieza (copia idéntica en aliados).
 import { lasQueCuentan, promedioDelNegocio, promediosPorNegocio } from './estrellasNegocio';
 
@@ -69,8 +69,6 @@ const guardarMiPedidoId = (id) => { try { const arr = leerMisPedidosIds().filter
 
 // Botón de volver del módulo de restaurantes (azul, claro)
 const backBtn = { display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#EAF2FF', border: '1px solid #1C8EF9', borderRadius: '12px', padding: '9px 16px', color: '#1C8EF9', fontSize: '14px', fontWeight: 'bold', cursor: 'pointer' };
-
-const METODOS_PAGO = ['Efectivo', 'Nequi', 'Daviplata', 'Tarjeta'];
 
 // ¿El restaurante está abierto ahora? G46: la regla es UNA para restaurantes y agencias, en hora de Colombia
 // (horarioNegocio.js): no pausado a mano Y dentro de su horario; abrir y cerrar a la misma hora = las 24 horas.

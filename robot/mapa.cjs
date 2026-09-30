@@ -494,6 +494,15 @@ const RECORRIDOS = [
     vigila: ['guajirago/src/estadosPedido.js', 'guajirago-aliados/src/flujoPedidos.js', 'guajirago-aliados/src/PedidosDomicilio.js',
       'guajirago/src/Restaurantes.js'],
   },
+  {
+    nombre: 'metodos-pago',
+    que: 'la app (al pedir) y el cobro de la mesa en aliados ofrecen los mismos cuatro métodos de pago, y la mesa se cierra en Efectivo con su pago guardado (G85; reabre y cierra un pedido de mesa fijo en PRUEBAS)',
+    archivo: 'metodos-pago.cjs',
+    // Que los cuatro sitios (app, cierre del domicilio, mesa y corte de caja) usen la MISMA lista, y el careo con el
+    // código de antes, lo SACA de cada archivo y lo EJECUTA pruebas/metodosPago.test.js.
+    vigila: ['guajirago/src/estadosPedido.js', 'guajirago-aliados/src/flujoPedidos.js', 'guajirago-aliados/src/Mesero.js',
+      'guajirago/src/Restaurantes.js'],
+  },
 ];
 
 // Los archivos de pantalla: los que, si cambian, el robot debería poder probar. Todo lo que esté en

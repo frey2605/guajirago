@@ -692,6 +692,16 @@ la placa de `conductores/{uid}` (la escribe su GPS con la misma placa que va en 
 - Con el código de antes publicado en pruebas el recorrido sale 🔴: #VIE02 y #NAD03 salen «Rechazado por el
   restaurante» en aliados y «Cancelado por mí» en el cliente.
 
+### metodos-pago · la app y el cobro de la mesa ofrecen los mismos métodos (G85, 30-sep-2026)
+- 🪤 El Restaurante de Prueba NO tiene mesas (`numeroMesas` 0): «Tomar pedido» solo dice «El dueño aún no ha configurado
+  el número de mesas». El robot le pone 1 con `base.cambiar` como restaurante@gg.test y al final le devuelve el que tenía.
+- El restaurante SÍ puede crear un pedido de mesa en la base (firestore.rules: `esDelNegocio`), así que el pedido fijo
+  `pedidos/robotG85MESA1` (Mesa 1, un jugo de $ 5.000, `estado: 'tomado'`) lo escribe él; cada corrida lo reabre.
+- En el cobro «💳 Cerrar mesa» (sin dividir) cada método es un renglón: su nombre en un `span` y la caja del monto
+  (`input` con `placeholder="0"`) en un div al lado. El monto se escribe subiendo del span «Efectivo» a su renglón.
+- En la app los botones de pago son `span` hermanos: se leen los hijos del padre del que dice «Efectivo».
+- Con el código de ANTES publicado sale ✓ igual (G85 no cambia lo que se ve: la lista era la misma en todos lados).
+
 ## Lo que el robot dejó creado en pruebas
 
 - 27-sep-2026: «Robot Taxi De Prueba» (robot.taxi.1790508222079@gg.test) y
@@ -748,3 +758,6 @@ la placa de `conductores/{uid}` (la escribe su GPS con la misma placa que va en 
 - 29-sep-2026: tres pedidos FIJOS de pasajero@gg.test al Restaurante de Prueba, `pedidos/robotG84CLI01`,
   `pedidos/robotG84VIE02` y `pedidos/robotG84NAD03` ($ 5.000, «Calle Robot G84»), ya `cancelados`, de `quien-cancelo.cjs`.
   Cada corrida los reusa y les renueva la hora.
+- 30-sep-2026 en adelante: un pedido de MESA FIJO del Restaurante de Prueba, `pedidos/robotG85MESA1` (Mesa 1, un jugo de
+  $ 5.000), que cada corrida de `metodos-pago.cjs` reabre y cierra en Efectivo desde «💳 Cerrar mesa»: suma $ 5.000 al corte de
+  caja de pruebas de ese día y un jugo a `ventasPorPlato`. El número de mesas del restaurante se devuelve como estaba.

@@ -75,3 +75,12 @@ export const quienCanceloElPedido = (pedido) => {
   if (p.motivoCancelacion) return { quien: 'cliente', motivo };
   return { quien: null, motivo };
 };
+
+// ¿CÓMO SE PAGA UN PEDIDO? — gemelo G85, 30-sep-2026.
+// PIEZA COMPARTIDA: los métodos de pago de un pedido. La app del cliente los ofrece al pedir (Restaurantes.js) y el
+// restaurante al cerrar la venta del domicilio y de la mesa, y los cuenta en el corte de caja (aliados).
+// Este bloque está IGUAL, letra por letra, en guajirago/src/estadosPedido.js y en guajirago-aliados/src/flujoPedidos.js
+// (otro repo, no puede importarlo): lo atan pruebas/metodosPago.test.js y scripts/medir-metodos-pago.cjs.
+// El pedido guarda el nombre tal cual (`metodoPago`, y `metodo` en cada renglón de `pagos`), o 'Mixto' si se pagó con
+// varios: cambiar un nombre aquí deja los pedidos viejos en «Sin especificar» del corte de caja.
+export const METODOS_PAGO = ['Efectivo', 'Nequi', 'Daviplata', 'Tarjeta'];
