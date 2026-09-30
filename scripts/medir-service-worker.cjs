@@ -48,6 +48,42 @@ function juzgarSw(texto, env, configFirebaseDe) {
   return { proyecto: tiene.projectId || null, ok: distintos.length === 0, distintos };
 }
 
+/** (G93) El ícono y la insignia con que un SW pinta los avisos: los `icon:` y `badge:` de su showNotification. */
+function iconosDelSw(texto) {
+  const de = (campo) => ((String(texto).match(new RegExp('\\b' + campo + ':\\s*["\'`]([^"\'`]*)["\'`]')) || [])[1] || null);
+  return { icon: de('icon'), badge: de('badge') };
+}
+
+/**
+ * (G93) LO SERVIDO: en cada sitio, el ícono del manifest publicado (leído con iconoDelManifest del generador de
+ * la app, la misma pieza que llena el SW) contra el icon/badge del SW publicado; y el ícono se BAJA y se compara
+ * con el archivo de public/ del repo.
+ */
+async function medirIconoServido(raiz = RAIZ, pedir = fetch) {
+  const crypto = require('crypto');
+  const filas = [];
+  for (const app of APPS) {
+    const rutaGen = path.join(raiz, app, 'sw', 'generar-sw.cjs');
+    delete require.cache[require.resolve(rutaGen)];
+    const { iconoDelManifest } = require(rutaGen);
+    for (const amb of ['pruebas', 'produccion']) {
+      const base = SITIOS[app][amb];
+      const bajar = async (url) => { try { const r = await pedir(url + '?v=' + Date.now(), { cache: 'no-store' }); return { ok: r.ok !== false, tipo: (r.headers && r.headers.get && r.headers.get('content-type')) || '', buf: Buffer.from(await r.arrayBuffer()) }; } catch (e) { return { ok: false, tipo: '', buf: Buffer.alloc(0) }; } };
+      const sw = iconosDelSw((await bajar(base + '/' + NOMBRE_SW)).buf.toString('utf8'));
+      let manifest = null;
+      try { manifest = iconoDelManifest((await bajar(base + '/manifest.json')).buf.toString('utf8')); } catch (e) { manifest = null; }
+      const img = manifest ? await bajar(base + manifest) : { ok: false, tipo: '', buf: Buffer.alloc(0) };
+      const local = manifest && fs.existsSync(path.join(raiz, app, 'public', manifest)) ? fs.readFileSync(path.join(raiz, app, 'public', manifest)) : null;
+      const md5 = (b) => crypto.createHash('md5').update(b).digest('hex').slice(0, 8);
+      const esPng = img.buf.slice(0, 4).toString('hex') === '89504e47';
+      const igualAlRepo = !!local && img.buf.equals(local);
+      const ok = !!manifest && sw.icon === manifest && sw.badge === manifest && img.ok && esPng && igualAlRepo;
+      filas.push({ app, amb, url: base + (manifest || ''), manifest, icon: sw.icon, badge: sw.badge, bytes: img.buf.length, md5: md5(img.buf), esPng, igualAlRepo, ok });
+    }
+  }
+  return filas;
+}
+
 /** Los valores de configuración de los dos .env de una app (para cazarlos escritos a mano). */
 function valoresDeLosEnv(dirApp) {
   const vals = new Set();
@@ -97,27 +133,38 @@ function medirRepoApp(dirApp) {
   porque.push(...malos);
 
   // 3 · el generador, EJECUTADO con cada .env, da un SW con los valores de ESE .env y sin marcas sin llenar
+  // 4 · (G93) y el ícono de sus avisos es el del manifest de la app, y ese archivo existe en public/
   let corre = false;
+  let icono = false;
   const rutaGen = path.join(dirApp, 'sw', 'generar-sw.cjs');
   if (fs.existsSync(rutaGen) && plantilla !== null) {
     try {
       delete require.cache[require.resolve(rutaGen)];
-      const { generarServiceWorker } = require(rutaGen);
+      const { generarServiceWorker, iconoDelManifest } = require(rutaGen);
       const { configFirebaseDe } = require(path.join(dirApp, 'src', 'ambiente.js'));
+      const manifest = leerSi(path.join(dirApp, 'public', 'manifest.json'));
       corre = true;
+      icono = true;
+      const delManifest = typeof iconoDelManifest === 'function' ? iconoDelManifest(manifest) : null;
+      if (!delManifest) { icono = false; porque.push('el generador no sabe cuál es el ícono del manifest (no hay iconoDelManifest)'); }
+      else if (!fs.existsSync(path.join(dirApp, 'public', delManifest))) { icono = false; porque.push('el ícono del manifest ' + delManifest + ' no existe en public/'); }
       for (const amb of ['pruebas', 'produccion']) {
         const env = leerEnv(leerSi(path.join(dirApp, '.env.' + amb)) || '');
-        const sw = generarServiceWorker(plantilla, env);
+        const sw = generarServiceWorker(plantilla, env, manifest);
         const j = juzgarSw(sw, env, configFirebaseDe);
         if (!j.ok) { corre = false; porque.push('el SW generado para ' + amb + ' no trae su configuración: ' + j.distintos.join(', ')); }
         if (/%[A-Za-z]+%/.test(sw)) { corre = false; porque.push('el SW generado para ' + amb + ' deja marcas sin llenar'); }
+        const i = iconosDelSw(sw);
+        if (!delManifest || i.icon !== delManifest || i.badge !== delManifest) { icono = false; porque.push('los avisos de ' + amb + ' pintan icon «' + i.icon + '» y badge «' + i.badge + '», y el manifest dice «' + delManifest + '»'); }
       }
     } catch (e) {
       corre = false;
+      icono = false;
       porque.push('el generador no corre: ' + String(e.message || e).slice(0, 200));
     }
   } else porque.push('no hay sw/generar-sw.cjs');
   piezas.generadorDaSuAmbiente = corre;
+  piezas.iconoDelManifest = icono;
 
   const puestas = Object.values(piezas).filter(Boolean).length;
   return { app: path.basename(dirApp), piezas, puestas, de: Object.keys(piezas).length, porque };
@@ -141,7 +188,7 @@ async function medirServido(raiz = RAIZ, pedir = fetch) {
   return filas;
 }
 
-module.exports = { configDelSw, juzgarSw, medirRepoApp, medirServido, APPS, SITIOS };
+module.exports = { configDelSw, juzgarSw, medirRepoApp, medirServido, iconosDelSw, medirIconoServido, APPS, SITIOS };
 
 if (require.main === module) {
   (async () => {
@@ -152,6 +199,11 @@ if (require.main === module) {
       for (const f of await medirServido()) {
         if (!f.ok) malo++;
         console.log(`   ${f.ok ? '✓' : '🔴'} ${f.url.padEnd(62)} ${String(f.bytes).padStart(5)} bytes · dice projectId «${f.proyecto}»` + (f.ok ? '' : ` · distinto: ${f.distintos.join(', ')}`));
+      }
+      console.log('\n1b · EL ÍCONO DE LOS AVISOS EN CADA SITIO (G93: el del manifest publicado, bajado y comparado con public/)');
+      for (const f of await medirIconoServido()) {
+        if (!f.ok) malo++;
+        console.log(`   ${f.ok ? '✓' : '🔴'} ${f.app}/${f.amb}: manifest «${f.manifest}» · avisos icon «${f.icon}» badge «${f.badge}» · ${f.url} → ${f.bytes} bytes ${f.esPng ? 'PNG' : 'NO es PNG'} md5 ${f.md5} ${f.igualAlRepo ? '= public/' : '≠ public/'}`);
       }
     }
     console.log('\n2 · EL REPO');
