@@ -789,3 +789,13 @@ la placa de `conductores/{uid}` (la escribe su GPS con la misma placa que va en 
   `misReservasGuajira` (una lista JSON), así que el robot los mete con `page.evaluate` ANTES de entrar. Para volver a
   leer «Mis reservas» basta «‹ Volver» y otra vez «📋 Mis reservas» (la lista se relee al abrirla); «Mis pedidos» la
   lee al entrar a esa pantalla.
+- **pantallas-negocios (G89, 30-sep-2026):** 🍽️ Restaurantes y 🧭 Turismo del panel son UNA pantalla
+  (`NegociosDeUnTipo.js`). El menú de cada módulo es `.gg-mod-navitems > div` en orden Resumen / Todos(as) /
+  Pendientes, y el contenido es `.gg-mod > div` número 2. Solo mira: no aprieta nada que escriba. Con
+  `--guardar <archivo>` deja lo que vio y con `--comparar <archivo>` lo carea: corrido con el panel de antes
+  (0f89437) y con el de después (1cf9bef) publicado en pruebas, 11 vistas y 0 distintas. OJO: «pedidos hoy» cambia con
+  el día de Colombia y con cada pedido nuevo, así que el careo vale si las dos corridas son seguidas. Tras borrar
+  `Turismo.js` del panel, `probar-cambio` lo nombra «SIN RECORRIDO» (git ve el otro borrado como renombre a
+  `NegociosDeUnTipo.js`): es un archivo que ya no existe, no una pantalla sin probar. Y `errores-de-cuenta` salió rojo
+  una vez en aliados («no salió la frase») y ✓ al repetirlo solo: con muchos recorridos seguidos, la entrada falla por
+  momentos.
