@@ -665,6 +665,18 @@ la placa de `conductores/{uid}` (la escribe su GPS con la misma placa que va en 
   Lo mismo muerde a todo lo que en storage.rules pasa por Firestore (empleados de un negocio, el chat de un pedido).
   No es de G82: pasaba igual con el código de antes. Lo decide el dueño.
 
+### estrellas-restaurante · el cliente y el restaurante ven las mismas estrellas (G83, 29-sep-2026)
+- Mira tres sitios: la tarjeta de «Restaurante de Prueba» en la lista (sube 4 padres desde el nombre y busca
+  «⭐ x.x (n)»), la barra del menú («⭐ x.x (n)» o «Aún sin calificaciones») y aliados → ☰ → «Calificaciones» (el
+  número grande con «n calificaciones», o «Aún no tienes calificaciones»). Solo mira: no califica ni reporta.
+- 🪤 **En pruebas el restaurante de prueba NO tiene ninguna calificación** (29-sep): los tres dicen «sin
+  calificaciones», así que hoy el recorrido prueba que las tres pantallas abren con la pieza y coinciden, no un número.
+  Crear una exige un pedido de pasajero@gg.test ya `entregado` (firestore.rules, `calificaSuPedido`) y quedaría para
+  siempre en la base. Los números raros (la de taxi al dueño, 0 estrellas, reportadas) los corre
+  pruebas/promedioRestaurante.test.js sacando cada sitio de su archivo.
+- Si todas las del restaurante están reportadas, aliados enseña «0.0 · 0 calificaciones» y el cliente «sin»: el robot
+  lo cuenta como lo mismo (era así antes de G83).
+
 ## Lo que el robot dejó creado en pruebas
 
 - 27-sep-2026: «Robot Taxi De Prueba» (robot.taxi.1790508222079@gg.test) y
