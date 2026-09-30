@@ -99,7 +99,7 @@ const PENDIENTES = {
   'guajirago-aliados/src/flujoPedidos.js': 9,
   'guajirago-aliados/src/recibo.js': 5,
   'guajirago/src/Anuncio.js': 19,
-  'guajirago/src/App.js': 128,
+  'guajirago/src/App.js': 125, // G97: 128 -> 125 (la caja y el texto del campo salen de estiloCampo.js)
   'guajirago/src/AppConductor.js': 298,
   'guajirago/src/AvisoModal.js': 5,
   'guajirago/src/AyudaSoporte.js': 22,
@@ -113,7 +113,7 @@ const PENDIENTES = {
   'guajirago/src/Llamada.js': 26,
   'guajirago/src/LlamadoAtencion.js': 9,
   'guajirago/src/LlamarAl123.js': 4,
-  'guajirago/src/Login.js': 72,
+  'guajirago/src/Login.js': 69, // G97: 72 -> 69 (ídem)
   'guajirago/src/Logo.js': 5,
   'guajirago/src/MapaConRuta.js': 1,
   'guajirago/src/MenuLateral.js': 3,

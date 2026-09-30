@@ -38,6 +38,7 @@ import { cop } from './moneda';
 import PantallaFiesta, { REBOTE } from './PantallaFiesta';
 import { leerConfig, modulosDe, mensajeDeMantenimiento } from './configApp';
 import BotonVolver from './BotonVolver';
+import { estiloCampo, estiloInput } from './estiloCampo';
 const MARCAS_VEHICULO = [
   'AKT', 'Auteco', 'Bajaj', 'BMW', 'BYD', 'Chery', 'Chevrolet',
   'Citroen', 'Ford', 'Foton', 'Hero', 'Honda', 'Hyundai', 'JAC',
@@ -300,10 +301,8 @@ function PantallaDatosConductor({ nombre, foto, celular, onGuardar, onVolver, on
     setCargando(false);
   };
 
-  const estiloCampoBase = { background: '#FFFFFF', border: '1.5px solid #ECECEF', borderRadius: '16px', padding: '16px', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '12px' };
-  const estiloCampo = estiloCampoBase;
-  const campoRojo = (campo) => campoError === campo ? { ...estiloCampoBase, border: '2px solid #FF4444' } : estiloCampoBase;
-  const estiloInput = { background: 'none', border: 'none', outline: 'none', color: '#1A1A1E', fontSize: '16px', width: '100%' };
+  // G97: la caja del campo y su texto salen de estiloCampo.js (la misma pieza que Login.js).
+  const campoRojo = (campo) => campoError === campo ? { ...estiloCampo, border: '2px solid #FF4444' } : estiloCampo;
 
   return (
     <div style={{ backgroundColor: '#FFFFFF', minHeight: '100vh', fontFamily: 'Arial, sans-serif', display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '32px 24px', position: 'relative' }}>

@@ -16,6 +16,8 @@ import PantallaFiesta, { REBOTE } from './PantallaFiesta';
 import { useAccion } from './useAccion';
 import { mandarCorreoDeRecuperacion, CORREO_DE_RECUPERACION_ENVIADO } from './recuperarContrasena';
 import { avisoEnUnaLinea } from './avisoRechazo';
+// G97: la caja del campo y su texto salen de UNA pieza (la misma de los datos del conductor, App.js).
+import { estiloCampo, estiloInput } from './estiloCampo';
 
 // Identificador único de este navegador/dispositivo (persiste en localStorage)
 function obtenerDeviceId() {
@@ -178,8 +180,6 @@ function Login({ onEntrar }) {
   };
 
   // ---- Estilos reutilizables del tema claro ----
-  const estiloCampo = { background: '#FFFFFF', border: '1.5px solid #ECECEF', borderRadius: '16px', padding: '16px', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '12px' };
-  const estiloInput = { background: 'none', border: 'none', outline: 'none', color: '#1A1A1E', fontSize: '16px', width: '100%' };
   const btnPrimario = { width: '100%', padding: '18px', background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)', border: 'none', borderRadius: '16px', color: '#FFFFFF', fontSize: '18px', fontWeight: '900', cursor: 'pointer' };
 
   if (celebracionBienvenida) return <CelebracionBienvenida monto={celebracionBienvenida.monto} onContinuar={() => onEntrar(...celebracionBienvenida.datosEntrar)} />;
