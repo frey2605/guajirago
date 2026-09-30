@@ -845,3 +845,11 @@ la placa de `conductores/{uid}` (la escribe su GPS con la misma placa que va en 
   `probar-cambio` de G97 (74bce47 en pruebas) salieron rojos `registrar-conductor` (clic de 30 s), `errores-de-cuenta`,
   `quien-cancelo` (`page.goto` de 30 s) y `metodos-pago` (`page.fill` de 30 s); corridos solos: los cuatro ✓
   (`registrar-conductor` rojo una vez más y ✓ a la siguiente). Son esperas de la red o de crear la cuenta, no el cambio.
+- **foto-redonda (G98, 30-sep-2026):** el círculo de la foto (☰ Menú, 56 px; «Mi perfil», 80 px) se reconoce por su
+  estilo en línea (`borderRadius: 50%` y `overflow: hidden`) con una `<img>` o el 👤 dentro; la foto «cargada» es
+  `complete && naturalWidth > 0`. Para cada caso se cambia `fotoConductor` de la ficha de PRUEBAS de pasajero@ y se
+  RECARGA la página (la sesión se queda; vuelve a módulos): así App.js y Mi perfil leen la ficha nueva. La foto rota es
+  una dirección del propio sitio de pruebas (`SITIOS.transporte + 'robot-foto-que-no-existe.jpg'`): el hosting contesta
+  la página, no una imagen, y la `<img>` falla. Nunca escribir la dirección a mano: `pruebas/elRobot.test.js` lo caza.
+  Corrido con a261efd publicado en pruebas: 6 pantallas ✓ (buena → foto; rota y sin foto → 👤); probar-cambio 30 ✓.
+  Los 403 de la consola salen como en los demás recorridos.
