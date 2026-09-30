@@ -46,6 +46,7 @@ import MapaConRuta from './MapaConRuta';
 import { numeroWhatsApp, telefonoSirve, celularDiezCifras, cifrasMientrasEscribe } from './telefonoValido';
 // La tarjeta roja «Llamar al 123» y el número salen de UNA pieza, la misma de Ajustes › Seguridad (G70).
 import { TarjetaLlamar123 } from './LlamarAl123';
+import BotonVolver from './BotonVolver';
 
 /**
  * EL AVISO DE «NO SÉ DÓNDE RECOGERTE» — ESCRITO UNA SOLA VEZ.
@@ -1530,7 +1531,7 @@ const PanelEmergencia = () => (
   return (
     <div style={{ backgroundColor: '#FFFFFF', minHeight: '100vh', fontFamily: 'Arial, sans-serif' }}>
       <div style={{ background: '#FFFFFF', padding: '12px 20px', display: 'flex', alignItems: 'center', gap: '16px', position: 'relative', borderBottom: '1px solid #ECECEF' }}>
-        <div onClick={onVolver} style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(0,0,0,0.06)', borderRadius: '12px', color: '#1A1A1E', fontSize: '14px', fontWeight: '500', padding: '8px 16px', cursor: 'pointer' }}><span style={{ fontSize: '22px', fontWeight: '900', lineHeight: '1', position: 'relative', top: '-1px' }}>‹</span> Volver</div>
+        <BotonVolver alVolver={onVolver} />
         <h2 style={{ color: '#1A1A1E', margin: '0', fontSize: '20px' }}>{esMensajeria ? 'Pedir mandado 📦' : `Solicitar ${tipo}`}</h2>
         <Logo size={26} style={{ position: 'absolute', top: '12px', right: '16px' }} />
       </div>

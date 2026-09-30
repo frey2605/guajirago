@@ -9,6 +9,7 @@ import { fechaDeCalendario } from './fechaCalendario';
 import { useAccion } from './useAccion';
 import AvisoModal from './AvisoModal';
 import PantallaFiesta from './PantallaFiesta';
+import BotonVolver from './BotonVolver';
 
 // El fondo y el confeti salen del marco común PantallaFiesta.js (gemelo G80); lo de dentro es de esta pantalla.
 function CelebracionPromo({ codigo, textoValor, onCerrar }) {
@@ -99,9 +100,7 @@ function Promociones({ onVolver }) {
   return (
     <div style={{ backgroundColor: '#FFFFFF', minHeight: '100vh', fontFamily: 'Arial, sans-serif' }}>
       <div style={{ background: 'linear-gradient(135deg, #FFFFFF, #ECECEF)', padding: '24px 20px', position: 'relative', display: 'flex', alignItems: 'center' }}>
-        <div onClick={onVolver} style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(0,0,0,0.06)', borderRadius: '12px', color: '#1A1A1E', fontSize: '14px', fontWeight: '500', padding: '8px 16px', cursor: 'pointer' }}>
-          <span style={{ fontSize: '20px', fontWeight: '900', lineHeight: '1', position: 'relative', top: '-1px' }}>‹</span> Volver
-        </div>
+        <BotonVolver alVolver={onVolver} />
         <h2 style={{ color: '#1A1A1E', margin: '0 auto', fontSize: '20px', fontWeight: '900' }}>Promociones</h2>
         <Logo size={28} style={{ position: 'absolute', top: '14px', right: '16px', zIndex: 6 }} />
       </div>

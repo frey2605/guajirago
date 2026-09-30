@@ -54,6 +54,7 @@ import { PASOS_DEL_CLIENTE, indiceDelPaso, yaLlegoAlCliente, terminadoParaElClie
 import { lasQueCuentan, promedioDelNegocio, promediosPorNegocio } from './estrellasNegocio';
 // G88: «Mis pedidos» se recuerda en el teléfono con la pieza única (la misma de «Mis reservas»).
 import { MIS_PEDIDOS, leerRecordados, recordar } from './recordadosEnTelefono';
+import BotonVolver from './BotonVolver';
 
 // G30: Google no dio el nombre de la calle. Lo dice la ventanita de la ubicación, con su propio título.
 const SIN_NOMBRE_DE_CALLE = 'Encontramos tu ubicación, pero no el nombre de la calle. Dejamos tus coordenadas en la dirección: agrégale la calle, el barrio o una referencia para que el domiciliario te encuentre.';
@@ -70,8 +71,6 @@ const SIN_NOMBRE_DE_CALLE = 'Encontramos tu ubicación, pero no el nombre de la 
 // la misma de «Mis reservas»; aquí solo se dice cuál lista (su clave y su tope de 40).
 
 // Botón de volver del módulo de restaurantes (azul, claro)
-const backBtn = { display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#EAF2FF', border: '1px solid #1C8EF9', borderRadius: '12px', padding: '9px 16px', color: '#1C8EF9', fontSize: '14px', fontWeight: 'bold', cursor: 'pointer' };
-
 // ¿El restaurante está abierto ahora? G46: la regla es UNA para restaurantes y agencias, en hora de Colombia
 // (horarioNegocio.js): no pausado a mano Y dentro de su horario; abrir y cerrar a la misma hora = las 24 horas.
 
@@ -523,7 +522,7 @@ function Restaurantes({ nombre, onVolver, foto, onCerrarSesion, onIrPerfil, onIr
 
         {/* Header */}
         <div style={{ background: 'linear-gradient(135deg, #FFFFFF, #ECECEF)', padding: '20px', display: 'flex', alignItems: 'center', gap: '14px' }}>
-          <button onClick={() => setPantalla('misPedidos')} style={backBtn}>‹ Volver</button>
+          <BotonVolver alVolver={() => setPantalla('misPedidos')} />
           <div>
             <p style={{ color: '#1A1A1E', fontWeight: '900', fontSize: '18px', margin: '0' }}>
               Pedido #{numeroPedido}
@@ -733,7 +732,7 @@ function Restaurantes({ nombre, onVolver, foto, onCerrarSesion, onIrPerfil, onIr
           padding: '20px',
           display: 'flex', alignItems: 'center', gap: '14px',
         }}>
-          <button onClick={() => { setPantalla('lista'); setRestauranteActivo(null); setCarrito([]); }} style={backBtn}>‹ Volver</button>
+          <BotonVolver alVolver={() => { setPantalla('lista'); setRestauranteActivo(null); setCarrito([]); }} />
           {restauranteActivo.logo ? (
             <img src={restauranteActivo.logo} alt="" style={{ width: '48px', height: '48px', borderRadius: '12px', objectFit: 'cover', flexShrink: 0 }} />
           ) : (
@@ -1044,7 +1043,7 @@ function Restaurantes({ nombre, onVolver, foto, onCerrarSesion, onIrPerfil, onIr
     return (
       <div style={{ backgroundColor: '#FFFFFF', minHeight: '100vh', fontFamily: 'Arial, sans-serif' }}>
         <div style={{ background: 'linear-gradient(135deg, #FFFFFF, #ECECEF)', padding: '20px', display: 'flex', alignItems: 'center', gap: '14px' }}>
-          <button onClick={() => setPantalla('lista')} style={backBtn}>‹ Volver</button>
+          <BotonVolver alVolver={() => setPantalla('lista')} />
           <div>
             <p style={{ color: '#1A1A1E', fontWeight: '900', fontSize: '20px', margin: '0' }}>📦 Mis pedidos</p>
             <p style={{ color: '#6B7280', fontSize: '13px', margin: '2px 0 0' }}>Toca un pedido para ver su estado</p>
@@ -1110,7 +1109,7 @@ function Restaurantes({ nombre, onVolver, foto, onCerrarSesion, onIrPerfil, onIr
       }}>
         <MenuLateral nombre={nombre} foto={foto} onIrPerfil={onIrPerfil} onIrCreditos={onIrCreditos} onIrViajes={onIrViajes} onIrGanancias={onIrGanancias} onIrSeguridad={onIrSeguridad} onIrAyuda={onIrAyuda} onIrConfig={onIrConfig} onIrPromociones={onIrPromociones} onCerrarSesion={onCerrarSesion} />
         <Logo size={28} style={{ position: 'absolute', top: '14px', right: '16px', zIndex: 6 }} />
-        <button onClick={onVolver} style={{ ...backBtn, marginLeft: '96px' }}>‹ Volver</button>
+        <BotonVolver alVolver={onVolver} lugar="trasMenu" />
         <div>
           <p style={{ color: '#1A1A1E', fontWeight: '900', fontSize: '20px', margin: '0' }}>
             🍽️ Restaurantes

@@ -4,6 +4,7 @@ import { db } from './firebase';
 import Logo from './Logo';
 import { RESPALDO_CONFIG, leerConfig, lugaresFavoritos } from './configApp';
 import { CORREO_SOPORTE } from './correoSoporte';
+import BotonVolver from './BotonVolver';
 
 // G35: la lista se arma con el tope de favoritos de config/global (lo pone el dueño en el panel), en palabras
 // («2 lugares»), para que la respuesta diga lo mismo que la ventanita «Llegaste al límite» de Solicitar.js.
@@ -65,9 +66,7 @@ function AyudaSoporte({ onVolver }) {
   return (
     <div style={{ backgroundColor: '#FFFFFF', minHeight: '100vh', fontFamily: 'Arial, sans-serif' }}>
       <div style={{ background: 'linear-gradient(135deg, #FFFFFF, #ECECEF)', padding: '24px 20px', position: 'relative', display: 'flex', alignItems: 'center' }}>
-        <div onClick={onVolver} style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(0,0,0,0.06)', borderRadius: '12px', color: '#1A1A1E', fontSize: '14px', fontWeight: '500', padding: '8px 16px', cursor: 'pointer' }}>
-          <span style={{ fontSize: '20px', fontWeight: '900', lineHeight: '1', position: 'relative', top: '-1px' }}>‹</span> Volver
-        </div>
+        <BotonVolver alVolver={onVolver} />
         <h2 style={{ color: '#1A1A1E', margin: '0 auto', fontSize: '20px', fontWeight: '900' }}>Ayuda y soporte</h2>
         <Logo size={28} style={{ position: 'absolute', top: '14px', right: '16px', zIndex: 6 }} />
       </div>

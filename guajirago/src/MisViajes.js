@@ -4,6 +4,7 @@ import { collection, query, where, orderBy, limit, getDocs } from 'firebase/fire
 import Logo from './Logo';
 // G21: qué viajes salen en el historial y cómo terminó cada uno salen de UNA pieza, la misma de las otras dos pantallas.
 import { ESTADOS_TERMINADOS, comoTermino } from './estadosViaje';
+import BotonVolver from './BotonVolver';
 
 function MisViajes({ onVolver }) {
   const [viajes, setViajes] = useState([]);
@@ -49,9 +50,7 @@ function MisViajes({ onVolver }) {
   return (
     <div style={{ backgroundColor: '#FFFFFF', minHeight: '100vh', fontFamily: 'Arial, sans-serif' }}>
       <div style={{ background: 'linear-gradient(135deg, #FFFFFF, #ECECEF)', padding: '24px 20px', position: 'relative', display: 'flex', alignItems: 'center' }}>
-        <div onClick={onVolver} style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(0,0,0,0.06)', borderRadius: '12px', color: '#1A1A1E', fontSize: '14px', fontWeight: '500', padding: '8px 16px', cursor: 'pointer' }}>
-          <span style={{ fontSize: '20px', fontWeight: '900', lineHeight: '1', position: 'relative', top: '-1px' }}>‹</span> Volver
-        </div>
+        <BotonVolver alVolver={onVolver} />
         <h2 style={{ color: '#1A1A1E', margin: '0 auto', fontSize: '20px', fontWeight: '900' }}>Mis viajes</h2>
         <Logo size={28} style={{ position: 'absolute', top: '14px', right: '16px', zIndex: 6 }} />
       </div>

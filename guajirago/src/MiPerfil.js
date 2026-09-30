@@ -7,6 +7,7 @@ import { telefonoSirve, celularDiezCifras } from './telefonoValido';
 import { motivoDeRechazo, apuntarRechazo } from './avisoRechazo';
 import { doc, getDoc, setDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { subirAlAlmacen } from './subirAlAlmacen';
+import BotonVolver from './BotonVolver';
 
 function MiPerfil({ onVolver }) {
   const [cargando, setCargando] = useState(true);
@@ -109,7 +110,7 @@ function MiPerfil({ onVolver }) {
   return (
     <div style={{ backgroundColor: '#FFFFFF', minHeight: '100vh', fontFamily: 'Arial, sans-serif' }}>
       <div style={{ background: '#FFFFFF', padding: '24px 20px', position: 'relative', display: 'flex', alignItems: 'center' }}>
-        <div onClick={onVolver} style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(0,0,0,0.06)', borderRadius: '12px', color: '#1A1A1E', fontSize: '14px', fontWeight: '500', padding: '8px 16px', cursor: 'pointer' }}><span style={{ fontSize: '20px', fontWeight: '900', lineHeight: '1', position: 'relative', top: '-1px' }}>‹</span> Volver</div>
+        <BotonVolver alVolver={onVolver} />
         <h2 style={{ color: '#1A1A1E', margin: '0 auto', fontSize: '20px', fontWeight: '900' }}>Mi perfil</h2>
         <Logo size={28} style={{ position: 'absolute', top: '16px', right: '16px' }} />
       </div>

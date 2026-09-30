@@ -540,6 +540,19 @@ const RECORRIDOS = [
     // (pruebas/pantallasNegocios.test.js).
     vigila: ['guajirago-admin/src/NegociosDeUnTipo.js', 'guajirago-admin/src/tiposDeNegocio.js'],
   },
+  {
+    nombre: 'boton-volver',
+    que: 'el «‹ Volver» es la misma pastilla gris en 15 pantallas (menú de módulos, Términos, escoger rol, pasajero, Mis pedidos, Restaurantes, Mis reservas, Turismo), cabe en el celular y al tocarlo vuelve a donde volvía (G91; solo mira)',
+    archivo: 'boton-volver.cjs',
+    // Que cada uno de los 24 botones vuelva al MISMO sitio que antes de G91 lo SACA de su archivo, lo pinta con React,
+    // lo toca y lo carea scripts/medir-boton-volver.cjs (pruebas/botonVolver.test.js). El de Solicitar.js y los dos del
+    // conductor (AppConductor.js) no los recorre este robot (pedir un viaje o ser conductor es otro recorrido), ni el de
+    // MisViajes.js, que solo sale a quien no ha escogido papel (pasajero@gg.test ya es pasajero: ve el de Home.js).
+    vigila: ['guajirago/src/BotonVolver.js', 'guajirago/src/theme.js', 'guajirago/src/MiPerfil.js', 'guajirago/src/Home.js',
+      'guajirago/src/Creditos.js', 'guajirago/src/Ganancias.js', 'guajirago/src/Seguridad.js', 'guajirago/src/Promociones.js',
+      'guajirago/src/AyudaSoporte.js', 'guajirago/src/Configuracion.js', 'guajirago/src/PaginaLegal.js', 'guajirago/src/App.js',
+      'guajirago/src/Restaurantes.js', 'guajirago/src/Turismo.js'],
+  },
 ];
 
 // Los archivos de pantalla: los que, si cambian, el robot debería poder probar. Todo lo que esté en

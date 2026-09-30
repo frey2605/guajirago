@@ -46,6 +46,7 @@ import Logo from './Logo';
 import { pedirGps, seguirGps } from './pedirGps';
 // El mapa con ruta es UNO para el conductor y el pasajero (G29).
 import MapaConRuta from './MapaConRuta';
+import BotonVolver from './BotonVolver';
 
 // Valores por defecto (respaldo). Se reemplazan por los de config/global cuando cargan.
 // G36/G66: el respaldo ENTERO sale de configApp.js (tarifas, comisiones, números y módulos), el mismo de toda la app,
@@ -187,7 +188,7 @@ function HistorialConductor({ onVolver }) {
   return (
     <div style={{ backgroundColor: '#FFFFFF', minHeight: '100vh', fontFamily: 'Arial, sans-serif' }}>
       <div style={{ background: '#FFFFFF', borderBottom: '1.5px solid #ECECEF', padding: '24px 20px', position: 'relative', display: 'flex', alignItems: 'center' }}>
-        <div onClick={onVolver} style={{ display: 'flex', alignItems: 'center', gap: '4px', background: '#ECECEF', borderRadius: '12px', color: '#1A1A1E', fontSize: '14px', fontWeight: '500', padding: '8px 16px', cursor: 'pointer' }}><span style={{ fontSize: '20px', fontWeight: '900', lineHeight: '1', position: 'relative', top: '-1px' }}>‹</span> Volver</div>
+        <BotonVolver alVolver={onVolver} />
         <h2 style={{ color: '#1A1A1E', margin: '0 auto', fontSize: '20px', fontWeight: '900' }}>Mis viajes</h2>
       </div>
       {totalHoy > 0 && (
@@ -1473,7 +1474,7 @@ if (sancionActiva) return (
       <div style={{ background: '#FFFFFF', borderBottom: '1.5px solid #ECECEF', padding: '24px 20px', position: 'relative' }}>
         <Logo size={30} style={{ position: 'absolute', top: '14px', right: '16px', zIndex: 6 }} />
         <MenuLateral nombre={nombre} foto={fotoConductor} onIrPerfil={() => setVerPerfil(true)} onIrCreditos={() => setVerCreditos(true)} onIrViajes={() => abrirDelMenu('viajes')} onIrGanancias={() => abrirDelMenu('ganancias')} onIrSeguridad={() => setVerSeguridad(true)} onIrAyuda={() => setVerAyuda(true)} onIrConfig={() => setVerConfig(true)} onIrPromociones={() => setVerPromociones(true)} onCerrarSesion={cerrarSesion} />
-        <div onClick={onVolver} style={{ position: 'absolute', top: '18px', left: '120px', display: 'flex', alignItems: 'center', gap: '4px', background: '#ECECEF', borderRadius: '12px', color: '#1A1A1E', fontSize: '14px', fontWeight: '500', padding: '8px 16px', cursor: 'pointer', zIndex: 5 }}><span style={{ fontSize: '20px', fontWeight: '900', lineHeight: '1' }}>‹</span> Volver</div>
+        <BotonVolver alVolver={onVolver} lugar="flotante" />
         <div style={{ marginTop: '48px' }}>
           <p style={{ color: '#6B7280', fontSize: '11px', margin: '0', letterSpacing: '2px' }}>CONDUCTOR</p>
           <h2 style={{ color: '#1A1A1E', fontSize: '20px', margin: '4px 0 8px', fontWeight: '900' }}>Hola, {nombre || 'Conductor'} 👋</h2>

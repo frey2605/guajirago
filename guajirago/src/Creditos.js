@@ -15,6 +15,7 @@ import AvisoModal from './AvisoModal';
 import { cop } from './moneda';
 // G81: el saldo de la ficha se lee con UNA pieza (la misma que usa la pantalla del conductor).
 import { saldoDe } from './saldoUsuario';
+import BotonVolver from './BotonVolver';
 
 function Creditos({ onVolver }) {
   const [saldo, setSaldo] = useState(null);
@@ -142,7 +143,7 @@ function Creditos({ onVolver }) {
   return (
     <div style={{ backgroundColor: '#FFFFFF', minHeight: '100vh', fontFamily: 'Arial, sans-serif' }}>
       <div style={{ background: 'linear-gradient(135deg, #FFFFFF, #ECECEF)', padding: '14px 20px', position: 'relative', display: 'flex', alignItems: 'stretch', justifyContent: 'space-between', gap: '12px' }}>
-        <div onClick={onVolver} style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(0,0,0,0.06)', borderRadius: '12px', color: '#1A1A1E', fontSize: '14px', fontWeight: '500', padding: '8px 16px', cursor: 'pointer', flexShrink: 0 }}><span style={{ fontSize: '20px', fontWeight: '900', lineHeight: '1', position: 'relative', top: '-1px' }}>‹</span> Volver</div>
+        <BotonVolver alVolver={onVolver} lugar="filaApretada" />
         <div style={{ background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F)', borderRadius: '14px', padding: '6px 24px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1 }}>
           <p style={{ color: '#FFFFFF', fontSize: '11px', margin: '0', letterSpacing: '1px', fontWeight: '900' }}>SALDO DISPONIBLE</p>
           <p style={{ color: '#FFFFFF', fontSize: '26px', fontWeight: '900', margin: '0' }}>

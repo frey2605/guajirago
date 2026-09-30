@@ -1,4 +1,5 @@
 import React from 'react';
+import BotonVolver from './BotonVolver';
 
 // 📜 EL ESQUELETO DE LAS PÁGINAS LEGALES — UNA sola pieza (gemelo G75, 29-sep-2026).
 //
@@ -20,9 +21,7 @@ function PaginaLegal({ titulo, actualizacion, onVolver, children }) {
   return (
     <div style={{ backgroundColor: '#FFFFFF', minHeight: '100vh', fontFamily: 'Arial, sans-serif' }}>
       <div style={{ background: 'linear-gradient(135deg, #FFFFFF, #ECECEF)', padding: '24px 20px', position: 'relative', display: 'flex', alignItems: 'center' }}>
-        <div onClick={onVolver} style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(0,0,0,0.06)', borderRadius: '12px', color: '#1A1A1E', fontSize: '14px', fontWeight: '500', padding: '8px 16px', cursor: 'pointer' }}>
-          <span style={{ fontSize: '20px', fontWeight: '900', lineHeight: '1', position: 'relative', top: '-1px' }}>‹</span> Volver
-        </div>
+        <BotonVolver alVolver={onVolver} />
         <h2 style={{ color: '#1A1A1E', margin: '0 auto', fontSize: '18px', fontWeight: '900' }}>{titulo}</h2>
       </div>
 

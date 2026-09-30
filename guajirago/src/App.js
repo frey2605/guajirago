@@ -37,6 +37,7 @@ import { placaLimpia, placaMientrasEscribe, vehiculoDe } from './vehiculoConduct
 import { cop } from './moneda';
 import PantallaFiesta, { REBOTE } from './PantallaFiesta';
 import { leerConfig, modulosDe, mensajeDeMantenimiento } from './configApp';
+import BotonVolver from './BotonVolver';
 const MARCAS_VEHICULO = [
   'AKT', 'Auteco', 'Bajaj', 'BMW', 'BYD', 'Chery', 'Chevrolet',
   'Citroen', 'Ford', 'Foton', 'Hero', 'Honda', 'Hyundai', 'JAC',
@@ -151,7 +152,7 @@ function PantallaRol({ nombre, foto, onSeleccionar, onVolver, onCerrarSesion, on
   return (
     <div style={{ backgroundColor: '#FFFFFF', minHeight: '100vh', fontFamily: 'Arial, sans-serif', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px 24px', position: 'relative' }}>
       <MenuLateral nombre={nombre} foto={foto} onIrPerfil={onIrPerfil} onIrGanancias={onIrGanancias} onIrSeguridad={onIrSeguridad} onIrViajes={onIrViajes} onIrCreditos={onIrCreditos} onIrAyuda={onIrAyuda} onIrConfig={onIrConfig} onIrPromociones={onIrPromociones} onCerrarSesion={onCerrarSesion} />
-      <div onClick={onVolver} style={{ position: 'absolute', top: '18px', left: '120px', display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(0,0,0,0.06)', borderRadius: '12px', color: '#1A1A1E', fontSize: '14px', fontWeight: '500', padding: '8px 16px', cursor: 'pointer', zIndex: 5 }}><span style={{ fontSize: '20px', fontWeight: '900', lineHeight: '1' }}>‹</span> Volver</div>
+      <BotonVolver alVolver={onVolver} lugar="flotante" />
       <Logo size={100} style={{ marginBottom: '20px' }} />
       <p style={{ color: '#6B7280', fontSize: '14px', letterSpacing: '3px', marginBottom: '8px', textAlign: 'center' }}>BIENVENIDO</p>
       <h2 style={{ color: '#1A1A1E', fontSize: '26px', fontWeight: '900', margin: '0 0 32px', textAlign: 'center' }}>{nombre || 'Usuario'}</h2>
@@ -180,7 +181,7 @@ function PantallaMensajeria({ nombre, foto, onEnviar, onDomiciliario, onVolver, 
   return (
     <div style={{ backgroundColor: '#FFFFFF', minHeight: '100vh', fontFamily: 'Arial, sans-serif', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px 24px', position: 'relative' }}>
       <MenuLateral nombre={nombre} foto={foto} onIrPerfil={onIrPerfil} onIrCreditos={onIrCreditos} onIrViajes={onIrViajes} onIrGanancias={onIrGanancias} onIrSeguridad={onIrSeguridad} onIrAyuda={onIrAyuda} onIrConfig={onIrConfig} onIrPromociones={onIrPromociones} onCerrarSesion={onCerrarSesion} />
-      <div onClick={onVolver} style={{ position: 'absolute', top: '18px', left: '120px', display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(0,0,0,0.06)', borderRadius: '12px', color: '#1A1A1E', fontSize: '14px', fontWeight: '500', padding: '8px 16px', cursor: 'pointer', zIndex: 5 }}><span style={{ fontSize: '20px', fontWeight: '900', lineHeight: '1' }}>‹</span> Volver</div>
+      <BotonVolver alVolver={onVolver} lugar="flotante" />
       <Logo size={34} style={{ position: 'absolute', top: '16px', right: '16px', zIndex: 5 }} />
       <span style={{ fontSize: '52px', marginBottom: '8px' }}>📦</span>
       <h2 style={{ color: '#1A1A1E', fontSize: '26px', fontWeight: '900', margin: '0 0 4px', textAlign: 'center' }}>Mensajería y Mandados</h2>
@@ -310,7 +311,7 @@ function PantallaDatosConductor({ nombre, foto, celular, onGuardar, onVolver, on
         <AvisoModal aviso={{ titulo: 'Falta un dato', texto: error }} onCerrar={() => setError('')} />
       )}
       <MenuLateral nombre={nombre} foto={foto} onIrPerfil={onIrPerfil} onIrGanancias={onIrGanancias} onIrSeguridad={onIrSeguridad} onIrViajes={onIrViajes} onIrCreditos={onIrCreditos} onIrAyuda={onIrAyuda} onIrConfig={onIrConfig} onIrPromociones={onIrPromociones} onCerrarSesion={onCerrarSesion} />
-      <div onClick={onVolver} style={{ position: 'absolute', top: '18px', left: '120px', display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(0,0,0,0.06)', borderRadius: '12px', color: '#1A1A1E', fontSize: '14px', fontWeight: '500', padding: '8px 16px', cursor: 'pointer', zIndex: 5 }}><span style={{ fontSize: '20px', fontWeight: '900', lineHeight: '1' }}>‹</span> Volver</div>
+      <BotonVolver alVolver={onVolver} lugar="flotante" />
       <div style={{ textAlign: 'center', marginBottom: '32px' }}>
         <span style={{ fontSize: '48px' }}>{iconoDelVehiculo(tipoVehiculo)}</span>
         <h2 style={{ color: '#1A1A1E', fontSize: '22px', fontWeight: '900', margin: '12px 0 4px' }}>Datos del conductor</h2>

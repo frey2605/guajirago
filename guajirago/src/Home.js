@@ -19,6 +19,7 @@ import LlamadoAtencion from './LlamadoAtencion';
 // G21: qué viajes salen en el historial y cómo terminó cada uno salen de UNA pieza, la misma de las otras dos pantallas.
 import { ESTADOS_TERMINADOS, comoTermino } from './estadosViaje';
 import { fotoDe } from './fotoUsuario';
+import BotonVolver from './BotonVolver';
 
 // G67 (29-sep-2026): los lugares favoritos viven en UN sitio, la nube (`usuarios/{uid}.favoritos`), y los guarda y
 // borra Solicitar.js con el tope de config/global. Aquí había una segunda versión en el TELÉFONO (localStorage
@@ -54,7 +55,7 @@ function Historial({ onVolver }) {
   return (
     <div style={{ backgroundColor: '#FFFFFF', minHeight: '100vh', fontFamily: 'Arial, sans-serif' }}>
       <div style={{ background: '#FFFFFF', padding: '24px 20px', position: 'relative', display: 'flex', alignItems: 'center' }}>
-        <div onClick={onVolver} style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(0,0,0,0.06)', borderRadius: '12px', color: '#1A1A1E', fontSize: '14px', fontWeight: '500', padding: '8px 16px', cursor: 'pointer' }}><span style={{ fontSize: '20px', fontWeight: '900', lineHeight: '1', position: 'relative', top: '-1px' }}>‹</span> Volver</div>
+        <BotonVolver alVolver={onVolver} />
         <h2 style={{ color: '#1A1A1E', margin: '0 auto', fontSize: '20px', fontWeight: '900' }}>Mis viajes</h2>
         <Logo size={28} style={{ position: 'absolute', top: '16px', right: '16px' }} />
       </div>
@@ -193,7 +194,7 @@ function Home({ nombre, onCerrarSesion, onVolver, onCambiarNegocio }) {
       <div style={{ background: '#FFFFFF', padding: '24px 20px', position: 'relative' }}>
         <MenuLateral nombre={nombre} foto={fotoUsuario} onIrPerfil={() => setVerPerfil(true)} onIrViajes={() => abrirDelMenu('viajes')} onIrGanancias={() => abrirDelMenu('ganancias')} onIrCreditos={() => setVerCreditos(true)} onIrSeguridad={() => setVerSeguridad(true)} onIrAyuda={() => setVerAyuda(true)} onIrConfig={() => setVerConfig(true)} onIrPromociones={() => setVerPromociones(true)} onCerrarSesion={onCerrarSesion} onCambiarNegocio={onCambiarNegocio} />
         <Logo size={34} style={{ position: 'absolute', top: '16px', right: '16px', zIndex: 5 }} />
-        <div onClick={onVolver} style={{ position: 'absolute', top: '18px', left: '120px', display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(0,0,0,0.06)', borderRadius: '12px', color: '#1A1A1E', fontSize: '14px', fontWeight: '500', padding: '8px 16px', cursor: 'pointer', zIndex: 5 }}><span style={{ fontSize: '20px', fontWeight: '900', lineHeight: '1' }}>‹</span> Volver</div>
+        <BotonVolver alVolver={onVolver} lugar="flotante" />
         <div style={{ marginTop: '48px' }}>
           <p style={{ color: '#6B7280', fontSize: '12px', margin: '0', letterSpacing: '2px' }}>UBICACIÓN</p>
           <p style={{ color: '#1A1A1E', fontSize: '16px', margin: '4px 0 0', fontWeight: 'bold' }}>📍 Riohacha, La Guajira</p>

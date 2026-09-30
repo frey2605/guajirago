@@ -6,11 +6,13 @@
  *   1. Los colores a mano de las tres apps SOLO PUEDEN BAJAR, archivo por archivo (PENDIENTES del medidor).
  *   2. La paleta dice los colores del sistema de diseño, y Turismo.js y MenuLateral.js la usan (sin paleta propia).
  *   3. La copia de aliados (flujoPedidos.js, otro repo) dice lo mismo que la paleta.
- *   4. Turismo.js y MenuLateral.js, pintados con React, se ven IGUAL que antes de G90 (907dfd6), paso por paso.
+ *   4. Turismo.js y MenuLateral.js, pintados con React, se ven IGUAL que antes de G90 (907dfd6), paso por paso (menos el
+ *      «‹ Volver», que G91 cambió a propósito y carea pruebas/botonVolver.test.js).
  */
 const test = require('node:test');
 const assert = require('node:assert');
 const M = require('../scripts/medir-paleta.cjs');
+const V = require('../scripts/medir-boton-volver.cjs');
 
 test.describe('LA PALETA (G90) · los colores a mano solo pueden bajar', () => {
   test.it('ningún archivo de las tres apps tiene más colores a mano que los que dice PENDIENTES (ni menos sin tachar)', () => {
@@ -93,9 +95,11 @@ test.describe('LA PALETA (G90) · Turismo y el menú se ven igual (pintados con 
     assert.ok(ahora.some((p) => p.escrituras.length === 1 && p.escrituras[0].col === 'reservasTurismo'), 'la reserva no se escribe');
   });
 
-  test.it('careo con 907dfd6 (antes de G90): el mismo HTML y las mismas escrituras, paso por paso', async () => {
+  // G91 (30-sep-2026) cambió A PROPÓSITO el «‹ Volver» de Turismo (ahora es la pieza BotonVolver.js): ese botón se carea
+  // aparte (pruebas/botonVolver.test.js), y aquí se quita de los dos lados para carear TODO lo demás con 907dfd6.
+  test.it('careo con 907dfd6 (antes de G90): el mismo HTML y las mismas escrituras, paso por paso (sin el ‹ Volver de G91)', async () => {
     const antes = await M.recorrido(M.ANTES);
-    assert.deepStrictEqual(M.carear(antes, ahora), []);
+    assert.deepStrictEqual(M.carear(V.sinVolver(antes), V.sinVolver(ahora)), []);
   });
 
   test.it('pantallas de mentira: un color cambiado en Turismo, en el menú o en la paleta se ve en el careo', async () => {

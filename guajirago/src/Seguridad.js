@@ -18,6 +18,7 @@ import { telefonoSirve, numeroWhatsApp, celularDiezCifras } from './telefonoVali
 import { motivoDeRechazo, apuntarRechazo } from './avisoRechazo';
 // La tarjeta roja «Llamar al 123» y el número salen de UNA pieza, la misma del 🚨 del viaje (G70).
 import { TarjetaLlamar123 } from './LlamarAl123';
+import BotonVolver from './BotonVolver';
 
 function Seguridad({ onVolver }) {
   const [contactoNombre, setContactoNombre] = useState('');
@@ -146,9 +147,7 @@ function Seguridad({ onVolver }) {
   return (
     <div style={{ backgroundColor: '#FFFFFF', minHeight: '100vh', fontFamily: 'Arial, sans-serif' }}>
       <div style={{ background: 'linear-gradient(135deg, #FFFFFF, #ECECEF)', padding: '24px 20px', position: 'relative', display: 'flex', alignItems: 'center' }}>
-        <div onClick={onVolver} style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(0,0,0,0.06)', borderRadius: '12px', color: '#1A1A1E', fontSize: '14px', fontWeight: '500', padding: '8px 16px', cursor: 'pointer' }}>
-          <span style={{ fontSize: '20px', fontWeight: '900', lineHeight: '1', position: 'relative', top: '-1px' }}>‹</span> Volver
-        </div>
+        <BotonVolver alVolver={onVolver} />
         <h2 style={{ color: '#1A1A1E', margin: '0 auto', fontSize: '20px', fontWeight: '900' }}>Seguridad</h2>
         <Logo size={28} style={{ position: 'absolute', top: '14px', right: '16px', zIndex: 6 }} />
       </div>

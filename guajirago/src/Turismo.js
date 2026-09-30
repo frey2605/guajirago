@@ -24,6 +24,7 @@ import { unidadTxt } from './unidadesTour';
 import { MIS_RESERVAS, leerRecordados, recordar } from './recordadosEnTelefono';
 // G90: los colores salen de LA paleta (theme.js), no de una paleta propia de esta pantalla.
 import { T } from './theme';
+import BotonVolver from './BotonVolver';
 
 const AZUL = T.azul;
 const NARANJA = T.naranja;
@@ -138,7 +139,7 @@ function Turismo({ nombre, foto, onVolver, onCerrarSesion, onIrPerfil, onIrGanan
       <div style={{ minHeight: '100vh', background: '#F7F8FA', fontFamily: 'Arial, sans-serif', padding: '20px 16px 40px', position: 'relative' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
           <MenuLateral nombre={nombre} foto={foto} onIrPerfil={onIrPerfil} onIrGanancias={onIrGanancias} onIrSeguridad={onIrSeguridad} onIrViajes={onIrViajes} onIrCreditos={onIrCreditos} onIrAyuda={onIrAyuda} onIrConfig={onIrConfig} onIrPromociones={onIrPromociones} onCerrarSesion={onCerrarSesion} />
-          <div onClick={onVolver} style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(0,0,0,0.06)', borderRadius: '12px', color: '#1A1A1E', fontSize: '14px', fontWeight: '500', padding: '8px 14px', cursor: 'pointer', marginLeft: '96px' }}><span style={{ fontSize: '20px', fontWeight: '900', lineHeight: '1' }}>‹</span> Volver</div>
+          <BotonVolver alVolver={onVolver} lugar="trasMenu" />
           <Logo size={30} style={{ marginLeft: 'auto' }} />
         </div>
 
@@ -183,7 +184,7 @@ function Turismo({ nombre, foto, onVolver, onCerrarSesion, onIrPerfil, onIrGanan
   if (pantalla === 'misReservas') {
     return (
       <div style={{ minHeight: '100vh', background: '#F7F8FA', fontFamily: 'Arial, sans-serif', padding: '20px 16px 40px' }}>
-        <div onClick={() => setPantalla('lista')} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: 'rgba(0,0,0,0.06)', borderRadius: '12px', color: '#1A1A1E', fontSize: '14px', fontWeight: '500', padding: '8px 14px', cursor: 'pointer', marginBottom: '16px' }}><span style={{ fontSize: '20px', fontWeight: '900', lineHeight: '1' }}>‹</span> Volver</div>
+        <BotonVolver alVolver={() => setPantalla('lista')} lugar="arriba" />
         <h2 style={{ color: '#1A1A1E', fontSize: '22px', fontWeight: '900', margin: '0 0 14px' }}>📋 Mis reservas</h2>
         {cargandoMis ? <p style={{ color: '#999' }}>Cargando...</p> : misReservas.length === 0 ? (
           <p style={{ color: '#999', fontSize: '14px', textAlign: 'center', padding: '30px 0' }}>Aún no tienes reservas.</p>
@@ -210,7 +211,7 @@ function Turismo({ nombre, foto, onVolver, onCerrarSesion, onIrPerfil, onIrGanan
   const tours = (agenciaActiva.tours || []).filter(t => t.disponible !== false).sort((a, b) => (b.destacado ? 1 : 0) - (a.destacado ? 1 : 0));
   return (
     <div style={{ minHeight: '100vh', background: '#F7F8FA', fontFamily: 'Arial, sans-serif', padding: '20px 16px 40px' }}>
-      <div onClick={() => setPantalla('lista')} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: 'rgba(0,0,0,0.06)', borderRadius: '12px', color: '#1A1A1E', fontSize: '14px', fontWeight: '500', padding: '8px 14px', cursor: 'pointer', marginBottom: '16px' }}><span style={{ fontSize: '20px', fontWeight: '900', lineHeight: '1' }}>‹</span> Volver</div>
+      <BotonVolver alVolver={() => setPantalla('lista')} lugar="arriba" />
 
       <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginBottom: '16px' }}>
         {agenciaActiva.logo ? <img src={agenciaActiva.logo} alt="" style={{ width: '60px', height: '60px', borderRadius: '14px', objectFit: 'cover' }} /> : <span style={{ fontSize: '46px' }}>🧭</span>}

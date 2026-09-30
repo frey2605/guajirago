@@ -10,6 +10,7 @@ export const T = {
   fondoSuave: '#FFFBF7',     // secciones con tinte cálido muy suave
   tarjeta: '#FFFFFF',        // fondo de tarjetas/inputs
   borde: '#ECECEF',          // borde neutro
+  pastilla: 'rgba(0,0,0,0.06)', // la pastilla gris del botón «Volver» (BotonVolver.js, G91)
   bordeCalido: '#FF7A2F',    // borde de acento cálido
   azul: '#1C8EF9',           // Azul Cielo (el mismo de la app de restaurante/mesero)
   azulClaro: '#39A6FF',
