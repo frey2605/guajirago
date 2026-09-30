@@ -81,7 +81,7 @@ const PENDIENTES = {
   'guajirago-aliados/src/Configuracion.js': 21,
   'guajirago-aliados/src/CorteCaja.js': 22,
   'guajirago-aliados/src/Empleados.js': 34,
-  'guajirago-aliados/src/ErrorBoundary.js': 7,
+  'guajirago-aliados/src/ErrorBoundary.js': 3, // G102: 7 -> 3 (los colores de la app entran por props desde index.js)
   'guajirago-aliados/src/HistorialDomicilios.js': 15,
   'guajirago-aliados/src/HistorialMesas.js': 8,
   'guajirago-aliados/src/Inventario.js': 76,
@@ -96,7 +96,9 @@ const PENDIENTES = {
   'guajirago-aliados/src/ResumenDia.js': 17,
   'guajirago-aliados/src/Tours.js': 54,
   'guajirago-aliados/src/ambiente.js': 2,
-  'guajirago-aliados/src/flujoPedidos.js': 9,
+  // G102: 9 -> 11, y es la única subida a propósito: TINTA y GRIS salieron de ErrorBoundary.js (7 -> 3) a la paleta
+  // de aliados, que es este archivo (no puede importar theme.js). En aliados, en total, 16 -> 14.
+  'guajirago-aliados/src/flujoPedidos.js': 11,
   'guajirago-aliados/src/recibo.js': 5,
   'guajirago/src/Anuncio.js': 19,
   'guajirago/src/App.js': 125, // G97: 128 -> 125 (la caja y el texto del campo salen de estiloCampo.js)
@@ -107,7 +109,7 @@ const PENDIENTES = {
   'guajirago/src/CartelAmbiente.js': 1,
   'guajirago/src/Configuracion.js': 45,
   'guajirago/src/Creditos.js': 52,
-  'guajirago/src/ErrorBoundary.js': 7,
+  'guajirago/src/ErrorBoundary.js': 3, // G102: 7 -> 3 (los colores entran por props desde index.js, tomados de T)
   'guajirago/src/Ganancias.js': 25,
   'guajirago/src/Home.js': 35,
   'guajirago/src/Llamada.js': 26,

@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client';
 import './index.css';
 import App from './App';
 import ErrorBoundary from './ErrorBoundary';
+import { T } from './theme';
 import CartelAmbiente from './CartelAmbiente';
 import reportWebVitals from './reportWebVitals';
 
@@ -10,7 +11,7 @@ const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
   <React.StrictMode>
     <CartelAmbiente />
-    <ErrorBoundary>
+    <ErrorBoundary app="GuajiraGo" colores={{ titulo: T.tinta, texto: T.gris, boton: `linear-gradient(135deg, ${T.amarillo}, ${T.naranja})` }}>
       <App />
     </ErrorBoundary>
   </React.StrictMode>
