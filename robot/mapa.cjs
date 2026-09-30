@@ -85,8 +85,9 @@ const RECORRIDOS = [
     nombre: 'promo-asignar',
     que: 'el panel no asigna una promoción vencida (ventanita) y el servidor no deja canjear una que pide viajes previos a quien no los tiene (G12; crea dos promociones de mentira en pruebas y las apaga)',
     archivo: 'promo-asignar.cjs',
+    // Busca a la persona por su documento («ROBOT-PASAJERO», con guion): pasa por la pieza de G79.
     vigila: ['guajirago-admin/src/Promociones.js', 'guajirago-admin/src/reglaPromocion.js',
-      'guajirago/src/Promociones.js', 'guajirago/src/reglaPromocion.js'],
+      'guajirago/src/Promociones.js', 'guajirago/src/reglaPromocion.js', 'guajirago-admin/src/documentoUsuario.js'],
   },
   {
     nombre: 'uso-promo',
