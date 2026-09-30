@@ -575,6 +575,15 @@ const RECORRIDOS = [
     // servidor la corta, lo CORRE scripts/medir-chat-del-viaje.cjs (pruebas/chatDelViaje.test.js).
     vigila: ['guajirago/src/chatDelViaje.js', 'guajirago/src/AppConductor.js', 'guajirago/src/Solicitar.js'],
   },
+  {
+    nombre: 'foto-redonda',
+    que: 'la foto redonda del ☰ Menú (56) y de «Mi perfil» (80) sale cargada con una foto buena, y el muñeco 👤 sin foto y con una foto ROTA (G98; cambia la foto de la ficha de PRUEBAS de pasajero@ y la devuelve)',
+    archivo: 'foto-redonda.cjs',
+    // Las tres fotos del conductor en la pantalla del pasajero (la oferta, el que viene y el viaje en curso) las SACA
+    // de Solicitar.js, las pinta con React con foto, sin foto y rota, y las carea con el código de antes
+    // scripts/medir-foto-redonda.cjs (pruebas/fotoRedonda.test.js).
+    vigila: ['guajirago/src/FotoRedonda.js', 'guajirago/src/MenuLateral.js', 'guajirago/src/MiPerfil.js'],
+  },
 ];
 
 // Los archivos de pantalla: los que, si cambian, el robot debería poder probar. Todo lo que esté en

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 // G90: los colores salen de LA paleta (theme.js).
 import { T } from './theme';
+import FotoRedonda from './FotoRedonda';
 
 function MenuLateral({ nombre, foto, onIrPerfil, onIrCreditos, onIrViajes, onIrGanancias, onIrSeguridad, onIrAyuda, onIrConfig, onIrPromociones, onCerrarSesion, onCambiarNegocio }) {
   const [abierto, setAbierto] = useState(false);
@@ -43,9 +44,7 @@ function MenuLateral({ nombre, foto, onIrPerfil, onIrCreditos, onIrViajes, onIrG
           <div onClick={(e) => e.stopPropagation()} style={{ position: 'absolute', top: 0, left: 0, bottom: 0, width: '82%', maxWidth: '320px', background: T.fondo, borderRight: `1.5px solid ${T.borde}`, display: 'flex', flexDirection: 'column', boxShadow: '2px 0 20px rgba(0,0,0,0.5)' }}>
 
             <div style={{ background: T.grad, padding: '28px 20px 24px' }}>
-              <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: 'rgba(255,255,255,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '28px', marginBottom: '12px', overflow: 'hidden' }}>
-                {foto ? <img src={foto} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : '👤'}
-              </div>
+              <FotoRedonda src={foto} tamano="menu" estilo={{ background: 'rgba(255,255,255,0.25)', marginBottom: '12px' }} />
               <p style={{ color: T.negro, fontSize: '18px', fontWeight: '900', margin: '0' }}>{nombre || 'Usuario'}</p>
               <p style={{ color: 'rgba(20,20,22,0.7)', fontSize: '13px', margin: '4px 0 0', fontWeight: 'bold' }}>GuajiraGo</p>
             </div>

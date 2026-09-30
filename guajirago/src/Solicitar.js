@@ -48,6 +48,7 @@ import { numeroWhatsApp, telefonoSirve, celularDiezCifras, cifrasMientrasEscribe
 // La tarjeta roja «Llamar al 123» y el número salen de UNA pieza, la misma de Ajustes › Seguridad (G70).
 import { TarjetaLlamar123 } from './LlamarAl123';
 import BotonVolver from './BotonVolver';
+import FotoRedonda from './FotoRedonda';
 import { minutosSegundos } from './tiempoDelViaje';
 
 /**
@@ -126,9 +127,7 @@ function TarjetaContraoferta({ oferta, onAceptar, onRechazar, ocupado }) {
       </div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '22px', overflow: 'hidden', border: '2px solid #FF7A2F', flexShrink: 0 }}>
-            {fotoConductor ? <img src={fotoConductor} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : '👤'}
-          </div>
+          <FotoRedonda src={fotoConductor} tamano="tarjeta" estilo={{ background: '#FFFFFF', border: '2px solid #FF7A2F', flexShrink: 0 }} />
           <div>
             <p style={{ color: '#1A1A1E', fontWeight: '900', fontSize: '15px', margin: '0' }}>{oferta.conductorNombre}</p>
             {oferta.conductorPlaca && <p style={{ color: '#FF7A2F', fontSize: '12px', margin: '3px 0 0' }}>🚘 {oferta.conductorPlaca} · {oferta.conductorVehiculo}</p>}
@@ -1322,9 +1321,7 @@ const PanelEmergencia = () => (
           <div ref={tarjetaRef} style={{ position: 'absolute', bottom: '0', left: '0', right: '0', zIndex: 10, background: 'rgba(255,255,255,0.97)', borderRadius: '24px 24px 0 0', padding: '20px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px', overflow: 'hidden', border: '2px solid #2ECC71', flexShrink: 0 }}>
-                  {datosConductor?.foto ? <img src={datosConductor.foto} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : '👤'}
-                </div>
+                <FotoRedonda src={datosConductor?.foto} tamano="tarjetaGrande" estilo={{ background: '#FFFFFF', border: '2px solid #2ECC71', flexShrink: 0 }} />
                 <div>
                   <p style={{ color: '#6B7280', fontSize: '10px', margin: '0' }}>CONDUCTOR</p>
                   <p style={{ color: '#1A1A1E', fontSize: '14px', fontWeight: 'bold', margin: '4px 0 0' }}>{viaje?.conductorNombre}</p>
@@ -1397,9 +1394,7 @@ const PanelEmergencia = () => (
         <div ref={tarjetaRef} style={{ position: 'absolute', bottom: '0', left: '0', right: '0', zIndex: 10, background: 'rgba(255,255,255,0.97)', borderRadius: '24px 24px 0 0', padding: '20px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '22px', overflow: 'hidden', border: '2px solid #FF7A2F', flexShrink: 0 }}>
-                {datosConductor?.foto ? <img src={datosConductor.foto} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : '👤'}
-              </div>
+              <FotoRedonda src={datosConductor?.foto} tamano="tarjeta" estilo={{ background: '#FFFFFF', border: '2px solid #FF7A2F', flexShrink: 0 }} />
               <div>
                 <p style={{ color: '#6B7280', fontSize: '10px', margin: '0' }}>CONDUCTOR</p>
                 <p style={{ color: '#1A1A1E', fontSize: '14px', fontWeight: 'bold', margin: '4px 0 0' }}>{viaje?.conductorNombre}</p>

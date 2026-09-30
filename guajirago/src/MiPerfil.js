@@ -8,6 +8,7 @@ import { motivoDeRechazo, apuntarRechazo } from './avisoRechazo';
 import { doc, getDoc, setDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { subirAlAlmacen } from './subirAlAlmacen';
 import BotonVolver from './BotonVolver';
+import FotoRedonda from './FotoRedonda';
 
 function MiPerfil({ onVolver }) {
   const [cargando, setCargando] = useState(true);
@@ -121,9 +122,7 @@ function MiPerfil({ onVolver }) {
         <div style={{ padding: '24px 20px' }}>
           {/* Foto de perfil */}
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: '16px' }}>
-            <div style={{ width: '80px', height: '80px', borderRadius: '50%', background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '36px', overflow: 'hidden', marginBottom: '8px' }}>
-              {fotoMostrar ? <img src={fotoMostrar} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : '👤'}
-            </div>
+            <FotoRedonda src={fotoMostrar} tamano="perfil" estilo={{ background: 'linear-gradient(135deg, #FFCF4D, #FF7A2F, #D6357E)', marginBottom: '8px' }} />
             <label style={{ cursor: 'pointer', background: '#FFFFFF', border: '1px solid #FF7A2F', borderRadius: '12px', padding: '8px 18px', color: '#FF7A2F', fontSize: '13px', fontWeight: 'bold' }}>
               📸 Cambiar foto
               <input type="file" accept="image/*" onChange={elegirFoto} style={{ display: 'none' }} />
