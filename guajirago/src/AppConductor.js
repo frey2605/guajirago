@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { db, auth } from './firebase';
-import { collection, query, where, limit, onSnapshot, doc, updateDoc, setDoc, getDoc, getDocs, addDoc, orderBy, deleteField } from 'firebase/firestore';
+import { collection, query, where, limit, onSnapshot, doc, updateDoc, setDoc, getDoc, getDocs, orderBy, deleteField } from 'firebase/firestore';
 import { registrarTokenFCM, permisoDeAvisos, avisoDeAvisos } from './Notificaciones';
 import { sonarAlerta, desbloquearAudio } from './alerta';
 import { getFunctions, httpsCallable } from 'firebase/functions';
@@ -26,6 +26,7 @@ import Calificacion from './Calificacion';
 import Llamada from './Llamada';
 import TratoHecho from './TratoHecho'; // G74: la ventanita «¡Trato hecho!», la misma para pasajero y conductor
 import { useLlamadaEntrante } from './llamadaEntrante';
+import { useChatDelViaje } from './chatDelViaje'; // G96: escuchar y enviar el chat del viaje, la misma pieza que el pasajero
 import Creditos from './Creditos';
 import MiPerfil from './MiPerfil';
 import Ganancias from './Ganancias';
@@ -434,9 +435,9 @@ function AppConductor({ nombre, telefono, placa, vehiculo, tipoVehiculo, onCerra
   const [enLlamada, setEnLlamada] = useState(false);
   const [confirmarFin, setConfirmarFin] = useState(false);
   const [llamadaEntrante, setLlamadaEntrante] = useLlamadaEntrante(viajeActual?.id, setAviso);
-  const [mensajesChat, setMensajesChat] = useState([]);
   const [textoChat, setTextoChat] = useState('');
   const chatFinRef = useRef(null);
+  const [mensajesChat, enviarAlChat] = useChatDelViaje(viajeActual?.id, 'conductor', chatFinRef, setAviso);
   const contadorRef = useRef(null);
   const ultimoMensajeRef = useRef(null);
   const descartadosRef = useRef({});
@@ -1148,27 +1149,12 @@ const cargarSaldo = useCallback(async (uid) => {
   const omitirCodigoDescuento = async () => {
     await cerrarViajeFinal();
   };
-useEffect(() => {
-    if (!viajeActual?.id) return;
-    const q = query(collection(db, 'viajes', viajeActual.id, 'mensajes'), orderBy('fecha', 'asc'));
-    const unsub = onSnapshot(q, (snap) => {
-      setMensajesChat(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-      setTimeout(() => { if (chatFinRef.current) chatFinRef.current.scrollIntoView({ behavior: 'smooth' }); }, 100);
-    });
-    return () => unsub();
-  }, [viajeActual?.id]);
-
   const enviarMensajeConductor = async () => {
     if (!textoChat.trim() || !viajeActual?.id) return;
-    const user = auth.currentUser;
     // Antes: `catch (e) {}` — si no salía, nadie lo decía. Y dos Enter seguidos lo mandaban dos veces.
+    // Qué se escribe lo decide chatDelViaje.js (G96), la misma pieza que usa el pasajero.
     await correr(async () => {
-      await addDoc(collection(db, 'viajes', viajeActual.id, 'mensajes'), {
-        texto: textoChat.trim(),
-        autor: 'conductor',
-        autorId: user?.uid || '',
-        fecha: new Date().toISOString(),
-      });
+      await enviarAlChat(textoChat);
       setTextoChat('');
     }, 'mensaje', 'Mensaje enviado.', 'enviar el mensaje');
   };

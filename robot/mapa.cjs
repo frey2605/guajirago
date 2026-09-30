@@ -565,6 +565,14 @@ const RECORRIDOS = [
       'guajirago/src/Ganancias.js', 'guajirago/src/Seguridad.js', 'guajirago/src/Promociones.js', 'guajirago/src/AyudaSoporte.js',
       'guajirago/src/Configuracion.js', 'guajirago/src/App.js', 'guajirago/src/Restaurantes.js', 'guajirago/src/Solicitar.js'],
   },
+  {
+    nombre: 'chat-del-viaje',
+    que: 'con un viaje aceptado (confirmarConductor, en la base de pruebas), el taxista escribe en el chat con Enter, el pasajero lo ve en «💬 Chat con el conductor (1)» y contesta con ➤, y los dos ven los dos mensajes sin ventanita de error (G96; ~2 min)',
+    archivo: 'chat-del-viaje.cjs',
+    // Que se escriba en la base LO MISMO que antes de G96 (texto, autor, autorId, fecha), y que la escucha avise si el
+    // servidor la corta, lo CORRE scripts/medir-chat-del-viaje.cjs (pruebas/chatDelViaje.test.js).
+    vigila: ['guajirago/src/chatDelViaje.js', 'guajirago/src/AppConductor.js', 'guajirago/src/Solicitar.js'],
+  },
 ];
 
 // Los archivos de pantalla: los que, si cambian, el robot debería poder probar. Todo lo que esté en
