@@ -22,10 +22,12 @@ import { enlaceWhatsApp, telefonoSirve, celularDiezCifras, cifrasMientrasEscribe
 import { unidadTxt } from './unidadesTour';
 // G88: «Mis reservas» se recuerda en el teléfono con la pieza única (la misma de «Mis pedidos»; su clave, sin tope).
 import { MIS_RESERVAS, leerRecordados, recordar } from './recordadosEnTelefono';
+// G90: los colores salen de LA paleta (theme.js), no de una paleta propia de esta pantalla.
+import { T } from './theme';
 
-const AZUL = '#1C8EF9';
-const NARANJA = '#FF7A2F';
-const VERDE = '#2ECC71';
+const AZUL = T.azul;
+const NARANJA = T.naranja;
+const VERDE = T.ok;
 
 function Turismo({ nombre, foto, onVolver, onCerrarSesion, onIrPerfil, onIrGanancias, onIrSeguridad, onIrViajes, onIrCreditos, onIrAyuda, onIrConfig, onIrPromociones }) {
   const [pantalla, setPantalla] = useState('lista'); // lista | agencia | misReservas

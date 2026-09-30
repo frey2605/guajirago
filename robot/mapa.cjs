@@ -414,8 +414,10 @@ const RECORRIDOS = [
     archivo: 'menu-navegacion.cjs',
     // Cada botón (41 combinaciones de entrada, papel y opción) lo SACA de su archivo y lo EJECUTA
     // pruebas/menuNavegacion.test.js, también la tarjeta «Mis viajes» del conductor fuera de turno.
+    // theme.js (LA paleta, G90) le da los colores al menú: si cambia, este recorrido abre el menú. Que se VEA igual lo
+    // pinta y lo carea con React pruebas/paleta.test.js (el robot no compara colores).
     vigila: ['guajirago/src/navegacionMenu.js', 'guajirago/src/MenuLateral.js', 'guajirago/src/App.js', 'guajirago/src/Home.js',
-      'guajirago/src/AppConductor.js'],
+      'guajirago/src/AppConductor.js', 'guajirago/src/theme.js'],
   },
   {
     nombre: 'recuperar-contrasena',
