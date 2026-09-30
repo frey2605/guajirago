@@ -6,6 +6,10 @@ service cloud.firestore {
     // ese campo ya no lo puede escribir el dueño de la ficha, así que la respuesta
     // es de fiar. Usa .get('rol','') a propósito: medido el 23-ago-2026, 8 de las
     // 10 fichas NO tienen el campo, y preguntar por un campo que no existe da error.
+    // G78 (29-sep-2026): es la ÚNICA respuesta de este archivo; antes había seis copias escritas a mano.
+    // La misma pregunta vive en storage.rules, en functions (recalcularCobro) y en el panel
+    // (guajirago-admin/src/rolesPanel.js). No se pueden importar entre sí, así que las ata
+    // pruebas/quienEsAdmin.test.js: todas tienen que aceptar exactamente los mismos roles.
     function esAdmin() {
       return request.auth != null && (
         get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.get('rol', '') == 'admin' ||
@@ -207,10 +211,7 @@ service cloud.firestore {
       // Caso 2 — un admin o superadmin sí puede tocarlo todo, en cualquier ficha.
       // Es la única vía para dar un rol (Superadmin.js:599) o sancionar
       // (Conductores.js:299). Cuesta una lectura, por eso va después.
-      allow create, update: if request.auth != null && (
-        get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.rol == 'admin' ||
-        get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.rol == 'superadmin'
-      );
+      allow create, update: if esAdmin();
 
       allow delete: if false;
     }
@@ -692,8 +693,7 @@ service cloud.firestore {
       allow list: if esAdmin();
       allow create, update: if request.auth != null && (
         request.auth.uid == conductorId ||
-        get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.rol == 'admin' ||
-        get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.rol == 'superadmin'
+        esAdmin()
       );
       allow delete: if false;
     }
@@ -1091,10 +1091,7 @@ service cloud.firestore {
       // van por las funciones (SDK de administrador, no pasa por aquí).
       allow create, update: if esAdmin();
       // EXCEPCION medida: el panel borra promociones (Promociones.js:155).
-      allow delete: if request.auth != null && (
-        get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.rol == 'admin' ||
-        get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.rol == 'superadmin'
-      );
+      allow delete: if esAdmin();
       match /usos/{usoId} {
         allow read: if request.auth != null;
         // SEGURIDAD (29-sep-2026): el contador del tope por persona. Abierto a
@@ -1107,15 +1104,9 @@ service cloud.firestore {
     }
     match /anuncios/{anuncioId} {
       allow read: if request.auth != null;
-      allow create, update: if request.auth != null && (
-        get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.rol == 'admin' ||
-        get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.rol == 'superadmin'
-      );
+      allow create, update: if esAdmin();
       // EXCEPCION medida: el panel borra anuncios (Superadmin.js:541).
-      allow delete: if request.auth != null && (
-        get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.rol == 'admin' ||
-        get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.rol == 'superadmin'
-      );
+      allow delete: if esAdmin();
     }
     match /config/{documentoConfig} {
       allow read: if request.auth != null;
@@ -1126,10 +1117,7 @@ service cloud.firestore {
     match /logs/{logId} {
       allow read: if request.auth != null &&
         get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.rol == 'superadmin';
-      allow create: if request.auth != null && (
-        get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.rol == 'admin' ||
-        get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.rol == 'superadmin'
-      );
+      allow create: if esAdmin();
     }
     // ── REGLA 9 · LA BANDEJA DE RECHAZOS (26-ago-2026) ──────────────────────
     // Palabras del dueño: «Nada se rechaza en silencio. Todo rechazo va a una
