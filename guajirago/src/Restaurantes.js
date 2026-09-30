@@ -48,6 +48,8 @@ import { direccionDePunto, textoDeCoordenadas } from './direccionDePunto';
 import { ponerSugerencias } from './sugerenciasDeDirecciones';
 // G33: qué paso ve el cliente según el estado que puso el negocio, en una sola tabla.
 import { PASOS_DEL_CLIENTE, indiceDelPaso, yaLlegoAlCliente, terminadoParaElCliente, etiquetaParaElCliente } from './estadosPedido';
+// G83: qué calificaciones cuentan y cuánto da el promedio del negocio, en una sola pieza (copia idéntica en aliados).
+import { lasQueCuentan, promedioDelNegocio, promediosPorNegocio } from './estrellasNegocio';
 
 // G30: Google no dio el nombre de la calle. Lo dice la ventanita de la ubicación, con su propio título.
 const SIN_NOMBRE_DE_CALLE = 'Encontramos tu ubicación, pero no el nombre de la calle. Dejamos tus coordenadas en la dirección: agrégale la calle, el barrio o una referencia para que el domiciliario te encuentre.';
@@ -141,15 +143,7 @@ function Restaurantes({ nombre, onVolver, foto, onCerrarSesion, onIrPerfil, onIr
     (async () => {
       try {
         const snap = await getDocs(collection(db, 'calificaciones'));
-        const m = {};
-        snap.docs.forEach((d) => {
-          const c = d.data();
-          if (c.reportado || !c.calificadoId || c.quienCalifica !== 'cliente') return;
-          if (!m[c.calificadoId]) m[c.calificadoId] = { suma: 0, count: 0 };
-          m[c.calificadoId].suma += (c.estrellas || 0);
-          m[c.calificadoId].count += 1;
-        });
-        setMapaCalif(m);
+        setMapaCalif(promediosPorNegocio(snap.docs.map((d) => d.data())));
       } catch (e) {}
     })();
   }, []);
@@ -182,7 +176,7 @@ function Restaurantes({ nombre, onVolver, foto, onCerrarSesion, onIrPerfil, onIr
     (async () => {
       try {
         const snap = await getDocs(query(collection(db, 'calificaciones'), where('calificadoId', '==', restauranteActivo.id)));
-        if (activo) setCalifsRestaurante(snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(c => !c.reportado));
+        if (activo) setCalifsRestaurante(lasQueCuentan(snap.docs.map(d => ({ id: d.id, ...d.data() })), restauranteActivo.id));
       } catch (e) {}
     })();
     return () => { activo = false; };
@@ -728,8 +722,7 @@ function Restaurantes({ nombre, onVolver, foto, onCerrarSesion, onIrPerfil, onIr
     const totalConDom = totalCarrito + costoDom;
     const bajoMinimo = carrito.length > 0 && totalCarrito < minimoPedido;
     const telValido = telefonoSirve(telefono);
-    const totalCalif = califsRestaurante.length;
-    const promedioCalif = totalCalif ? (califsRestaurante.reduce((s, c) => s + (c.estrellas || 0), 0) / totalCalif) : 0;
+    const { promedio: promedioCalif, total: totalCalif } = promedioDelNegocio(califsRestaurante, restauranteActivo.id);
     const abiertoAhora = sePuedePedirAhora(restauranteActivo);
     return (
       <div style={{ backgroundColor: '#FFFFFF', minHeight: '100vh', fontFamily: 'Arial, sans-serif', paddingBottom: carrito.length > 0 ? '210px' : '20px' }}>
@@ -1203,8 +1196,8 @@ function Restaurantes({ nombre, onVolver, foto, onCerrarSesion, onIrPerfil, onIr
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <p style={{ color: '#1A1A1E', fontWeight: '900', fontSize: '16px', margin: '0' }}>{r.nombre}</p>
-                  {mapaCalif[r.id] && mapaCalif[r.id].count > 0 ? (
-                    <span style={{ color: '#FF7A2F', fontSize: '13px', fontWeight: '900', flexShrink: 0 }}>⭐ {(mapaCalif[r.id].suma / mapaCalif[r.id].count).toFixed(1)} <span style={{ color: '#9AA0A6', fontWeight: 'normal' }}>({mapaCalif[r.id].count})</span></span>
+                  {mapaCalif[r.id] && mapaCalif[r.id].total > 0 ? (
+                    <span style={{ color: '#FF7A2F', fontSize: '13px', fontWeight: '900', flexShrink: 0 }}>⭐ {mapaCalif[r.id].promedio.toFixed(1)} <span style={{ color: '#9AA0A6', fontWeight: 'normal' }}>({mapaCalif[r.id].total})</span></span>
                   ) : (
                     <span style={{ color: '#8A97B8', fontSize: '12px', fontWeight: 'bold', background: '#F0F1F4', borderRadius: '8px', padding: '2px 7px', flexShrink: 0 }}>🆕 Nuevo</span>
                   )}

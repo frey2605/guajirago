@@ -476,6 +476,15 @@ const RECORRIDOS = [
     args: ['aliados', 'agencia'],
     vigila: ['guajirago-aliados/src/subirAlAlmacen.js', 'guajirago-aliados/src/PerfilRestaurante.js', 'guajirago-aliados/src/PerfilAgencia.js'],
   },
+  {
+    nombre: 'estrellas-restaurante',
+    que: 'el promedio de estrellas del restaurante de prueba se ve igual en la lista y el menú del cliente y en «Calificaciones» de aliados (G83; solo mira)',
+    archivo: 'estrellas-restaurante.cjs',
+    // Que los tres sitios den el mismo número con casos raros (una de taxi al dueño, sin estrellas, reportadas) lo
+    // SACA de cada archivo y lo EJECUTA pruebas/promedioRestaurante.test.js.
+    vigila: ['guajirago/src/estrellasNegocio.js', 'guajirago-aliados/src/estrellasNegocio.js', 'guajirago-aliados/src/CalificacionesRestaurante.js',
+      'guajirago/src/Restaurantes.js'],
+  },
 ];
 
 // Los archivos de pantalla: los que, si cambian, el robot debería poder probar. Todo lo que esté en
