@@ -21,7 +21,9 @@ const RECORRIDOS = [
     archivo: 'registrar-conductor.cjs',
     args: ['Taxi'],
     vigila: ['guajirago/src/App.js', 'guajirago/src/Login.js', 'guajirago/src/documentosConductor.js',
-      'guajirago/src/firebase.js', 'guajirago/src/ambiente.js'],
+      'guajirago/src/firebase.js', 'guajirago/src/ambiente.js',
+      // G97: la caja de los campos de «Crear cuenta» y de los datos del conductor; este recorrido llena los dos.
+      'guajirago/src/estiloCampo.js'],
   },
   {
     nombre: 'revisar-panel',

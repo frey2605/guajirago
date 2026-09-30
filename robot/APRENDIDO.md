@@ -839,3 +839,9 @@ la placa de `conductores/{uid}` (la escribe su GPS con la misma placa que va en 
   En el `probar-cambio` de G92 (43 ✓ y 1 rojo) volvió a salir rojo `registrar-conductor` («locator.click: Timeout», la
   captura en «Creando cuenta…»), y repetido solo, otra vez rojo. Careo: con 236586d publicado pasó, y con e403e95
   publicado de nuevo pasó dos de dos. Es la creación de la cuenta que a ratos tarda, no el cambio.
+- **estiloCampo (G97, 30-sep-2026):** la caja de los campos de «Crear cuenta», «Ya tengo cuenta» y los datos del
+  conductor sale de `guajirago/src/estiloCampo.js`; `registrar-conductor` la vigila (llena los dos formularios). No
+  cambia nada a la vista: lo demuestra `scripts/medir-estilo-campo.cjs --antes` pintando con React. En el
+  `probar-cambio` de G97 (74bce47 en pruebas) salieron rojos `registrar-conductor` (clic de 30 s), `errores-de-cuenta`,
+  `quien-cancelo` (`page.goto` de 30 s) y `metodos-pago` (`page.fill` de 30 s); corridos solos: los cuatro ✓
+  (`registrar-conductor` rojo una vez más y ✓ a la siguiente). Son esperas de la red o de crear la cuenta, no el cambio.
