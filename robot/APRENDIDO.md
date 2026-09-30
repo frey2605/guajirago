@@ -799,3 +799,16 @@ la placa de `conductores/{uid}` (la escribe su GPS con la misma placa que va en 
   `NegociosDeUnTipo.js`): es un archivo que ya no existe, no una pantalla sin probar. Y `errores-de-cuenta` salió rojo
   una vez en aliados («no salió la frase») y ✓ al repetirlo solo: con muchos recorridos seguidos, la entrada falla por
   momentos.
+- **boton-volver (G91, 30-sep-2026):** el «‹ Volver» de la app de transporte es UNA pieza (`BotonVolver.js`): un
+  `<div>` con un `<span>‹</span>` y el texto « Volver». Se encuentra con `getByText('‹ Volver')`, y para mirarlo se
+  busca el `div` cuyo texto es «‹ Volver» y cuyo único hijo es el `span` (así no se confunde con el padre). En el
+  navegador la pastilla sale `rgba(0, 0, 0, 0.06)`, la letra `rgb(26, 26, 30)` y el ‹ de 20px. Para saber si se está en
+  el menú de módulos o en una lista (Restaurantes, Turismo) sirve mirar si hay «☰»: las pantallas de detalle
+  (Mis pedidos, Mis reservas, Mi perfil…) no lo llevan. Configuración → «Términos y condiciones» → «‹ Volver» regresa a
+  Configuración, no a módulos. `pasajero@gg.test` ya es pasajero: «Mis viajes» del menú le abre el historial de
+  `Home.js`, no `MisViajes.js` (esa solo sale a quien no ha escogido papel). Corrido en pruebas con 42cbb25 publicado:
+  15 pantallas, todas la misma pastilla, dentro del celular (400 px) y volviendo a su sitio. El 403 de la consola sale
+  también aquí (es el de siempre, ver arriba). Solo mira: no escribe nada.
+  En el `probar-cambio` de G91 salió rojo `registrar-conductor` dos veces seguidas («locator.click: Timeout»): la
+  captura se quedó en «Creando cuenta…» a los 6 s (Login.js, que G91 no toca). Careo: con 9dca917 publicado pasó, y
+  con 42cbb25 publicado otra vez pasó dos de dos. Es la creación de la cuenta que a ratos tarda más de 6 s, no el cambio.
