@@ -1,6 +1,22 @@
 import React from 'react';
 
-// ── LA VENTANITA DE AVISO DEL PANEL · UNA SOLA ─────────────────────────────
+// ── LA VENTANITA DE AVISO · UNA SOLA, COPIADA IGUAL EN LAS TRES APPS ──────
+// PIEZA COMPARTIDA. Nació en el panel (27-ago-2026) y hoy la pintan las tres
+// apps. Los tres repos son APARTE y no pueden importar uno del otro, así que
+// vive en TRES copias que dicen lo mismo letra por letra:
+//   · guajirago/src/AvisoModal.js          (pasajero y conductor)
+//   · guajirago-admin/src/AvisoModal.js    (panel)
+//   · guajirago-aliados/src/AvisoModal.js  (negocios)
+// Se cambian las tres o ninguna. Las atan pruebas/avisosConductor.test.js
+// (app y panel) y pruebas/sinSenalAliados.test.js (aliados y app); las que le
+// miran el cuerpo están en pruebas/avisosPanel.test.js.
+//
+// LO QUE SIGUE ES LA HISTORIA DEL PANEL, escrita el día que nació: los archivos
+// que nombra (App.js, Superadmin.js, Conductores.js, ComentariosReportados.js,
+// Rechazos.js) son los de guajirago-admin/src, y sus números de renglón son de
+// ese día: el código se ha movido desde entonces, así que se buscan por el
+// nombre de la función, no por el número.
+//
 // REGLA 9 del dueño: «Nada se rechaza en silencio.»
 //
 // El 27-ago-2026 se cerraron los botones del panel que fallaban callados: aprobar

@@ -356,6 +356,28 @@ describe('SEGUNDA LEY · las copias compartidas no se separan', () => {
       'la ventanita del conductor se separó de la del panel. Las pruebas que le '
       + 'miran el cuerpo están en el panel: si son distintas, esta no la comprueba nadie.');
   });
+
+  it('G77 · la cabecera de AvisoModal dice que es pieza compartida y nombra sus TRES copias', () => {
+    // Hasta el 29-sep-2026 la cabecera se titulaba «LA VENTANITA DE AVISO DEL PANEL»
+    // y no decía que la app y aliados llevan la misma: quien la abría en la app no
+    // sabía que había otras dos que tocar. Se mira SOLO el comentario de arriba
+    // (hasta la función): el nombre de las rutas en otro sitio no vale.
+    const COPIAS = ['guajirago/src/AvisoModal.js', 'guajirago-admin/src/AvisoModal.js',
+      'guajirago-aliados/src/AvisoModal.js'];
+    for (const f of COPIAS) {
+      const t = leer(f).split('\r\n').join('\n');
+      const i = t.indexOf('function AvisoModal');
+      assert.ok(i > 0, f + ': no se encuentra la función AvisoModal');
+      const cabecera = t.slice(0, i).split('\n').filter((r) => r.trim().startsWith('//')).join('\n');
+      assert.ok(/PIEZA COMPARTIDA/.test(cabecera), f + ': la cabecera no dice que es una pieza compartida');
+      assert.ok(!/VENTANITA DE AVISO DEL PANEL/.test(cabecera),
+        f + ': la cabecera vuelve a decir que es solo del panel, y la pintan las tres apps');
+      for (const ruta of COPIAS) {
+        assert.ok(cabecera.includes(ruta), f + ': la cabecera no nombra «' + ruta
+          + '». Quien la lea no sabrá dónde están las otras copias que tiene que tocar.');
+      }
+    }
+  });
 });
 
 // ── LO QUE QUEDA ABIERTO, ESCRITO PARA QUE NO SE OLVIDE ────────────────────

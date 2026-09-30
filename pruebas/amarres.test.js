@@ -1782,6 +1782,22 @@ describe('AMARRES · REGLA 9 · la bandeja de rechazos', () => {
       'se tocan los dos o ninguno.');
   });
 
+  it('G77 · la nota de la cola sin red cita la FUNCIÓN de firebase.js, y esa función está en las dos apps', () => {
+    // Hasta el 29-sep-2026 decía «firebase.js:24», y en ese renglón ya había otra
+    // cosa (el código se movió con G65). Un número dentro de un comentario nace
+    // viejo; el nombre de la función no se mueve. Y lo que la nota promete —que
+    // las DOS apps encienden la cola— se comprueba en sus dos firebase.js.
+    const t = leer('guajirago/src/guardarRechazo.js');
+    assert.ok(!/firebase\.js:\d+/.test(t),
+      'guardarRechazo.js vuelve a citar firebase.js por número de renglón: se cita la función');
+    assert.ok(/enableIndexedDbPersistence de firebase\.js/.test(t),
+      'guardarRechazo.js ya no dice qué función de firebase.js enciende la cola sin red');
+    for (const f of ['guajirago/src/firebase.js', 'guajirago-aliados/src/firebase.js']) {
+      assert.ok(/enableIndexedDbPersistence\(db\)/.test(soloCodigo(leer(f))),
+        f + ' ya no llama a enableIndexedDbPersistence(db): la nota de guardarRechazo.js miente');
+    }
+  });
+
   it('la etiqueta de la clase dice lo mismo en la app que en aliados', () => {
     // La app del pasajero guarda `motivo.clave` y aliados también. Si una dijera
     // 'sinRed' y la otra 'sin_red', la bandeja del panel pintaría la mitad de los

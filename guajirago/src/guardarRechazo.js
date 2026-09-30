@@ -74,7 +74,8 @@ export function limpiar(donde) {
  * consola.
  *
  * SIN RED NO FALLA: SE ESPERA. Las dos apps encienden la cola de escrituras sin
- * red (firebase.js:24), así que el apunte se guarda en el teléfono y llega solo
+ * red (el enableIndexedDbPersistence de firebase.js), así que el apunte se
+ * guarda en el teléfono y llega solo
  * cuando vuelve la señal. Esta promesa se queda pendiente mientras tanto — por
  * eso se llama SIN await desde las pantallas: nadie debe esperar a esto.
  */
