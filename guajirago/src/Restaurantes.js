@@ -16,6 +16,8 @@ import { guardarRechazo } from './guardarRechazo';
 // que usa Turismo.js. Ahí vive también el interruptor `visibleEnEscaparate`.
 import { losDeComida } from './escaparate';
 import { etapaDeVigencia } from './reglaPromocion';
+// G87: qué número es cada día de la promoción y cómo se dice vive en diasSemana.js (copia atada en aliados).
+import { diasTxt } from './diasSemana';
 // G47: «¿me pueden pedir ahora?» es UNA regla (candado + escaparate + pausa + horario), la misma del dueño y del panel.
 import { sePuedePedirAhora } from './horarioNegocio';
 // G48: la fecha guardada de un pedido (texto o Timestamp) se lee en un solo sitio.
@@ -251,9 +253,8 @@ function Restaurantes({ nombre, onVolver, foto, onCerrarSesion, onIrPerfil, onIr
     }
     return mejor;
   };
-  const DOW_TXT = { 0: 'Dom', 1: 'Lun', 2: 'Mar', 3: 'Mié', 4: 'Jue', 5: 'Vie', 6: 'Sáb' };
   const vigenciaTxt = (p) => {
-    if (p.programacion === 'dias' && (p.dias || []).length) return [...p.dias].sort().map((d) => DOW_TXT[d]).join(', ');
+    if (p.programacion === 'dias' && (p.dias || []).length) return diasTxt(p.dias);
     if (p.programacion === 'rango' && p.fechaInicio) return 'hasta ' + (p.fechaFin || p.fechaInicio);
     return '';
   };

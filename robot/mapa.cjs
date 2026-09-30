@@ -512,6 +512,15 @@ const RECORRIDOS = [
     vigila: ['guajirago/src/unidadesTour.js', 'guajirago-aliados/src/unidadesTour.js', 'guajirago-aliados/src/Tours.js',
       'guajirago/src/Turismo.js'],
   },
+  {
+    nombre: 'dias-promocion',
+    que: 'con dos promociones fijas «por días» en el restaurante de prueba, la lista de «Promociones» de aliados, sus botones L M M J V S D y la etiqueta del plato en la app dicen los días igual (G87; cambia las promociones del restaurante de PRUEBAS y se las devuelve)',
+    archivo: 'dias-promocion.cjs',
+    // Que los tres sitios digan lo mismo en todos los casos (y el careo con el código de antes) lo SACA de cada archivo
+    // y lo EJECUTA pruebas/diasPromocion.test.js.
+    vigila: ['guajirago/src/diasSemana.js', 'guajirago-aliados/src/diasSemana.js', 'guajirago-aliados/src/Promociones.js',
+      'guajirago/src/Restaurantes.js'],
+  },
 ];
 
 // Los archivos de pantalla: los que, si cambian, el robot debería poder probar. Todo lo que esté en
