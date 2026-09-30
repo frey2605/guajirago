@@ -485,6 +485,15 @@ const RECORRIDOS = [
     vigila: ['guajirago/src/estrellasNegocio.js', 'guajirago-aliados/src/estrellasNegocio.js', 'guajirago-aliados/src/CalificacionesRestaurante.js',
       'guajirago/src/Restaurantes.js'],
   },
+  {
+    nombre: 'quien-cancelo',
+    que: 'de tres pedidos cancelados (uno nuevo del cliente, uno viejo del cliente y uno viejo sin datos), «Mis pedidos» y el seguimiento del cliente y «Cancelado» de aliados dicen lo mismo de quién canceló (G84; deja 3 pedidos fijos en PRUEBAS)',
+    archivo: 'quien-cancelo.cjs',
+    // Que los tres sitios digan el mismo «quién» con todos los casos (y el careo con el código de antes) lo SACA de
+    // cada archivo y lo EJECUTA pruebas/quienCancelo.test.js.
+    vigila: ['guajirago/src/estadosPedido.js', 'guajirago-aliados/src/flujoPedidos.js', 'guajirago-aliados/src/PedidosDomicilio.js',
+      'guajirago/src/Restaurantes.js'],
+  },
 ];
 
 // Los archivos de pantalla: los que, si cambian, el robot debería poder probar. Todo lo que esté en

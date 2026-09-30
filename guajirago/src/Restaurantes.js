@@ -47,7 +47,7 @@ import { pedirGps } from './pedirGps';
 import { direccionDePunto, textoDeCoordenadas } from './direccionDePunto';
 import { ponerSugerencias } from './sugerenciasDeDirecciones';
 // G33: qué paso ve el cliente según el estado que puso el negocio, en una sola tabla.
-import { PASOS_DEL_CLIENTE, indiceDelPaso, yaLlegoAlCliente, terminadoParaElCliente, etiquetaParaElCliente } from './estadosPedido';
+import { PASOS_DEL_CLIENTE, indiceDelPaso, yaLlegoAlCliente, terminadoParaElCliente, etiquetaParaElCliente, quienCanceloElPedido } from './estadosPedido';
 // G83: qué calificaciones cuentan y cuánto da el promedio del negocio, en una sola pieza (copia idéntica en aliados).
 import { lasQueCuentan, promedioDelNegocio, promediosPorNegocio } from './estrellasNegocio';
 
@@ -540,9 +540,9 @@ function Restaurantes({ nombre, onVolver, foto, onCerrarSesion, onIrPerfil, onIr
           {/* Estado del pedido */}
           {cancelado ? (
             <div style={{ background: '#FFFFFF', border: '1px solid #FF4444', borderRadius: '16px', padding: '18px', marginBottom: '20px', textAlign: 'center' }}>
-              <p style={{ color: '#FF4444', fontWeight: '900', fontSize: '15px', margin: '0 0 4px' }}>❌ {(pedidoActivo.canceladoPor === 'restaurante' || (!pedidoActivo.canceladoPor && pedidoActivo.motivoRechazo)) ? 'Cancelado por el restaurante' : 'Cancelado por ti'}</p>
-              {(pedidoActivo.motivoRechazo || pedidoActivo.motivoCancelacion) && (
-                <p style={{ color: '#6B7280', fontSize: '13px', margin: 0 }}>Motivo: {pedidoActivo.motivoRechazo || pedidoActivo.motivoCancelacion}</p>
+              <p style={{ color: '#FF4444', fontWeight: '900', fontSize: '15px', margin: '0 0 4px' }}>❌ {{ restaurante: 'Cancelado por el restaurante', cliente: 'Cancelado por ti' }[quienCanceloElPedido(pedidoActivo).quien] || 'Cancelado'}</p>
+              {quienCanceloElPedido(pedidoActivo).motivo && (
+                <p style={{ color: '#6B7280', fontSize: '13px', margin: 0 }}>Motivo: {quienCanceloElPedido(pedidoActivo).motivo}</p>
               )}
             </div>
           ) : (
@@ -1060,9 +1060,9 @@ function Restaurantes({ nombre, onVolver, foto, onCerrarSesion, onIrPerfil, onIr
             </div>
           ) : (
             lista.map((p) => {
-              const porRest = p.canceladoPor === 'restaurante' || (!p.canceladoPor && p.motivoRechazo);
+              const quien = quienCanceloElPedido(p).quien;
               const est = p.estado === 'cancelado'
-                ? (porRest ? 'Cancelado por el restaurante' : 'Cancelado por mí')
+                ? ({ restaurante: 'Cancelado por el restaurante', cliente: 'Cancelado por mí' }[quien] || 'Cancelado')
                 : etiquetaParaElCliente(p.estado);
               const cancelado = p.estado === 'cancelado';
               return (

@@ -677,6 +677,21 @@ la placa de `conductores/{uid}` (la escribe su GPS con la misma placa que va en 
 - Si todas las del restaurante están reportadas, aliados enseña «0.0 · 0 calificaciones» y el cliente «sin»: el robot
   lo cuenta como lo mismo (era así antes de G83).
 
+### quien-cancelo · el cliente y el restaurante dicen lo mismo de quién canceló (G84, 29-sep-2026)
+- Deja en la base (como pasajero@gg.test) TRES pedidos FIJOS al Restaurante de Prueba, ya cancelados: `robotG84CLI01`
+  (canceladoPor cliente), `robotG84VIE02` (viejo: canceladoPor null y motivo del cliente) y `robotG84NAD03` (viejo: sin
+  nada). El cliente solo puede CREAR un pedido en `nuevo` (firestore.rules): la primera vez se crea así y se cancela;
+  las siguientes se reusan y solo se les renueva `creado` (aliados esconde los cancelados de más de 24 h).
+- «Borrar» un campo con `base.cambiar` no se puede (no acepta undefined): se pone `null`, que para las dos apps es lo
+  mismo que no tenerlo.
+- 🪤 «📦 Mis pedidos» del cliente NO consulta la base por cliente: lee los ids guardados en el TELÉFONO
+  (`localStorage` «misPedidosGuajira»). El robot los mete con `page.evaluate` antes de entrar.
+- 🪤 En aliados la tarjeta lleva DOS cosas con «❌»: la etiqueta «❌ Cancelado» (un span arriba) y la línea de quién
+  canceló (un <p> abajo). Hay que subir desde «Pedido #COD» hasta tener un <p> que empiece por «❌»; subir hasta el
+  primer «❌» se para en la etiqueta y no encuentra nada.
+- Con el código de antes publicado en pruebas el recorrido sale 🔴: #VIE02 y #NAD03 salen «Rechazado por el
+  restaurante» en aliados y «Cancelado por mí» en el cliente.
+
 ## Lo que el robot dejó creado en pruebas
 
 - 27-sep-2026: «Robot Taxi De Prueba» (robot.taxi.1790508222079@gg.test) y
@@ -730,3 +745,6 @@ la placa de `conductores/{uid}` (la escribe su GPS con la misma placa que va en 
 - 29-sep-2026 en adelante: una foto de perfil de pasajero@gg.test (`usuarios/prueba-pasajero/perfil_…`) y un logo del
   restaurante y otro de la agencia de prueba (`restaurantes/<id>/logo_…`) por cada corrida de `subir-foto.cjs`, en el
   almacén de pruebas y sin usar: la ficha del pasajero se devuelve como estaba y el negocio no se guarda.
+- 29-sep-2026: tres pedidos FIJOS de pasajero@gg.test al Restaurante de Prueba, `pedidos/robotG84CLI01`,
+  `pedidos/robotG84VIE02` y `pedidos/robotG84NAD03` ($ 5.000, «Calle Robot G84»), ya `cancelados`, de `quien-cancelo.cjs`.
+  Cada corrida los reusa y les renueva la hora.

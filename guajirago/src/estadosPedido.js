@@ -55,3 +55,23 @@ export const etiquetaParaElCliente = (estado) => {
   const paso = PASOS_DEL_CLIENTE.find((p) => p.id === pasoDelCliente(estado));
   return paso ? paso.label : estado;
 };
+
+// ¿QUIÉN CANCELÓ EL PEDIDO, Y POR QUÉ? — gemelo G84, 29-sep-2026.
+// PIEZA COMPARTIDA: la usan la app del cliente (Restaurantes.js) y el restaurante (aliados/PedidosDomicilio.js).
+// Este bloque está IGUAL, letra por letra, en guajirago/src/estadosPedido.js y en guajirago-aliados/src/flujoPedidos.js
+// (otro repo, no puede importarlo): lo atan pruebas/quienCancelo.test.js y scripts/medir-quien-cancelo.cjs.
+// Antes cada app lo decidía a su manera y, con los pedidos viejos que no traen `canceladoPor`, el cliente leía
+// «Cancelado por ti» y el restaurante «Rechazado por el restaurante» del MISMO pedido.
+//   · `canceladoPor` manda: 'cliente' lo escribe la app al cancelar y 'restaurante' aliados al rechazar.
+//   · Sin él (pedidos viejos), se mira el motivo: `motivoRechazo` solo lo escribe el restaurante y
+//     `motivoCancelacion` solo el cliente.
+//   · Sin nada de eso no se sabe, y no se inventa: quien = null (la pantalla dice solo «Cancelado»).
+// El motivo es el mismo que ya enseñaban las dos: el del restaurante, o si no el del cliente.
+export const quienCanceloElPedido = (pedido) => {
+  const p = pedido || {};
+  const motivo = p.motivoRechazo || p.motivoCancelacion || null;
+  if (p.canceladoPor === 'cliente' || p.canceladoPor === 'restaurante') return { quien: p.canceladoPor, motivo };
+  if (p.motivoRechazo) return { quien: 'restaurante', motivo };
+  if (p.motivoCancelacion) return { quien: 'cliente', motivo };
+  return { quien: null, motivo };
+};
