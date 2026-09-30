@@ -13,6 +13,8 @@ import { contieneInfoSensible } from './filtroChat';
 import { useAccion } from './useAccion';
 import AvisoModal from './AvisoModal';
 import { cop } from './moneda';
+// G81: el saldo de la ficha se lee con UNA pieza (la misma que usa la pantalla del conductor).
+import { saldoDe } from './saldoUsuario';
 
 function Creditos({ onVolver }) {
   const [saldo, setSaldo] = useState(null);
@@ -99,7 +101,7 @@ function Creditos({ onVolver }) {
         if (!user) { setSaldo(0); return; }
         const snap = await getDoc(doc(db, 'usuarios', user.uid));
         if (snap.exists()) {
-          setSaldo(snap.data().creditos || 0);
+          setSaldo(saldoDe(snap.data()));
         } else {
           setSaldo(0);
         }
@@ -130,7 +132,7 @@ function Creditos({ onVolver }) {
 
       // Recargar saldo en pantalla
       const snap = await getDoc(doc(db, 'usuarios', user.uid));
-      setSaldo(snap.exists() ? (snap.data().creditos || 0) : 0);
+      setSaldo(snap.exists() ? saldoDe(snap.data()) : 0);
       setCodigo('');
       return valorRecargado;
       // El motivo del fallo lo explica el servidor ("Ese código ya fue usado", etc.) y el candado lo respeta tal cual;

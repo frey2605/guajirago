@@ -37,6 +37,8 @@ import MenuLateral from './MenuLateral';
 // G51: adónde llevan «Mis viajes» y «Ganancias» lo dice UNA tabla; aquí, con el papel de conductor.
 import { pantallaDelMenu } from './navegacionMenu';
 import { fotoDe } from './fotoUsuario';
+// G81: el saldo de la ficha se lee con UNA pieza (la misma que usa «Mis créditos»).
+import { saldoDe } from './saldoUsuario';
 import { sinConductor } from './conductorDelViaje';
 import { puntoDeDireccion, geocodificadorDe } from './direccionDePunto';
 import Logo from './Logo';
@@ -709,7 +711,7 @@ const cargarSaldo = useCallback(async (uid) => {
       if (!id) { setSaldoCreditos(0); return; }
       const snap = await getDoc(doc(db, 'usuarios', id));
       if (snap.exists()) {
-        setSaldoCreditos(snap.data().creditos || 0);
+        setSaldoCreditos(saldoDe(snap.data()));
         setFotoConductor(fotoDe(snap.data()));
         setColorConductor(snap.data().color || '');
       } else {
@@ -725,7 +727,7 @@ const cargarSaldo = useCallback(async (uid) => {
         cargarSaldo(user.uid);
         // Saldo en TIEMPO REAL: refleja al instante el cobro de comisión que hace la Cloud Function
         unsubSaldo = onSnapshot(doc(db, 'usuarios', user.uid), (snap) => {
-          if (snap.exists()) setSaldoCreditos(snap.data().creditos || 0);
+          if (snap.exists()) setSaldoCreditos(saldoDe(snap.data()));
         });
       } else setSaldoCreditos(0);
     });

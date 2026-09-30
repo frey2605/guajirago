@@ -636,6 +636,14 @@ la placa de `conductores/{uid}` (la escribe su GPS con la misma placa que va en 
   (N de 1 a 11) por separado, y el 12 para cazar una de más.
 - El 403 de la consola sale igual que en los demás recorridos. No crea cuentas ni escribe nada.
 
+### saldo-conductor · el mismo saldo en «Mis créditos» y en la pantalla del conductor (G81, 29-sep-2026)
+- El saldo guardado se lee de la base de PRUEBAS con `entrarALaBase('taxi@gg.test')` → `usuarios/{uid}.creditos` (solo
+  lectura). El 29-sep el taxista de prueba tenía **-$ 16.400**: el saldo negativo se pinta «-$ 16.400», así que el
+  buscador de pesos acepta el signo delante del «$».
+- Se comparan solo las CIFRAS del «$ …» (el Intl de Node y el del navegador pueden poner espacios distintos).
+- Primero «Menú» → «Mis créditos» (desde la pantalla de servicios, como `candado-recarga`), luego `p.reload()` y
+  «Transporte y movilidad» → «Soy conductor»: la sesión aguanta la recarga. No toca el interruptor de disponible.
+
 ## Lo que el robot dejó creado en pruebas
 
 - 27-sep-2026: «Robot Taxi De Prueba» (robot.taxi.1790508222079@gg.test) y

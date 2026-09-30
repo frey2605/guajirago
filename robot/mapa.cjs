@@ -443,6 +443,14 @@ const RECORRIDOS = [
     vigila: ['guajirago/src/TerminosCondiciones.js', 'guajirago/src/PoliticaPrivacidad.js', 'guajirago/src/PaginaLegal.js',
       'guajirago/src/correoSoporte.js'],
   },
+  {
+    nombre: 'saldo-conductor',
+    que: 'el saldo guardado en la ficha del taxista de prueba se ve igual en «Mis créditos» y en la pantalla del conductor (G81; solo lee la base)',
+    archivo: 'saldo-conductor.cjs',
+    // Que los cuatro sitios den EXACTAMENTE lo mismo que antes, con valores raros, lo SACA del archivo y lo EJECUTA
+    // pruebas/saldoConductor.test.js.
+    vigila: ['guajirago/src/saldoUsuario.js', 'guajirago/src/Creditos.js', 'guajirago/src/AppConductor.js'],
+  },
 ];
 
 // Los archivos de pantalla: los que, si cambian, el robot debería poder probar. Todo lo que esté en

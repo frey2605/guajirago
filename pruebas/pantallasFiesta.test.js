@@ -47,7 +47,11 @@ describe('G80 · las pantallas de fiesta salen de UN marco', () => {
   });
 
   it('el resto de cada archivo no se movió', () => {
-    for (const [i, p] of hoy.pantallas.entries()) assert.strictEqual(p.resto, antes.pantallas[i].resto, p.nombre + ': se movió algo que no era la pantalla de fiesta');
+    // Es el careo DEL ARREGLO de G80: el commit del arreglo (f6a60f4) contra el de antes, no el disco de hoy. Comparar
+    // el disco lo ponía rojo con cualquier arreglo posterior de otra parte de esos archivos (le pasó a G81, que cambió
+    // la lectura del saldo en AppConductor.js). Es lo mismo que ya se hizo en pruebas/tratoHecho.test.js.
+    const arreglo = medir('f6a60f4');
+    for (const [i, p] of arreglo.pantallas.entries()) assert.strictEqual(p.resto, antes.pantallas[i].resto, p.nombre + ': el arreglo de G80 movió algo que no era la pantalla de fiesta');
   });
 
   it('en las tres apps el confeti está dibujado en UN solo archivo, el marco', () => {
