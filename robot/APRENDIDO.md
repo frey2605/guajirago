@@ -701,6 +701,8 @@ la placa de `conductores/{uid}` (la escribe su GPS con la misma placa que va en 
   (`input` con `placeholder="0"`) en un div al lado. El monto se escribe subiendo del span «Efectivo» a su renglón.
 - En la app los botones de pago son `span` hermanos: se leen los hijos del padre del que dice «Efectivo».
 - Con el código de ANTES publicado sale ✓ igual (G85 no cambia lo que se ve: la lista era la misma en todos lados).
+- 🪤 Lo que se lee de la base con `base.leer` puede traer los campos de un mapa en otro orden (`pagos` salió una vez
+  `{monto, metodo}` y otra `{metodo, monto}`): se compara campo por campo, nunca el JSON como texto.
 
 ## Lo que el robot dejó creado en pruebas
 

@@ -102,7 +102,9 @@ async function verMesero(base) {
   if (JSON.stringify(m.metodos) !== JSON.stringify(METODOS)) fallos.push('el cobro de la mesa ofrece ' + JSON.stringify(m.metodos) + ' y tenía que ofrecer ' + JSON.stringify(METODOS));
   if (m.guardado.estado !== 'cerrado') fallos.push('la mesa no quedó cerrada: ' + m.guardado.estado);
   if (m.guardado.metodoPago !== 'Efectivo') fallos.push('el pedido guardó metodoPago «' + m.guardado.metodoPago + '» y tenía que ser «Efectivo»');
-  if (JSON.stringify(m.guardado.pagos) !== JSON.stringify([{ metodo: 'Efectivo', monto: 5000 }])) fallos.push('el pedido guardó pagos ' + JSON.stringify(m.guardado.pagos));
+  // 🪤 Firestore no devuelve los campos siempre en el mismo orden: se compara campo por campo, no el texto.
+  const pagos = Array.isArray(m.guardado.pagos) ? m.guardado.pagos.map((x) => x.metodo + ':' + x.monto) : null;
+  if (JSON.stringify(pagos) !== JSON.stringify(['Efectivo:5000'])) fallos.push('el pedido guardó pagos ' + JSON.stringify(m.guardado.pagos));
   console.log('NÚMERO DE MESAS DEL RESTAURANTE: ' + mesasAntes + ' antes, devuelto a ' + mesasAntes);
   console.log('ERRORES DE LA PÁGINA:', [...c.errores, ...m.errores].join(' || ') || 'ninguno');
   console.log(fallos.length ? '🔴 FALLÓ:\n  · ' + fallos.join('\n  · ') : '✓ la app y el cobro de la mesa ofrecen los mismos cuatro métodos, y la mesa se cierra en Efectivo');
