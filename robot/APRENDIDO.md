@@ -782,3 +782,10 @@ la placa de `conductores/{uid}` (la escribe su GPS con la misma placa que va en 
   «🏷️ … · días» de una promo que vale HOY, y lo decide con el día del teléfono (`new Date().getDay()`), así que con un
   solo día la prueba dependería del día en que se corra. Los botones L M M J V S D son los de la fila que sigue al botón
   «Días» del formulario «+ Crear promoción» (se abre y no se guarda). Los 403 de la consola salen también aquí.
+- 30-sep-2026 en adelante (G88, `recordados-telefono.cjs`): un pedido FIJO de pasajero@gg.test, `pedidos/robotG88PED01`
+  ($ 5.000, «Calle Robot G88», `cancelado` por el cliente), y una reserva FIJA suya, `reservasTurismo/robotG88RES01`
+  («Tour fijo del robot G88» en la agencia de prueba, `cancelada`). Se crean la primera vez y se reusan. «Mis pedidos» y
+  «Mis reservas» NO buscan en la base por cliente: leen los ids que el TELÉFONO tiene en `misPedidosGuajira` y
+  `misReservasGuajira` (una lista JSON), así que el robot los mete con `page.evaluate` ANTES de entrar. Para volver a
+  leer «Mis reservas» basta «‹ Volver» y otra vez «📋 Mis reservas» (la lista se relee al abrirla); «Mis pedidos» la
+  lee al entrar a esa pantalla.
