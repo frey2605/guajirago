@@ -4385,9 +4385,12 @@ describe('SE VENDE · la ficha de cobro de cada cliente', () => {
 
   it('EL QUE MUERDE · los seis estados buenos SÍ se guardan', async () => {
     // La otra mitad: si la lista de la regla se quedara corta, el panel no podría
-    // marcar a alguien como pagado.
+    // marcar a alguien como pagado. Los estados buenos NO se copian aquí: salen de
+    // ESTADOS de suscripcion.js, la única fuente (G99). Así, un estado nuevo en la
+    // fuente se prueba contra las reglas de verdad sin que nadie se acuerde.
+    const { ESTADOS } = require('../guajirago/functions/suscripcion.js');
     const { doc, setDoc } = FS;
-    for (const bueno of ['prueba', 'alDia', 'porVencer', 'vencido', 'bloqueado', 'cancelado']) {
+    for (const bueno of ESTADOS) {
       await RUT.assertSucceeds(setDoc(doc(como('eladmin'), 'suscripciones/r1'), ficha({ estado: bueno })),
         'no dejó guardar el estado «' + bueno + '», que sí es de los buenos.');
     }

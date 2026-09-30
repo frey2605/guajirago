@@ -2140,6 +2140,8 @@ service cloud.firestore {
       // «Bloqueado» con mayúscula escrito desde el panel dejaría el bloqueo sin
       // efecto PARA SIEMPRE y nadie lo notaría hasta que un moroso siguiera
       // trabajando. Aquí se corta esa posibilidad de raíz.
+      // La lista es COPIA de ESTADOS de guajirago/functions/suscripcion.js (las
+      // reglas no pueden importar JavaScript): la ata pruebas/estadosCobro.test.js.
       function estadoConocido() {
         return !request.resource.data.keys().hasAny(['estado'])
           || request.resource.data.estado in
