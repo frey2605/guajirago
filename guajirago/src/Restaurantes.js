@@ -35,7 +35,7 @@ import {
   query,
   where,
 } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { subirAlAlmacen } from './subirAlAlmacen';
 import Logo from './Logo';
 // LA LEY DEL BOTÓN (26-sep-2026): lo que guarda en esta pantalla pasa por el candado; su aviso, en ventanita.
 import { useAccion } from './useAccion';
@@ -399,9 +399,7 @@ function Restaurantes({ nombre, onVolver, foto, onCerrarSesion, onIrPerfil, onIr
 
   // ---------- Chat de soporte de pago (dentro del pedido) ----------
   const subirImagenChat = async (archivo) => {
-    const refArchivo = ref(storage, `pedidosRestaurantes/${pedidoActivo.id}/${Date.now()}.jpg`);
-    await uploadBytes(refArchivo, archivo);
-    return await getDownloadURL(refArchivo);
+    return await subirAlAlmacen(storage, `pedidosRestaurantes/${pedidoActivo.id}/${Date.now()}.jpg`, archivo);
   };
 
   const enviarMensajeChat = async () => {

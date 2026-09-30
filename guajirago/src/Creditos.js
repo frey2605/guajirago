@@ -4,7 +4,7 @@ import Logo from './Logo';
 // runTransaction salió con la REGLA 7: el canje del código lo hace el servidor.
 import { doc, getDoc, updateDoc, onSnapshot, arrayUnion } from 'firebase/firestore';
 import { getFunctions, httpsCallable } from 'firebase/functions';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { subirAlAlmacen } from './subirAlAlmacen';
 // El filtro anti-datos vive en filtroChat.js: un solo sitio para todos los
 // chats de la app (SEGUNDA LEY), amarrado por prueba a la copia del panel.
 import { contieneInfoSensible } from './filtroChat';
@@ -81,9 +81,7 @@ function Creditos({ onVolver }) {
     if (!user) return;
     setErrorChatRecarga('');
     await correr(async () => {
-      const refArchivo = ref(storage, `recargas/${user.uid}/comprobante_${Date.now()}.jpg`);
-      await uploadBytes(refArchivo, archivo);
-      const url = await getDownloadURL(refArchivo);
+      const url = await subirAlAlmacen(storage, `recargas/${user.uid}/comprobante_${Date.now()}.jpg`, archivo);
       const nuevoMensaje = { tipo: 'imagen', url, autor: 'conductor', fecha: new Date().toISOString() };
       // EL COMPROBANTE, por el mismo camino seguro que el texto de arriba: se le
       // pega a la lista EN EL SERVIDOR. Antes, si el dueño contestaba en ese

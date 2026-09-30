@@ -6,7 +6,7 @@ import { fotoDe } from './fotoUsuario';
 import { telefonoSirve, celularDiezCifras } from './telefonoValido';
 import { motivoDeRechazo, apuntarRechazo } from './avisoRechazo';
 import { doc, getDoc, setDoc, collection, query, where, getDocs } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { subirAlAlmacen } from './subirAlAlmacen';
 
 function MiPerfil({ onVolver }) {
   const [cargando, setCargando] = useState(true);
@@ -78,9 +78,7 @@ function MiPerfil({ onVolver }) {
 
       let urlFoto = foto;
       if (fotoNueva) {
-        const refArchivo = ref(storage, `usuarios/${user.uid}/perfil_${Date.now()}.jpg`);
-        await uploadBytes(refArchivo, fotoNueva);
-        urlFoto = await getDownloadURL(refArchivo);
+        urlFoto = await subirAlAlmacen(storage, `usuarios/${user.uid}/perfil_${Date.now()}.jpg`, fotoNueva);
       }
 
       const actualizacion = {

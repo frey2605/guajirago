@@ -451,6 +451,31 @@ const RECORRIDOS = [
     // pruebas/saldoConductor.test.js.
     vigila: ['guajirago/src/saldoUsuario.js', 'guajirago/src/Creditos.js', 'guajirago/src/AppConductor.js'],
   },
+  // G82 · las fotos se suben con UNA pieza, subirAlAlmacen (copia idéntica en cada repo). Cada recorrido sube una foto
+  // de verdad en pruebas y le pregunta al almacén con qué tipo quedó. Que los 13 sitios hagan lo mismo que antes lo
+  // SACA de cada archivo y lo EJECUTA pruebas/subirFoto.test.js; contra las reglas de verdad, pruebas/storage.test.js.
+  // La cédula y los papeles del conductor (App.js) los sube de verdad registrar-conductor.
+  {
+    nombre: 'subir-foto-transporte',
+    que: 'el pasajero de prueba cambia su foto en «Mi perfil» con una foto SIN tipo: queda en la ficha, abre, y el almacén la guarda como image/jpeg (G82; al final se le devuelve la ficha)',
+    archivo: 'subir-foto.cjs',
+    args: ['transporte'],
+    vigila: ['guajirago/src/subirAlAlmacen.js', 'guajirago/src/MiPerfil.js'],
+  },
+  {
+    nombre: 'subir-foto-panel',
+    que: 'el superadmin sube la imagen de un anuncio (sin publicarlo) y sale su vista previa (G82). Hoy el almacén la rechaza con 403 por un permiso que le falta al proyecto, no por G82: ver robot/APRENDIDO.md',
+    archivo: 'subir-foto.cjs',
+    args: ['panel'],
+    vigila: ['guajirago-admin/src/subirAlAlmacen.js'],
+  },
+  {
+    nombre: 'subir-foto-aliados',
+    que: 'el restaurante y la agencia de prueba suben su logo SIN tipo (sin guardar el negocio): sale la vista previa, abre, y queda como image/jpeg (G82)',
+    archivo: 'subir-foto.cjs',
+    args: ['aliados', 'agencia'],
+    vigila: ['guajirago-aliados/src/subirAlAlmacen.js', 'guajirago-aliados/src/PerfilRestaurante.js', 'guajirago-aliados/src/PerfilAgencia.js'],
+  },
 ];
 
 // Los archivos de pantalla: los que, si cambian, el robot debería poder probar. Todo lo que esté en

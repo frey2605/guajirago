@@ -485,6 +485,9 @@ describe('STORAGE · lo que se puede subir', () => {
     // medido contra el emulador— y una foto buena se habría quedado fuera, en
     // silencio. Si alguien endurece la regla sin arreglar antes los 13 sitios,
     // esta prueba se pone roja.
+    // G82 (29-sep-2026): los 13 sitios ya suben con la pieza subirAlAlmacen, que
+    // SÍ dice el tipo (el del teléfono, o image/jpeg): lo prueba el bloque de
+    // abajo. Esta se queda mientras haya teléfonos con la app de antes guardada.
     const { ref, uploadBytes } = ST;
     await RUT.assertSucceeds(uploadBytes(ref(como('conductor1'), 'conductores/conductor1/sinTipo.jpg'),
       foto(), undefined));
@@ -501,6 +504,41 @@ describe('STORAGE · lo que se puede subir', () => {
     const { ref, uploadBytes } = ST;
     await RUT.assertSucceeds(uploadBytes(ref(como('conductor1'), 'conductores/conductor1/normal.jpg'),
       foto(5 * 1024), COMO_FOTO));
+  });
+});
+
+// ── G82 · LA PIEZA QUE SUBEN LAS 13 PANTALLAS, CONTRA LAS REGLAS DE VERDAD ─────
+//  Las tres apps suben sus fotos con subirAlAlmacen (una copia idéntica en cada
+//  repo). Aquí se sube CON CADA COPIA, con el SDK de verdad y storage.rules
+//  puestas en el emulador, y se le pregunta al almacén con qué tipo quedó.
+describe('STORAGE · la pieza de subir fotos (G82)', () => {
+  const COPIAS = ['guajirago/src/subirAlAlmacen.js', 'guajirago-admin/src/subirAlAlmacen.js', 'guajirago-aliados/src/subirAlAlmacen.js'];
+  const pieza = (r) => require('../scripts/medir-subir-foto.cjs').cargarPieza(leer(r), ST);
+
+  it('una foto SIN tipo sube y queda guardada como image/jpeg (antes: application/octet-stream), y devuelve su dirección', async () => {
+    for (const [i, r] of COPIAS.entries()) {
+      const ruta = 'conductores/conductor1/' + nueva(3000 + i);
+      const url = await pieza(r).subirAlAlmacen(como('conductor1'), ruta, new Blob([foto()], { type: '' }));
+      const md = await ST.getMetadata(ST.ref(como('conductor1'), ruta));
+      assert.strictEqual(md.contentType, 'image/jpeg', r + ': la foto sin tipo quedó como «' + md.contentType + '»');
+      assert.ok(typeof url === 'string' && url.includes(encodeURIComponent(ruta)), r + ': no devolvió la dirección de esa foto: ' + url);
+    }
+  });
+
+  it('con tipo, queda el que dijo el teléfono (image/png)', async () => {
+    const ruta = 'usuarios/conductor1/' + nueva(3100);
+    await pieza(COPIAS[0]).subirAlAlmacen(como('conductor1'), ruta, new Blob([foto()], { type: 'image/png' }));
+    assert.strictEqual((await ST.getMetadata(ST.ref(como('conductor1'), ruta))).contentType, 'image/png');
+  });
+
+  it('EL QUE MUERDE · la pieza no disfraza lo que no es foto: un PDF lo rechaza el almacén', async () => {
+    await RUT.assertFails(pieza(COPIAS[2]).subirAlAlmacen(como('conductor1'), 'conductores/conductor1/' + nueva(3200),
+      new Blob([foto()], { type: 'application/pdf' })));
+  });
+
+  it('EL QUE MUERDE · y la carpeta la siguen mandando las reglas: en la de otro no entra', async () => {
+    await RUT.assertFails(pieza(COPIAS[1]).subirAlAlmacen(como('conductor2'), 'conductores/conductor1/' + nueva(3300),
+      new Blob([foto()], { type: 'image/jpeg' })));
   });
 });
 

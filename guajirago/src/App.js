@@ -26,7 +26,7 @@ import { motivoDeRechazo, apuntarRechazo } from './avisoRechazo';
 import { auth, db, storage } from './firebase';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { subirAlAlmacen } from './subirAlAlmacen';
 // REGLA 7: los créditos de bienvenida los da el servidor, no este teléfono.
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { DOCUMENTOS_CONDUCTOR, documentoQueFalta, nombreDelDocumento, iconoDelDocumento, iconoDelVehiculo } from './documentosConductor';
@@ -224,9 +224,7 @@ function PantallaDatosConductor({ nombre, foto, celular, onGuardar, onVolver, on
   const [cargando, setCargando] = React.useState(false);
 
   const subirFoto = async (archivo, carpeta, uid) => {
-    const refArchivo = ref(storage, `conductores/${uid}/${carpeta}_${Date.now()}.jpg`);
-    await uploadBytes(refArchivo, archivo);
-    return await getDownloadURL(refArchivo);
+    return await subirAlAlmacen(storage, `conductores/${uid}/${carpeta}_${Date.now()}.jpg`, archivo);
   };
 
   const guardar = async () => {

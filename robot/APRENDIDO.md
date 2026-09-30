@@ -644,6 +644,24 @@ la placa de `conductores/{uid}` (la escribe su GPS con la misma placa que va en 
 - Primero «Menú» → «Mis créditos» (desde la pantalla de servicios, como `candado-recarga`), luego `p.reload()` y
   «Transporte y movilidad» → «Soy conductor»: la sesión aguanta la recarga. No toca el interruptor de disponible.
 
+### subir-foto · las tres apps suben con la misma pieza (G82, 29-sep-2026)
+- Una foto SIN tipo: `fotoDeMentira` con `name: 'foto-sin-tipo'` y `mimeType: ''` → el `File.type` llega vacío, como
+  con un teléfono que no dice qué es. Para saber con qué tipo quedó se pide la dirección (la URL con token) con `fetch`
+  y se mira el `content-type`: el almacén sirve el tipo con que se guardó.
+- Careo contra lo publicado ANTES de G82 (29-sep): transporte y aliados subían bien, pero la foto sin tipo quedaba como
+  `application/octet-stream`. Con la pieza, `image/jpeg`.
+- La vista previa del logo (aliados) y del anuncio (panel) es un `img` cuya dirección lleva `firebasestorage` y la
+  carpeta con la barra escapada (`restaurantes%2F…%2Flogo_`, `anuncios%2Fanuncio_`).
+- Aliados: Configuración → «Datos del restaurante» (o «Datos de la agencia» con agencia@gg.test). Si ya hay logo, sale
+  la imagen y «✕ Quitar» (solo lo quita de la pantalla); tocándolo aparece «📤 Subir foto o logo». No se toca «Guardar».
+- 🪤 **El panel NO puede subir la imagen de un anuncio: el almacén contesta 403**, en pruebas y —por lo que dice IAM—
+  también en producción. `esAdmin()` de storage.rules le pregunta a Firestore quién es admin (`firestore.get`), y para
+  eso el proyecto tiene que darle a la cuenta de las reglas (`service-…@firebase-rules.iam.gserviceaccount.com`) el
+  rol `roles/firebaserules.firestoreServiceAgent`. Leído el 29-sep con getIamPolicy: ni guajirago ni guajirago-pruebas
+  lo tienen (solo `firebaserules.system`). Comprobado también subiendo directo por la API como admin@gg.test: 403.
+  Lo mismo muerde a todo lo que en storage.rules pasa por Firestore (empleados de un negocio, el chat de un pedido).
+  No es de G82: pasaba igual con el código de antes. Lo decide el dueño.
+
 ## Lo que el robot dejó creado en pruebas
 
 - 27-sep-2026: «Robot Taxi De Prueba» (robot.taxi.1790508222079@gg.test) y
@@ -694,3 +712,6 @@ la placa de `conductores/{uid}` (la escribe su GPS con la misma placa que va en 
 - 29-sep-2026 en adelante: dos mandados FIJOS de pasajero@gg.test, `viajes/robot-que-paso-g56-soltado`
   (`cancelado_conductor`) y `viajes/robot-que-paso-g56-cerrado` (`expirado`, con `motivoExpiracion`), de
   `que-paso-panel.cjs`. Cada corrida los reescribe; ya terminados, nadie los toma.
+- 29-sep-2026 en adelante: una foto de perfil de pasajero@gg.test (`usuarios/prueba-pasajero/perfil_…`) y un logo del
+  restaurante y otro de la agencia de prueba (`restaurantes/<id>/logo_…`) por cada corrida de `subir-foto.cjs`, en el
+  almacén de pruebas y sin usar: la ficha del pasajero se devuelve como estaba y el negocio no se guarda.

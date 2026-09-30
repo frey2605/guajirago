@@ -78,7 +78,9 @@ const APPS = ['guajirago/src', 'guajirago-admin/src', 'guajirago-aliados/src'];
 const LA_PIEZA = ['candado.js', 'useAccion.js'];
 // La base, las funciones de la nube, el almacén de fotos, y la cuenta (crear, entrar, borrar, cambiar la clave):
 // todo lo que con un doble toque se hace dos veces, o que puede fallar y hay que decirlo.
-const ESCRIBE = /\b(addDoc|updateDoc|setDoc|deleteDoc|runTransaction|writeBatch|httpsCallable|uploadBytes|uploadBytesResumable|uploadString|deleteObject|createUserWithEmailAndPassword|signInWithEmailAndPassword|deleteUser|updatePassword|updateEmail|updateProfile|sendPasswordResetEmail|sendEmailVerification|reauthenticateWithCredential)\s*\(/;
+// G82 (29-sep-2026): `subirAlAlmacen` es la pieza que sube las fotos (lleva el uploadBytes dentro); sin ella en esta
+// lista, los botones que suben una foto dejaban de contar como «guarda» y 6 «guardando» a mano se volvían invisibles.
+const ESCRIBE = /\b(addDoc|updateDoc|setDoc|deleteDoc|runTransaction|writeBatch|httpsCallable|uploadBytes|subirAlAlmacen|uploadBytesResumable|uploadString|deleteObject|createUserWithEmailAndPassword|signInWithEmailAndPassword|deleteUser|updatePassword|updateEmail|updateProfile|sendPasswordResetEmail|sendEmailVerification|reauthenticateWithCredential)\s*\(/;
 const NO_SON_NOMBRES = new Set(['if', 'for', 'while', 'switch', 'catch', 'return', 'await', 'async', 'function', 'new', 'typeof', 'const', 'let', 'var', 'true', 'false', 'null', 'undefined', 'e', 'x']);
 
 // Hasta la llave que cierra, contando llaves sobre el texto SIN textos (una llave dentro de un texto no descuadra).
