@@ -866,3 +866,10 @@ la placa de `conductores/{uid}` (la escribe su GPS con la misma placa que va en 
   buscar «Te falta saldo» en la página (la franja ya lo dice); se mira si hay un botón «Entendido». La franja se toca
   por su texto (`AVISO_SIN_SALDO.texto`, cargado de textosViaje.js con `pruebas/cargar.cjs`, no escrito a mano) y
   «Mis créditos» se reconoce por «¿CÓMO RECARGAR?». El saldo se lee en vivo: al ponerle 10.000 la franja se va sola.
+- **total-pedido (P09, 30-sep-2026):** el id del pedido que acaba de hacer el pasajero se saca del propio aparato
+  (`localStorage['misPedidosGuajira']`, el primero de la lista) y el pedido se lee como ESA persona con
+  `entrarALaBase` (las reglas dejan al cliente leer el suyo). El precio lo pone `notificarNuevoPedido` unos segundos
+  DESPUÉS de crear el pedido: hay que esperar a que aparezca `revisionServidor` (se pregunta cada 1,5 s), no leerlo
+  de una. Para el caso «app modificada» se crea el pedido por la red con `cambiar` (un PATCH a un id nuevo es un
+  create para las reglas) con los mismos platos a $1. Los dos se cancelan al final, como el cliente; y se comprueba
+  que después el cliente ya no puede cambiar el `total`.
