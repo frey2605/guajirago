@@ -861,3 +861,8 @@ la placa de `conductores/{uid}` (la escribe su GPS con la misma placa que va en 
   a 10.000 si tiene menos y al final `devolver()` los deja EXACTAMENTE como estaban. En `sin-saldo-confirmar`, la
   tarjeta del taxista se ancla por «✗ Rechazar»: «✅ Aceptar viaje» cambia a «💬 Enviar contraoferta» al tocar «+», y
   un ancla en ese botón deja de encontrar la tarjeta (el clic se queda esperando 30 s).
+- **disponible-sin-saldo (P05, 30-sep-2026):** desde P05 el interruptor «Estoy disponible» se prende con cualquier
+  saldo, y la franja «Te falta saldo» lleva el MISMO título que la ventanita: para saber si salió la ventanita no sirve
+  buscar «Te falta saldo» en la página (la franja ya lo dice); se mira si hay un botón «Entendido». La franja se toca
+  por su texto (`AVISO_SIN_SALDO.texto`, cargado de textosViaje.js con `pruebas/cargar.cjs`, no escrito a mano) y
+  «Mis créditos» se reconoce por «¿CÓMO RECARGAR?». El saldo se lee en vivo: al ponerle 10.000 la franja se va sola.

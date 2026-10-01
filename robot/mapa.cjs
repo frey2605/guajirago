@@ -235,6 +235,13 @@ const RECORRIDOS = [
     vigila: ['guajirago/src/Solicitar.js', 'guajirago/src/avisoRechazo.js', 'guajirago/src/AppConductor.js', 'guajirago/src/textosViaje.js'],
   },
   {
+    nombre: 'disponible-sin-saldo',
+    que: 'con el taxista de prueba en 0 créditos: prende «Estoy disponible» sin ventanita, ve la franja «Te falta saldo» (texto de AVISO_SIN_SALDO) y el viaje del pasajero, al aceptar sale «Te falta saldo» y no queda oferta; tocar la franja abre «Mis créditos» y con saldo la franja se va (P05; le devuelve los créditos)',
+    archivo: 'disponible-sin-saldo.cjs',
+    // Qué hace el interruptor y cuándo sale la franja, caso por caso, lo EJECUTA pruebas/disponibleSinSaldo.test.js.
+    vigila: ['guajirago/src/AppConductor.js', 'guajirago/src/comisiones.js', 'guajirago/src/textosViaje.js'],
+  },
+  {
     nombre: 'espera-conductor',
     que: 'con 300 s en config/global de pruebas, el taxista aprieta «📍 Llegué al punto» y su reloj «Esperando al pasajero...» y el del pasajero «Sal pronto…» arrancan los dos de 5:00 (G26)',
     archivo: 'espera-conductor.cjs',

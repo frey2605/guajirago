@@ -21,6 +21,7 @@ import LlamadoAtencion from './LlamadoAtencion';
 import { useAccion } from './useAccion';
 import { calcularDistanciaKm } from './distancia';
 import { RAZONES_CANCELACION_CONDUCTOR, AVISO_SIN_SALDO } from './textosViaje';
+import { T } from './theme'; // P05: los colores de la franja «Te falta saldo» (G90: no se escriben a mano)
 import ModalCancelacion from './ModalCancelacion';
 import Calificacion from './Calificacion';
 import Llamada from './Llamada';
@@ -257,6 +258,24 @@ function HistorialConductor({ onVolver }) {
             </div>
           );
         })}
+      </div>
+    </div>
+  );
+}
+
+// P05 (30-sep-2026, decisión del dueño: «Que pueda ver: se pone disponible y ve los viajes y sus precios, pero no puede
+// ofertar hasta recargar»). El interruptor ya no frena por saldo. Mientras no le alcance para la comisión más barata
+// que puede tomar (comisionParaActivarse, la misma vara que tenía el interruptor), esta franja le dice por qué no
+// puede ofertar, con el texto de AVISO_SIN_SALDO, y tocarla abre «Mis créditos». El freno de verdad sigue al aceptar
+// o contraofertar cada viaje (P04: app, reglas y servidor).
+function FranjaSinSaldo({ saldoCreditos, tipoVehiculo, configApp, onRecargar }) {
+  if (!(saldoCreditos !== null && saldoCreditos < comisionParaActivarse(tipoVehiculo, configApp))) return null;
+  return (
+    <div onClick={onRecargar} style={{ background: T.fondoSuave, border: '1px solid ' + T.amarillo, borderRadius: '14px', padding: '12px 16px', display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', marginBottom: '12px' }}>
+      <span style={{ fontSize: '22px' }}>{AVISO_SIN_SALDO.icono}</span>
+      <div>
+        <p style={{ color: T.tinta, fontWeight: '900', fontSize: '14px', margin: '0' }}>{AVISO_SIN_SALDO.titulo}</p>
+        <p style={{ color: T.gris, fontSize: '12px', margin: '4px 0 0', lineHeight: '1.4' }}>{AVISO_SIN_SALDO.texto}</p>
       </div>
     </div>
   );
@@ -1481,11 +1500,12 @@ if (sancionActiva) return (
         
         <div style={{ background: '#FFFFFF', border: '1.5px solid #ECECEF', borderRadius: '14px', padding: '12px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
           <p style={{ color: activo ? '#1A1A1E' : '#6B7280', fontWeight: '900', fontSize: '15px', margin: '0' }}>{activo ? '🟢 Estoy disponible' : '⚪ No disponible'}</p>
-          <div onClick={() => { if (!activo && saldoCreditos !== null && saldoCreditos < comisionParaActivarse(tipoVehiculo, configApp)) { setAviso(AVISO_SIN_SALDO); return; } desbloquearAudio(); setActivo(!activo); }} style={{ width: '52px', height: '30px', borderRadius: '15px', background: activo ? 'linear-gradient(135deg, #FFCF4D, #FF7A2F)' : '#ECECEF', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '0 4px', justifyContent: activo ? 'flex-end' : 'flex-start', flexShrink: 0 }}>
+          <div onClick={() => { desbloquearAudio(); setActivo(!activo); }} style={{ width: '52px', height: '30px', borderRadius: '15px', background: activo ? 'linear-gradient(135deg, #FFCF4D, #FF7A2F)' : '#ECECEF', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '0 4px', justifyContent: activo ? 'flex-end' : 'flex-start', flexShrink: 0 }}>
             <div style={{ width: '22px', height: '22px', borderRadius: '50%', background: '#FFFFFF' }}/>
           </div>
         </div>
-        
+        <FranjaSinSaldo saldoCreditos={saldoCreditos} tipoVehiculo={tipoVehiculo} configApp={configApp} onRecargar={() => setVerCreditos(true)} />
+
         {viajesEscuchando.length > 0 && !fase && (
           <div style={{ background: 'rgba(255,207,77,0.1)', borderRadius: '16px', padding: '14px 16px', marginBottom: '12px', border: '1px solid #FFCF4D', display: 'flex', alignItems: 'center', gap: '10px' }}>
             <span style={{ fontSize: '20px' }}>⏳</span>

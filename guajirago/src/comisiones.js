@@ -65,8 +65,10 @@ export function tiposDeViajeQueVe(tipoVehiculo) {
 }
 
 /**
- * El saldo mínimo para prender el interruptor: la comisión más barata de los viajes que puede tomar. Con menos no
- * podría tomar ninguno; con eso, por lo menos uno (y cada viaje vuelve a mirar su propia comisión al aceptarlo).
+ * La comisión más barata de los viajes que puede tomar. Con menos saldo no podría tomar ninguno; con eso, por lo menos
+ * uno (y cada viaje vuelve a mirar su propia comisión al aceptarlo). Hasta P05 (30-sep-2026) era el mínimo para prender
+ * el interruptor «disponible»; desde entonces el conductor se prende con cualquier saldo, y esta cifra decide cuándo
+ * su pantalla le enseña la franja «Te falta saldo» (FranjaSinSaldo, en AppConductor.js).
  */
 export function comisionParaActivarse(tipoVehiculo, cfg = COMISIONES_DEFECTO) {
   return Math.min(...tiposDeViajeQueVe(tipoVehiculo).map((t) => comisionSegunTipoDeViaje(t, cfg)));

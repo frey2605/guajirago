@@ -32,8 +32,10 @@ describe('G69 · el aviso de «no tienes saldo» sale de UNA ventanita', () => {
     assert.match(AVISO_SIN_SALDO.texto, /[Rr]ecarga/);
   });
 
-  it('los dos frenos por saldo avisan con esa ventanita, y ninguno con alert()', () => {
-    assert.strictEqual(hoy.sitios.length, 2, 'AppConductor.js debería tener 2 frenos por saldo y tiene ' + hoy.sitios.length);
+  // P05 (30-sep-2026): el interruptor ya no frena por saldo (decisión del dueño); queda UN freno, al aceptar o
+  // contraofertar. La franja que lo explica la vigila pruebas/disponibleSinSaldo.test.js.
+  it('el freno por saldo avisa con esa ventanita, y ninguno con alert()', () => {
+    assert.strictEqual(hoy.sitios.length, 1, 'AppConductor.js debería tener 1 freno por saldo (al ofertar) y tiene ' + hoy.sitios.length);
     for (const s of hoy.sitios) {
       assert.strictEqual(s.dice.length, 1, 'el freno del renglón ' + s.renglon + ' avisa ' + s.dice.length + ' veces');
       assert.strictEqual(s.dice[0].via, 'ventanita', 'el freno del renglón ' + s.renglon + ' avisa por ' + s.dice[0].via);
@@ -51,9 +53,9 @@ describe('G69 · el aviso de «no tienes saldo» sale de UNA ventanita', () => {
     assert.match(fuente, /<AvisoModal aviso=\{aviso\} onCerrar=\{\(\) => setAviso\(null\)\} \/>/);
   });
 
-  it('el umbral NO se movió: cada freno decide igual que en el commit de antes, caso por caso', () => {
+  it('el umbral NO se movió: el freno al ofertar decide igual que en el commit de antes, caso por caso', () => {
     const antes = M.medirCodigo(M.lector(ANTES));
-    assert.strictEqual(antes.sitios.length, hoy.sitios.length);
+    assert.strictEqual(antes.sitios.length, 2); // el de ofertar (primero en el archivo) y el del interruptor, que P05 quitó
     for (let i = 0; i < hoy.sitios.length; i += 1) {
       assert.strictEqual(hoy.sitios[i].huella, antes.sitios[i].huella, 'el freno ' + (i + 1) + ' cambió cuándo frena');
       assert.strictEqual(hoy.sitios[i].frena, antes.sitios[i].frena);
@@ -64,15 +66,16 @@ describe('G69 · el aviso de «no tienes saldo» sale de UNA ventanita', () => {
   });
 
   it('el medidor no se deja engañar (pantallas de mentira)', () => {
-    const conAlert = M.medirCodigo(conPantalla((t) => t.replace('setAviso(AVISO_SIN_SALDO); return;', "alert('Sin saldo'); return;")));
+    const conAlert = M.medirCodigo(conPantalla((t) => t.replace('onAviso(AVISO_SIN_SALDO);', "alert('Sin saldo');")));
     assert.ok(conAlert.sitios.some((s) => s.dice.some((d) => d.via === 'alert()')), 'no vio un alert() de vuelta');
     assert.strictEqual(conAlert.alerts, 1);
     const aMano = M.medirCodigo(conPantalla((t) => t.replace('onAviso(AVISO_SIN_SALDO);', "onAviso({ titulo: 'Sin saldo', texto: 'Recarga ya.' });")));
-    assert.strictEqual(aMano.textosDistintos, 2, 'no vio una ventanita con texto propio');
+    // P05: con un solo freno, el texto propio es el único que hay; se mira que ya no sea el de la pieza.
+    assert.notStrictEqual(aMano.sitios[0].dice[0].texto, AVISO_SIN_SALDO.texto, 'no vio una ventanita con texto propio');
     const tercero = M.medirCodigo(conPantalla((t) => t.replace('const user = auth.currentUser;', "if (saldoCreditos < 1) { alert('No tienes saldo suficiente para tomar viajes.'); return; }\n    const user = auth.currentUser;")));
-    assert.strictEqual(tercero.sitios.length, 3, 'no vio un tercer freno');
+    assert.strictEqual(tercero.sitios.length, 2, 'no vio un segundo freno');
     assert.strictEqual(tercero.aMano.length, 1, 'no vio el texto a mano');
-    const mudo = M.medirCodigo(conPantalla((t) => t.replace('setAviso(AVISO_SIN_SALDO); return;', 'return;')));
+    const mudo = M.medirCodigo(conPantalla((t) => t.replace('onAviso(AVISO_SIN_SALDO);', '')));
     assert.ok(mudo.sitios.some((s) => s.dice.length === 0), 'no vio un freno que se calla');
     const umbral = M.medirCodigo(conPantalla((t) => t.replace('saldoCreditos < comisionAplicable', 'saldoCreditos <= comisionAplicable')));
     assert.notStrictEqual(umbral.sitios[0].huella, hoy.sitios[0].huella, 'no vio que el umbral cambió');

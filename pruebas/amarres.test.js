@@ -232,8 +232,10 @@ describe('AMARRES · la comisión: el servidor, la app del conductor y el panel 
     const cuerpo = cuerpoDeLaFuncion(fuente, desde).texto;
     assert.match(cuerpo, /const comisionAplicable = comisionSegunTipoDeViaje\(solicitud\.tipo, configApp\);\s*if \(saldoCreditos !== null && saldoCreditos < comisionAplicable\)/,
       'aceptarOEnviar ya no compara el saldo con la comisión del tipo del VIAJE');
-    assert.match(fuente, /!activo && saldoCreditos !== null && saldoCreditos < comisionParaActivarse\(tipoVehiculo, configApp\)\)/,
-      'el interruptor de activarse ya no usa comisionParaActivarse');
+    // P05 (30-sep-2026): el interruptor ya no frena por saldo; la vara de comisionParaActivarse la usa ahora la franja
+    // «Te falta saldo» (FranjaSinSaldo; la EJECUTA pruebas/disponibleSinSaldo.test.js).
+    assert.match(fuente, /function FranjaSinSaldo\([^)]*\) \{\s*if \(!\(saldoCreditos !== null && saldoCreditos < comisionParaActivarse\(tipoVehiculo, configApp\)\)\) return null;/,
+      'la franja «Te falta saldo» ya no usa comisionParaActivarse');
     // Desde G04 la lista filtra con leTocaElViaje.js, que a su vez usa tiposDeViajeQueVe de comisiones.js.
     assert.match(fuente, /if \(porQueNoLeToca\(v, tipoVehiculo, km\)\) return false;/,
       'la lista de solicitudes ya no filtra con porQueNoLeToca (leTocaElViaje.js)');
