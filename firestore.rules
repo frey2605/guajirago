@@ -130,6 +130,12 @@ service cloud.firestore {
       );
     }
 
+    // ¿Es un texto de hasta `largo` letras? El tope de tamaño de lo que escribe el cliente. Nació en P13 dentro de
+    // `pedidos`; P16 (1-oct-2026) lo sube aquí, sin cambiarlo, para que lo use también `reservasTurismo` (una sola pieza).
+    function textoCorto(v, largo) {
+      return v is string && v.size() <= largo;
+    }
+
     match /usuarios/{userId} {
       // ── REGLA 1 · LA LLAVE MAESTRA ──────────────────────────────────────────
       // Hasta el 23-ago-2026 el dueño de una ficha podía escribir CUALQUIER campo
@@ -1907,9 +1913,6 @@ service cloud.firestore {
           d.get('subtotal', 0) is number && d.get('costoDomicilio', 0) is number && d.get('total', 0) is number &&
           (d.get('creado', request.time) is timestamp || textoCorto(d.get('creado', ''), 40));
       }
-      function textoCorto(v, largo) {
-        return v is string && v.size() <= largo;
-      }
 
       // Lo único que el cliente puede hacerle al estado de SU pedido: dejarlo
       // como está, o cancelarlo. Todo lo demás lo mueve el restaurante.
@@ -2242,12 +2245,51 @@ service cloud.firestore {
       allow create: if esAdmin() ||
         esDelNegocio(request.resource.data.agenciaId) ||
         (request.auth != null &&
-         request.resource.data.get('clienteId', '') == request.auth.uid);
+         request.resource.data.get('clienteId', '') == request.auth.uid &&
+         laReservaDelClienteNaceCerrada());
+
+      // P16 (1-oct-2026): la reserva del cliente nace SOLO con los campos que manda la app (enviarReserva,
+      // Turismo.js; comprobado también en el paquete publicado) y con topes muy por encima de una reserva de verdad
+      // (los mismos de P13 para los pedidos). Antes entraba cualquier campo de cualquier tamaño, hasta casi 1 MiB, y en
+      // cualquier estado. Medido en producción ese día: 0 reservas y 1 agencia sin tours, así que no deja nada viejo
+      // fuera. La lista vive aquí y en la app; la ata pruebas/reservaCerrada.test.js. La agencia y el panel no pasan por
+      // aquí. El `total` lo sigue poniendo el teléfono (anotado aparte: P16 no decide la plata).
+      function laReservaDelClienteNaceCerrada() {
+        let d = request.resource.data;
+        return d.keys().hasOnly(['agenciaId', 'clienteId', 'agenciaNombre', 'tourId', 'tipo', 'nombreTour', 'imagen',
+                 'cliente', 'telefono', 'personas', 'fecha', 'total', 'unidadPrecio', 'estado', 'notas', 'creado']) &&
+          d.get('estado', '') == 'nueva' &&
+          textoCorto(d.get('agenciaId', ''), 128) && d.get('agenciaId', '').size() > 0 &&
+          textoCorto(d.get('agenciaNombre', ''), 300) &&
+          textoCorto(d.get('tourId', ''), 200) &&
+          textoCorto(d.get('tipo', ''), 30) &&
+          textoCorto(d.get('nombreTour', ''), 300) &&
+          textoCorto(d.get('imagen', ''), 2000) &&
+          textoCorto(d.get('cliente', ''), 200) &&
+          // El teléfono en sus 10 cifras limpias, como lo manda la app desde G42 (celularDiezCifras), igual que el pedido.
+          d.get('telefono', '') is string && d.get('telefono', '').matches('^[0-9]{10}$') &&
+          d.get('personas', 1) is int && d.get('personas', 1) >= 1 && d.get('personas', 1) <= 1000 &&
+          textoCorto(d.get('fecha', ''), 40) &&
+          d.get('total', 0) is number &&
+          textoCorto(d.get('unidadPrecio', ''), 30) &&
+          textoCorto(d.get('notas', ''), 1000) &&
+          (d.get('creado', request.time) is timestamp || textoCorto(d.get('creado', ''), 40));
+      }
+
+      // P16: lo ÚNICO que el cliente le cambia a su reserva ya creada es su token de avisos (prepararTokenDeAvisos,
+      // Notificaciones.js). Antes podía cambiarle cualquier cosa —hasta confirmarla él mismo o ponerle otro total—.
+      // Confirmar, marcar realizada y cancelar son de la agencia (aliados, ReservasTurismo.js) y del panel.
+      function elClienteDeLaReservaSoloPegaSuToken() {
+        let cambia = request.resource.data.diff(resource.data).affectedKeys();
+        return cambia.hasOnly(['clienteFcmToken']) &&
+          (!cambia.hasAny(['clienteFcmToken']) || textoCorto(request.resource.data.clienteFcmToken, 500));
+      }
 
       allow update: if (esAdmin() ||
           esDelNegocio(resource.data.agenciaId) ||
           (request.auth != null &&
-           resource.data.get('clienteId', '') == request.auth.uid)) &&
+           resource.data.get('clienteId', '') == request.auth.uid &&
+           elClienteDeLaReservaSoloPegaSuToken())) &&
         request.resource.data.agenciaId == resource.data.agenciaId &&
         request.resource.data.get('clienteId', '') == resource.data.get('clienteId', '');
 

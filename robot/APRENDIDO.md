@@ -911,3 +911,12 @@ la placa de `conductores/{uid}` (la escribe su GPS con la misma placa que va en 
   Con el código de antes (corrido el 1-oct-2026 en pruebas) el primer envío decía «Promoción sin cupos» y los dos
   siguientes «No se pudo enviar el pedido · Algo falló…», con `addDoc() called with invalid data. Unsupported field
   value: undefined` en la consola. Los 403 de la consola siguen saliendo igual.
+- **reserva-sin-nombre, P16 (1-oct-2026):** los dos tours que siembra `scripts/sembrar-pruebas.cjs` en la Agencia de
+  Turismo de Prueba llevan `incluye` como TEXTO («Transporte y guía (de prueba)»), y la pantalla de la agencia en la app
+  se cae con ellos («Algo se quedó pegado · e.incluye.join is not a function»): Turismo.js hace `t.incluye.join` y
+  aliados siempre guarda una lista. Por eso el robot (como `unidades-tour`) deja en la agencia SOLO su tour y al final
+  le devuelve los suyos; comparar lo devuelto con `JSON.stringify` a pelo falla aunque sea igual (la base devuelve los
+  campos en otro orden): se ordenan las claves. Desde P16 el cliente ya no cambia el estado de su reserva, así que las
+  reservas de mentira (`fecha-reserva`, `recordados-telefono`) las cancela admin@gg.test, y el cliente las crea como la
+  app: en 'nueva' y con el teléfono en 10 cifras. Con el código de antes (corrido el 1-oct-2026 en pruebas) el cliente
+  veía «No se pudo enviar la reserva» con `Unsupported field value: undefined (found in field tourId …)` en la consola.

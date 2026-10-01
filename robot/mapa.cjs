@@ -622,6 +622,14 @@ const RECORRIDOS = [
     // verdad, con el careo con el código de antes, los corre pruebas/pedidoSinIndefinidos.test.js.
     vigila: ['guajirago/src/Restaurantes.js', 'guajirago/src/precioPedido.js'],
   },
+  {
+    nombre: 'reserva-sin-nombre',
+    que: 'con un tour sin nombre ni código en la Agencia de Turismo de Prueba, el cliente reserva y ve «¡Reserva enviada!» (hasta P16 salía «No se pudo enviar la reserva» cada vez), y la reserva queda como «Tour», sin tourId y con el teléfono en 10 cifras; le pone el tour a la agencia como agencia@gg.test, la reserva la cancela admin@gg.test, y deja los tours como estaban (P16)',
+    archivo: 'reserva-sin-nombre.cjs',
+    // El envío sacado de Turismo.js y ejecutado con la validación de Firestore de verdad, con el careo con el código
+    // de antes, y el careo de las reglas en el emulador, los corre pruebas/reservaCerrada.test.js.
+    vigila: ['guajirago/src/Turismo.js'],
+  },
 ];
 
 // Los archivos de pantalla: los que, si cambian, el robot debería poder probar. Todo lo que esté en

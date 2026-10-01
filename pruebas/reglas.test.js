@@ -1890,6 +1890,7 @@ describe('REGLA 9 · las reservas de turismo, igual (y aquí nace limpio)', () =
     const { collection, addDoc } = FS;
     await RUT.assertSucceeds(addDoc(collection(como('pasajero1'), 'reservasTurismo'), {
       agenciaId: 'a1', clienteId: 'pasajero1', estado: 'nueva', personas: 2, total: 200000,
+      telefono: '3001112233', // P16: la reserva del cliente nace con su teléfono en 10 cifras, como la manda la app
     }));
   });
 

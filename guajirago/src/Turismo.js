@@ -20,6 +20,8 @@ import { sePuedePedirAhora } from './horarioNegocio';
 import { enlaceWhatsApp, telefonoSirve, celularDiezCifras, cifrasMientrasEscribe } from './telefonoValido';
 // G86: «por persona / por grupo / por día / por hora» sale de la pieza única, la misma que usa aliados al crear el tour.
 import { unidadTxt } from './unidadesTour';
+// P16: un nombre que falta sale de la pieza única de P15 (la misma del pedido a domicilio): vive en precioPedido.js.
+import { nombreOPorDefecto } from './precioPedido';
 // G88: «Mis reservas» se recuerda en el teléfono con la pieza única (la misma de «Mis pedidos»; su clave, sin tope).
 import { MIS_RESERVAS, leerRecordados, recordar } from './recordadosEnTelefono';
 // G90: los colores salen de LA paleta (theme.js), no de una paleta propia de esta pantalla.
@@ -81,16 +83,19 @@ function Turismo({ nombre, foto, onVolver, onCerrarSesion, onIrPerfil, onIrGanan
     try {
       // G34: la reserva ya no espera a que el cliente conteste el cartel de permiso; el token se le pega cuando llegue.
       const pegarToken = prepararTokenDeAvisos('clienteFcmToken');
+      // P16: un tour sin nombre (o con un nombre que no es texto) iba en `undefined` y Firestore rechazaba la reserva en
+      // el teléfono, siempre. Ahora lleva «Tour» o «Alquiler»; y un tour sin id va sin `tourId` (nadie lo lee).
+      const nombreTour = nombreOPorDefecto(tourReserva.nombre, tourReserva.tipo === 'alquiler' ? 'Alquiler' : 'Tour');
       const ref = await addDoc(collection(db, 'reservasTurismo'), {
         agenciaId: agenciaActiva.id,
         // REGLA 9 - LA FIRMA: aqui se apunta QUIEN lo pide. Sin esta firma el
         // servidor no tiene forma de saber de quien es, y hasta el 24-ago-2026
         // por eso los dejaba mirar a CUALQUIERA que tuviera una cuenta.
         clienteId: auth.currentUser ? auth.currentUser.uid : null,
-        agenciaNombre: agenciaActiva.nombre || '',
-        tourId: tourReserva.id,
+        agenciaNombre: nombreOPorDefecto(agenciaActiva.nombre, ''),
+        ...(tourReserva.id != null ? { tourId: tourReserva.id } : {}),
         tipo: tourReserva.tipo || 'tour',
-        nombreTour: tourReserva.nombre,
+        nombreTour,
         imagen: tourReserva.imagen || '',
         cliente: cliente.trim(),
         telefono: celularDiezCifras(telefono), // G42: 10 cifras limpias (antes «+57» + las 10 últimas)
@@ -105,7 +110,7 @@ function Turismo({ nombre, foto, onVolver, onCerrarSesion, onIrPerfil, onIrGanan
       pegarToken(ref);
       recordar(MIS_RESERVAS, ref.id);
       setEnviando(false);
-      setExito({ nombre: tourReserva.nombre });
+      setExito({ nombre: nombreTour });
       setTourReserva(null);
     } catch (e) {
       setEnviando(false);

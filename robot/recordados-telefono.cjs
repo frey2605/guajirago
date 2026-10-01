@@ -33,13 +33,17 @@ async function dejarDatos() {
   existe = true;
   try { await base.leer('reservasTurismo/' + RESERVA); } catch (e) { existe = false; }
   if (!existe) {
+    // P16: el cliente solo puede CREAR su reserva como la app (en 'nueva', con sus 16 campos); la cancela la
+    // administradora de pruebas, porque desde P16 el cliente solo le pega su token de avisos.
     await base.cambiar('reservasTurismo/' + RESERVA, {
       agenciaId: 'prueba-agencia', clienteId: base.uid, agenciaNombre: 'Agencia de Turismo de Prueba',
       tourId: 'tour_1', tipo: 'tour', nombreTour: TOUR, imagen: '', cliente: 'Robot G88',
       telefono: '3000000001', personas: 1, fecha: '2026-10-05', total: 250000, unidadPrecio: 'persona',
-      estado: 'cancelada', motivoCancelacion: 'Reserva fija del robot G88', notas: 'Reserva de mentira del robot (G88)',
+      estado: 'nueva', notas: 'Reserva de mentira del robot (G88)',
       creado: new Date().toISOString(),
     });
+    const adm = await entrarALaBase('admin@gg.test');
+    await adm.cambiar('reservasTurismo/' + RESERVA, { estado: 'cancelada', motivoCancelacion: 'Reserva fija del robot G88' });
   }
 }
 

@@ -192,7 +192,8 @@ describe('G42 · cada formulario guarda las 10 cifras limpias, y no guarda lo qu
       const r = { b: base() };
       await enviar({ ...APP, ...r.b, fecha: '2026-10-01', cliente: 'Ana', telefono, personas: '1', notas: '', auth: { currentUser: { uid: 'u1' } },
         agenciaActiva: { id: 'a1', nombre: 'A' }, tourReserva: { id: 't1', nombre: 'T', precio: 1, unidadPrecio: 'persona' },
-        totalReserva: () => 1, prepararTokenDeAvisos: () => () => {}, recordar: () => {}, MIS_RESERVAS: {}, setAviso: (t) => { r.aviso = t; } });
+        totalReserva: () => 1, prepararTokenDeAvisos: () => () => {}, recordar: () => {}, MIS_RESERVAS: {}, setAviso: (t) => { r.aviso = t; },
+        nombreOPorDefecto: cargarDeLaApp('guajirago/src/precioPedido.js').nombreOPorDefecto }); // P16: el nombre del tour, de la pieza
       return r;
     };
     assert.strictEqual((await correr('+57 300 123 4567')).b.escritos[0].datos.telefono, '3001234567');

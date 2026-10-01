@@ -20,7 +20,7 @@ const FECHA = '2026-10-05';
   await base.cambiar(ruta, {
     agenciaId: 'prueba-agencia', clienteId: base.uid, agenciaNombre: 'Agencia de Turismo de Prueba',
     tourId: 'tour_1', tipo: 'tour', nombreTour: 'Cabo de la Vela en un día', imagen: '', cliente,
-    telefono: '+573000000001', personas: 1, fecha: FECHA, total: 250000, unidadPrecio: 'persona',
+    telefono: '3000000001', // P16: la app manda 10 cifras (las reglas ya no dejan otra cosa) personas: 1, fecha: FECHA, total: 250000, unidadPrecio: 'persona',
     estado: 'nueva', notas: 'Reserva de mentira del robot (G11)', creado: new Date().toISOString(),
   });
 
@@ -48,7 +48,8 @@ const FECHA = '2026-10-05';
     await r.captura('reservas');
   } finally {
     await r.cerrar();
-    try { await base.cambiar(ruta, { estado: 'cancelada', motivoCancelacion: 'Reserva de mentira del robot' }); } catch (e) {
+    // P16: el cliente ya no cambia el estado de su reserva (solo pega su token); la cancela la administradora de pruebas.
+    try { await (await entrarALaBase('admin@gg.test')).cambiar(ruta, { estado: 'cancelada', motivoCancelacion: 'Reserva de mentira del robot' }); } catch (e) {
       console.log('⚠ no pude cancelar la reserva de mentira ' + ruta + ': ' + e.message);
     }
   }
