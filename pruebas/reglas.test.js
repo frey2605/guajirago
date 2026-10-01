@@ -4112,6 +4112,22 @@ describe('SE VENDE · un negocio no puede tocar los datos de otro', () => {
       await RUT.assertSucceeds(setDoc(doc(como('pasajero1'), suNombre), uso(4)));
     });
 
+    // P08 (30-sep-2026): la prueba de arriba solo comprobaba que SUBIR UNO entra; nadie
+    // comprobaba que subir MÁS de uno, quedarse igual o irse a negativo NO entra.
+    it('EL QUE MUERDE · P08 · el cliente no suma más de uno, ni lo deja igual, ni lo baja a negativo', async () => {
+      const { doc, setDoc, updateDoc, increment } = FS;
+      await entorno.withSecurityRulesDisabled(async (ctx) => {
+        await setDoc(doc(ctx.firestore(), suNombre), uso(1));
+      });
+      await RUT.assertFails(updateDoc(doc(como('pasajero1'), suNombre), { veces: 3 }));
+      await RUT.assertFails(updateDoc(doc(como('pasajero1'), suNombre), { veces: increment(2) }));
+      await RUT.assertFails(updateDoc(doc(como('pasajero1'), suNombre), { veces: -5 }));
+      await RUT.assertFails(setDoc(doc(como('pasajero1'), suNombre), uso(1)));
+      // Y lo que hace la app (Restaurantes.js: increment(1) con merge) SÍ entra.
+      await RUT.assertSucceeds(setDoc(doc(como('pasajero1'), suNombre),
+        { veces: increment(1), telefono: '3001112233', promoId: 'promoA' }, { merge: true }));
+    });
+
     it('EL QUE MUERDE · nadie barre la colección y se lleva los teléfonos', async () => {
       const { getDocs, collection, doc, setDoc } = FS;
       await entorno.withSecurityRulesDisabled(async (ctx) => {
