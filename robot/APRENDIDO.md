@@ -959,3 +959,15 @@ la placa de `conductores/{uid}` (la escribe su GPS con la misma placa que va en 
   ventana no da permiso de avisos, así que el cajón queda solo con el teléfono.
   En la tanda de `probar-cambio` de P21 (23 recorridos: los que vigilan Solicitar.js, AppConductor.js, las reglas,
   el servidor y el panel) salieron los 23 ✓.
+
+**La ventanita de las ofertas del pasajero (P23, 1-oct-2026).**
+- 🪤 **Desde P23, al pedir un viaje sin permiso de avisos le sale al pasajero «Así no te van a llegar las ofertas»**,
+  y tapa la pantalla de espera (va a zIndex 10000). El navegador del robot no da ese permiso, así que le sale SIEMPRE:
+  los 12 recorridos que piden un viaje la cierran con `cerrarAvisoDeOfertas(p)` de `robot/comun.cjs` justo después de
+  «Solicitar Taxi» / «Pedir mandado». Un recorrido NUEVO que pida un viaje tiene que hacer lo mismo, o el siguiente
+  toque («Cancelar viaje», aceptar una oferta) choca con la ventanita.
+- El recorrido `aviso-ofertas` EXIGE que salga, con su texto de pasajero (no el del conductor), que «Entendido» la
+  cierre y que la pantalla de espera siga ahí; cancela su viaje con «Otro motivo». Corrido en pruebas con b92b6ac: ✓.
+- Lo que el robot NO puede ver: el caso CON permiso (el token pegado en la ficha y el aviso que llega). Lo ejecuta
+  `pruebas/tokenDelPasajero.test.js` con la nube de mentira.
+- En la tanda de `probar-cambio` de P23 (19 recorridos) salieron los 19 ✓.

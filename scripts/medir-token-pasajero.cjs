@@ -183,7 +183,9 @@ async function main() {
       const enElRepo = AVISOS_EN_EL_CODIGO.includes(nombre);
       const sitios = dondeBuscaElServidor(trozoDe(cod.index, nombre), cod.pieza);
       console.log('    ' + nombre + (enElRepo ? '' : ' (su código NO está en el repo)') + ' lo busca en: ' + (sitios.join(' → ') || 'ningún sitio'));
-      if (!enElRepo) avisos.push({ nombre, sitios });
+      // Lo publicado también se juzga contra la app: si la app sale antes que el servidor, el aviso publicado busca
+      // donde la app ya no pega, y eso es justo lo que hay que ver (el servidor va PRIMERO).
+      avisos.push({ nombre: nombre + ' (publicada)', sitios });
     }
     const viajes = (await n.traer('viajes')).map(n.doc);
     const contactos = {};
