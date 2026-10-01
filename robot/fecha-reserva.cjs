@@ -17,10 +17,11 @@ const FECHA = '2026-10-05';
   const cliente = 'Robot G11 ' + hora;
   const ruta = 'reservasTurismo/robot-g11-' + hora;
   const base = await entrarALaBase('pasajero@gg.test');
+  // P16: el cliente crea su reserva como la app (en 'nueva', teléfono en 10 cifras); las reglas no dejan otra cosa.
   await base.cambiar(ruta, {
     agenciaId: 'prueba-agencia', clienteId: base.uid, agenciaNombre: 'Agencia de Turismo de Prueba',
     tourId: 'tour_1', tipo: 'tour', nombreTour: 'Cabo de la Vela en un día', imagen: '', cliente,
-    telefono: '3000000001', // P16: la app manda 10 cifras (las reglas ya no dejan otra cosa) personas: 1, fecha: FECHA, total: 250000, unidadPrecio: 'persona',
+    telefono: '3000000001', personas: 1, fecha: FECHA, total: 250000, unidadPrecio: 'persona',
     estado: 'nueva', notas: 'Reserva de mentira del robot (G11)', creado: new Date().toISOString(),
   });
 
