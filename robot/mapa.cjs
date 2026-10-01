@@ -287,6 +287,12 @@ const RECORRIDOS = [
     vigila: ['guajirago/src/ubicacionEnVivo.js', 'guajirago/src/AppConductor.js', 'guajirago/src/Solicitar.js', 'firestore.rules'],
   },
   {
+    nombre: 'mercado-viajes',
+    que: 'el pasajero pide un Taxi y el taxista lo VE en su lista; el mototaxista, el propio pasajero y el panel leen el viaje, y OTRA pasajera y el restaurante de prueba reciben «permiso denegado» (P20; deja un viaje cancelado, no cuesta comisión)',
+    archivo: 'mercado-viajes.cjs',
+    vigila: ['firestore.rules', 'guajirago/src/AppConductor.js', 'guajirago/src/estadosViaje.js', 'guajirago/src/viajeNuevo.js'],
+  },
+  {
     nombre: 'llave-maps',
     que: 'transporte y aliados cargan Google Maps con la llave de su .env.pruebas (la escribe CRA en el index.html), Google no la rechaza y un mapa se dibuja (G62; no entra ni escribe nada)',
     archivo: 'llave-maps.cjs',

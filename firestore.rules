@@ -300,8 +300,28 @@ service cloud.firestore {
       function dejoUnaOferta() {
         return exists(/databases/$(database)/documents/viajes/$(viajeId)/contraofertas/$(request.auth.uid));
       }
+      // ── P20 · EL MERCADO ES DE LOS CONDUCTORES (1-oct-2026) ─────────────────
+      // Un viaje del mercado lleva el nombre, el correo, las coordenadas, el origen y
+      // el destino del pasajero (viajeNuevo.js) y, si es un mandado, el nombre y el
+      // teléfono de quien recibe. Hasta hoy lo leía CUALQUIERA con sesión: una
+      // pasajera, un restaurante de aliados o una cuenta recién hecha bajaban el
+      // mercado entero. La única pantalla de usuario que lo pide es la del conductor
+      // (AppConductor.js, `where('estado', 'in', ESTADOS_MERCADO)`).
+      //
+      // ¿Quién es conductor? Lo que dice SU ficha (`usuarios/{uid}`, campo `tipo`):
+      // es la misma marca que ya usa el servidor (reclamarPromocion y
+      // creditosDeBienvenida, `tipo === "conductor"`), y la escribe la app al guardar
+      // los datos del vehículo (App.js). De cualquier tipo de vehículo: el mercado lo
+      // filtra la app por tipo, y las reglas no pueden hacerlo sin que la consulta lo
+      // pida. Y SIN mirar el saldo: el que no tiene saldo también ve (P05).
+      // El exists() va antes del get(): preguntar por una ficha que no existe da error.
+      // Lo mide scripts/medir-mercado-viajes.cjs y lo carea pruebas/mercadoViajes.test.js.
+      function esConductor() {
+        let ficha = /databases/$(database)/documents/usuarios/$(request.auth.uid);
+        return exists(ficha) && get(ficha).data.get('tipo', '') == 'conductor';
+      }
       allow read: if request.auth != null
-        && (esMio() || enElMercado() || esAdmin() || dejoUnaOferta());
+        && (esMio() || (enElMercado() && esConductor()) || esAdmin() || dejoUnaOferta());
 
       // ── REGLA 10 · QUIÉN PUEDE TOCAR UN VIAJE (25-ago-2026) ─────────────
       //
