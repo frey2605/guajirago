@@ -293,6 +293,12 @@ const RECORRIDOS = [
     vigila: ['firestore.rules', 'guajirago/src/AppConductor.js', 'guajirago/src/estadosViaje.js', 'guajirago/src/viajeNuevo.js'],
   },
   {
+    nombre: 'contacto-del-viaje',
+    que: 'el pasajero pide un MANDADO por la pantalla: el viaje del mercado no lleva correo, teléfono de quien recibe ni token; la tarjeta del mercado del mototaxista no enseña el teléfono y él no lee el cajón; el pasajero y el panel sí; ya aceptado, el repartidor ve «Llamar a quien recibe (teléfono)" y lee el cajón; terminado el viaje, ya no (P21; deja un viaje cancelado y cuesta una comisión de prueba)',
+    archivo: 'contacto-del-viaje.cjs',
+    vigila: ['guajirago/src/contactoDelViaje.js', 'guajirago/src/viajeNuevo.js', 'guajirago/src/Solicitar.js', 'guajirago/src/AppConductor.js', 'firestore.rules', 'guajirago-admin/src/Mensajeria.js', 'guajirago-admin/src/contactoDelViaje.js'],
+  },
+  {
     nombre: 'llave-maps',
     que: 'transporte y aliados cargan Google Maps con la llave de su .env.pruebas (la escribe CRA en el index.html), Google no la rechaza y un mapa se dibuja (G62; no entra ni escribe nada)',
     archivo: 'llave-maps.cjs',

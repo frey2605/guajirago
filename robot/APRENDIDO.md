@@ -946,3 +946,16 @@ la placa de `conductores/{uid}` (la escribe su GPS con la misma placa que va en 
   `tipo: 'conductor'` en su ficha (scripts/sembrar-pruebas.cjs); una cuenta nueva solo lo tiene tras guardar los datos
   del vehículo. Corrido en pruebas con las reglas de 7733a4f: ✓, y la tanda de `probar-cambio` entera ✓. Los 403 de la
   consola salen igual que en los demás. No cuesta comisión (nadie oferta).
+- **contacto-del-viaje, P21 (1-oct-2026):** el mandado se pide por la pantalla de verdad: «Mensajería y Mandados» →
+  «Quiero enviar algo», con los placeholders «¿Dónde se recoge? (Riohacha)», «¿Dónde se entrega? (Riohacha)», «¿Qué
+  envías? (ej: una caja)», «NOMBRE DE QUIEN RECIBE», «Teléfono (10 números)» y la nota; el botón es «Pedir mandado —
+  $…». Lo ve moto@gg.test (los mototaxistas ven los mandados; el taxista no). La tarjeta del mercado se reconoce por el
+  nombre de quien recibe (lleva un sello de la hora) y se comprueba que el teléfono NO está en el texto de la pantalla;
+  ya aceptado, el texto «Llamar a quien recibe (3001112233)». El cajón `viajes/{id}/contacto/pasajero` se lee por la red
+  con cuatro cuentas (pasajero, moto antes y después de aceptar y tras terminar, pasajera@gg.test, admin@gg.test). La
+  primera vez, Google contestó «The service is currently unavailable» al entrar la 3.ª/4.ª cuenta seguidas: el robot
+  reintenta hasta 4 veces con espera (`entrarConPaciencia`). Corrido en pruebas con 5175854 (app y reglas) y el panel
+  894f551: ✓. Los 403 de la consola salen igual que en los demás. El token de avisos no se puede ver: el navegador sin
+  ventana no da permiso de avisos, así que el cajón queda solo con el teléfono.
+  En la tanda de `probar-cambio` de P21 (23 recorridos: los que vigilan Solicitar.js, AppConductor.js, las reglas,
+  el servidor y el panel) salieron los 23 ✓.
