@@ -159,9 +159,21 @@ function pedidoConPreciosDelMenu(negocio, items, usos, ahora) {
   let subtotal = 0;
   const todas = Array.isArray(items) ? items : [];
   if (todas.length > MAX_LINEAS) problemas.push({ codigo: 'demasiadas-lineas', lineas: todas.length });
+  // P13 (1-oct-2026): de cada línea se guardan SOLO los campos que manda la app (agregarLinea, Restaurantes.js), con
+  // los textos recortados a LARGO_TEXTO, y las adiciones (las de un plato fuera del menú se quedan) como
+  // { nombre, precio }. Antes `...base` copiaba la línea tal cual: un campo de sobra o un texto enorme dentro de una
+  // línea llenaba el pedido casi hasta 1 MiB y el servidor no cabía ni para poner el precio ni para dejar la marca.
+  // Lo de fuera de las líneas lo cierran las reglas (firestore.rules, el `create` del cliente en `pedidos`).
+  const CAMPOS_DE_LA_LINEA = ['lineaId', 'firma', 'id', 'nombre', 'precio', 'cantidad', 'adiciones'];
+  const simple = (v) => typeof v === 'string' || typeof v === 'boolean' || (typeof v === 'number' && Number.isFinite(v));
+  const lineaCerrada = (l) => Object.fromEntries(Object.entries(sinPromo(l))
+    .filter(([k, v]) => CAMPOS_DE_LA_LINEA.includes(k) && (k === 'adiciones' ? Array.isArray(v) : simple(v)))
+    .map(([k, v]) => [k, k === 'adiciones'
+      ? v.slice(0, MAX_ADICIONES).map((a) => ({ nombre: textoCorto(a && a.nombre), precio: numero(a && a.precio) || 0 }))
+      : (typeof v === 'string' ? v.slice(0, LARGO_TEXTO) : v)]));
   const lineas = todas.slice(0, MAX_LINEAS).map((linea, i) => {
     const l = linea && typeof linea === 'object' ? linea : {};
-    const base = sinPromo(l);
+    const base = lineaCerrada(l);
     const cantidadBuena = Number.isInteger(l.cantidad) && l.cantidad > 0 && l.cantidad <= CANTIDAD_MAXIMA;
     if (!cantidadBuena) problemas.push({ linea: i, codigo: 'cantidad-no-valida' });
     const plato = menu.find((p) => p && p.id === l.id);

@@ -6,11 +6,14 @@
 //      · P12: uno con un teléfono que lleva «/» → las reglas lo RECHAZAN (el teléfono nace en 10 cifras).
 //      · P12 «Robot P12 venenoso»: a $1 con una promoción inventada «a/b» (hasta P12 eso hacía reventar la revisión):
 //        queda 'revisado' con el precio del MENÚ.
-//      · «Robot P11 sin revisar»: a $1 y LLENO casi hasta el máximo de un documento (1 MiB) con un campo de relleno. Es
-//        lo único que le queda al cliente para hacer fallar la revisión (hasta P12 bastaba el teléfono con «/»): el
-//        servidor no cabe ni para poner el precio ni para dejar la marca, así que el pedido se queda SIN revisión, con
-//        la plata del teléfono, y aliados lo da por «sin revisar» cuando pasa la espera de 2 minutos (P11).
-//   2. El restaurante (aliados) → Pedidos a domicilio, pasada la espera: la tarjeta del «sin revisar» dice «⚠️ Precio
+//      · P13: uno LLENO casi hasta el máximo de un documento (1 MiB) con un campo de sobra → las reglas lo RECHAZAN
+//        (lista cerrada de campos). Hasta P13 era lo único que le quedaba al cliente para que el servidor no cupiera
+//        ni para poner el precio ni para dejar la marca.
+//      · P13: uno lleno DENTRO de una línea (un campo «nota» que la app no manda) → entra, pero la revisión guarda de
+//        la línea solo sus campos conocidos: queda «revisado», con el precio del menú y pequeño.
+//      · «Robot P11 sin revisar»: a $1. Como el cliente ya no puede hacer fallar la revisión, el fallo se SIMULA: tras
+//        la revisión, la administradora de pruebas le pone la marca que deja el servidor cuando no puede revisar.
+//   2. El restaurante (aliados) → Pedidos a domicilio: la tarjeta del «sin revisar» dice «⚠️ Precio
 //      sin revisar» y la del normal no; al tocar «✅ Confirmar pedido» en el «sin revisar», la ventanita también lo
 //      dice (no se confirma: se cierra con «Cancelar»).
 //   3. Los pedidos se cancelan al final, como el cliente.
@@ -42,7 +45,7 @@ async function dejarPedidos(base) {
     creado: new Date().toISOString(),
   };
   const t = Date.now();
-  const ids = { normal: 'robotP11N' + t, malo: 'robotP11S' + t, venenoso: 'robotP12V' + t, barra: 'robotP12B' + t };
+  const ids = { normal: 'robotP11N' + t, malo: 'robotP11S' + t, venenoso: 'robotP12V' + t, barra: 'robotP12B' + t, sobra: 'robotP13C' + t, linea: 'robotP13L' + t };
   await base.cambiar('pedidos/' + ids.normal, {
     ...comun, cliente: 'Robot P11 normal', telefono: '3001100110',
     items: [{ id: plato.id, nombre: plato.nombre, precio: plato.precio, cantidad: 1, adiciones: [] }],
@@ -61,22 +64,28 @@ async function dejarPedidos(base) {
     ...comun, cliente: 'Robot P12 venenoso', telefono: '3001100110',
     items: [{ id: plato.id, nombre: plato.nombre, precio: 1, cantidad: 1, adiciones: [], promoId: 'a/b' }], subtotal: 1, total: 1,
   });
-  // P11: el pedido lleno casi hasta el máximo (la cuenta de tamaño de Firestore, como en el medidor de P12).
-  const malo = {
-    ...comun, cliente: 'Robot P11 sin revisar', telefono: '3001100110',
-    items: [{ id: plato.id, nombre: plato.nombre, precio: 1, cantidad: 1, adiciones: [] }], subtotal: 1, total: 1, relleno: '',
-  };
-  const nombre = 'pedidos'.length + 1 + ids.malo.length + 1 + 16;
-  let holgura = HOLGURA;
-  for (;;) {
-    malo.relleno = '';
-    malo.relleno = 'x'.repeat(LIMITE_DOCUMENTO - holgura - nombre - 32 - tamano(malo));
-    try { await base.cambiar('pedidos/' + ids.malo, malo); break; } catch (e) {
-      if (holgura >= 150) throw new Error('no pude dejar el pedido lleno: ' + e.message.split('\n')[0]);
-      holgura += 30; // la cuenta quedó corta por unos bytes: se deja un poco más libre
+  // P13: el pedido lleno casi hasta el máximo (la cuenta de tamaño de Firestore, como en el medidor de P12) ya no
+  // entra con un campo de sobra: las reglas cierran la lista. Y lleno DENTRO de una línea (un campo «nota» que la app
+  // no manda) sí entra, pero la revisión guarda de la línea solo sus campos conocidos: queda revisado y pequeño.
+  const relleno = async (id, pedido, poner) => {
+    const nombre = 'pedidos'.length + 1 + id.length + 1 + 16;
+    let holgura = HOLGURA;
+    for (;;) {
+      const p = poner(pedido, '');
+      const lleno = poner(pedido, 'x'.repeat(LIMITE_DOCUMENTO - holgura - nombre - 32 - tamano(p)));
+      try { await base.cambiar('pedidos/' + id, lleno); return { entro: true, holgura }; } catch (e) {
+        if (!/size|tama|exceed|bytes/i.test(e.message) || holgura >= 150) return { entro: false, motivo: e.message.split('\n')[0] };
+        holgura += 30; // la cuenta quedó corta por unos bytes: se deja un poco más libre
+      }
     }
-  }
-  return { ids, plato, barraEntro, holgura };
+  };
+  const aUnPeso = { ...comun, telefono: '3001100110', items: [{ id: plato.id, nombre: plato.nombre, precio: 1, cantidad: 1, adiciones: [] }], subtotal: 1, total: 1 };
+  const sobra = await relleno(ids.sobra, { ...aUnPeso, cliente: 'Robot P13 campo de sobra' }, (p, x) => ({ ...p, relleno: x }));
+  const enLinea = await relleno(ids.linea, { ...aUnPeso, cliente: 'Robot P13 lleno en la línea' }, (p, x) => ({ ...p, items: [{ ...p.items[0], nota: x }] }));
+  // P11: el que aliados tiene que dar por «sin revisar». Desde P13 el cliente ya no puede hacer fallar la revisión, así
+  // que el fallo se SIMULA: la administradora de pruebas le pone la marca que deja el servidor cuando no puede revisar.
+  await base.cambiar('pedidos/' + ids.malo, { ...aUnPeso, cliente: 'Robot P11 sin revisar' });
+  return { ids, plato, barraEntro, sobra, enLinea };
 }
 
 async function verAliados() {
@@ -130,8 +139,7 @@ async function verAliados() {
 (async () => {
   const fallos = [];
   const yo = await entrarALaBase('pasajero@gg.test');
-  const nacio = Date.now();
-  const { ids, plato, barraEntro, holgura } = await dejarPedidos(yo);
+  const { ids, plato, barraEntro, sobra, enLinea } = await dejarPedidos(yo);
   const normal = await conRevision(yo, 'pedidos/' + ids.normal);
   const venenoso = await conRevision(yo, 'pedidos/' + ids.venenoso);
   console.log('NORMAL: total ' + normal.total + ' · revisión ' + JSON.stringify(normal.revisionServidor && { estado: normal.revisionServidor.estado }));
@@ -144,13 +152,27 @@ async function verAliados() {
   if (!venenoso.revisionServidor || venenoso.revisionServidor.estado !== 'revisado') fallos.push('P12: el pedido con la promoción «a/b» no quedó «revisado»');
   if (venenoso.subtotal !== plato.precio) fallos.push('P12: el pedido con la promoción «a/b» no quedó con el precio del menú: ' + venenoso.subtotal);
 
-  // El lleno: el servidor no cabe ni para la revisión ni para la marca. Se espera a que pase la espera de aliados.
-  const falta = nacio + 2 * 60 * 1000 + 15000 - Date.now();
-  if (falta > 0) await esperar(falta);
+  // P13: lleno con un campo de sobra → no entra; lleno dentro de una línea → entra y queda revisado y pequeño.
+  console.log('P13 · LLENO con un campo de sobra: ' + (sobra.entro ? 'ENTRÓ' : 'rechazado (' + sobra.motivo.slice(0, 80) + ')'));
+  if (sobra.entro) fallos.push('P13: las reglas dejaron crear un pedido lleno con un campo de sobra');
+  if (!enLinea.entro) fallos.push('P13: no pude crear el pedido lleno dentro de una línea: ' + enLinea.motivo);
+  else {
+    const linea = await conRevision(yo, 'pedidos/' + ids.linea);
+    const { id: _id, ...campos } = linea;
+    const peso = tamano(campos);
+    console.log('P13 · LLENO en la línea (holgura ' + enLinea.holgura + ' bytes): subtotal ' + linea.subtotal + ' · revisión '
+      + JSON.stringify(linea.revisionServidor && { estado: linea.revisionServidor.estado }) + ' · queda de ~' + peso + ' bytes');
+    if (!linea.revisionServidor || linea.revisionServidor.estado !== 'revisado') fallos.push('P13: el pedido lleno en la línea no quedó «revisado»');
+    if (linea.subtotal !== plato.precio) fallos.push('P13: el pedido lleno en la línea no quedó con el precio del menú: ' + linea.subtotal);
+    if (peso > 20000) fallos.push('P13: el pedido lleno en la línea sigue pesando ' + peso + ' bytes: la revisión no soltó la «nota»');
+  }
+  // P11 (simulado desde P13): se espera la revisión de verdad y encima se pone la marca de «sin revisar», como admin.
+  await conRevision(yo, 'pedidos/' + ids.malo);
+  const adm = await entrarALaBase('admin@gg.test');
+  await adm.cambiar('pedidos/' + ids.malo, { revisionServidor: { evento: 'robot', estado: 'sin_revisar', motivo: 'simulado por el robot', subtotalDelTelefono: 1, totalDelTelefono: 1, promos: [], problemas: [] } });
   const malo = await yo.leer('pedidos/' + ids.malo);
-  console.log('LLENO (holgura ' + holgura + ' bytes): total ' + malo.total + ' · revisión ' + JSON.stringify(malo.revisionServidor && { estado: malo.revisionServidor.estado }));
-  if (malo.revisionServidor && malo.revisionServidor.estado === 'revisado') fallos.push('el pedido lleno sí se pudo revisar: no sirve para probar el aviso');
-  if (malo.total !== 1) fallos.push('al pedido sin revisar se le cambió la plata (' + malo.total + '): el servidor no tenía cómo revisarlo');
+  console.log('SIN REVISAR (simulado): revisión ' + JSON.stringify(malo.revisionServidor && { estado: malo.revisionServidor.estado }));
+  if (!malo.revisionServidor || malo.revisionServidor.estado !== 'sin_revisar') fallos.push('no quedó puesta la marca de «sin revisar» del pedido simulado');
 
   const al = await verAliados();
   console.log('ALIADOS · capturas', al.carpeta);
@@ -165,11 +187,11 @@ async function verAliados() {
   console.log('  tarjeta normal: ' + (tN && /Precio sin revisar/.test(tN) ? 'con aviso' : 'sin aviso') + ' · tarjeta sin revisar: '
     + (tS && /Precio sin revisar/.test(tS) ? 'con aviso' : 'sin aviso') + ' · ventanita: ' + (al.ventanita && /Precio sin revisar/.test(al.ventanita) ? 'con aviso' : 'sin aviso'));
 
-  for (const id of [ids.normal, ids.malo, ids.venenoso]) {
+  for (const id of [ids.normal, ids.malo, ids.venenoso, ...(enLinea.entro ? [ids.linea] : []), ...(sobra.entro ? [ids.sobra] : [])]) {
     try { await yo.cambiar('pedidos/' + id, { estado: 'cancelado', canceladoPor: 'cliente' }); } catch (e) { fallos.push('no pude cancelar ' + id + ': ' + e.message); }
   }
   console.log('ERRORES DE LA PÁGINA:', al.errores.join(' || ') || 'ninguno');
   console.log(fallos.length ? '🔴 FALLÓ:\n  · ' + fallos.join('\n  · ')
-    : '✓ el pedido normal sale revisado y sin aviso; el teléfono con «/» no entra y la promoción «a/b» sale revisada con el precio del menú (P12); el que no se pudo revisar, aliados lo dice en la tarjeta y al confirmar');
+    : '✓ el pedido normal sale revisado y sin aviso; el teléfono con «/» no entra y la promoción «a/b» sale revisada con el precio del menú (P12); el lleno con un campo de sobra no entra y el lleno dentro de una línea sale revisado y pequeño (P13); el marcado «sin revisar», aliados lo dice en la tarjeta y al confirmar');
   process.exit(fallos.length ? 1 : 0);
 })().catch((e) => { console.log('🔴 ' + e.message.split('\n')[0]); process.exit(1); });

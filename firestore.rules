@@ -1882,7 +1882,34 @@ service cloud.firestore {
          // arma el contador de las promociones; el servidor igual lo limpia por su cuenta.
          request.resource.data.get('telefono', '') is string &&
          request.resource.data.get('telefono', '').matches('^[0-9]{10}$') &&
+         elPedidoDelClienteNaceCerrado() &&
          negocioPuedeOperar(request.resource.data.restauranteId));
+
+      // P13 (1-oct-2026): el pedido del cliente nace SOLO con los campos que manda la app (enviarPedido,
+      // Restaurantes.js; comprobado también en el paquete publicado) y con topes de tamaño muy por encima de un pedido
+      // de verdad (medido en producción: el más grande pesa 918 bytes, 2 líneas, nombre 19 letras, dirección 48). Antes
+      // un cliente podía meter un campo de sobra o un texto enorme y llenar el pedido casi hasta 1 MiB: el servidor no
+      // cabía ni para ponerle el precio ni para dejarle la marca de «sin revisar». Dentro de las líneas las reglas no
+      // pueden mirar (no recorren listas: con 50 líneas ya se pasan de 1.000 expresiones), así que eso lo cierra la
+      // revisión del servidor, que guarda de cada línea solo sus campos conocidos (precioPedido.cjs, P13); aquí se
+      // topa cuántas líneas (las mismas 100 que revisa el servidor, MAX_LINEAS). La lista vive aquí y en la app; la ata
+      // pruebas/pedidoCerrado.test.js. Los pedidos del negocio (la mesa) y los del panel no pasan por aquí.
+      function elPedidoDelClienteNaceCerrado() {
+        let d = request.resource.data;
+        return d.keys().hasOnly(['restauranteId', 'clienteId', 'restauranteNombre', 'cliente', 'telefono',
+                 'direccion', 'items', 'subtotal', 'costoDomicilio', 'total', 'metodoPago', 'estado', 'tipo', 'creado']) &&
+          textoCorto(d.get('restauranteNombre', ''), 300) &&
+          textoCorto(d.get('cliente', ''), 200) &&
+          textoCorto(d.get('direccion', ''), 1000) &&
+          textoCorto(d.get('metodoPago', ''), 50) &&
+          textoCorto(d.get('tipo', ''), 30) &&
+          d.get('items', []) is list && d.get('items', []).size() <= 100 &&
+          d.get('subtotal', 0) is number && d.get('costoDomicilio', 0) is number && d.get('total', 0) is number &&
+          (d.get('creado', request.time) is timestamp || textoCorto(d.get('creado', ''), 40));
+      }
+      function textoCorto(v, largo) {
+        return v is string && v.size() <= largo;
+      }
 
       // Lo único que el cliente puede hacerle al estado de SU pedido: dejarlo
       // como está, o cancelarlo. Todo lo demás lo mueve el restaurante.
@@ -1901,6 +1928,36 @@ service cloud.firestore {
           .hasAny(['items', 'subtotal', 'costoDomicilio', 'total', 'revisionServidor']);
       }
 
+      // P13 (1-oct-2026): lo ÚNICO que el cliente le cambia a su pedido ya creado (Restaurantes.js, también en el
+      // paquete publicado): cancelarlo (estado + canceladoPor), el motivo, un mensaje del chat, la marca de calificado
+      // con sus estrellas, y el token de avisos (prepararTokenDeAvisos, Notificaciones.js). Con topes, para que no
+      // pueda llenar el pedido después de crearlo: el chat crece de a UN mensaje suyo, sin tocar los de antes, hasta
+      // 100 en total (medido en producción: 1 como mucho).
+      function elClienteSoloCambiaLoSuyo() {
+        let d = request.resource.data;
+        let cambia = d.diff(resource.data).affectedKeys();
+        return cambia.hasOnly(['estado', 'canceladoPor', 'motivoCancelacion', 'mensajesPedido', 'calificado',
+                 'estrellas', 'clienteFcmToken']) &&
+          (!cambia.hasAny(['canceladoPor']) || d.canceladoPor == 'cliente') &&
+          (!cambia.hasAny(['motivoCancelacion']) || textoCorto(d.motivoCancelacion, 1000)) &&
+          (!cambia.hasAny(['calificado']) || d.calificado is bool) &&
+          (!cambia.hasAny(['estrellas']) || (d.estrellas is int && d.estrellas >= 1 && d.estrellas <= 5)) &&
+          (!cambia.hasAny(['clienteFcmToken']) || textoCorto(d.clienteFcmToken, 500)) &&
+          (!cambia.hasAny(['mensajesPedido']) ||
+            unMensajeMasDelCliente(resource.data.get('mensajesPedido', []), d.mensajesPedido));
+      }
+      function unMensajeMasDelCliente(antes, ahora) {
+        return antes is list && ahora is list && ahora.size() == antes.size() + 1 && ahora.size() <= 100 &&
+          // (con el chat vacío no se rebana: `ahora[0:0]` revienta en las reglas — «Index: [-1]»)
+          (antes.size() == 0 || ahora[0:antes.size()] == antes) &&
+          ahora[antes.size()] is map &&
+          ahora[antes.size()].keys().hasOnly(['de', 'texto', 'imagen', 'fecha']) &&
+          ahora[antes.size()].get('de', '') == 'cliente' &&
+          textoCorto(ahora[antes.size()].get('texto', ''), 1000) &&
+          textoCorto(ahora[antes.size()].get('imagen', ''), 500) &&
+          textoCorto(ahora[antes.size()].get('fecha', ''), 40);
+      }
+
       // Al cambiarlo: su cliente, su restaurante o el panel. Y el pedido NO
       // puede cambiar de dueño ni de restaurante por el camino: si pudiera, la
       // firma de arriba no valdría nada — bastaría crear uno propio y después
@@ -1914,7 +1971,8 @@ service cloud.firestore {
           (request.auth != null &&
            resource.data.get('clienteId', '') == request.auth.uid &&
            elClienteNoMueveElPedido() &&
-           elClienteNoTocaLaPlata())) &&
+           elClienteNoTocaLaPlata() &&
+           elClienteSoloCambiaLoSuyo())) &&
         request.resource.data.restauranteId == resource.data.restauranteId &&
         request.resource.data.get('clienteId', '') == resource.data.get('clienteId', '');
 
