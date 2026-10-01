@@ -873,3 +873,10 @@ la placa de `conductores/{uid}` (la escribe su GPS con la misma placa que va en 
   de una. Para el caso «app modificada» se crea el pedido por la red con `cambiar` (un PATCH a un id nuevo es un
   create para las reglas) con los mismos platos a $1. Los dos se cancelan al final, como el cliente; y se comprueba
   que después el cliente ya no puede cambiar el `total`.
+- **revision-precio (P11, 30-sep-2026):** para provocar un fallo DE VERDAD en la revisión del precio sin tocar datos del
+  negocio basta un teléfono con «/» y cualquier `promoId`: la ruta del contador (`usosPromo/<promo>__<teléfono>`) deja
+  de ser un documento y la transacción del servidor revienta (el motivo queda en `revisionServidor.motivo`). El total
+  del pedido normal lleva el DOMICILIO del negocio que pone el servidor: se compara el `subtotal` con el menú, no el
+  `total` (la primera corrida se puso roja por eso). En aliados la tarjeta se ubica subiendo desde «👤 <cliente>» hasta
+  la caja con «Pedido #», y su botón «✅ Confirmar pedido» se marca con un `data-robot` para tocarlo sin equivocarse
+  de tarjeta. Los 403 de la consola salen igual que en los demás recorridos.

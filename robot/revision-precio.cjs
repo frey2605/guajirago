@@ -102,7 +102,8 @@ async function verAliados() {
   console.log('NORMAL: total ' + normal.total + ' · revisión ' + JSON.stringify(normal.revisionServidor && { estado: normal.revisionServidor.estado }));
   console.log('SIN REVISAR: total ' + malo.total + ' · revisión ' + JSON.stringify(malo.revisionServidor && { estado: malo.revisionServidor.estado, motivo: malo.revisionServidor.motivo }));
   if (!normal.revisionServidor || normal.revisionServidor.estado !== 'revisado') fallos.push('el pedido normal no quedó «revisado» (¿está publicada la función?)');
-  if (normal.total !== plato.precio) fallos.push('al pedido normal le cambió el total: ' + normal.total + ' y el menú dice ' + plato.precio);
+  // El total del normal lleva además el domicilio del negocio (lo pone el servidor): se compara el subtotal.
+  if (normal.subtotal !== plato.precio) fallos.push('al pedido normal le cambió el subtotal: ' + normal.subtotal + ' y el menú dice ' + plato.precio);
   if (!malo.revisionServidor || malo.revisionServidor.estado !== 'sin_revisar') fallos.push('el pedido cuya revisión revienta no quedó marcado «sin_revisar»');
   if (malo.total !== 1) fallos.push('al pedido sin revisar se le cambió la plata (' + malo.total + '): el servidor no tenía cómo revisarlo');
 
