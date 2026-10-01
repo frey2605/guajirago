@@ -900,3 +900,14 @@ la placa de `conductores/{uid}` (la escribe su GPS con la misma placa que va en 
   reglas solo dejan al cliente cambiar lo que la app le cambia, así que esa preparación la hace admin@gg.test (el
   cliente sigue CREANDO su pedido, como la app). Regla general: lo que un recorrido escribe por la red como una
   persona tiene que ser lo que su app escribe; lo que es preparar datos va con la cuenta de administración.
+- **promo-agotada, P14 (1-oct-2026):** para que la app vea una promoción «agotada» hace falta que la haya gastado ESE
+  TELÉFONO en OTRO aparato: el aparato que la usó la recuerda (`usosPromoGuajira`) y ya no la ofrece. Cada `abrir()` es
+  un navegador nuevo, así que el segundo aparato es otra llamada a `abrir()` con el mismo número. La promoción se
+  crea nueva en cada corrida (`robotP14_<hora>`) y el teléfono también (`314` + 7 cifras de la hora), para que el
+  contador `usosPromo` empiece en 0 sin tener que borrarlo; la pone y la quita admin@gg.test (el negocio de prueba no
+  es la cuenta de su dueño: `negocios/prueba-restaurante` no es un uid). El Restaurante de Prueba pide un MÍNIMO de
+  $10.000: el botón dice «Pedido mínimo…» y no deja pedir; el robot sube unidades con el «+» del carrito hasta que
+  cambia. La promoción va al 50 % en todos los platos (`platosAplica: []`) para que gane a cualquier otra del negocio.
+  Con el código de antes (corrido el 1-oct-2026 en pruebas) el primer envío decía «Promoción sin cupos» y los dos
+  siguientes «No se pudo enviar el pedido · Algo falló…», con `addDoc() called with invalid data. Unsupported field
+  value: undefined` en la consola. Los 403 de la consola siguen saliendo igual.

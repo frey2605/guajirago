@@ -614,6 +614,14 @@ const RECORRIDOS = [
     // careo los EJECUTA pruebas/revisionPrecio.test.js.
     vigila: ['guajirago-aliados/src/revisionPrecio.js', 'guajirago-aliados/src/PedidosDomicilio.js'],
   },
+  {
+    nombre: 'promo-agotada',
+    que: 'con una promoción de un uso ya gastada por ese teléfono (en otro aparato), la app la quita y lo dice («Promoción sin cupos»), y al volver a enviar el pedido ENTRA sin descuento y al precio del menú (hasta P14 salía «No se pudo enviar el pedido» cada vez); crea una promoción del 50 % en el Restaurante de Prueba como admin@gg.test, dos pedidos que cancela, y deja las promociones como estaban (P14; necesita notificarNuevoPedido publicada en pruebas)',
+    archivo: 'promo-agotada.cjs',
+    // El carrito y el envío sacados de Restaurantes.js y ejecutados con el candado y la validación de Firestore de
+    // verdad, con el careo con el código de antes, los corre pruebas/pedidoSinIndefinidos.test.js.
+    vigila: ['guajirago/src/Restaurantes.js', 'guajirago/src/precioPedido.js'],
+  },
 ];
 
 // Los archivos de pantalla: los que, si cambian, el robot debería poder probar. Todo lo que esté en

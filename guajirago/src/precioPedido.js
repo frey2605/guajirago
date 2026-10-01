@@ -62,6 +62,16 @@ export function precioDeLaLinea(plato, adiciones, desc) {
   return (desc ? desc.precioFinal : plato.precio) + extra;
 }
 
+/**
+ * La línea sin lo que dice de la promoción (promoId, promoNombre y precioOriginal). El servidor la usa para guardar la
+ * línea (la promoción la pone él), y la app para quitar una promoción que ese teléfono ya agotó. P14: la app ponía
+ * esos tres campos en `undefined`, y Firestore no guarda `undefined`: el pedido ya no salía del teléfono.
+ */
+export function sinPromo(linea) {
+  const { promoId, promoNombre, precioOriginal, ...resto } = linea && typeof linea === 'object' ? linea : {};
+  return resto;
+}
+
 // ── EL DOMICILIO DEL NEGOCIO (se copia igual en la app y en aliados) ──
 
 /**

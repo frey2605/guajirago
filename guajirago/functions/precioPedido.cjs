@@ -75,6 +75,16 @@ function precioDeLaLinea(plato, adiciones, desc) {
   return (desc ? desc.precioFinal : plato.precio) + extra;
 }
 
+/**
+ * La línea sin lo que dice de la promoción (promoId, promoNombre y precioOriginal). El servidor la usa para guardar la
+ * línea (la promoción la pone él), y la app para quitar una promoción que ese teléfono ya agotó. P14: la app ponía
+ * esos tres campos en `undefined`, y Firestore no guarda `undefined`: el pedido ya no salía del teléfono.
+ */
+function sinPromo(linea) {
+  const { promoId, promoNombre, precioOriginal, ...resto } = linea && typeof linea === 'object' ? linea : {};
+  return resto;
+}
+
 // ── EL DOMICILIO DEL NEGOCIO (se copia igual en la app y en aliados) ──
 
 /**
@@ -95,12 +105,6 @@ function costoDomicilioDelNegocio(negocio) {
 // ── SOLO EN EL SERVIDOR ──
 
 const numero = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : null);
-
-/** La línea sin lo que dice de la promoción (promoId, promoNombre y precioOriginal): eso lo pone el servidor. */
-function sinPromo(linea) {
-  const { promoId, promoNombre, precioOriginal, ...resto } = linea && typeof linea === 'object' ? linea : {};
-  return resto;
-}
 
 /**
  * P12 (30-sep-2026): LO QUE MANDA EL CLIENTE NO HACE REVENTAR LA REVISIÓN. Una app modificada puede mandar cualquier

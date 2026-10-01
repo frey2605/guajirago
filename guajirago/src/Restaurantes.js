@@ -17,7 +17,7 @@ import { guardarRechazo } from './guardarRechazo';
 import { losDeComida } from './escaparate';
 // P09: qué promoción vale hoy y cuánto cuesta cada línea es la cuenta del SERVIDOR (copia atada de
 // functions/precioPedido.cjs). Aquí solo se ENSEÑA: el precio de verdad lo pone el servidor cuando nace el pedido.
-import { promoVigenteHoy, mejorDescuento, precioDeLaLinea, costoDomicilioDelNegocio } from './precioPedido';
+import { promoVigenteHoy, mejorDescuento, precioDeLaLinea, costoDomicilioDelNegocio, sinPromo } from './precioPedido';
 // G87: qué número es cada día de la promoción y cómo se dice vive en diasSemana.js (copia atada en aliados).
 import { diasTxt } from './diasSemana';
 // G47: «¿me pueden pedir ahora?» es UNA regla (candado + escaparate + pausa + horario), la misma del dueño y del panel.
@@ -305,7 +305,9 @@ function Restaurantes({ nombre, onVolver, foto, onCerrarSesion, onIrPerfil, onIr
       }
       if (excedidas.length > 0) {
         const ids = excedidas.map((p) => p.id);
-        setCarrito((prev) => prev.map((l) => ids.includes(l.promoId) ? { ...l, precio: l.precioOriginal || l.precio, promoId: undefined, promoNombre: undefined, precioOriginal: undefined } : l));
+        // P14: la promoción se QUITA de la línea (sinPromo, la misma pieza del servidor); antes se dejaba en
+        // `undefined`, y con eso Firestore rechazaba el pedido en el teléfono cada vez que el cliente volvía a enviar.
+        setCarrito((prev) => prev.map((l) => ids.includes(l.promoId) ? { ...sinPromo(l), precio: l.precioOriginal || l.precio } : l));
         setAvisoPromo('Con este teléfono ya usaste el máximo de veces: ' + excedidas.map((p) => p.nombre).join(', ') + '. Se quitó ese descuento; revisa el total y vuelve a enviar.');
         return { ok: false, avisado: true };
       }
