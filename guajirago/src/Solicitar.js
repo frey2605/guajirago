@@ -19,6 +19,7 @@ import { valorDelBeneficio } from './reglaPromocion';
 import { aplicarDescuento, armarDescuentoInfo, tarifaParaPasajero } from './descuentos';
 import { generarCodigoSeguridad, guardarCodigoDeViaje, cargarCodigoDeViaje } from './codigoSeguridad';
 import { armarViajeNuevo } from './viajeNuevo';
+import { guardarContactoDelViaje, refContactoDelViaje } from './contactoDelViaje'; // P21: correo/teléfono/token fuera del mercado
 import { ESTADOS_QUE_CIERRA_EL_SERVIDOR, avisoDelCierre, huellaDelViaje } from './estadosViaje';
 // Los datos que comparten las pantallas salen de archivos únicos (SEGUNDA LEY).
 import { centroRiohacha } from './riohacha';
@@ -1129,14 +1130,19 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
         tipo, origen, destino, tarifa,
         datosDescuento,
         radioBusqueda: configApp.radioBusquedaInicial,
-        extras: { mensajeria: { queEnvia: queEnvia.trim(), recibeNombre: recibeNombre.trim(), recibeTel: celularDiezCifras(recibeTel), nota: notaEnvio.trim() } },
+        // P21: el teléfono de quien recibe NO va aquí (esto lo lee todo el mercado): va al cajón de contacto, abajo.
+        extras: { mensajeria: { queEnvia: queEnvia.trim(), recibeNombre: recibeNombre.trim(), nota: notaEnvio.trim() } },
       }));
+      // P21: el cajón de contacto (contactoDelViaje.js) lo leen solo ella, su conductor ya aceptado y el panel.
+      guardarContactoDelViaje(db, docRef.id, celularDiezCifras(recibeTel));
+      const contactoRef = refContactoDelViaje(db, docRef.id);
       setViajeId(docRef.id);
       // El código, al cajón privado del viaje: ahí solo lo ve ella.
       setCodigoSeguridad(codigoSeguridad);
       guardarCodigoDeViaje(docRef.id, codigoSeguridad);
       // Token del pasajero SIN bloquear la creación del viaje (el permiso de notificación puede tardar).
-      pegarToken(docRef);
+      // P21: en el cajón de contacto, no en el viaje (lo lee notificarPasajeroOferta con el SDK admin).
+      pegarToken(contactoRef);
       setContraofertas([]);
       contaofertasIdsRef.current.clear();
       setBuscandoAgotado(false);

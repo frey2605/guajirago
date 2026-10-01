@@ -212,8 +212,9 @@ describe('G42 · cada formulario guarda las 10 cifras limpias, y no guarda lo qu
     };
     assert.match(await correr('1'), /Teléfono de quien recibe/);
     assert.doesNotMatch(await correr('3001234567'), /Teléfono de quien recibe/);
-    // Y lo que se guarda en el viaje sale de la regla (el resto de solicitarViaje necesita el mapa: aquí se lee).
-    assert.match(soloCodigo(leer('guajirago/src/Solicitar.js')), /recibeTel: celularDiezCifras\(recibeTel\),/);
+    // Y lo que se guarda sale de la regla (el resto de solicitarViaje necesita el mapa: aquí se lee). Desde P21 va al
+    // cajón de contacto del viaje (contactoDelViaje.js), no al viaje.
+    assert.match(soloCodigo(leer('guajirago/src/Solicitar.js')), /guardarContactoDelViaje\(db, docRef\.id, celularDiezCifras\(recibeTel\)\);/);
   });
 
   it('aliados · registro (Login.js `validarRegistro` y `registrar`): antes «+57…», ahora 10 cifras', async () => {

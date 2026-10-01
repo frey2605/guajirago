@@ -35,7 +35,7 @@ describe('SEGUNDA LEY · el documento del viaje se arma en un solo sitio', () =>
   it('el documento ENTERO, campo por campo — el contrato con el conductor y el servidor', () => {
     assert.deepStrictEqual(armarViajeNuevo(PEDIDO, RELOJ), {
       pasajeroId: 'pasajera-1',
-      pasajeroEmail: 'ella@correo.com',
+      // P21: sin pasajeroEmail — iba al mercado, lo leían todos los conductores y no lo usaba nadie.
       pasajeroNombre: 'Erika',
       tieneCodigo: true,             // el aviso; el código va al cajón privado (REGLA 11)
       pasajeroLat: 11.5444,          // el servidor avisa a los conductores cercanos con esto

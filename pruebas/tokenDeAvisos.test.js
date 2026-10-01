@@ -147,9 +147,14 @@ function quejasDeLaPantalla(texto, col, campo) {
   const variable = (antes.match(/const\s+(\w+)\s*=\s*await\s*$/) || [])[1];
   if (!variable) { quejas.push('no sé cómo se llama el documento creado'); return quejas; }
   const pegados = [...t.matchAll(new RegExp('\\b' + pegar + '\\(\\s*(\\w+)\\s*\\)', 'g'))];
+  // P21: el viaje lo lee todo el mercado, así que su token va al cajón de contacto DE ESE VIAJE
+  // (`const x = refContactoDelViaje(db, <el creado>.id)`, contactoDelViaje.js); el servidor lo lee de ahí.
+  const cajon = col === 'viajes'
+    ? (t.slice(alta).match(new RegExp('const\\s+(\\w+)\\s*=\\s*refContactoDelViaje\\(\\s*db\\s*,\\s*' + variable + '\\.id\\s*\\)')) || [])[1]
+    : undefined;
   if (pegados.length !== 1) quejas.push('pega el token ' + pegados.length + ' veces (tiene que ser 1)');
   else {
-    if (pegados[0][1] !== variable) quejas.push('pega el token en «' + pegados[0][1] + '», no en el documento creado («' + variable + '»)');
+    if (pegados[0][1] !== variable && pegados[0][1] !== cajon) quejas.push('pega el token en «' + pegados[0][1] + '», no en el documento creado («' + variable + '»)');
     if (pegados[0].index < fin) quejas.push('pega el token antes de que exista el documento');
     if (/await\s*$/.test(t.slice(0, pegados[0].index))) quejas.push('espera a que se pegue el token');
   }

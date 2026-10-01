@@ -439,9 +439,12 @@ exports.notificarPasajeroOferta = onDocumentCreated("viajes/{viajeId}/contraofer
   const of = event.data && event.data.data();
   if (!of) return null;
   try {
-    const viajeSnap = await admin.firestore().collection("viajes").doc(event.params.viajeId).get();
+    const viajeRef = admin.firestore().collection("viajes").doc(event.params.viajeId);
+    // P21: el token vive en el cajón de contacto del viaje (guajirago/src/contactoDelViaje.js; la ruta la ata
+    // pruebas/contactoDelViaje.test.js), fuera del mercado. Los viajes de antes y los de una app vieja lo llevan dentro.
+    const [viajeSnap, contactoSnap] = await Promise.all([viajeRef.get(), viajeRef.collection("contacto").doc("pasajero").get()]);
     if (!viajeSnap.exists) return null;
-    const token = viajeSnap.data().pasajeroFcmToken;
+    const token = (contactoSnap.exists && contactoSnap.data().pasajeroFcmToken) || viajeSnap.data().pasajeroFcmToken;
     if (!token) return null;
     const cuerpo = (of.conductorNombre || "Un conductor") +
       (of.tipoOferta === "acepta" ? " aceptó tu oferta" : " te ofrece " + (of.monto || ""));

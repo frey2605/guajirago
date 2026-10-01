@@ -37,7 +37,9 @@ import { cop } from './moneda';
 /** Arma el documento con que nace TODO viaje (taxi, mototaxi o mandado). */
 export function armarViajeNuevo({ user, nombrePasajero, coords, tipo, origen, destino, tarifa, datosDescuento, radioBusqueda, extras }, ahora = new Date()) {
   return {
-    pasajeroId: user.uid, pasajeroEmail: user.email,
+    // P21: sin `pasajeroEmail` — iba al mercado, lo leían todos los conductores y no lo usaba nadie. El teléfono de
+    // quien recibe y el token de avisos tampoco van aquí: van al cajón de contacto (contactoDelViaje.js).
+    pasajeroId: user.uid,
     pasajeroNombre: nombrePasajero,
     tieneCodigo: true,
     pasajeroLat: coords.lat, pasajeroLng: coords.lng,

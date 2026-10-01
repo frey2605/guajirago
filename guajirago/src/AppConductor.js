@@ -47,6 +47,7 @@ import { LogoEsquina } from './Logo';
 // Pedirle el GPS al teléfono, con sus tiempos en un solo sitio (G28).
 import { pedirGps, seguirGps } from './pedirGps';
 import { refUbicacionEnVivo, puntoEnVivo } from './ubicacionEnVivo';
+import { leerContactoDelViaje, telefonoDeQuienRecibe } from './contactoDelViaje'; // P21: el teléfono de quien recibe, al ser aceptado
 // El mapa con ruta es UNO para el conductor y el pasajero (G29).
 import MapaConRuta from './MapaConRuta';
 import BotonVolver from './BotonVolver';
@@ -367,7 +368,7 @@ function TarjetaSolicitud({ solicitud, nombre, telefono, placa, vehiculo, tipoVe
           {solicitud.mensajeria?.queEnvia && <p style={{ color: '#1A1A1E', fontWeight: '900', fontSize: '17px', margin: '0 0 8px' }}>📦 Envía: {solicitud.mensajeria.queEnvia}</p>}
           <p style={{ color: '#1A1A1E', fontSize: '15px', margin: '0 0 4px', fontWeight: 'bold' }}>📍 Recoger en: {solicitud.origen}</p>
           <p style={{ color: '#1A1A1E', fontSize: '15px', margin: '0 0 8px', fontWeight: 'bold' }}>🏁 Entregar en: {solicitud.destino}</p>
-          {solicitud.mensajeria?.recibeNombre && <p style={{ color: '#1A1A1E', fontSize: '15px', margin: '0 0 4px', fontWeight: 'bold' }}>🙋 Recibe: {solicitud.mensajeria.recibeNombre}{solicitud.mensajeria?.recibeTel ? ` · 📞 ${solicitud.mensajeria.recibeTel}` : ''}</p>}
+          {solicitud.mensajeria?.recibeNombre && <p style={{ color: '#1A1A1E', fontSize: '15px', margin: '0 0 4px', fontWeight: 'bold' }}>🙋 Recibe: {solicitud.mensajeria.recibeNombre}</p>}
           {solicitud.mensajeria?.nota && <p style={{ color: '#FF7A2F', fontSize: '14px', margin: '0 0 14px', fontWeight: 'bold' }}>📝 {solicitud.mensajeria.nota}</p>}
           {!solicitud.mensajeria?.nota && <div style={{ marginBottom: '14px' }} />}
         </>
@@ -412,6 +413,18 @@ function AppConductor({ nombre, telefono, placa, vehiculo, tipoVehiculo, onCerra
   const [solicitudes, setSolicitudes] = useState([]);
   const [fase, setFase] = useState(null);
   const [viajeActual, setViajeActual] = useState(null);
+  // P21: el teléfono de quien recibe vive en el cajón de contacto del viaje (contactoDelViaje.js), que las reglas solo
+  // le abren al conductor ya ACEPTADO. Se lee cuando el viaje pasa a ser suyo; un viaje de antes de P21 lo lleva dentro.
+  const [contactoViaje, setContactoViaje] = useState({});
+  const viajeActualId = viajeActual?.id;
+  useEffect(() => {
+    setContactoViaje({});
+    if (!viajeActualId) return undefined;
+    let sigue = true;
+    leerContactoDelViaje(db, viajeActualId).then((c) => { if (sigue) setContactoViaje(c); });
+    return () => { sigue = false; };
+  }, [viajeActualId]);
+  const telQuienRecibe = telefonoDeQuienRecibe(viajeActual, contactoViaje);
   const [ubicacion, setUbicacion] = useState(null);
   const [ubicacionPasajero, setUbicacionPasajero] = useState(null);
   const [celebrando, setCelebrando] = useState(false);
@@ -1186,7 +1199,7 @@ const cargarSaldo = useCallback(async (uid) => {
   if (enLlamada) return <Llamada viajeId={viajeActual?.id} miRol="conductor" nombreOtro={viajeActual?.pasajeroNombre || 'Pasajero'} onCerrar={() => { setEnLlamada(false); }} />;
   if (llamadaEntrante) return <Llamada viajeId={viajeActual?.id} miRol="entrante" nombreOtro={viajeActual?.pasajeroNombre || 'Pasajero'} onCerrar={() => { setLlamadaEntrante(false); }} />;
   const llamarQuienRecibe = () => {
-    const tel = viajeActual?.mensajeria?.recibeTel;
+    const tel = telQuienRecibe;
     if (tel) window.location.href = 'tel:' + tel;
   };
   const tarjetaMensajeria = (viajeActual?.tipo === 'Mensajería' && viajeActual?.mensajeria) ? (
@@ -1197,8 +1210,8 @@ const cargarSaldo = useCallback(async (uid) => {
       <p style={{ color: '#1A1A1E', fontSize: '14px', margin: '0 0 3px' }}>🏁 Entregar en: {viajeActual.destino}</p>
       {viajeActual.mensajeria.recibeNombre && <p style={{ color: '#1A1A1E', fontSize: '14px', margin: '0 0 3px' }}>🙋 Recibe: {viajeActual.mensajeria.recibeNombre}</p>}
       {viajeActual.mensajeria.nota && <p style={{ color: '#FF7A2F', fontSize: '13px', margin: '0 0 8px', fontWeight: 'bold' }}>📝 {viajeActual.mensajeria.nota}</p>}
-      {viajeActual.mensajeria.recibeTel && (
-        <button onClick={llamarQuienRecibe} style={{ width: '100%', padding: '12px', background: 'linear-gradient(135deg, #2ECC71, #27AE60)', border: 'none', borderRadius: '12px', color: '#FFFFFF', fontSize: '14px', fontWeight: '900', cursor: 'pointer', marginTop: '4px' }}>📞 Llamar a quien recibe ({viajeActual.mensajeria.recibeTel})</button>
+      {telQuienRecibe && (
+        <button onClick={llamarQuienRecibe} style={{ width: '100%', padding: '12px', background: 'linear-gradient(135deg, #2ECC71, #27AE60)', border: 'none', borderRadius: '12px', color: '#FFFFFF', fontSize: '14px', fontWeight: '900', cursor: 'pointer', marginTop: '4px' }}>📞 Llamar a quien recibe ({telQuienRecibe})</button>
       )}
     </div>
   ) : null;
@@ -1417,8 +1430,8 @@ const cargarSaldo = useCallback(async (uid) => {
                 {viajeActual?.mensajeria?.recibeNombre && (
                   <div style={{ background: '#FFFFFF', borderRadius: '14px', padding: '14px', marginBottom: '18px', border: '1px solid #ECECEF' }}>
                     <p style={{ color: '#1A1A1E', fontSize: '14px', margin: '0 0 8px', fontWeight: 'bold' }}>🙋 Entregar a: {viajeActual.mensajeria.recibeNombre}</p>
-                    {viajeActual.mensajeria.recibeTel && (
-                      <button onClick={() => { window.location.href = 'tel:' + viajeActual.mensajeria.recibeTel; }} style={{ width: '100%', padding: '11px', background: 'linear-gradient(135deg, #2ECC71, #27AE60)', border: 'none', borderRadius: '10px', color: '#FFFFFF', fontSize: '14px', fontWeight: '900', cursor: 'pointer' }}>📞 Llamar a quien recibe ({viajeActual.mensajeria.recibeTel})</button>
+                    {telQuienRecibe && (
+                      <button onClick={() => { window.location.href = 'tel:' + telQuienRecibe; }} style={{ width: '100%', padding: '11px', background: 'linear-gradient(135deg, #2ECC71, #27AE60)', border: 'none', borderRadius: '10px', color: '#FFFFFF', fontSize: '14px', fontWeight: '900', cursor: 'pointer' }}>📞 Llamar a quien recibe ({telQuienRecibe})</button>
                     )}
                   </div>
                 )}

@@ -717,6 +717,40 @@ service cloud.firestore {
         allow delete: if false;
       }
 
+      // ── P21 · EL CAJÓN DE CONTACTO (1-oct-2026) ─────────────────────────────
+      // El viaje del mercado lo leen todos los conductores (P20), y llevaba dentro
+      // datos que el conductor solo necesita DESPUÉS de que lo aceptan: el teléfono
+      // de quien recibe un mandado y el token de avisos del pasajero. Ahora van AQUÍ.
+      // Lo leen: el pasajero del viaje; su conductor, solo cuando ya es suyo y el
+      // viaje está vivo ('aceptado' = ESTADO_ACEPTADO de estadosViaje.js); y el
+      // panel. El servidor (SDK admin) lee el token para «tienes una oferta».
+      // La ruta la arma UNA pieza, `guajirago/src/contactoDelViaje.js` (copia atada
+      // en el panel); lo carea pruebas/contactoDelViaje.test.js.
+      match /contacto/{cual} {
+        function elViajeDelContacto() {
+          return get(/databases/$(database)/documents/viajes/$(viajeId)).data;
+        }
+        function esSuPasajero() {
+          return elViajeDelContacto().get('pasajeroId', '') == request.auth.uid;
+        }
+        allow get: if request.auth != null && cual == 'pasajero' && (
+          esSuPasajero()
+          || (elViajeDelContacto().get('estado', '') == 'aceptado'
+              && elViajeDelContacto().get('conductorId', '') == request.auth.uid)
+          || esAdmin()
+        );
+        allow list: if esAdmin();
+        // Nace UNA vez, al pedir, y solo con el teléfono de quien recibe (o vacío).
+        allow create: if request.auth != null && cual == 'pasajero' && esSuPasajero()
+          && request.resource.data.keys().hasOnly(['recibeTel'])
+          && (!('recibeTel' in request.resource.data) || textoCorto(request.resource.data.recibeTel, 20));
+        // Después, el pasajero solo le pega su token de avisos (Notificaciones.js).
+        allow update: if request.auth != null && cual == 'pasajero' && esSuPasajero()
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['pasajeroFcmToken'])
+          && textoCorto(request.resource.data.pasajeroFcmToken, 4096);
+        allow delete: if false;
+      }
+
       match /contraofertas/{conductorId} {
         // ── REGLA 2 · LA OFERTA LA FIRMA SU CONDUCTOR ────────────────────────
         // Hasta el 23-ago-2026 cualquiera podía escribir una oferta a nombre de
