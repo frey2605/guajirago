@@ -928,3 +928,13 @@ la placa de `conductores/{uid}` (la escribe su GPS con la misma placa que va en 
   Confirmar bloqueado: si el robot mirara antes de que llegue la revisión, el total no saldría. Los 403 de la consola
   salen igual que en los demás. Y `unidades-tour` se quedó una vez en un clic (30 s) dentro de la tanda de
   `probar-cambio`; corrido solo justo después, ✓: es un tropiezo de tiempo del recorrido, no del cambio.
+- **carro-en-vivo, P19 (1-oct-2026):** para ver moverse el carro hace falta un GPS de mentira que se pueda MOVER desde
+  fuera: el de `ruta-conductor` contesta una sola vez. Éste guarda los que lo siguen (`watchPosition`) y
+  `window.__moverGps(lat, lng)` les avisa a todos. Como el mapa del pasajero se vuelve a encuadrar con cada ruta nueva,
+  mirar si el 🚗 bajó o subió no sirve (el encuadre lo deja casi en el mismo sitio): se mueve el taxista 600 m al ESTE y
+  se mide cuántos px queda el 🚗 a la derecha del 📍 (antes 0, después 64). Que la ficha esté cerrada se comprueba por
+  la red como el pasajero y como otra cuenta (restaurante@gg.test): la base contesta «Missing or insufficient
+  permissions». Corrido en pruebas con 2990357 (app) y las reglas de a2c0236: ✓. Los 403 de la consola salen igual.
+  En la tanda de `probar-cambio` de P19, `sin-saldo-confirmar` dijo una vez «la oferta del taxista no apareció en la
+  pantalla del pasajero»; corrido solo justo después, ✓ (esa oferta sale de `contraofertas`, que P19 no tocó): tropiezo
+  de tiempo del recorrido.
