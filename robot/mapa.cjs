@@ -608,7 +608,7 @@ const RECORRIDOS = [
   },
   {
     nombre: 'revision-precio',
-    que: 'un pedido normal sale «revisado» y sin aviso; otro cuya revisión del precio revienta en el servidor queda «sin_revisar» con la plata del teléfono, y aliados dice «⚠️ Precio sin revisar» en su tarjeta y al confirmar (P11; crea dos pedidos en PRUEBAS y los cancela; necesita notificarNuevoPedido, las reglas y aliados publicados en pruebas)',
+    que: 'un pedido normal sale «revisado» y sin aviso; P12: uno con el teléfono «300/1100110» no entra y otro con la promoción «a/b» a $1 sale «revisado» con el precio del menú; y uno lleno casi hasta 1 MiB, que el servidor no puede revisar, se queda con la plata del teléfono y aliados dice «⚠️ Precio sin revisar» en su tarjeta y al confirmar (P11 y P12; crea tres pedidos en PRUEBAS y los cancela; tarda más de 2 minutos; necesita notificarNuevoPedido, las reglas y aliados publicados en pruebas)',
     archivo: 'revision-precio.cjs',
     // La pieza (y su copia atada), la marca del servidor, los 7 caminos de index.js y el confirmar de aliados con el
     // careo los EJECUTA pruebas/revisionPrecio.test.js.

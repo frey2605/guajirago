@@ -880,3 +880,10 @@ la placa de `conductores/{uid}` (la escribe su GPS con la misma placa que va en 
   `total` (la primera corrida se puso roja por eso). En aliados la tarjeta se ubica subiendo desde «👤 <cliente>» hasta
   la caja con «Pedido #», y su botón «✅ Confirmar pedido» se marca con un `data-robot` para tocarlo sin equivocarse
   de tarjeta. Los 403 de la consola salen igual que en los demás recorridos.
+- **revision-precio, desde P12 (30-sep-2026):** el teléfono con «/» ya no sirve para provocar el fallo: las reglas lo
+  rechazan al crear (el teléfono nace en 10 cifras) y el servidor ya no arma rutas con datos del cliente. Lo único que
+  le queda al cliente para que la revisión no pueda escribir es llenar el pedido casi hasta 1 MiB: el robot calcula el
+  relleno con `tamano` del medidor de P12 (`scripts/medir-revision-venenosa.cjs`) y deja 60 bytes libres; si la base lo
+  rechaza por pasarse, suelta 30 más. Ese pedido se queda SIN `revisionServidor` (ni la marca cabe), así que el aviso
+  de aliados sale por la espera de 2 minutos: el recorrido espera a que pase y tarda unos 3 minutos. La promoción
+  inventada «a/b» a $1 sale «revisado» con el precio del menú. Los 403 de la consola siguen saliendo igual.
