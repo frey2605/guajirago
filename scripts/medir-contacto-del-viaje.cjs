@@ -11,6 +11,10 @@
  *   2. LA TARJETA DEL MERCADO (AppConductor.js): si le enseña al conductor el teléfono de quien recibe ANTES de aceptar.
  *   3. QUIÉN LEE cada campo (hoy): los renglones de código de las tres apps y del servidor que lo nombran.
  *   4. `--nube`: cuántos viajes de producción llevan cada campo, y cuántos están en el mercado ahora.
+ *   5. P22 · LAS REGLAS (las de hoy o las de `--commit X`): qué campos sensibles deja escribir en el viaje el `allow
+ *      create` y el `allow update` (fase 1: los tres; fase 2: ninguno).
+ *   6. `--publicado`: en los paquetes publicados (app, panel, aliados y pruebas), si nombran el correo y si arman el
+ *      teléfono de quien recibe dentro de `mensajeria` (o sea, en el viaje).
  *
  *   node scripts/medir-contacto-del-viaje.cjs                  → el código de hoy
  *   node scripts/medir-contacto-del-viaje.cjs --commit 7733a4f → el código de ese commit (el «antes»)
@@ -138,6 +142,47 @@ function veredicto({ publicos, token, tarjeta }) {
   return v;
 }
 
+// ── P22 · LAS REGLAS: ¿dejan ESCRIBIR esos campos en el viaje? ──
+/**
+ * Del `match /viajes/{viajeId}` (sin comentarios y sin las subcolecciones) saca el `allow create` y el `allow update`,
+ * les expande las funciones que llaman (las de ese mismo bloque, hasta el fondo) y dice cuáles de los campos sensibles
+ * NO nombra cada guardia: esos son los que una app (vieja o hecha a mano) puede escribir en el viaje. Mira el TEXTO:
+ * que la guardia de verdad niegue lo carea el emulador (pruebas/contactoDelViaje.test.js).
+ */
+function camposQueLasReglasDejanEscribir(reglas) {
+  const { sinComentarios } = require('./medir-lectura-ajena.cjs');
+  const t = sinComentarios(reglas.replace(/\r\n/g, '\n'));
+  const i = t.indexOf('match /viajes/{viajeId}');
+  if (i < 0) throw new Error('no encuentro match /viajes/{viajeId} en las reglas');
+  const b = t.slice(i, t.indexOf('match /privado/', i));
+  const funciones = {};
+  for (const m of b.matchAll(/function\s+(\w+)\s*\([^)]*\)\s*\{/g)) funciones[m[1]] = objetoDesde(b, m.index);
+  const expandir = (texto, vistos = new Set()) => texto.replace(/\b(\w+)\s*\(/g, (todo, nombre) => {
+    if (!funciones[nombre] || vistos.has(nombre)) return todo;
+    return '(' + expandir(funciones[nombre], new Set([...vistos, nombre])) + ')(';
+  });
+  const guardia = (que) => {
+    const a = b.indexOf('allow ' + que + ':');
+    if (a < 0) throw new Error('no encuentro allow ' + que + ': en el viaje');
+    return expandir(b.slice(a, b.indexOf(';', a)));
+  };
+  const r = {};
+  for (const que of ['create', 'update']) {
+    const g = guardia(que);
+    r[que] = SENSIBLES.filter((k) => !new RegExp('\\b' + k.split('.').pop() + '\\b').test(g));
+  }
+  return r;
+}
+
+/** En el paquete PUBLICADO: veces que nombra el correo, y si arma un `mensajeria:{…recibeTel…}` (el teléfono en el viaje). */
+function contactoEnElPaquete(texto) {
+  return {
+    pasajeroEmail: (texto.match(/pasajeroEmail/g) || []).length,
+    telefonoEnElViaje: /mensajeria:\{[^}]*recibeTel/.test(texto),
+    pasajeroFcmToken: (texto.match(/pasajeroFcmToken/g) || []).length,
+  };
+}
+
 async function main() {
   const i = process.argv.indexOf('--commit');
   const commit = i >= 0 ? process.argv[i + 1] : null;
@@ -158,6 +203,18 @@ async function main() {
       console.log('  hoy · nombran «' + campo + '» (' + q.length + '): ' + (q.join(' · ') || 'nadie'));
     }
   }
+  const reglas = camposQueLasReglasDejanEscribir(leerDe(commit, 'firestore.rules'));
+  console.log('  reglas · el viaje deja escribir al CREARLO: ' + (reglas.create.join(', ') || 'ninguno')
+    + ' · al CAMBIARLO: ' + (reglas.update.join(', ') || 'ninguno'));
+  if (process.argv.includes('--publicado')) {
+    const L = require('./medir-lectura-ajena.cjs');
+    for (const sitio of ['guajirago', 'guajirago-admin', 'guajirago-aliados', 'guajirago-pruebas']) {
+      const p = await L.paquete(sitio); // eslint-disable-line no-await-in-loop
+      const c = contactoEnElPaquete(p.texto);
+      console.log('  publicado · ' + sitio + '.web.app (' + p.nombre.split('/').pop() + '): nombra pasajeroEmail ' + c.pasajeroEmail
+        + ' · arma el teléfono dentro de mensajeria: ' + (c.telefonoEnElViaje ? 'SÍ' : 'no') + ' · nombra pasajeroFcmToken ' + c.pasajeroFcmToken);
+    }
+  }
   if (process.argv.includes('--nube')) {
     const N = require('./nube.cjs');
     const viajes = (await N.traer('viajes')).map(N.doc);
@@ -167,8 +224,11 @@ async function main() {
     if (N.tiposQueNoSupe().length) console.log('  ⚠ tipos de campo que no supe leer: ' + N.tiposQueNoSupe().join(', '));
   }
   const v = veredicto({ publicos, token, tarjeta });
+  for (const que of ['create', 'update']) {
+    if (reglas[que].length) v.push('🟠 las reglas aún dejan ' + (que === 'create' ? 'CREAR' : 'CAMBIAR') + ' un viaje con ' + reglas[que].join(', ') + ' dentro (fase 1)');
+  }
   console.log('\n── VEREDICTO ──\n  ' + (v.length ? v.join('\n  ') : '✓ el viaje del mercado no lleva correo, teléfono de quien recibe ni token del pasajero'));
 }
 
 if (require.main === module) main().catch((e) => { console.error('🔴 ' + e.message); process.exit(1); });
-module.exports = { viajePublicoDeUnMandado, sensiblesEnElViaje, dondeVaElToken, telefonoEnLaTarjetaDelMercado, contarEnLaNube, veredicto, objetoDesde, SENSIBLES };
+module.exports = { viajePublicoDeUnMandado, sensiblesEnElViaje, dondeVaElToken, telefonoEnLaTarjetaDelMercado, contarEnLaNube, veredicto, objetoDesde, SENSIBLES, camposQueLasReglasDejanEscribir, contactoEnElPaquete };

@@ -16,6 +16,9 @@
  *      cajón (hoy) o en el viaje (viajes de antes / apps viejas); el aviso a conductores cercanos y el mensaje de
  *      emergencia salen IDÉNTICOS con el viaje de antes y el de hoy;
  *   5. CAREA en el emulador las reglas de antes (7733a4f) y las de hoy, con el viaje armado por el código de cada uno.
+ *   6. P22 (fase 2): el medidor de las reglas no se ablanda, y el CAREO en el emulador de las reglas de la fase 1
+ *      (dca9179) con las de hoy: la app de hoy pide igual y los viajes guardados se siguen moviendo; escribir el
+ *      correo, el token o el teléfono de quien recibe en el viaje se niega, al crear y al cambiar.
  */
 const { describe, it, before, after } = require('node:test');
 const assert = require('node:assert');
@@ -319,11 +322,77 @@ describe('P21 · el pedido entero, como lo hace la app, con las reglas de hoy', 
     await RUT.assertFails(FS.setDoc(FS.doc(ana, C(ref.id)), { recibeTel: '3001112233', pasajeroEmail: 'a@b.co' }));
     await RUT.assertFails(FS.setDoc(FS.doc(e.authenticatedContext('beto').firestore(), C(ref.id)), { recibeTel: '3001112233' }));
   });
-  it('FASE 1 · una app VIEJA (7733a4f) sigue pidiendo igual con las reglas de hoy: correo y teléfono en el viaje, token en el viaje', async () => {
-    const e = entornos.hoy;
-    await sembrar(e, 'hoy');
-    const db = e.authenticatedContext('ana').firestore();
-    const ref = await RUT.assertSucceeds(FS.addDoc(FS.collection(db, 'viajes'), nuevoDe('antes')));
-    await RUT.assertSucceeds(FS.updateDoc(ref, { pasajeroFcmToken: 'tokAna' }));
+});
+
+// ── 6. P22 · FASE 2: esos campos ya no se escriben en el viaje ──
+const FASE1 = 'dca9179';
+describe('P22 · el medidor de las reglas no se ablanda', () => {
+  it('las reglas de la fase 1 (' + FASE1 + ') dejan escribir los tres al crear y al cambiar; las de hoy, ninguno', () => {
+    const r1 = M.camposQueLasReglasDejanEscribir(execFileSync('git', ['show', FASE1 + ':firestore.rules'], { cwd: RAIZ, encoding: 'utf8' }));
+    assert.deepStrictEqual(r1, { create: M.SENSIBLES, update: M.SENSIBLES });
+    assert.deepStrictEqual(M.camposQueLasReglasDejanEscribir(leer('firestore.rules')), { create: [], update: [] });
   });
+  it('quitarle la guardia al alta o al cambio lo pone a decirlo', () => {
+    const r = leer('firestore.rules').replace(/\r\n/g, '\n'); // las reglas van con CRLF
+    const sinAlta = cambiar(r, "&& !request.resource.data.keys().hasAny(['conductorId'])\n        && contactoFueraDelViajeNuevo();", "&& !request.resource.data.keys().hasAny(['conductorId']);");
+    assert.deepStrictEqual(M.camposQueLasReglasDejanEscribir(sinAlta).create, M.SENSIBLES);
+    const sinCambio = cambiar(r, '&& tarjetaIntacta()\n        && contactoNoEntraAlViaje();', '&& tarjetaIntacta();');
+    assert.deepStrictEqual(M.camposQueLasReglasDejanEscribir(sinCambio).update, M.SENSIBLES);
+  });
+  it('el paquete: cuenta el correo y ve el teléfono armado dentro de mensajeria', () => {
+    assert.deepStrictEqual(M.contactoEnElPaquete('x={pasajeroEmail:r.email,mensajeria:{queEnvia:g,recibeTel:b}}'), { pasajeroEmail: 1, telefonoEnElViaje: true, pasajeroFcmToken: 0 });
+    assert.deepStrictEqual(M.contactoEnElPaquete('x={mensajeria:{queEnvia:g,nota:w}};kx(h,{recibeTel:e})'), { pasajeroEmail: 0, telefonoEnElViaje: false, pasajeroFcmToken: 0 });
+  });
+});
+
+/** Un viaje GUARDADO de antes de P21: lleva el correo y (es un mandado) el teléfono de quien recibe dentro. */
+const VIAJE_DE_ANTES = { ...MANDADO.antes, estado: 'aceptado', conductorId: 'taxi' };
+async function sembrarFase2(entorno) {
+  await sembrar(entorno, 'hoy');
+  await entorno.withSecurityRulesDisabled(async (ctx) => {
+    await FS.setDoc(FS.doc(ctx.firestore(), 'viajes/deAntes'), VIAJE_DE_ANTES);
+    // 79 de los 92 viajes de producción no llevan `mensajeria` (taxis de antes): la guardia no puede tropezar con eso.
+    const { mensajeria, ...taxi } = VIAJE_DE_ANTES; // eslint-disable-line no-unused-vars
+    await FS.setDoc(FS.doc(ctx.firestore(), 'viajes/taxiDeAntes'), { ...taxi, tipo: 'Taxi' });
+  });
+}
+const V = (db, id) => FS.doc(db, 'viajes/' + id);
+const nuevoHoy = () => ({ ...MANDADO.hoy, fechaSolicitud: new Date().toISOString() });
+/** [quién, qué hace, (db) => promesa, ¿pasa hoy?] — con las reglas de la fase 1 (dca9179) TODAS pasan. */
+const FASE2 = [
+  ['ana', 'la app de hoy crea un mandado', (db) => FS.addDoc(FS.collection(db, 'viajes'), nuevoHoy()), true],
+  ['ana', 'la app de hoy crea un taxi', (db) => FS.addDoc(FS.collection(db, 'viajes'), { ...nuevoHoy(), tipo: 'Taxi' }), true],
+  ['ana', 'la pasajera amplía el radio de su mandado', (db) => FS.updateDoc(V(db, 'enEspera'), { radioBusqueda: 7 }), true],
+  ['taxi', 'el conductor llega al punto de un viaje GUARDADO con correo y teléfono dentro', (db) => FS.updateDoc(V(db, 'deAntes'), { conductorEnPunto: true, fase: 'en_punto' }), true],
+  ['taxi', 'el conductor finaliza ese viaje guardado', (db) => FS.updateDoc(V(db, 'deAntes'), { estado: 'finalizado', fase: 'finalizado' }), true],
+  ['taxi', 'el conductor finaliza un taxi guardado SIN mensajeria', (db) => FS.updateDoc(V(db, 'taxiDeAntes'), { estado: 'finalizado', fase: 'finalizado' }), true],
+  ['ana', 'la pasajera califica ese taxi guardado', (db) => FS.updateDoc(V(db, 'taxiDeAntes'), { calificadoPorPasajero: true, estrellas_pasajero: 5 }), true],
+  ['ana', 'la pasajera cancela un viaje guardado (reenvía el viaje entero, igual)', (db) => FS.setDoc(V(db, 'deAntes'), { ...VIAJE_DE_ANTES, estado: 'cancelado' }), true],
+  ['ana', 'la pasajera le quita el correo a su viaje guardado', (db) => FS.updateDoc(V(db, 'deAntes'), { pasajeroEmail: FS.deleteField() }), true],
+  ['ana', 'NIEGA · una app VIEJA (7733a4f) crea el mandado con correo y teléfono dentro', (db) => FS.addDoc(FS.collection(db, 'viajes'), { ...MANDADO.antes, fechaSolicitud: new Date().toISOString() }), false],
+  ['ana', 'NIEGA · crear con el correo', (db) => FS.addDoc(FS.collection(db, 'viajes'), { ...nuevoHoy(), pasajeroEmail: 'ana@correo.co' }), false],
+  ['ana', 'NIEGA · crear con el token', (db) => FS.addDoc(FS.collection(db, 'viajes'), { ...nuevoHoy(), pasajeroFcmToken: 'tokAna' }), false],
+  ['ana', 'NIEGA · crear con el teléfono de quien recibe', (db) => FS.addDoc(FS.collection(db, 'viajes'), { ...nuevoHoy(), mensajeria: { ...MANDADO.hoy.mensajeria, recibeTel: '3001112233' } }), false],
+  ['ana', 'NIEGA · pegar el token en el viaje (lo que hacía la app vieja)', (db) => FS.updateDoc(V(db, 'enEspera'), { pasajeroFcmToken: 'tokAna' }), false],
+  ['ana', 'NIEGA · ponerle el correo al viaje', (db) => FS.updateDoc(V(db, 'enEspera'), { pasajeroEmail: 'ana@correo.co' }), false],
+  ['ana', 'NIEGA · ponerle el teléfono dentro de mensajeria', (db) => FS.updateDoc(V(db, 'enEspera'), { 'mensajeria.recibeTel': '3001112233' }), false],
+  ['ana', 'NIEGA · reescribir mensajeria entera con el teléfono', (db) => FS.updateDoc(V(db, 'enEspera'), { mensajeria: { ...MANDADO.hoy.mensajeria, recibeTel: '3001112233' } }), false],
+  ['ana', 'NIEGA · cambiar el teléfono de un viaje guardado', (db) => FS.updateDoc(V(db, 'deAntes'), { 'mensajeria.recibeTel': '3000000000' }), false],
+  ['ana', 'NIEGA · cambiar el correo de un viaje guardado', (db) => FS.updateDoc(V(db, 'deAntes'), { pasajeroEmail: 'otro@correo.co' }), false],
+  ['eladmin', 'NIEGA · el panel le pone el token a un viaje', (db) => FS.updateDoc(V(db, 'enEspera'), { pasajeroFcmToken: 'x' }), false],
+];
+describe('P22 · CAREO de las reglas del viaje: fase 1 (' + FASE1 + ') contra hoy, en el emulador', () => {
+  before(async () => {
+    entornos.fase1 = await RUT.initializeTestEnvironment({ projectId: 'demo-p22-fase1', firestore: { rules: execFileSync('git', ['show', FASE1 + ':firestore.rules'], { cwd: RAIZ, encoding: 'utf8' }), host: '127.0.0.1', port: require('./cargar.cjs').elEmulador().firestore } });
+  });
+  for (const [quien, que, hacer, hoy] of FASE2) {
+    it(quien + ' · ' + que + ' → fase 1 pasa, hoy ' + (hoy ? 'pasa' : 'no'), async () => {
+      for (const [cual, esperado] of [['fase1', true], ['hoy', hoy]]) {
+        const e = entornos[cual];
+        await sembrarFase2(e);
+        const promesa = hacer(e.authenticatedContext(quien).firestore());
+        if (esperado) await RUT.assertSucceeds(promesa); else await RUT.assertFails(promesa);
+      }
+    });
+  }
 });

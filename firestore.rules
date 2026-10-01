@@ -515,9 +515,41 @@ service cloud.firestore {
           || (request.resource.data.get('conductorId', null) == null && esMio());
       }
 
+      // ── P22 · LO DEL CAJÓN DE CONTACTO NO SE ESCRIBE EN EL VIAJE (1-oct-2026) ──
+      // Fase 2 de P21. El correo del pasajero (`pasajeroEmail`), su token de avisos
+      // (`pasajeroFcmToken`) y el teléfono de quien recibe un mandado
+      // (`mensajeria.recibeTel`) ya no van en el viaje, que lo lee todo el mercado:
+      // el token y el teléfono viven en `contacto/pasajero` (abajo) y el correo no
+      // se guarda. En la fase 1 estas reglas aún dejaban a una app vieja ponerlos
+      // aquí; ahora no, ni al crear ni al cambiar. MEDIDO: los paquetes publicados
+      // (app, panel y aliados) no los escriben en el viaje; el servidor (SDK admin)
+      // no pasa por aquí. Quitarlos sí se puede; ponerlos o cambiarlos, no. Los 92
+      // viajes guardados que ya llevan el correo (y 12 mandados el teléfono) se
+      // siguen pudiendo mover: lo que se compara es si CAMBIA, no si está.
+      // Lo carea pruebas/contactoDelViaje.test.js; lo mide scripts/medir-contacto-del-viaje.cjs.
+      function sinTelefonoDeQuienRecibe(d) {
+        return !(d.get('mensajeria', null) is map) || !('recibeTel' in d.mensajeria);
+      }
+      function contactoFueraDelViajeNuevo() {
+        return !request.resource.data.keys().hasAny(['pasajeroEmail', 'pasajeroFcmToken'])
+          && sinTelefonoDeQuienRecibe(request.resource.data);
+      }
+      function contactoSeQuedaOSeVa(campo) {
+        return !request.resource.data.diff(resource.data).affectedKeys().hasAny([campo])
+          || !(campo in request.resource.data);
+      }
+      function contactoNoEntraAlViaje() {
+        return contactoSeQuedaOSeVa('pasajeroEmail')
+          && contactoSeQuedaOSeVa('pasajeroFcmToken')
+          && (sinTelefonoDeQuienRecibe(request.resource.data)
+              || (!sinTelefonoDeQuienRecibe(resource.data)
+                  && request.resource.data.mensajeria.recibeTel == resource.data.mensajeria.recibeTel));
+      }
+
       allow create: if request.auth != null
         && request.resource.data.get('pasajeroId', '') == request.auth.uid
-        && !request.resource.data.keys().hasAny(['conductorId']);
+        && !request.resource.data.keys().hasAny(['conductorId'])
+        && contactoFueraDelViajeNuevo();
 
       // El `esAdmin()` va DONDE ESTABA, dentro del `&&`, y no delante con un `||`.
       // Sacarlo delante —como se hizo en el primer intento— le quitaba al panel el
@@ -658,7 +690,8 @@ service cloud.firestore {
         && request.resource.data.get('pasajeroId', '') == resource.data.get('pasajeroId', '')
         && request.resource.data.get('descuentoInfo', null) == resource.data.get('descuentoInfo', null)
         && conductorIntacto()
-        && tarjetaIntacta();
+        && tarjetaIntacta()
+        && contactoNoEntraAlViaje();
 
       allow delete: if false;
       // ── REGLAS 5 y 11 · EL CAJON PRIVADO DEL VIAJE ─────────────────────────
