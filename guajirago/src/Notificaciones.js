@@ -14,8 +14,16 @@ export const permisoDeAvisos = () => (typeof Notification === 'undefined' ? 'no-
 
 // La ventanita que se le enseña al conductor cuando NO le van a sonar los viajes (27-sep-2026). Antes la app
 // se callaba y solo pintaba «FCM: permiso=denied». Con permiso, no sale nada.
-export const avisoDeAvisos = (permiso) => {
+// P23 (1-oct-2026): la MISMA ventanita le sale al pasajero cuando pide un viaje sin dar permiso (`quien` = 'pasajero'):
+// sin permiso no le llegan «tienes una oferta» ni «¡tu conductor llegó!» con la app cerrada, y hasta hoy nadie se lo decía.
+export const avisoDeAvisos = (permiso, quien = 'conductor') => {
   if (permiso === 'granted') return null;
+  if (quien === 'pasajero') {
+    const titulo = 'Así no te van a llegar las ofertas';
+    if (permiso === 'denied') return { icono: '🔕', titulo, texto: 'Bloqueaste los avisos de GuajiraGo en este celular. Para enterarte de las ofertas de los conductores y de cuándo llega tu conductor aunque cierres la app, actívalos en los ajustes del navegador: el candado junto a la dirección → Notificaciones → Permitir.' };
+    if (permiso === 'default') return { icono: '🔔', titulo, texto: 'Todavía no le diste permiso a GuajiraGo para avisarte. La próxima vez que el celular te pregunte, toca «Permitir» para enterarte de las ofertas y de cuándo llega tu conductor aunque cierres la app.' };
+    return { icono: '📵', titulo, texto: 'Este navegador no puede avisarte con la app cerrada. Mientras esperas, deja GuajiraGo abierta en la pantalla para ver las ofertas de los conductores.' };
+  }
   const titulo = 'Así no te van a sonar los viajes';
   if (permiso === 'denied') return { icono: '🔕', titulo, texto: 'Bloqueaste los avisos de GuajiraGo en este celular. Para que te suenen los viajes nuevos aunque la app esté cerrada, actívalos en los ajustes del navegador: el candado junto a la dirección → Notificaciones → Permitir.' };
   if (permiso === 'default') return { icono: '🔔', titulo, texto: 'Todavía no le diste permiso a GuajiraGo para avisarte. Cuando el celular te pregunte, toca «Permitir» para que te suenen los viajes nuevos aunque la app esté cerrada.' };
@@ -73,8 +81,8 @@ export const obtenerTokenFCM = async () => {
 // la reserva no nacían mientras el cliente no tocara «Permitir» o «Bloquear», y cada pantalla lo pegaba a su manera.
 // Sin permiso no se escribe nada; si la escritura falla, queda rastro en la consola y el documento sigue bueno (solo se
 // queda sin avisos, como sin permiso). El campo lo nombra quien llama porque cada colección lo lee una función distinta
-// del servidor: pasajeroFcmToken (notificarPasajeroOferta) y clienteFcmToken (notificarClienteDelPedido y
-// notificarClienteReserva). Devuelve una promesa con true si quedó pegado.
+// del servidor: fcmToken en la ficha del pasajero (P23: usuarios/{uid}, lo lee functions/tokenDelPasajero.cjs) y
+// clienteFcmToken (notificarClienteDelPedido y notificarClienteReserva). Devuelve una promesa con true si quedó pegado.
 export const prepararTokenDeAvisos = (campo) => {
   const token = obtenerTokenFCM();
   return (ref) => token

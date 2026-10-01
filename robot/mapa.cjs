@@ -136,6 +136,14 @@ const RECORRIDOS = [
     vigila: ['guajirago/src/ModalCancelacion.js', 'guajirago/src/Solicitar.js', 'guajirago/src/textosViaje.js'],
   },
   {
+    nombre: 'aviso-ofertas',
+    que: 'el pasajero pide un taxi sin permiso de avisos y le sale «Así no te van a llegar las ofertas»; la cierra y sigue esperando (P23)',
+    archivo: 'aviso-ofertas.cjs',
+    // El caso CON permiso (el token en la ficha y el aviso que llega) no lo puede probar el robot: lo ejecuta
+    // pruebas/tokenDelPasajero.test.js.
+    vigila: ['guajirago/src/Solicitar.js', 'guajirago/src/Notificaciones.js'],
+  },
+  {
     nombre: 'salir-por-el-menu',
     que: 'el conductor disponible sale por «☰ Menú → Cerrar sesión» y su ficha queda APAGADA (mira la base de pruebas) (G07)',
     archivo: 'salir-por-el-menu.cjs',

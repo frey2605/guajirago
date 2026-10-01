@@ -105,6 +105,14 @@ function campoQueLeeElServidor(inicio) {
   const resto = INDEX.slice(i + inicio.length);
   const fin = resto.search(/\nexports\.|\nasync function |\nfunction /);
   const trozo = fin >= 0 ? resto.slice(0, fin) : resto;
+  // P23: el aviso al pasajero le pregunta a tokenDelPasajero.cjs; el campo que cuenta es el de la ficha, el PRIMERO
+  // que mira la pieza (el cajón y el viaje quedan solo para los viajes de antes).
+  if (/\btokenDelPasajero\(/.test(trozo)) {
+    const pieza = soloCodigo(leer('guajirago/functions/tokenDelPasajero.cjs'));
+    const primero = pieza.match(/return\s+sirve\(\s*ficha\s*&&\s*ficha\.(\w+)\s*\)/);
+    assert.ok(primero, 'tokenDelPasajero.cjs ya no mira primero la ficha');
+    return primero[1];
+  }
   const campos = [...new Set([...trozo.matchAll(/\.(\w+FcmToken)\b/g)].map((m) => m[1]))];
   assert.strictEqual(campos.length, 1, inicio + ' lee ' + campos.length + ' campos de token: ' + campos.join(', '));
   return campos[0];
@@ -147,14 +155,14 @@ function quejasDeLaPantalla(texto, col, campo) {
   const variable = (antes.match(/const\s+(\w+)\s*=\s*await\s*$/) || [])[1];
   if (!variable) { quejas.push('no sé cómo se llama el documento creado'); return quejas; }
   const pegados = [...t.matchAll(new RegExp('\\b' + pegar + '\\(\\s*(\\w+)\\s*\\)', 'g'))];
-  // P21: el viaje lo lee todo el mercado, así que su token va al cajón de contacto DE ESE VIAJE
-  // (`const x = refContactoDelViaje(db, <el creado>.id)`, contactoDelViaje.js); el servidor lo lee de ahí.
-  const cajon = col === 'viajes'
-    ? (t.slice(alta).match(new RegExp('const\\s+(\\w+)\\s*=\\s*refContactoDelViaje\\(\\s*db\\s*,\\s*' + variable + '\\.id\\s*\\)')) || [])[1]
-    : undefined;
+  // P21 lo llevó del viaje (lo lee todo el mercado) al cajón de contacto; P23 (1-oct-2026) lo lleva a la FICHA del
+  // pasajero (`const x = doc(db, 'usuarios', user.uid)`), la única fuente, que lee tokenDelPasajero.cjs.
+  const destino = col === 'viajes'
+    ? (t.slice(alta).match(/const\s+(\w+)\s*=\s*doc\(\s*db\s*,\s*'usuarios'\s*,\s*user\.uid\s*\)/) || [])[1]
+    : variable;
   if (pegados.length !== 1) quejas.push('pega el token ' + pegados.length + ' veces (tiene que ser 1)');
   else {
-    if (pegados[0][1] !== variable && pegados[0][1] !== cajon) quejas.push('pega el token en «' + pegados[0][1] + '», no en el documento creado («' + variable + '»)');
+    if (pegados[0][1] !== destino) quejas.push('pega el token en «' + pegados[0][1] + '», no en ' + (col === 'viajes' ? 'la ficha del pasajero' : 'el documento creado («' + variable + '»)'));
     if (pegados[0].index < fin) quejas.push('pega el token antes de que exista el documento');
     if (/await\s*$/.test(t.slice(0, pegados[0].index))) quejas.push('espera a que se pegue el token');
   }

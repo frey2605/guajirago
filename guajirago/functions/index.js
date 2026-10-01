@@ -67,6 +67,8 @@ const { loRevisaElServidor, ponerElPrecioDelServidor, marcarSinRevisar, comoVaLa
 const { tarjetaDelConductor } = require('./conductorDeLaFicha.cjs');
 // P17: el total de la reserva de turismo lo pone el servidor con el precio del tour (precioReserva.cjs).
 const { reservaConElPrecioDelServidor } = require('./precioReserva.cjs');
+// P23: «¿a qué token le aviso a este pasajero?» sale de UNA pieza: su ficha (usuarios/{uid}), y los viajes de antes.
+const { tokenDelPasajero } = require('./tokenDelPasajero.cjs');
 
 // Distancia en km entre dos coordenadas (Haversine)
 function distanciaKm(lat1, lng1, lat2, lng2) {
@@ -439,12 +441,10 @@ exports.notificarPasajeroOferta = onDocumentCreated("viajes/{viajeId}/contraofer
   const of = event.data && event.data.data();
   if (!of) return null;
   try {
-    const viajeRef = admin.firestore().collection("viajes").doc(event.params.viajeId);
-    // P21: el token vive en el cajón de contacto del viaje (guajirago/src/contactoDelViaje.js; la ruta la ata
-    // pruebas/contactoDelViaje.test.js), fuera del mercado. Los viajes de antes y los de una app vieja lo llevan dentro.
-    const [viajeSnap, contactoSnap] = await Promise.all([viajeRef.get(), viajeRef.collection("contacto").doc("pasajero").get()]);
+    const viajeSnap = await admin.firestore().collection("viajes").doc(event.params.viajeId).get();
     if (!viajeSnap.exists) return null;
-    const token = (contactoSnap.exists && contactoSnap.data().pasajeroFcmToken) || viajeSnap.data().pasajeroFcmToken;
+    // P23: el token lo dice tokenDelPasajero.cjs (la ficha del pasajero; los viajes de antes, su cajón o el viaje).
+    const token = await tokenDelPasajero(admin.firestore(), event.params.viajeId, viajeSnap.data());
     if (!token) return null;
     const cuerpo = (of.conductorNombre || "Un conductor") +
       (of.tipoOferta === "acepta" ? " aceptó tu oferta" : " te ofrece " + (of.monto || ""));

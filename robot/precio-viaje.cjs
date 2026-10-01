@@ -6,7 +6,7 @@
 // decir el mismo número que `tarifaValor`. Antes de G13 ese teléfono guardaba «$10,000».
 // Al final cancela el viaje por la pantalla («Otro motivo»), así que no le llega a nadie como viaje vivo.
 //   node robot/precio-viaje.cjs
-const { abrir, claveDePruebas, entrarALaBase } = require('./comun.cjs');
+const { abrir, cerrarAvisoDeOfertas, claveDePruebas, entrarALaBase } = require('./comun.cjs');
 const { formaDe, numeroDel } = require('../scripts/medir-tarifa-texto.cjs');
 
 const CORREO = 'pasajero@gg.test';
@@ -63,6 +63,7 @@ const antesDeCargar = '(' + ((lat, lng) => {
     await r.captura('formulario');
     await p.getByRole('button', { name: /^Solicitar Taxi/ }).click();
     await p.waitForTimeout(6000);
+    await cerrarAvisoDeOfertas(p); // P23: sin permiso de avisos sale la ventanita de las ofertas y tapa la pantalla
     await r.captura('esperando');
 
     const base = await entrarALaBase(CORREO);

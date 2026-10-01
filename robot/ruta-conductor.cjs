@@ -16,7 +16,7 @@
 // Deja en pruebas UN viaje `cancelado_conductor` y
 // los créditos del taxista de prueba quedan como estaban (saldoDePrueba de comun.cjs le da saldo para ofertar y al final le devuelve el suyo, P04).
 //   node robot/ruta-conductor.cjs
-const { abrir, claveDePruebas, entrarALaBase, saldoDePrueba } = require('./comun.cjs');
+const { abrir, cerrarAvisoDeOfertas, claveDePruebas, entrarALaBase, saldoDePrueba } = require('./comun.cjs');
 
 const CARRO = { lat: 11.5444, lng: -72.9072 };
 const RECOGIDA = { lat: 11.5324, lng: -72.9072 };
@@ -126,6 +126,7 @@ function juzgar(quien, h, fallos) {
     await p.waitForTimeout(1500);
     await p.getByRole('button', { name: /^Solicitar Taxi/ }).click();
     await p.waitForTimeout(6000);
+    await cerrarAvisoDeOfertas(p); // P23: sin permiso de avisos sale la ventanita de las ofertas y tapa la pantalla
     const ids = [...vistos];
     if (ids.length !== 1) throw new Error('esperaba que la app del pasajero escribiera en UN viaje y nombró ' + ids.length);
     idViaje = ids[0];

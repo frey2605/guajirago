@@ -14,7 +14,7 @@
 //   6. se termina el viaje (cancelado por el repartidor) y el repartidor ya NO lee el cajón; el pasajero sí.
 // Deja en pruebas UN viaje `cancelado_conductor`; los créditos y la ficha del repartidor quedan como estaban.
 //   node robot/contacto-del-viaje.cjs
-const { abrir, claveDePruebas, entrarALaBase, saldoDePrueba } = require('./comun.cjs');
+const { abrir, cerrarAvisoDeOfertas, claveDePruebas, entrarALaBase, saldoDePrueba } = require('./comun.cjs');
 
 const MOTO = { lat: 11.5444, lng: -72.9072 };
 const RECOGIDA = { lat: 11.5324, lng: -72.9072 };
@@ -115,6 +115,7 @@ async function entrarConPaciencia(correo) {
     await rp.captura('pasajero-llena-el-mandado');
     await p.getByRole('button', { name: /^Pedir mandado/ }).click();
     await p.waitForTimeout(6000);
+    await cerrarAvisoDeOfertas(p); // P23: sin permiso de avisos sale la ventanita de las ofertas y tapa la pantalla
     const ids = [...vistos];
     if (ids.length !== 1) throw new Error('esperaba que la app del pasajero escribiera en UN viaje y nombró ' + ids.length + ': ' + ids.join(', '));
     idViaje = ids[0];

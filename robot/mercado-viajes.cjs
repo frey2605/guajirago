@@ -11,7 +11,7 @@
 //      el restaurante de prueba reciben «permiso denegado».
 // Al final: el pasajero cancela su viaje y la ficha del taxista queda como estaba. Deja en pruebas UN viaje `cancelado`.
 //   node robot/mercado-viajes.cjs
-const { abrir, claveDePruebas, entrarALaBase } = require('./comun.cjs');
+const { abrir, cerrarAvisoDeOfertas, claveDePruebas, entrarALaBase } = require('./comun.cjs');
 
 const LAT = 11.5444;
 const LNG = -72.9072;
@@ -104,6 +104,7 @@ async function negado(quien, ruta) {
     await p.waitForTimeout(1500);
     await p.getByRole('button', { name: /^Solicitar Taxi/ }).click();
     await p.waitForTimeout(6000);
+    await cerrarAvisoDeOfertas(p); // P23: sin permiso de avisos sale la ventanita de las ofertas y tapa la pantalla
     const ids = [...vistos];
     if (ids.length !== 1) throw new Error('esperaba que la app del pasajero escribiera en UN viaje y nombró ' + ids.length);
     idViaje = ids[0];

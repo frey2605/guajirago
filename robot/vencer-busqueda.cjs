@@ -8,7 +8,7 @@
 //     `fechaExpiracion` y `motivoExpiracion`. Eso prueba también que las reglas de Firestore dejan escribirlo.
 // Deja en pruebas UN viaje por corrida, ya `vencido` (no le llega a nadie como viaje vivo).
 //   node robot/vencer-busqueda.cjs
-const { abrir, claveDePruebas, entrarALaBase } = require('./comun.cjs');
+const { abrir, cerrarAvisoDeOfertas, claveDePruebas, entrarALaBase } = require('./comun.cjs');
 const { cargarDeLaApp } = require('../pruebas/cargar.cjs');
 
 const CORREO = 'pasajero@gg.test';
@@ -56,6 +56,7 @@ const antesDeCargar = '(' + ((lat, lng) => {
     await p.waitForTimeout(1500);
     await p.getByRole('button', { name: /^Solicitar Taxi/ }).click();
     await p.waitForTimeout(4000);
+    await cerrarAvisoDeOfertas(p); // P23: sin permiso de avisos sale la ventanita de las ofertas y tapa la pantalla
     await r.captura('buscando');
     const t0 = await r.texto();
     if (!/Buscando conductor/.test(t0)) throw new Error('no llegué a «Buscando conductor»: ' + t0.slice(0, 200));

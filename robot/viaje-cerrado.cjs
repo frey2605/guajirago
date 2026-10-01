@@ -12,7 +12,7 @@
 // Lo que NO puede probar: el lado del CONDUCTOR, que pide un viaje confirmado por `confirmarConductor`; ese lo EJECUTA
 // pruebas/viajeCerrado.test.js.
 //   node robot/viaje-cerrado.cjs
-const { abrir, claveDePruebas, entrarALaBase } = require('./comun.cjs');
+const { abrir, cerrarAvisoDeOfertas, claveDePruebas, entrarALaBase } = require('./comun.cjs');
 
 const CORREO = 'pasajero@gg.test';
 const LAT = 11.5444;
@@ -60,6 +60,7 @@ const antesDeCargar = '(' + ((lat, lng) => {
     await p.waitForTimeout(1500);
     await p.getByRole('button', { name: /^Solicitar Taxi/ }).click();
     await p.waitForTimeout(6000);
+    await cerrarAvisoDeOfertas(p); // P23: sin permiso de avisos sale la ventanita de las ofertas y tapa la pantalla
     await r.captura('esperando');
     const ids = [...vistos];
     console.log('VIAJES QUE LA APP NOMBRÓ AL ESCRIBIR:', ids.join(', ') || '(ninguno)');

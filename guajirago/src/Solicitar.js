@@ -9,7 +9,7 @@ import Llamada from './Llamada';
 import TratoHecho from './TratoHecho'; // G74: la ventanita «¡Trato hecho!», la misma para pasajero y conductor
 import { useLlamadaEntrante } from './llamadaEntrante';
 import { useChatDelViaje } from './chatDelViaje'; // G96: escuchar y enviar el chat del viaje, la misma pieza que el conductor
-import { prepararTokenDeAvisos } from './Notificaciones';
+import { prepararTokenDeAvisos, avisoDeAvisos, permisoDeAvisos } from './Notificaciones';
 import { sonarAlerta, desbloquearAudio } from './alerta';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { calcularTarifaMinima } from './tarifas';
@@ -19,7 +19,7 @@ import { valorDelBeneficio } from './reglaPromocion';
 import { aplicarDescuento, armarDescuentoInfo, tarifaParaPasajero } from './descuentos';
 import { generarCodigoSeguridad, guardarCodigoDeViaje, cargarCodigoDeViaje } from './codigoSeguridad';
 import { armarViajeNuevo } from './viajeNuevo';
-import { guardarContactoDelViaje, refContactoDelViaje } from './contactoDelViaje'; // P21: correo/teléfono/token fuera del mercado
+import { guardarContactoDelViaje } from './contactoDelViaje'; // P21: correo y teléfono fuera del mercado (P23: el token va a la ficha)
 import { ESTADOS_QUE_CIERRA_EL_SERVIDOR, avisoDelCierre, huellaDelViaje } from './estadosViaje';
 // Los datos que comparten las pantallas salen de archivos únicos (SEGUNDA LEY).
 import { centroRiohacha } from './riohacha';
@@ -1105,7 +1105,7 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
 
       const user = auth.currentUser;
       // G34: el cartel de permiso de avisos sale YA, con el toque fresco; el token se pega al viaje cuando exista.
-      const pegarToken = prepararTokenDeAvisos('pasajeroFcmToken');
+      const pegarToken = prepararTokenDeAvisos('fcmToken');
       // Traer el nombre del pasajero guardado en su registro
       let nombrePasajero = '';
       // REGLAS 5 y 11 — el código de seguridad era el DÍA y el MES de nacimiento de
@@ -1135,14 +1135,19 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
       }));
       // P21: el cajón de contacto (contactoDelViaje.js) lo leen solo ella, su conductor ya aceptado y el panel.
       guardarContactoDelViaje(db, docRef.id, celularDiezCifras(recibeTel));
-      const contactoRef = refContactoDelViaje(db, docRef.id);
       setViajeId(docRef.id);
       // El código, al cajón privado del viaje: ahí solo lo ve ella.
       setCodigoSeguridad(codigoSeguridad);
       guardarCodigoDeViaje(docRef.id, codigoSeguridad);
       // Token del pasajero SIN bloquear la creación del viaje (el permiso de notificación puede tardar).
-      // P21: en el cajón de contacto, no en el viaje (lo lee notificarPasajeroOferta con el SDK admin).
-      pegarToken(contactoRef);
+      // P23: en SU FICHA (usuarios/{uid}), la única fuente: la leen «tienes una oferta» y «¡tu conductor llegó!» con el
+      // SDK admin (functions/tokenDelPasajero.cjs). Si no da permiso, se le dice en la ventanita de los avisos, sin
+      // tapar otra que ya esté abierta.
+      const fichaRef = doc(db, 'usuarios', user.uid);
+      pegarToken(fichaRef).then((pegado) => {
+        const sinAvisos = pegado ? null : avisoDeAvisos(permisoDeAvisos(), 'pasajero');
+        if (sinAvisos) setAviso((abierto) => abierto || sinAvisos);
+      });
       setContraofertas([]);
       contaofertasIdsRef.current.clear();
       setBuscandoAgotado(false);

@@ -7,7 +7,7 @@
 // vuelva al inicio y que el viaje quede cancelado en la base de pruebas con ese motivo.
 // Deja en pruebas UN viaje, ya cancelado (no le llega a nadie como viaje vivo).
 //   node robot/cancelar-viaje.cjs
-const { abrir, claveDePruebas, entrarALaBase } = require('./comun.cjs');
+const { abrir, cerrarAvisoDeOfertas, claveDePruebas, entrarALaBase } = require('./comun.cjs');
 const { contraste, CONTRASTE_MINIMO } = require('../scripts/medir-cancelacion-g06.cjs');
 
 const CORREO = 'pasajero@gg.test';
@@ -58,6 +58,7 @@ const aRgb = (s) => { const m = /rgba?\(([^)]+)\)/.exec(s); if (!m) return s; co
     await r.captura('formulario');
     await p.getByRole('button', { name: /^Solicitar Taxi/ }).click();
     await p.waitForTimeout(6000);
+    await cerrarAvisoDeOfertas(p); // P23: sin permiso de avisos sale la ventanita de las ofertas y tapa la pantalla
     await r.captura('esperando');
     const cancelar = p.getByRole('button', { name: 'Cancelar viaje', exact: true });
     if (!(await cancelar.count())) throw new Error('no llegué a la pantalla de espera: ' + (await r.texto()).slice(0, 200));

@@ -67,7 +67,7 @@ describe('P21 · el medidor del contacto del viaje no se ablanda', () => {
     assert.match(medir({ ...HOY, viajeNuevo: v }).join('\n'), /pasajeroEmail/);
   });
   it('volver a pegar el token en el viaje lo pone rojo', () => {
-    const s = cambiar(HOY.solicitar, 'pegarToken(contactoRef);', 'pegarToken(docRef);');
+    const s = cambiar(HOY.solicitar, 'pegarToken(fichaRef)', 'pegarToken(docRef)');
     assert.match(medir({ ...HOY, solicitar: s }).join('\n'), /token de avisos/);
   });
   it('volver a enseñar el teléfono en la tarjeta del mercado lo pone rojo', () => {
@@ -137,7 +137,8 @@ describe('P21 · todos usan la pieza', () => {
     const alta = sol.indexOf("const docRef = await addDoc(collection(db, 'viajes')");
     const guarda = sol.indexOf('guardarContactoDelViaje(db, docRef.id, celularDiezCifras(recibeTel));');
     assert.ok(alta > 0 && guarda > alta, 'no guarda el cajón después de crear el viaje');
-    assert.ok(/const contactoRef = refContactoDelViaje\(db, docRef\.id\);/.test(sol), 'el token no va al cajón del viaje creado');
+    // P23: el token del pasajero ya no va al cajón sino a SU ficha (lo vigila pruebas/tokenDelPasajero.test.js).
+    assert.ok(/const fichaRef = doc\(db, 'usuarios', user\.uid\);/.test(sol), 'el token no va a la ficha del pasajero');
   });
   it('nadie lee el teléfono de quien recibe del viaje a pelo: conductor y panel pasan por telefonoDeQuienRecibe', () => {
     for (const [nombre, t] of [['AppConductor.js', con], ['Mensajeria.js (panel)', panel]]) {
@@ -155,8 +156,11 @@ describe('P21 · todos usan la pieza', () => {
     const idx = soloCodigo(leer('guajirago/functions/index.js'));
     const i = idx.indexOf('exports.notificarPasajeroOferta');
     const trozo = idx.slice(i, idx.indexOf('\nexports.', i + 10));
-    const m = trozo.match(/collection\("viajes"\)\.doc\(event\.params\.viajeId\)[\s\S]*?\.collection\("(\w+)"\)\.doc\("(\w+)"\)/);
-    assert.ok(m, 'notificarPasajeroOferta ya no lee el cajón');
+    // P23: el aviso le pregunta a tokenDelPasajero.cjs (la ficha primero; los viajes de antes, el cajón y el viaje).
+    assert.ok(/tokenDelPasajero\(admin\.firestore\(\), event\.params\.viajeId, /.test(trozo), 'notificarPasajeroOferta ya no usa la pieza');
+    const pieza = soloCodigo(leer('guajirago/functions/tokenDelPasajero.cjs'));
+    const m = pieza.match(/collection\("viajes"\)\.doc\(viajeId\)\.collection\("(\w+)"\)\.doc\("(\w+)"\)/);
+    assert.ok(m, 'la pieza ya no lee el cajón');
     assert.strictEqual('viajes/V9/' + m[1] + '/' + m[2], P.refContactoDelViaje({}, 'V9').ruta);
   });
   it('las reglas del cajón: «vivo» es ESTADO_ACEPTADO de estadosViaje.js', () => {

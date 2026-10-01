@@ -75,20 +75,11 @@ function sensiblesEnElViaje(viaje) {
 
 /**
  * ¿A qué documento pega la pantalla el token de avisos? 'viaje' si lo pega en lo que devuelve el addDoc de `viajes`;
- * 'contacto' si lo pega en una ruta armada con refContactoDelViaje; si no, 'otro'/'no lo pega'.
+ * 'contacto' si lo pega en una ruta armada con refContactoDelViaje; 'ficha' (P23) si lo pega en usuarios/{uid}; si no,
+ * 'otro'/'no lo pega'. P23: la respuesta la da UNA pieza, la de scripts/medir-token-pasajero.cjs (no se escribe dos veces).
  */
 function dondeVaElToken(textoSolicitar) {
-  const t = soloCodigo(textoSolicitar);
-  const prep = t.match(/const\s+(\w+)\s*=\s*prepararTokenDeAvisos\(\s*'pasajeroFcmToken'\s*\)/);
-  if (!prep) return 'no lo pega';
-  const pegado = t.match(new RegExp('\\b' + prep[1] + '\\(\\s*([^)]*?)\\s*\\)'));
-  if (!pegado) return 'no lo pega';
-  const arg = pegado[1];
-  const viaje = (t.match(/const\s+(\w+)\s*=\s*await\s+addDoc\(\s*collection\(\s*db\s*,\s*'viajes'\s*\)/) || [])[1];
-  if (arg === viaje) return 'viaje';
-  if (/^refContactoDelViaje\(/.test(arg)) return 'contacto';
-  const def = t.match(new RegExp('const\\s+' + arg.replace(/\W/g, '') + '\\s*=\\s*refContactoDelViaje\\('));
-  return def ? 'contacto' : 'otro (' + arg + ')';
+  return require('./medir-token-pasajero.cjs').dondePegaLaApp(textoSolicitar).donde;
 }
 
 /** Los renglones del archivo con su número de verdad, sin los que son comentario (`//`, `/*`, `*`). */
@@ -137,7 +128,7 @@ function veredicto({ publicos, token, tarjeta }) {
   const v = [];
   if (publicos.length) v.push('🔴 el viaje del mercado lleva ' + publicos.join(', ') + ': lo lee cualquier conductor antes de que lo acepten');
   if (token === 'viaje') v.push('🔴 la pantalla pega el token de avisos del pasajero en el viaje del mercado');
-  else if (token !== 'contacto') v.push('🔴 no sé dónde pega la pantalla el token de avisos: ' + token);
+  else if (token !== 'contacto' && token !== 'ficha') v.push('🔴 no sé dónde pega la pantalla el token de avisos: ' + token);
   if (tarjeta.length) v.push('🔴 la tarjeta del mercado le enseña al conductor el teléfono de quien recibe (AppConductor.js:' + tarjeta.join(', ') + ')');
   return v;
 }

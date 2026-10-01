@@ -132,9 +132,24 @@ async function saldoDePrueba(uid, minimo = 10000) {
   };
 }
 
+/**
+ * P23 (1-oct-2026) · El navegador del robot no da permiso de avisos, así que al pedir un viaje al pasajero le sale la
+ * ventanita «Así no te van a llegar las ofertas» (Solicitar.js, avisoDeAvisos de Notificaciones.js). Tapa la pantalla:
+ * los recorridos que piden un viaje la cierran con esto antes de seguir. Devuelve true si salió (y la cerró), false si
+ * no salió en `espera` ms. El recorrido aviso-ofertas.cjs EXIGE que salga; los demás solo la quitan del medio.
+ */
+async function cerrarAvisoDeOfertas(pagina, espera = 8000) {
+  const titulo = pagina.getByText('Así no te van a llegar las ofertas');
+  try { await titulo.first().waitFor({ state: 'visible', timeout: espera }); } catch (e) { return false; }
+  await pagina.getByRole('button', { name: 'Entendido' }).first().click();
+  await pagina.waitForTimeout(400);
+  return true;
+}
+
 module.exports = {
   SITIOS,
   saldoDePrueba,
+  cerrarAvisoDeOfertas,
   MOTOR,
   entrarComoRestaurante,
   baseDePruebas,
