@@ -215,4 +215,4 @@ async function main() {
 }
 
 if (require.main === module) main().catch((e) => { console.error('🔴 ' + e.message); process.exit(1); });
-module.exports = { sinComentarios, lecturasDeLasReglas, abiertaATodos, abiertas, nombraEn, lectoresEnCodigo, laNecesitaUnaApp, vecesEnPaquete, datosDePersonas };
+module.exports = { sinComentarios, lecturasDeLasReglas, abiertaATodos, abiertas, nombraEn, lectoresEnCodigo, laNecesitaUnaApp, vecesEnPaquete, datosDePersonas, paquete };

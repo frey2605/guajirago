@@ -660,6 +660,43 @@ service cloud.firestore {
         allow update, delete: if false;
       }
 
+      // ── P19 · EL CARRO EN VIVO (1-oct-2026) ─────────────────────────────────
+      // Antes el pasajero seguía al carro leyendo la FICHA del conductor
+      // (`conductores/{uid}`), y esa ficha la leía cualquiera con sesión que supiera
+      // el uid: teléfono, placa, nombre, token de avisos y ubicación en vivo (8 de 8
+      // en producción), también mucho después del viaje. Ahora el GPS del conductor
+      // escribe su posición AQUÍ mientras el viaje está vivo, y solo la leen los dos
+      // que van en él y el panel. Terminado el viaje, solo el panel.
+      // La ruta la arma UNA pieza, `guajirago/src/ubicacionEnVivo.js`: la usan el GPS
+      // del conductor (AppConductor.js) y el mapa del pasajero (Solicitar.js).
+      // Vivo = 'aceptado' (ESTADO_ACEPTADO de estadosViaje.js; lo ata
+      // pruebas/ubicacionConductor.test.js).
+      match /enVivo/{cual} {
+        function elViajeVivo() {
+          return get(/databases/$(database)/documents/viajes/$(viajeId)).data;
+        }
+        function estaVivo() {
+          return elViajeVivo().get('estado', '') == 'aceptado';
+        }
+        allow get: if request.auth != null && cual == 'conductor' && (
+          (estaVivo() && (elViajeVivo().get('pasajeroId', '') == request.auth.uid
+                          || elViajeVivo().get('conductorId', '') == request.auth.uid))
+          || esAdmin()
+        );
+        allow list: if esAdmin();
+        // Solo su conductor, solo con el viaje vivo, y solo la posición: nada de
+        // teléfono ni token aquí dentro.
+        allow create, update: if request.auth != null && cual == 'conductor'
+          && elViajeVivo().get('conductorId', '') == request.auth.uid
+          && estaVivo()
+          && request.resource.data.keys().hasOnly(['lat', 'lng', 'timestamp'])
+          && request.resource.data.lat is number && request.resource.data.lng is number
+          && request.resource.data.lat >= -90 && request.resource.data.lat <= 90
+          && request.resource.data.lng >= -180 && request.resource.data.lng <= 180
+          && (!('timestamp' in request.resource.data) || textoCorto(request.resource.data.timestamp, 40));
+        allow delete: if false;
+      }
+
       match /contraofertas/{conductorId} {
         // ── REGLA 2 · LA OFERTA LA FIRMA SU CONDUCTOR ────────────────────────
         // Hasta el 23-ago-2026 cualquiera podía escribir una oferta a nombre de

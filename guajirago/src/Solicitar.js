@@ -43,6 +43,7 @@ import { pedirGps } from './pedirGps';
 import { direccionDePunto, puntoDeDireccion, geocodificadorDe } from './direccionDePunto';
 // El mapa con ruta es UNO para el conductor y el pasajero (G29).
 import MapaConRuta from './MapaConRuta';
+import { refUbicacionEnVivo } from './ubicacionEnVivo'; // P19: el carro en vivo, la misma pieza que el GPS del conductor
 // El número del contacto de emergencia: la MISMA regla que el registro y Seguridad (G10).
 import { numeroWhatsApp, telefonoSirve, celularDiezCifras, cifrasMientrasEscribe } from './telefonoValido';
 // La tarjeta roja «Llamar al 123» y el número salen de UNA pieza, la misma de Ajustes › Seguridad (G70).
@@ -722,7 +723,7 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
         setTimeout(() => {
           setCelebrando(false);
           setPantalla('fase1');
-          if (data.conductorId) escucharConductor(data.conductorId);
+          if (data.conductorId) escucharConductor(viajeId);
         }, 3000);
       }
 
@@ -789,11 +790,17 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viajeId]);
 
-  const escucharConductor = useCallback((conductorId) => {
-    if (!conductorId) return;
-    onSnapshot(doc(db, 'conductores', conductorId), (snap) => {
-      if (snap.exists() && snap.data().ubicacion) setUbicacionConductor({ lat: snap.data().ubicacion.lat, lng: snap.data().ubicacion.lng });
-    });
+  // P19 (1-oct-2026): el carro se sigue desde el VIAJE VIVO (`viajes/{id}/enVivo/conductor`, lo escribe el GPS del
+  // conductor), no desde su ficha: la ficha lleva su teléfono y su token de avisos y ya no la lee nadie más que él y el
+  // panel. Un solo vigilante a la vez; cuando el viaje se acaba las reglas lo cortan, y entonces solo se suelta.
+  const carroEnVivoRef = useRef(null);
+  const escucharConductor = useCallback((idDelViaje) => {
+    if (!idDelViaje) return;
+    if (carroEnVivoRef.current) carroEnVivoRef.current();
+    carroEnVivoRef.current = onSnapshot(refUbicacionEnVivo(db, idDelViaje), (snap) => {
+      const p = snap.exists() ? snap.data() : null;
+      if (p && typeof p.lat === 'number' && typeof p.lng === 'number') setUbicacionConductor({ lat: p.lat, lng: p.lng });
+    }, () => { carroEnVivoRef.current = null; });
   }, []);
 
   useEffect(() => {
@@ -1186,7 +1193,7 @@ function Solicitar({ tipo, onVolver, destinoInicial }) {
       setTimeout(() => {
         setCelebrando(false);
         setPantalla('fase1');
-        escucharConductor(oferta.conductorId);
+        escucharConductor(viajeId);
       }, 3000);
       return;
     }

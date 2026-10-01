@@ -46,6 +46,7 @@ import { puntoDeDireccion, geocodificadorDe } from './direccionDePunto';
 import { LogoEsquina } from './Logo';
 // Pedirle el GPS al teléfono, con sus tiempos en un solo sitio (G28).
 import { pedirGps, seguirGps } from './pedirGps';
+import { refUbicacionEnVivo, puntoEnVivo } from './ubicacionEnVivo';
 // El mapa con ruta es UNO para el conductor y el pasajero (G29).
 import MapaConRuta from './MapaConRuta';
 import BotonVolver from './BotonVolver';
@@ -764,6 +765,8 @@ const cargarSaldo = useCallback(async (uid) => {
     }
   }, []);
 
+  // P19: el viaje vivo al que el GPS le cuenta dónde va el carro (el pasajero ya no lee la ficha del conductor).
+  const viajeVivoId = fase && viajeActual ? viajeActual.id : null;
   useEffect(() => {
     if (!activo && !fase) return;
     const user = auth.currentUser;
@@ -782,13 +785,16 @@ const cargarSaldo = useCallback(async (uid) => {
         registrarTokenFCM().then((ok) => { tokenListo = ok; pidiendoToken = false; });
       }
       try {
-        await setDoc(doc(db, 'conductores', user.uid), {
+        const escrituras = [setDoc(doc(db, 'conductores', user.uid), {
           nombre: nombre || 'Conductor', telefono: telefono || '',
           placa: placa || '', vehiculo: vehiculo || '',
           ubicacion: nueva, activo: true,
         // merge (27-sep-2026, G02): sin él, cada lectura del GPS reescribía la ficha ENTERA y borraba
         // lo que pone el servidor al confirmarlo (enViajeId, ocupado) y el token si esta vez no salió.
-        }, { merge: true });
+        }, { merge: true })];
+        // P19: con un viaje vivo, la posición va también al viaje (solo lat, lng y hora): de ahí la lee el pasajero.
+        if (viajeVivoId) escrituras.push(setDoc(refUbicacionEnVivo(db, viajeVivoId), puntoEnVivo(nueva.lat, nueva.lng, nueva.timestamp)));
+        await Promise.all(escrituras);
       } catch (e) {}
     };
 
@@ -826,7 +832,7 @@ const cargarSaldo = useCallback(async (uid) => {
     const pararSeguimiento = seguirGps(navigator, 'seguimiento', guardarUbicacion);
 
     return () => pararSeguimiento();
-  }, [activo, fase, nombre, telefono, placa, vehiculo]);
+  }, [activo, fase, nombre, telefono, placa, vehiculo, viajeVivoId]);
 
   useEffect(() => {
     if (activo || fase) return;
