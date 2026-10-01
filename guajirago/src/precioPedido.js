@@ -62,4 +62,19 @@ export function precioDeLaLinea(plato, adiciones, desc) {
   return (desc ? desc.precioFinal : plato.precio) + extra;
 }
 
+// ── EL DOMICILIO DEL NEGOCIO (se copia igual en la app y en aliados) ──
+
+/**
+ * P10: cuánto cobra de domicilio este negocio. El campo de hoy es `costoDomicilio` (el que escribe el perfil de
+ * aliados desde el 6-jul-2026); `costoEnvio` es el MISMO dato con su nombre viejo, de antes de ese día, y solo vale
+ * si el negocio no tiene el de hoy. Lo guardado no se reescribe: se lee así.
+ */
+export function costoDomicilioDelNegocio(negocio) {
+  if (!negocio) return 0;
+  const valor = negocio.costoDomicilio != null ? negocio.costoDomicilio : negocio.costoEnvio;
+  return Number(valor) || 0;
+}
+
+// ── FIN DEL DOMICILIO DEL NEGOCIO ──
+
 // ── FIN DEL PRECIO DEL PEDIDO ──

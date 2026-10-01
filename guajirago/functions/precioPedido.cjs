@@ -74,6 +74,21 @@ function precioDeLaLinea(plato, adiciones, desc) {
   return (desc ? desc.precioFinal : plato.precio) + extra;
 }
 
+// ── EL DOMICILIO DEL NEGOCIO (se copia igual en la app y en aliados) ──
+
+/**
+ * P10: cuánto cobra de domicilio este negocio. El campo de hoy es `costoDomicilio` (el que escribe el perfil de
+ * aliados desde el 6-jul-2026); `costoEnvio` es el MISMO dato con su nombre viejo, de antes de ese día, y solo vale
+ * si el negocio no tiene el de hoy. Lo guardado no se reescribe: se lee así.
+ */
+function costoDomicilioDelNegocio(negocio) {
+  if (!negocio) return 0;
+  const valor = negocio.costoDomicilio != null ? negocio.costoDomicilio : negocio.costoEnvio;
+  return Number(valor) || 0;
+}
+
+// ── FIN DEL DOMICILIO DEL NEGOCIO ──
+
 // ── FIN DEL PRECIO DEL PEDIDO ──
 
 // ── SOLO EN EL SERVIDOR ──
@@ -177,7 +192,7 @@ async function ponerElPrecioDelServidor(db, pedidoId, eventoId, ahora) {
       usados[pid] = su.exists ? Number(su.data().veces) || 0 : 0;
     }
     const r = pedidoConPreciosDelMenu(negocio, p.items, (id) => usados[id] || 0, ahora);
-    const costoDomicilio = p.estado === 'nuevo' ? Number(negocio.costoDomicilio) || 0 : Number(p.costoDomicilio) || 0;
+    const costoDomicilio = p.estado === 'nuevo' ? costoDomicilioDelNegocio(negocio) : Number(p.costoDomicilio) || 0;
     const campos = {
       items: r.items, subtotal: r.subtotal, costoDomicilio, total: r.subtotal + costoDomicilio,
       revisionServidor: { evento: eventoId, ...delTelefono, promos: r.promos, problemas: r.problemas },
@@ -192,5 +207,5 @@ async function ponerElPrecioDelServidor(db, pedidoId, eventoId, ahora) {
 
 module.exports = {
   diaDeLaSemanaEnColombia, promoVigenteHoy, precioConPromo, topeLleno, mejorDescuento, precioDeLaLinea,
-  pedidoConPreciosDelMenu, loRevisaElServidor, ponerElPrecioDelServidor,
+  costoDomicilioDelNegocio, pedidoConPreciosDelMenu, loRevisaElServidor, ponerElPrecioDelServidor,
 };

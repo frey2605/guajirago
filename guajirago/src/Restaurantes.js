@@ -17,7 +17,7 @@ import { guardarRechazo } from './guardarRechazo';
 import { losDeComida } from './escaparate';
 // P09: qué promoción vale hoy y cuánto cuesta cada línea es la cuenta del SERVIDOR (copia atada de
 // functions/precioPedido.cjs). Aquí solo se ENSEÑA: el precio de verdad lo pone el servidor cuando nace el pedido.
-import { promoVigenteHoy, mejorDescuento, precioDeLaLinea } from './precioPedido';
+import { promoVigenteHoy, mejorDescuento, precioDeLaLinea, costoDomicilioDelNegocio } from './precioPedido';
 // G87: qué número es cada día de la promoción y cómo se dice vive en diasSemana.js (copia atada en aliados).
 import { diasTxt } from './diasSemana';
 // G47: «¿me pueden pedir ahora?» es UNA regla (candado + escaparate + pausa + horario), la misma del dueño y del panel.
@@ -327,8 +327,8 @@ function Restaurantes({ nombre, onVolver, foto, onCerrarSesion, onIrPerfil, onIr
         // del negocio en cuanto nace el pedido (notificarNuevoPedido), y los de él son los que valen.
         items: carrito,
         subtotal: totalCarrito,
-        costoDomicilio: restauranteActivo.costoDomicilio || 0,
-        total: totalCarrito + (restauranteActivo.costoDomicilio || 0),
+        costoDomicilio: costoDomicilioDelNegocio(restauranteActivo),
+        total: totalCarrito + costoDomicilioDelNegocio(restauranteActivo),
         metodoPago,
         estado: 'nuevo',
         tipo: 'domicilio',
@@ -702,7 +702,7 @@ function Restaurantes({ nombre, onVolver, foto, onCerrarSesion, onIrPerfil, onIr
   // PANTALLA: menú del restaurante + carrito
   // ============================================================
   if (pantalla === 'menu' && restauranteActivo) {
-    const costoDom = restauranteActivo.costoDomicilio || 0;
+    const costoDom = costoDomicilioDelNegocio(restauranteActivo);
     const minimoPedido = restauranteActivo.pedidoMinimo || 0;
     const totalConDom = totalCarrito + costoDom;
     const bajoMinimo = carrito.length > 0 && totalCarrito < minimoPedido;
