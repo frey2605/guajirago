@@ -887,3 +887,16 @@ la placa de `conductores/{uid}` (la escribe su GPS con la misma placa que va en 
   rechaza por pasarse, suelta 30 más. Ese pedido se queda SIN `revisionServidor` (ni la marca cabe), así que el aviso
   de aliados sale por la espera de 2 minutos: el recorrido espera a que pase y tarda unos 3 minutos. La promoción
   inventada «a/b» a $1 sale «revisado» con el precio del menú. Los 403 de la consola siguen saliendo igual.
+- **revision-precio, desde P13 (1-oct-2026):** el pedido lleno casi hasta 1 MiB con un campo de sobra ya NO entra: las
+  reglas cierran la lista de campos del pedido del cliente (la base contesta con un rechazo de permisos, no de tamaño:
+  el robot solo suelta más holgura si el error habla de tamaño). Lleno DENTRO de una línea (un campo «nota» que la app
+  no manda) sí entra, y sale «revisado» con el precio del menú y de unos 550 bytes: la revisión guarda de cada línea
+  solo sus campos conocidos. Como el cliente ya no tiene forma de hacer fallar la revisión, el «sin revisar» de aliados
+  se SIMULA: se espera la revisión de verdad y encima admin@gg.test le pone `revisionServidor.estado = 'sin_revisar'`
+  (las reglas dejan al panel cambiar el pedido). Así el recorrido ya no espera los 2 minutos. Corrido con 83fd1fa
+  publicado en pruebas: ✓. Los 403 de la consola siguen saliendo igual.
+- **quien-cancelo, desde P13 (1-oct-2026):** el robot se preparaba sus pedidos «viejos» escribiendo COMO CLIENTE campos
+  que la app del cliente nunca escribe (`motivoRechazo: null`, `canceladoPor: null` y renovar `creado`). Desde P13 las
+  reglas solo dejan al cliente cambiar lo que la app le cambia, así que esa preparación la hace admin@gg.test (el
+  cliente sigue CREANDO su pedido, como la app). Regla general: lo que un recorrido escribe por la red como una
+  persona tiene que ser lo que su app escribe; lo que es preparar datos va con la cuenta de administración.

@@ -30,6 +30,7 @@ function quienDice(texto) {
 
 async function dejarPedidos() {
   const base = await entrarALaBase('pasajero@gg.test');
+  const adm = await entrarALaBase('admin@gg.test');
   for (const x of PEDIDOS) {
     const ruta = 'pedidos/' + x.id;
     let existe = true;
@@ -43,7 +44,9 @@ async function dejarPedidos() {
         estado: 'nuevo', creado: new Date().toISOString(),
       });
     }
-    await base.cambiar(ruta, { estado: 'cancelado', motivoRechazo: null, ...x.campos, creado: new Date().toISOString() });
+    // P13: dejarlo «viejo» (sin canceladoPor, sin motivoRechazo) y renovarle la hora no es algo que haga la app del
+    // cliente, y desde P13 las reglas no se lo dejan: lo prepara la administradora de pruebas.
+    await adm.cambiar(ruta, { estado: 'cancelado', motivoRechazo: null, ...x.campos, creado: new Date().toISOString() });
   }
 }
 
