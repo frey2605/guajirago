@@ -2966,13 +2966,20 @@ describe('REGLA 10 · no se puede seguir a la flota', () => {
     await RUT.assertSucceeds(getDoc(doc(como('conductor1'), 'viajes/vf/contraofertas/conductor1')));
   });
 
-  // Así es como el pasajero ve moverse el carro en el mapa. Si esto se pusiera
-  // rojo, el mapa se queda quieto y en silencio: ese onSnapshot no tiene manejo
-  // de error (Solicitar.js:688).
-  it('el pasajero sigue viendo dónde va su conductor (Solicitar.js:688)', async () => {
+  // P19 (1-oct-2026): el pasajero ve moverse el carro desde su VIAJE VIVO
+  // (`viajes/{id}/enVivo/conductor`, escucharConductor en Solicitar.js), no desde
+  // la ficha, que lleva el teléfono y el token. Pedir la ficha ya no le sirve.
+  it('el pasajero sigue viendo dónde va su conductor, desde su viaje vivo (P19)', async () => {
     await sembrarFlota();
+    await entorno.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      await FS.setDoc(FS.doc(db, 'viajes/vv'), { pasajeroId: 'pasajero1', conductorId: 'conductor1', estado: 'aceptado' });
+      await FS.setDoc(FS.doc(db, 'viajes/vv/enVivo/conductor'), { lat: 11.54, lng: -72.90, timestamp: 'x' });
+    });
     const { doc, getDoc } = FS;
-    await RUT.assertSucceeds(getDoc(doc(como('pasajero1'), 'conductores/conductor1')));
+    await RUT.assertSucceeds(getDoc(doc(como('pasajero1'), 'viajes/vv/enVivo/conductor')));
+    await RUT.assertFails(getDoc(doc(como('pasajero1'), 'conductores/conductor1')),
+      'la ficha del conductor (teléfono, token de avisos) ya no la lee el pasajero');
   });
 
   it('y el conductor sigue leyendo y escribiendo la suya', async () => {

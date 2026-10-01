@@ -842,7 +842,11 @@ service cloud.firestore {
     // del todo pide mudar `ubicacion` a un sitio aparte, y eso toca las dos apps.
     // Queda ANOTADO. Lo que se cierra hoy es la descarga en montón.
     match /conductores/{conductorId} {
-      allow get: if request.auth != null;
+      // P19 (1-oct-2026): la ficha lleva teléfono, placa, nombre, token de avisos y ubicación en vivo. Hasta hoy la
+      // leía cualquiera con sesión que supiera el uid (8 de 8 en producción), porque el mapa del pasajero seguía al
+      // carro leyéndola. Ahora el carro va en el viaje vivo (`viajes/{id}/enVivo/conductor`, más abajo), y la ficha
+      // solo la leen él y el panel. El servidor (SDK admin) no pasa por aquí.
+      allow get: if request.auth != null && (request.auth.uid == conductorId || esAdmin());
       allow list: if esAdmin();
       allow create, update: if request.auth != null && (
         request.auth.uid == conductorId ||

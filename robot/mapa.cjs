@@ -281,6 +281,12 @@ const RECORRIDOS = [
       'guajirago/public/index.html'],
   },
   {
+    nombre: 'carro-en-vivo',
+    que: 'con un viaje aceptado, el taxista se mueve 600 m al este y el 🚗 del pasajero se corre en su mapa (lo lee del viaje vivo); el pasajero y otra cuenta NO leen la ficha del taxista, y con el viaje terminado el pasajero ya no ve el carro (P19; deja un viaje cancelado y cuesta una comisión de prueba)',
+    archivo: 'carro-en-vivo.cjs',
+    vigila: ['guajirago/src/ubicacionEnVivo.js', 'guajirago/src/AppConductor.js', 'guajirago/src/Solicitar.js', 'firestore.rules'],
+  },
+  {
     nombre: 'llave-maps',
     que: 'transporte y aliados cargan Google Maps con la llave de su .env.pruebas (la escribe CRA en el index.html), Google no la rechaza y un mapa se dibuja (G62; no entra ni escribe nada)',
     archivo: 'llave-maps.cjs',

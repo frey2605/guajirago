@@ -91,7 +91,8 @@ describe('P18 · el medidor de lo que se lee ajeno no se ablanda', () => {
   });
 });
 
-const ABIERTAS_DE_HOY = ['/conductores/{conductorId}', '/calificaciones/{calId}', '/promociones/{promoId}', '/anuncios/{anuncioId}',
+// P19 (1-oct-2026): conductores salió de la lista; el mapa del pasajero lee el carro del viaje vivo.
+const ABIERTAS_DE_HOY = ['/calificaciones/{calId}', '/promociones/{promoId}', '/anuncios/{anuncioId}',
   '/config/{documentoConfig}', '/restaurantes/{restauranteId}', '/negocios/{negocioId}', '/usosPromo/{usoId}'];
 
 describe('P18 · las reglas de hoy: lo que cualquiera con sesión lee, lo necesita una app', () => {
@@ -172,7 +173,8 @@ const LECTURAS = [
   ['ana', 'Ana lee su propio uso de la promoción', (db) => D(db, 'promociones/PROMO1/usos/ana'), true, true],
   // ── legítimas que hace la app hoy en las que siguen abiertas: no cambian
   ['ana', 'la app lista las promociones (Promociones.js)', (db) => L(db, 'promociones'), true, true],
-  ['ana', 'la app sigue al carro del conductor (Solicitar.js)', (db) => D(db, 'conductores/c1'), true, true],
+  // P19: el carro ya no se sigue por la ficha del conductor (ver pruebas/ubicacionConductor.test.js).
+  ['ana', 'AJENA (P19) · Ana lee la ficha del conductor', (db) => D(db, 'conductores/c1'), true, false],
   ['ana', 'la app mira su contador de una promo de restaurante (Restaurantes.js)', (db) => D(db, 'usosPromo/P__3001112233'), true, true],
   ['ana', 'la app baja las calificaciones (Restaurantes.js)', (db) => L(db, 'calificaciones'), true, true],
   ['ana', 'la app baja los negocios (Restaurantes.js)', (db) => L(db, 'negocios'), true, true],

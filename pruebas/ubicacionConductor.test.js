@@ -94,17 +94,14 @@ describe('P19 · las reglas y el código de hoy', () => {
     const lectores = archivos.flatMap((f) => M.leeElCarroEnVivo(f.texto()).map((n) => f.rel));
     assert.deepStrictEqual(lectores, ['guajirago/src/Solicitar.js']);
   });
-  // FASE 1 (este commit): la app ya escribe y lee el carro en vivo, y las reglas ya tienen ese sitio; la ficha SIGUE
-  // abierta para que las apps viejas que aún lean la ficha no se queden sin carro. La FASE 2 la cierra.
-  it('FASE 1 · la ficha del conductor todavía la lee cualquiera con sesión (la cierra la fase 2)', () => {
-    assert.strictEqual(M.quienLeeLaFicha(reglas), 'todos');
+  // FASE 2: la ficha ya solo la leen él y el panel (la fase 1, 2990357, solo abrió el carro en vivo).
+  it('la ficha del conductor la leen él y el panel', () => {
+    assert.strictEqual(M.quienLeeLaFicha(reglas), 'él y el panel');
   });
-  it('el veredicto del medidor solo se queja de la ficha abierta', () => {
+  it('el veredicto del medidor sale limpio', () => {
     const lectoresFicha = archivos.flatMap((f) => M.leeLaFicha(f.texto()));
     const lectoresEnVivo = archivos.flatMap((f) => M.leeElCarroEnVivo(f.texto()));
-    const v = M.veredicto({ quien: M.quienLeeLaFicha(reglas), enVivo: M.reglaEnVivo(reglas), lectoresFicha, lectoresEnVivo });
-    assert.strictEqual(v.length, 1);
-    assert.match(v[0], /cualquiera con sesión/);
+    assert.deepStrictEqual(M.veredicto({ quien: M.quienLeeLaFicha(reglas), enVivo: M.reglaEnVivo(reglas), lectoresFicha, lectoresEnVivo }), []);
   });
   it('el «vivo» de las reglas del carro es ESTADO_ACEPTADO de estadosViaje.js', () => {
     const { ESTADO_ACEPTADO } = cargarDeLaApp('guajirago/src/estadosViaje.js');
@@ -303,9 +300,9 @@ const CASOS = [
   ['c1', 'Carlos escribe su posición en su viaje vivo', (db) => ES(db, 'viajes/vivo/enVivo/conductor', PUNTO), false, true],
   ['eladmin', 'el panel lee la última posición de un viaje terminado', (db) => D(db, 'viajes/viejo/enVivo/conductor'), false, true],
   // ── AJENAS: la ficha con teléfono y token
-  ['ana', 'AJENA · Ana lee la ficha de Carlos (teléfono, token)', (db) => D(db, 'conductores/c1'), true, true],
-  ['beto', 'AJENA · Beto (viajó con Carlos, ya terminó) lee su ficha y ve dónde está', (db) => D(db, 'conductores/c1'), true, true],
-  ['c2', 'AJENA · otro conductor lee la ficha de Carlos', (db) => D(db, 'conductores/c1'), true, true],
+  ['ana', 'AJENA · Ana lee la ficha de Carlos (teléfono, token)', (db) => D(db, 'conductores/c1'), true, false],
+  ['beto', 'AJENA · Beto (viajó con Carlos, ya terminó) lee su ficha y ve dónde está', (db) => D(db, 'conductores/c1'), true, false],
+  ['c2', 'AJENA · otro conductor lee la ficha de Carlos', (db) => D(db, 'conductores/c1'), true, false],
   // ── cerradas antes y hoy
   ['beto', 'Beto lee el carro de su viaje ya terminado', (db) => D(db, 'viajes/viejo/enVivo/conductor'), false, false],
   ['beto', 'Beto lee el carro del viaje de Ana', (db) => D(db, 'viajes/vivo/enVivo/conductor'), false, false],
