@@ -1209,7 +1209,12 @@ service cloud.firestore {
       // EXCEPCION medida: el panel borra promociones (Promociones.js:155).
       allow delete: if esAdmin();
       match /usos/{usoId} {
-        allow read: if request.auth != null;
+        // P18 (1-oct-2026): antes `if request.auth != null` — cualquiera con cuenta
+        // veía quién usó cada promoción (el nombre del documento es su uid) y
+        // cuántas veces. Ninguna app de usuario lo lee (medido en el código y en lo
+        // publicado: scripts/medir-lectura-ajena.cjs): solo el panel al asignar a
+        // mano (admin) y las funciones (servidor, no pasan por aquí). Queda la suya.
+        allow read: if request.auth != null && (request.auth.uid == usoId || esAdmin());
         // SEGURIDAD (29-sep-2026): el contador del tope por persona. Abierto a
         // cualquiera, un pasajero se lo ponía en cero y canjeaba sin límite. Desde
         // G17 lo sube el servidor al cobrar; desde el teléfono solo el panel al
@@ -1362,7 +1367,12 @@ service cloud.firestore {
       allow delete: if false;
     }
     match /dispositivosBeneficio/{deviceId} {
-      allow read: if request.auth != null;
+      // P18 (1-oct-2026): antes `if request.auth != null` — cualquiera con cuenta
+      // se bajaba la lista entera: el uid de cada persona y el id de su aparato.
+      // Ninguna app la lee (medido en el código y en lo publicado:
+      // scripts/medir-lectura-ajena.cjs); solo `descuentoDeBienvenida` (servidor,
+      // no pasa por aquí). Queda la suya y el panel.
+      allow read: if request.auth != null && (resource.data.get('uid', '') == request.auth.uid || esAdmin());
       // P01 (30-sep-2026): antes `if request.auth != null`. Desde G18 la huella
       // del aparato la escribe SOLO `descuentoDeBienvenida` (servidor). Abierta,
       // cualquiera con cuenta le «gastaba» el regalo a otro aparato creándole su
