@@ -280,7 +280,7 @@ describe('REGLA 12 · lo que la app hace hoy sigue funcionando', () => {
   it('un restaurante sigue pudiendo recibir un pedido', async () => {
     const { doc, setDoc } = FS;
     await RUT.assertSucceeds(
-      setDoc(doc(como('pasajero1'), 'pedidos/ped2'), { restauranteId: 'r1', clienteId: 'pasajero1', estado: 'nuevo', total: 25000 })
+      setDoc(doc(como('pasajero1'), 'pedidos/ped2'), { telefono: '3001112233', restauranteId: 'r1', clienteId: 'pasajero1', estado: 'nuevo', total: 25000 })
     );
   });
 });
@@ -1456,14 +1456,14 @@ describe('REGLA 9 · los pedidos dejan de ser públicos entre usuarios', () => {
   // ── CREAR: EL PEDIDO SE FIRMA ────────────────────────────────────────────
   it('el cliente crea su pedido FIRMÁNDOLO (Restaurantes.js:322)', async () => {
     const { collection, addDoc } = FS;
-    await RUT.assertSucceeds(addDoc(collection(como('pasajero1'), 'pedidos'), {
+    await RUT.assertSucceeds(addDoc(collection(como('pasajero1'), 'pedidos'), { telefono: '3001112233',
       restauranteId: 'r1', clienteId: 'pasajero1', tipo: 'domicilio', estado: 'nuevo', total: 30000,
     }));
   });
 
   it('pero NO puede firmarlo con el nombre de otro', async () => {
     const { collection, addDoc } = FS;
-    await RUT.assertFails(addDoc(collection(como('pasajero1'), 'pedidos'), {
+    await RUT.assertFails(addDoc(collection(como('pasajero1'), 'pedidos'), { telefono: '3001112233',
       restauranteId: 'r1', clienteId: 'otroCliente', tipo: 'domicilio', estado: 'nuevo', total: 30000,
     }));
   });
@@ -1475,7 +1475,7 @@ describe('REGLA 9 · los pedidos dejan de ser públicos entre usuarios', () => {
   // 15 estrellas de una y la media de la victima en 1.0.
   it('EL ATAQUE · un pedido NO se puede crear contra alguien que no es un negocio', async () => {
     const { collection, addDoc } = FS;
-    await RUT.assertFails(addDoc(collection(como('pasajero1'), 'pedidos'), {
+    await RUT.assertFails(addDoc(collection(como('pasajero1'), 'pedidos'), { telefono: '3001112233',
       restauranteId: 'conductor1', clienteId: 'pasajero1', estado: 'nuevo', total: 30000,
     }), 'Asi se le colgaban estrellas de una a un CONDUCTOR, que ni siquiera es un negocio.');
   });
@@ -1487,14 +1487,14 @@ describe('REGLA 9 · los pedidos dejan de ser públicos entre usuarios', () => {
   // creaba el pedido YA entregado y lo calificaba de una.
   it('EL ATAQUE · ni creando el pedido YA entregado contra un rival', async () => {
     const { collection, addDoc } = FS;
-    await RUT.assertFails(addDoc(collection(como('pasajero1'), 'pedidos'), {
+    await RUT.assertFails(addDoc(collection(como('pasajero1'), 'pedidos'), { telefono: '3001112233',
       restauranteId: 'r1', clienteId: 'pasajero1', estado: 'entregado', total: 30000,
     }), 'Nacer entregado es fabricarse el comprobante de una sola vez.');
-    await RUT.assertFails(addDoc(collection(como('pasajero1'), 'pedidos'), {
+    await RUT.assertFails(addDoc(collection(como('pasajero1'), 'pedidos'), { telefono: '3001112233',
       restauranteId: 'r1', clienteId: 'pasajero1', estado: 'cerrado', total: 30000,
     }));
     // Y tampoco a medio camino del flujo, que seria el paso previo.
-    await RUT.assertFails(addDoc(collection(como('pasajero1'), 'pedidos'), {
+    await RUT.assertFails(addDoc(collection(como('pasajero1'), 'pedidos'), { telefono: '3001112233',
       restauranteId: 'r1', clienteId: 'pasajero1', estado: 'confirmado', total: 30000,
     }));
   });
@@ -1601,7 +1601,7 @@ describe('REGLA 9 · los pedidos dejan de ser públicos entre usuarios', () => {
   it('LA CADENA · contra un rival tampoco: ni naciendo entregado, ni moviendolo', async () => {
     const { doc, setDoc, updateDoc, addDoc, collection } = FS;
     // 1 - no puede nacer entregado
-    await RUT.assertFails(addDoc(collection(como('pasajero1'), 'pedidos'), {
+    await RUT.assertFails(addDoc(collection(como('pasajero1'), 'pedidos'), { telefono: '3001112233',
       restauranteId: 'r1', clienteId: 'pasajero1', estado: 'entregado', total: 30000,
     }));
     // 2 - naciendo 'nuevo' (lo unico que puede), no lo puede mover
@@ -1719,12 +1719,29 @@ describe('REGLA 9 · los pedidos dejan de ser públicos entre usuarios', () => {
   // con ella, aliados lo enseñaría como revisado aunque la revisión nunca hubiera corrido.
   it('EL QUE MUERDE · P11 · el cliente NO crea el pedido con la revisión del servidor ya puesta', async () => {
     const { doc, setDoc } = FS;
-    const base = { restauranteId: 'r1', clienteId: 'pasajero1', estado: 'nuevo', tipo: 'domicilio', subtotal: 2, total: 2 };
+    const base = { restauranteId: 'r1', clienteId: 'pasajero1', telefono: '3001112233', estado: 'nuevo', tipo: 'domicilio', subtotal: 2, total: 2 };
     await RUT.assertFails(setDoc(doc(como('pasajero1'), 'pedidos/prev1'),
-      { ...base, revisionServidor: { evento: 'x', estado: 'revisado', promos: [], problemas: [] } }));
-    await RUT.assertFails(setDoc(doc(como('pasajero1'), 'pedidos/prev2'), { ...base, revisionServidor: null }));
+      { telefono: '3001112233', ...base, revisionServidor: { evento: 'x', estado: 'revisado', promos: [], problemas: [] } }));
+    await RUT.assertFails(setDoc(doc(como('pasajero1'), 'pedidos/prev2'), { telefono: '3001112233', ...base, revisionServidor: null }));
     // Lo que manda la app (Restaurantes.js), sin la marca, sigue entrando.
     await RUT.assertSucceeds(setDoc(doc(como('pasajero1'), 'pedidos/prev3'), base));
+  });
+
+  // P12 (30-sep-2026): el teléfono del pedido nace en 10 cifras limpias (lo que manda la app desde G42). Con un «/» se
+  // rompía la ruta del contador de la promoción y la revisión del precio reventaba; con otra forma («+57 300…») el
+  // MISMO número contaba aparte y se saltaba el tope.
+  it('EL QUE MUERDE · P12 · el cliente NO crea el pedido con el teléfono fuera de 10 cifras', async () => {
+    const { doc, setDoc } = FS;
+    const base = { restauranteId: 'r1', clienteId: 'pasajero1', estado: 'nuevo', tipo: 'domicilio', subtotal: 2, total: 2 };
+    const malos = ['300/1112233', '300/111/2233', '+57 300 111 2233', '300 111 2233', '30011122', '573001112233', '300111223a', '', 3001112233, null];
+    for (const [i, telefono] of malos.entries()) {
+      await RUT.assertFails(setDoc(doc(como('pasajero1'), 'pedidos/ptel' + i), { ...base, telefono }), 'entró el teléfono ' + JSON.stringify(telefono));
+    }
+    await RUT.assertFails(setDoc(doc(como('pasajero1'), 'pedidos/ptelSin'), base), 'entró un pedido sin teléfono');
+    // Lo que manda la app: las 10 cifras.
+    await RUT.assertSucceeds(setDoc(doc(como('pasajero1'), 'pedidos/ptelBueno'), { ...base, telefono: '3001112233' }));
+    // Y el pedido de mesa del negocio no lleva teléfono: sigue entrando.
+    await RUT.assertSucceeds(setDoc(doc(como('r1'), 'pedidos/ptelMesa'), { restauranteId: 'r1', tipo: 'local', estado: 'tomado', mesa: 2, total: 1 }));
   });
 
   it('y EL RESTAURANTE sigue moviendo el pedido por su flujo (PedidosDomicilio.js:138)', async () => {
@@ -1748,7 +1765,7 @@ describe('REGLA 9 · los pedidos dejan de ser públicos entre usuarios', () => {
 
   it('ni puede crear uno SIN firma para colarse en un restaurante ajeno', async () => {
     const { collection, addDoc } = FS;
-    await RUT.assertFails(addDoc(collection(como('pasajero1'), 'pedidos'), {
+    await RUT.assertFails(addDoc(collection(como('pasajero1'), 'pedidos'), { telefono: '3001112233',
       restauranteId: 'r1', tipo: 'local', mesa: 9, estado: 'tomado', total: 5000,
     }));
   });
@@ -4507,7 +4524,7 @@ describe('SE VENDE · las tres llaves, y que apagar apague', () => {
     const { doc, setDoc } = FS;
     await poner('r1', bloqueado);
     await RUT.assertFails(setDoc(doc(como('pasajero1'), 'pedidos/p6'),
-      { restauranteId: 'r1', clienteId: 'pasajero1', tipo: 'domicilio', estado: 'nuevo', total: 30000 }));
+      { telefono: '3001112233', restauranteId: 'r1', clienteId: 'pasajero1', tipo: 'domicilio', estado: 'nuevo', total: 30000 }));
   });
 
   it('EL QUE MUERDE · el cliente SÍ puede cancelar el pedido que ya tenía', async () => {
@@ -4980,7 +4997,7 @@ describe('LA MUDANZA DE LOS NEGOCIOS · las dos carpetas', () => {
       });
       // Preguntando en «O» esto pasaría: la carpeta vieja dice «al día».
       // Preguntando en «Y», la nueva sigue diciendo «bloqueado» y manda.
-      await RUT.assertFails(setDoc(doc(como('pasajero1'), 'pedidos/pedGemelo'), {
+      await RUT.assertFails(setDoc(doc(como('pasajero1'), 'pedidos/pedGemelo'), { telefono: '3001112233',
         clienteId: 'pasajero1', estado: 'nuevo', restauranteId: 'moroso', total: 30000,
       }));
     });
@@ -4992,7 +5009,7 @@ describe('LA MUDANZA DE LOS NEGOCIOS · las dos carpetas', () => {
         await setDoc(doc(db, 'negocios/otro'), { nombre: 'OTRO', activo: true, estadoComercial: 'alDia' });
         await setDoc(doc(db, 'restaurantes/otro'), { nombre: 'OTRO', activo: true, estadoComercial: 'bloqueado' });
       });
-      await RUT.assertFails(setDoc(doc(como('pasajero1'), 'pedidos/pedOtro'), {
+      await RUT.assertFails(setDoc(doc(como('pasajero1'), 'pedidos/pedOtro'), { telefono: '3001112233',
         clienteId: 'pasajero1', estado: 'nuevo', restauranteId: 'otro', total: 30000,
       }));
     });
@@ -5007,7 +5024,7 @@ describe('LA MUDANZA DE LOS NEGOCIOS · las dos carpetas', () => {
         await setDoc(doc(db, 'negocios/sano'), { nombre: 'SANO', activo: true, estadoComercial: 'alDia' });
         await setDoc(doc(db, 'restaurantes/sano'), { nombre: 'SANO', activo: true, estadoComercial: 'alDia' });
       });
-      await RUT.assertSucceeds(setDoc(doc(como('pasajero1'), 'pedidos/pedSano'), {
+      await RUT.assertSucceeds(setDoc(doc(como('pasajero1'), 'pedidos/pedSano'), { telefono: '3001112233',
         clienteId: 'pasajero1', estado: 'nuevo', restauranteId: 'sano', total: 30000,
       }));
     });
@@ -5019,7 +5036,7 @@ describe('LA MUDANZA DE LOS NEGOCIOS · las dos carpetas', () => {
       await entorno.withSecurityRulesDisabled(async (ctx) => {
         await setDoc(doc(ctx.firestore(), 'negocios/solonuevo'), { nombre: 'NUEVO', activo: true });
       });
-      await RUT.assertSucceeds(setDoc(doc(como('pasajero1'), 'pedidos/pedNuevo'), {
+      await RUT.assertSucceeds(setDoc(doc(como('pasajero1'), 'pedidos/pedNuevo'), { telefono: '3001112233',
         clienteId: 'pasajero1', estado: 'nuevo', restauranteId: 'solonuevo', total: 30000,
       }));
     });
@@ -5048,7 +5065,7 @@ describe('LA MUDANZA DE LOS NEGOCIOS · las dos carpetas', () => {
     // `elNegocioExiste` antes de tener dos carpetas.
     it('un negocio que no existe en NINGUNA carpeta no recibe pedidos', async () => {
       const { doc, setDoc } = FS;
-      await RUT.assertFails(setDoc(doc(como('pasajero1'), 'pedidos/pedFantasma'), {
+      await RUT.assertFails(setDoc(doc(como('pasajero1'), 'pedidos/pedFantasma'), { telefono: '3001112233',
         clienteId: 'pasajero1', estado: 'nuevo', restauranteId: 'noexisteestenegocio', total: 30000,
       }));
     });

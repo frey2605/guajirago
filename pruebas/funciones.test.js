@@ -1301,3 +1301,53 @@ describe('P09 · notificarNuevoPedido le pone al pedido el precio del menú al n
     assert.strictEqual(comoJs(await leer('usosPromo/pct9__' + TEL)).veces, 1, 'se contó un uso que no hubo');
   });
 });
+
+// ── P12 · UN DATO DEL CLIENTE YA NO HACE REVENTAR LA REVISIÓN (30-sep-2026) ──
+// Con el disparador de verdad y el Firestore de verdad (el emulador): un teléfono con «/» rompía la ruta del contador
+// de la promoción y la revisión reventaba («sin revisar», con los precios del teléfono). Ahora el pedido queda
+// revisado, con el precio del MENÚ y sin el descuento con tope (sin teléfono válido no se puede mirar el tope).
+describe('P12 · notificarNuevoPedido revisa el pedido aunque el cliente mande datos raros', () => {
+  const { aCampos, val } = require('../scripts/nube.cjs');
+  const comoJs = (f) => f && Object.fromEntries(Object.entries(f).map(([k, v]) => [k, val(v)]));
+  const revisado = async (ruta) => {
+    for (let i = 0; i < 80; i++) {
+      const p = comoJs(await leer(ruta));
+      if (p && p.revisionServidor) return p;
+      await new Promise((r) => setTimeout(r, 250));
+    }
+    return comoJs(await leer(ruta));
+  };
+  const pedido = (telefono, items) => aCampos({
+    restauranteId: 'negP12', clienteId: 'cliP12', cliente: 'Ana', telefono, direccion: 'Calle 1', estado: 'nuevo',
+    tipo: 'domicilio', items, subtotal: 1, costoDomicilio: 0, total: 1,
+  });
+
+  test('teléfono con «/», promoción inventada «a/b» y el mismo número con otra forma: revisados, con el precio del menú', async () => {
+    await sembrar('negocios/negP12', aCampos({
+      nombre: 'Meche', costoDomicilio: 4000,
+      menu: [{ id: 'p1', nombre: 'Sancocho', precio: 18000, disponible: true }],
+      promociones: [{ id: 'pct12', nombre: '20%', tipo: 'porcentaje', valor: 20, activa: true, programacion: 'siempre', platosAplica: [], limiteCliente: 1 }],
+    }));
+    await sembrar('pedidos/pedP12a', pedido('300/5550012', [{ id: 'p1', nombre: 'Sancocho', precio: 1, cantidad: 1, promoId: 'pct12' }]));
+    const a = await revisado('pedidos/pedP12a');
+    assert.strictEqual(a.revisionServidor && a.revisionServidor.estado, 'revisado', 'la revisión reventó: ' + JSON.stringify(a.revisionServidor));
+    assert.strictEqual(a.subtotal, 18000, 'el descuento con tope entró sin un teléfono que lo cuente');
+    assert.strictEqual(a.total, 22000);
+
+    await sembrar('pedidos/pedP12b', pedido('3005550012', [{ id: 'p1', nombre: 'Sancocho', precio: 1, cantidad: 1, promoId: 'a/b' }]));
+    const b = await revisado('pedidos/pedP12b');
+    assert.strictEqual(b.revisionServidor && b.revisionServidor.estado, 'revisado', 'la revisión reventó: ' + JSON.stringify(b.revisionServidor));
+    assert.strictEqual(b.subtotal, 18000);
+
+    // El honrado usa la promoción: contador en 1. Luego el MISMO número escrito con +57 ya no la vuelve a usar.
+    await sembrar('pedidos/pedP12c', pedido('3005550012', [{ id: 'p1', nombre: 'Sancocho', precio: 14400, cantidad: 1, promoId: 'pct12' }]));
+    const c = await revisado('pedidos/pedP12c');
+    assert.strictEqual(c.subtotal, 14400);
+    assert.strictEqual(comoJs(await leer('usosPromo/pct12__3005550012')).veces, 1);
+    await sembrar('pedidos/pedP12d', pedido('+57 300 555 0012', [{ id: 'p1', nombre: 'Sancocho', precio: 14400, cantidad: 1, promoId: 'pct12' }]));
+    const d = await revisado('pedidos/pedP12d');
+    assert.strictEqual(d.revisionServidor && d.revisionServidor.estado, 'revisado');
+    assert.strictEqual(d.subtotal, 18000, 'el mismo número con otra forma se saltó el tope');
+    assert.strictEqual(comoJs(await leer('usosPromo/pct12__3005550012')).veces, 1);
+  });
+});

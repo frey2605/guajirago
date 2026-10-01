@@ -1877,6 +1877,11 @@ service cloud.firestore {
          // teléfono pudiera nacer el pedido con ella, aliados lo enseñaría como revisado aunque la
          // revisión nunca hubiera corrido.
          !request.resource.data.keys().hasAny(['revisionServidor']) &&
+         // P12: el teléfono nace en sus 10 cifras limpias, que es lo que manda la app desde G42
+         // (celularDiezCifras, telefonoValido.js; comprobado en el paquete publicado). Con él se
+         // arma el contador de las promociones; el servidor igual lo limpia por su cuenta.
+         request.resource.data.get('telefono', '') is string &&
+         request.resource.data.get('telefono', '').matches('^[0-9]{10}$') &&
          negocioPuedeOperar(request.resource.data.restauranteId));
 
       // Lo único que el cliente puede hacerle al estado de SU pedido: dejarlo
