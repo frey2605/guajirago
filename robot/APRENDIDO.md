@@ -920,3 +920,11 @@ la placa de `conductores/{uid}` (la escribe su GPS con la misma placa que va en 
   reservas de mentira (`fecha-reserva`, `recordados-telefono`) las cancela admin@gg.test, y el cliente las crea como la
   app: en 'nueva' y con el teléfono en 10 cifras. Con el código de antes (corrido el 1-oct-2026 en pruebas) el cliente
   veía «No se pudo enviar la reserva» con `Unsupported field value: undefined (found in field tourId …)` en la consola.
+- **reserva-total, P17 (1-oct-2026):** el servidor revisa la reserva en unos segundos (`notificarNuevaReserva` en
+  pruebas): el robot espera a que aparezca `revisionServidor` (hasta 60 s) antes de mirar aliados. Las tres reservas se
+  crean por la red como la app (los 16 campos de P16), cada una con su id de la hora, y las cancela admin@gg.test. En
+  aliados la tarjeta de cada cliente se encuentra subiendo desde «👤 <nombre>» hasta la caja con «Confirmar» (en
+  «Nuevas»). Una reserva con `creado` de hace menos de 2 minutos y SIN revisión sale «⏳ Revisando precio…» y el
+  Confirmar bloqueado: si el robot mirara antes de que llegue la revisión, el total no saldría. Los 403 de la consola
+  salen igual que en los demás. Y `unidades-tour` se quedó una vez en un clic (30 s) dentro de la tanda de
+  `probar-cambio`; corrido solo justo después, ✓: es un tropiezo de tiempo del recorrido, no del cambio.
