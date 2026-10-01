@@ -630,6 +630,14 @@ const RECORRIDOS = [
     // de antes, y el careo de las reglas en el emulador, los corre pruebas/reservaCerrada.test.js.
     vigila: ['guajirago/src/Turismo.js'],
   },
+  {
+    nombre: 'reserva-total',
+    que: 'tres reservas de 2 personas a un tour de $1.000 por persona: la honrada ($2.000) queda igual y «revisado»; la inventada ($1) queda en $2.000 «revisado» con el $1 guardado; la de un tour borrado queda «sin revisar» y aliados lo dice en su tarjeta (P17; pone un tour del robot como agencia@gg.test, crea tres reservas en PRUEBAS que cancela admin@gg.test, y deja los tours como estaban; necesita notificarNuevaReserva y aliados publicados en pruebas)',
+    archivo: 'reserva-total.cjs',
+    // La cuenta compartida (y su copia atada), el careo de la pantalla con el código de antes, la transacción del
+    // servidor, el disparo de index.js con el careo y la tarjeta de aliados los EJECUTA pruebas/totalReserva.test.js.
+    vigila: ['guajirago-aliados/src/ReservasTurismo.js', 'guajirago/src/Turismo.js', 'guajirago/src/precioPedido.js'],
+  },
 ];
 
 // Los archivos de pantalla: los que, si cambian, el robot debería poder probar. Todo lo que esté en

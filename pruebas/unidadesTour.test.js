@@ -11,7 +11,9 @@
  *   2. Cada sitio se lee de su archivo y se CORRE lo que de verdad usa (scripts/medir-unidades-tour.cjs): los tres
  *      dicen lo mismo en todos los casos, y nadie en las tres apps escribe la lista a mano.
  *   3. CAREO con el código de antes (703a088 / 6bbe95d / 0f89437): ningún sitio dice algo distinto.
- *   4. La cuenta del precio que depende de la unidad vive solo en la app (no es gemelo); si aparece otra, se nota.
+ *   4. La cuenta del precio que depende de la unidad es UNA: totalDeLaReserva, en la pieza de la plata que comparten la
+ *      app (guajirago/src/precioPedido.js) y el servidor (P17); Turismo.js solo la usa para saber si pregunta las
+ *      personas. Si aparece otra, se nota.
  *   5. El contador de lo guardado separa lo que tiene nombre de lo que ninguna pantalla sabe nombrar.
  *   6. Pantallas de mentira: si la copia se separa, o alguien vuelve a escribir la lista a mano, se pone roja.
  */
@@ -66,11 +68,13 @@ describe('G86 · la unidad del precio del tour sale de UNA pieza', () => {
     assert.deepStrictEqual(c.diferencias, [], 'un sitio dice otra cosa que antes');
   });
 
-  it('la CUENTA del precio que depende de la unidad vive solo en la app (Turismo.js): no hay otra que atar', () => {
+  // P17: la cuenta se mudó de Turismo.js (totalReserva) a la pieza de la plata, atada con el servidor (pruebas/totalReserva.test.js).
+  const PIEZA_PLATA = 'guajirago/src/precioPedido.js';
+  it('la CUENTA del precio que depende de la unidad vive en la pieza de la plata (atada al servidor): no hay otra', () => {
     const m = medir(null);
-    assert.ok(m.cuentas.length >= 1, 'el medidor no ve la cuenta de totalReserva');
-    assert.deepStrictEqual(m.cuentas.filter((c) => !c.startsWith(TURISMO + ':')), [], 'otra pantalla decide con la unidad: hay que atarla');
-    assert.deepStrictEqual(m.nombranUnidad.sort(), [TURISMO, TOURS].sort(), 'otro archivo nombra la unidad del tour: míralo');
+    assert.ok(m.cuentas.some((c) => c.startsWith(PIEZA_PLATA + ':')), 'el medidor no ve la cuenta de totalDeLaReserva en ' + PIEZA_PLATA);
+    assert.deepStrictEqual(m.cuentas.filter((c) => !c.startsWith(TURISMO + ':') && !c.startsWith(PIEZA_PLATA + ':')), [], 'otra pantalla decide con la unidad: hay que atarla');
+    assert.deepStrictEqual(m.nombranUnidad.sort(), [TURISMO, TOURS, PIEZA_PLATA].sort(), 'otro archivo nombra la unidad del tour: míralo');
   });
 
   it('lo guardado: lo que tiene nombre y lo que ninguna pantalla sabe nombrar se cuentan aparte', () => {

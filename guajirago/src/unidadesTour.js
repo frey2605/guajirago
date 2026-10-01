@@ -8,7 +8,8 @@
 //
 // `k` es lo que se GUARDA en el campo `unidadPrecio` del tour (y se copia a la reserva): no se cambia, o los tours
 // ya guardados se quedan sin nombre. `t` es cómo se dice en pantalla. Una unidad que no está aquí no se nombra ('').
-// La CUENTA del precio (por persona × personas) vive solo en la app (Turismo.js, totalReserva): aquí no hay pesos.
+// La CUENTA del precio (por persona × personas) es totalDeLaReserva, en la pieza de la plata que comparten la app
+// (guajirago/src/precioPedido.js, que usa Turismo.js) y el servidor (precioPedido.cjs, que pone el total: P17): aquí no hay pesos.
 
 export const UNIDADES_PRECIO = [
   { k: 'persona', t: 'por persona' },

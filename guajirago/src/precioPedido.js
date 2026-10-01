@@ -83,6 +83,19 @@ export function nombreOPorDefecto(nombre, porDefecto) {
 export const PLATO_SIN_NOMBRE = 'Plato';
 export const PROMO_SIN_NOMBRE = 'Promoción';
 
+/**
+ * P17: lo que cuesta una RESERVA de turismo: el precio del tour por las `personas` (un entero) si el tour se cobra
+ * «por persona» (`unidadPrecio`, G86); por grupo, por día o por hora es el precio tal cual (la app no pregunta cuántos
+ * días ni cuántas horas). La app la usa para ENSEÑAR el total al reservar (Turismo.js, totalReserva) y el servidor
+ * para PONERLO cuando nace la reserva (precioReserva.cjs): una sola cuenta. Hasta P17 vivía solo en la app y el
+ * servidor se creía el total del teléfono.
+ */
+export function totalDeLaReserva(tour, personas) {
+  if (!tour) return 0;
+  const p = tour.unidadPrecio === 'persona' ? personas : 1;
+  return (tour.precio || 0) * p;
+}
+
 // ── EL DOMICILIO DEL NEGOCIO (se copia igual en la app y en aliados) ──
 
 /**

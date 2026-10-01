@@ -237,11 +237,11 @@ async function main() {
   let fuera = imprimirEscrituras('\nLA APP · ' + PANTALLA, app, reglasHoy);
   console.log('  ' + (fuera.crear.length + fuera.cambiar.length ? '🔴 escribe y las reglas de hoy NO lo dejan: ' + JSON.stringify(fuera) : '✓ las reglas de hoy dejan todo lo que escribe'));
   imprimirEscrituras('ALIADOS · ' + ALIADOS + ' (la agencia: su permiso no cambia)', escriturasDe(leerRaiz(null, ALIADOS)), reglasHoy);
-  console.log('  el panel (guajirago-admin) solo LEE reservasTurismo; las funciones (notificarNuevaReserva, notificarClienteReserva) solo leen y avisan.');
+  console.log('  el panel (guajirago-admin) solo LEE reservasTurismo; notificarClienteReserva solo lee y avisa; notificarNuevaReserva, desde P17, además pone el total (lo escribe el servidor, por encima de las reglas).');
 
   console.log('\n── EL PRECIO DE LA RESERVA ──');
-  console.log('  `total` lo calcula el TELÉFONO (totalReserva: precio del tour × personas) y nadie lo revisa en el servidor:');
-  console.log('  notificarNuevaReserva le avisa a la agencia «Ana reservó … — $ <el total del teléfono>». (Pendiente aparte; P16 no lo toca.)');
+  console.log('  el teléfono ENSEÑA y manda `total` (totalReserva), pero desde P17 lo pone el servidor al nacer la reserva');
+  console.log('  (notificarNuevaReserva → precioReserva.cjs, con el precio del tour de la agencia). Lo mide scripts/medir-total-reserva.cjs.');
 
   if (process.argv.includes('--publicado')) {
     for (const [sitio, nombre] of [['guajirago', 'LA APP PUBLICADA'], ['guajirago-aliados', 'ALIADOS PUBLICADO']]) {

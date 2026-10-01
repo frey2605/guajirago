@@ -21,7 +21,7 @@ import { enlaceWhatsApp, telefonoSirve, celularDiezCifras, cifrasMientrasEscribe
 // G86: «por persona / por grupo / por día / por hora» sale de la pieza única, la misma que usa aliados al crear el tour.
 import { unidadTxt } from './unidadesTour';
 // P16: un nombre que falta sale de la pieza única de P15 (la misma del pedido a domicilio): vive en precioPedido.js.
-import { nombreOPorDefecto } from './precioPedido';
+import { nombreOPorDefecto, totalDeLaReserva } from './precioPedido';
 // G88: «Mis reservas» se recuerda en el teléfono con la pieza única (la misma de «Mis pedidos»; su clave, sin tope).
 import { MIS_RESERVAS, leerRecordados, recordar } from './recordadosEnTelefono';
 // G90: los colores salen de LA paleta (theme.js), no de una paleta propia de esta pantalla.
@@ -70,9 +70,9 @@ function Turismo({ nombre, foto, onVolver, onCerrarSesion, onIrPerfil, onIrGanan
   };
 
   const totalReserva = () => {
-    if (!tourReserva) return 0;
-    const p = tourReserva.unidadPrecio === 'persona' ? (parseInt(personas || '1', 10) || 1) : 1;
-    return (tourReserva.precio || 0) * p;
+    // P17: la cuenta es la del servidor (totalDeLaReserva, precioPedido.js, copia atada): aquí se ENSEÑA, y cuando nace
+    // la reserva el servidor pone el total con el precio del tour guardado en la agencia.
+    return totalDeLaReserva(tourReserva, parseInt(personas || '1', 10) || 1);
   };
 
   const enviarReserva = async () => {

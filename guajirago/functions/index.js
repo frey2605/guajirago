@@ -65,6 +65,8 @@ const { tokensDeLosEmpleados } = require('./quienRecibeElAviso.cjs');
 const { loRevisaElServidor, ponerElPrecioDelServidor, marcarSinRevisar, comoVaLaRevision } = require('./precioPedido.cjs');
 // P03: la tarjeta del conductor que lleva el viaje sale de su ficha (copias atadas de la app, pruebas/tarjetaDelConductor.test.js).
 const { tarjetaDelConductor } = require('./conductorDeLaFicha.cjs');
+// P17: el total de la reserva de turismo lo pone el servidor con el precio del tour (precioReserva.cjs).
+const { reservaConElPrecioDelServidor } = require('./precioReserva.cjs');
 
 // Distancia en km entre dos coordenadas (Haversine)
 function distanciaKm(lat1, lng1, lat2, lng2) {
@@ -265,7 +267,9 @@ exports.notificarClienteDelPedido = onDocumentUpdated("pedidos/{id}",
 
 // Avisar a la AGENCIA cuando llega una nueva reserva de turismo
 exports.notificarNuevaReserva = onDocumentCreated("reservasTurismo/{id}", async (event) => {
-  const r = event.data.data();
+  // P17: ANTES de avisar, el servidor le pone a la reserva de un cliente el total con el precio del TOUR guardado en la
+  // agencia (precioReserva.cjs); si no puede, la marca «sin revisar» y el aviso lo dice. Nunca revienta.
+  const r = await reservaConElPrecioDelServidor(admin.firestore(), event.data.id, event.id, event.data.data());
   if (!r || r.estado !== "nueva") return null;
   const agenciaId = r.agenciaId;
   if (!agenciaId) return null;
@@ -276,9 +280,11 @@ exports.notificarNuevaReserva = onDocumentCreated("reservasTurismo/{id}", async 
     tokens.push(...(await tokensDeLosEmpleados(admin.firestore(), agenciaId, "reservaNueva")));
     if (tokens.length === 0) return null;
     const totalTxt = r.total ? cop(Number(r.total)) : "";
+    // P17: si el servidor no pudo revisar el total, el aviso lo dice (es el que mandó el teléfono), como el del pedido (P11).
+    const sinRevisar = comoVaLaRevision(r, null) === "sin-revisar" ? " · ⚠️ precio sin revisar" : "";
     await mandarAviso(admin.messaging(), tokens,
       sobreDelAviso("🧭 Nueva reserva",
-        (r.cliente || "Cliente") + " reservó " + (r.nombreTour || "un tour") + (totalTxt ? " — " + totalTxt : ""),
+        (r.cliente || "Cliente") + " reservó " + (r.nombreTour || "un tour") + (totalTxt ? " — " + totalTxt : "") + sinRevisar,
         { canal: "pedidos", despertar: true }),
       "notificarNuevaReserva");
     return null;
