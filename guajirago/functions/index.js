@@ -53,6 +53,8 @@ const { sobreDelAviso, sobreSencillo, mandarAviso } = require('./avisos.cjs');
 const { avisoDelCambio } = require('./estadosPedido.cjs');
 // G42: ¿es el mismo celular? Por las 10 cifras, con la regla de la app (copia atada por pruebas/telefonoUnico.test.js).
 const { celularDiezCifras, formasGuardadas } = require('./telefonoValido.cjs');
+// P06: «¿otra ficha se registró con este celular?», una sola pregunta para celularDisponible y descuentoDeBienvenida.
+const { fichasConEsteCelular, esDeOtraFicha } = require('./telefonoValido.cjs');
 // G53: el regalo al conductor nuevo y su respaldo salen de UNA pieza (atada al panel por pruebas/regaloConductorNuevo.test.js).
 const { regaloDelConductorNuevo } = require('./regaloConductorNuevo.cjs');
 // G55: «buscando conductor» y «aceptado» salen de UNA pieza (atada a src/estadosViaje.js por pruebas/estadosAMano.test.js).
@@ -558,12 +560,9 @@ exports.celularDisponible = onCall(async (request) => {
   const diez = celularDiezCifras(celular);
   if (!diez) throw new HttpsError("invalid-argument", "El celular debe tener 10 cifras");
 
-  const snap = await admin.firestore()
-    .collection("usuarios").where("celular", "in", formasGuardadas(diez)).limit(2).get();
-
-  // Su propia ficha no cuenta: si vuelve a intentarlo, no se bloquea a sí mismo.
-  const deOtro = snap.docs.some((d) => d.id !== request.auth.uid);
-  return { disponible: !deOtro };
+  // P06: la misma pregunta que hace descuentoDeBienvenida (telefonoValido.cjs: fichasConEsteCelular, esDeOtraFicha).
+  const snap = await fichasConEsteCelular(admin.firestore(), diez).get();
+  return { disponible: !esDeOtraFicha(snap, request.auth.uid) };
 });
 
 // REGLA 2 — subirTarifa RETIRADA el 23-ago-2026.
@@ -786,12 +785,24 @@ exports.descuentoDeBienvenida = onCall(async (request) => {
         t.get(huellas.where("uid", "==", uid).limit(1)),
         t.get(db.collection("viajes").where("pasajeroId", "==", uid).limit(1)),
       ]);
+      // P06: el teléfono se decide AQUÍ. El número es el `celular` de la ficha (el del registro), en 10 cifras; el
+      // registro `bienvenidaPorTelefono/{10 cifras}` lo escribe SOLO esta función (las reglas no lo nombran: nadie más
+      // lo lee ni lo escribe), y cambiar el número después no lo borra.
+      const ficha = snapUsuario.exists ? snapUsuario.data() : null;
+      const telefono = celularDiezCifras((ficha || {}).celular);
+      const refTelefono = telefono ? db.collection("bienvenidaPorTelefono").doc(telefono) : null;
+      const [snapTelefono, snapFichasTel] = telefono
+        ? await Promise.all([t.get(refTelefono), t.get(fichasConEsteCelular(db, telefono))])
+        : [null, null];
       const motivo = porQueNoLaBienvenida({
         config: snapConfig.exists ? snapConfig.data() : {},
-        ficha: snapUsuario.exists ? snapUsuario.data() : null,
+        ficha,
         aparatoYaUsado: !!(snapAparato && snapAparato.exists),
         yaLaRecibio: !snapMias.empty,
         viajesPedidos: snapViajes.size,
+        telefono,
+        telefonoUsado: !!(snapTelefono && snapTelefono.exists && (snapTelefono.data() || {}).uid !== uid),
+        telefonoDeOtro: !!(snapFichasTel && esDeOtraFicha(snapFichasTel, uid)),
       });
       if (motivo) return { valor: 0, motivo };
 
@@ -800,6 +811,7 @@ exports.descuentoDeBienvenida = onCall(async (request) => {
         { promoId: PROMO_BIENVENIDA, tipoBeneficio: "credito", valorBeneficio: CREDITO_BIENVENIDA_PASAJERO }, ahora);
       t.set(refUsuario, { descuentoPendiente }, { merge: true });
       t.set(refHuella, { usado: true, uid, fecha: ahora });
+      t.set(refTelefono, { uid, fecha: ahora });
       return { valor: descuentoPendiente.valorBeneficio, codigoVerificacion: descuentoPendiente.codigoVerificacion };
     });
   } catch (e) {

@@ -47,13 +47,22 @@ function armarDescuentoPendiente({ promoId, tipoBeneficio, valorBeneficio }, fec
  * si no está) y que el aparato no lo haya usado ya— y las que el teléfono no podía comprobar de verdad: que la
  * persona no lo haya recibido antes (en otro aparato), que sea pasajero, que sea NUEVA (sin viajes pedidos) y que no
  * tenga ya otro descuento pendiente (no se le pisa).
+ *
+ * P06 (30-sep-2026): y UNA VEZ POR TELÉFONO, decidido aquí y no en la pantalla de registro. `telefono` es el `celular`
+ * de la ficha en 10 cifras (vacío si no sirve: sin número no hay regalo, lo que no paga de más); `telefonoUsado`, que
+ * ese número ya está en el registro del servidor `bienvenidaPorTelefono` a nombre de OTRA persona (cambiar el número
+ * después no lo borra de ahí); `telefonoDeOtro`, que OTRA ficha se registró con ese mismo número (la misma pregunta de
+ * `celularDisponible`, que antes solo hacía la pantalla y se podía saltar).
  */
-function porQueNoLaBienvenida({ config, ficha, aparatoYaUsado, yaLaRecibio, viajesPedidos }) {
+function porQueNoLaBienvenida({ config, ficha, aparatoYaUsado, yaLaRecibio, viajesPedidos, telefono, telefonoUsado, telefonoDeOtro }) {
   if (!ficha) return 'sin_ficha';
   if ((config || {}).viajeGratisNuevoPasajero === false) return 'apagada';
   if (ficha.tipo === 'conductor') return 'es_conductor';
   if (yaLaRecibio) return 'ya_recibida';
   if (aparatoYaUsado) return 'aparato_usado';
+  if (!telefono) return 'sin_telefono';
+  if (telefonoUsado) return 'telefono_usado';
+  if (telefonoDeOtro) return 'telefono_de_otro';
   if ((viajesPedidos || 0) > 0) return 'no_es_nuevo';
   if (ficha.descuentoPendiente) return 'ya_tiene_descuento';
   return null;

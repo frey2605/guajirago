@@ -91,7 +91,8 @@ describe('G18 · la ficha del descuento pendiente y quién la recibe (la pieza d
     assert.strictEqual(PIEZA.PROMO_BIENVENIDA, 'BIENVENIDA');
   });
 
-  const nuevo = { config: {}, ficha: { tipo: '' }, aparatoYaUsado: false, yaLaRecibio: false, viajesPedidos: 0 };
+  // P06: un pasajero nuevo trae su celular (el servidor lo saca de la ficha); los casos del teléfono, en bienvenidaPorTelefono.test.js.
+  const nuevo = { config: {}, ficha: { tipo: '' }, aparatoYaUsado: false, yaLaRecibio: false, viajesPedidos: 0, telefono: '3001112233' };
   const CASOS = [
     ['un pasajero nuevo, con el interruptor sin tocar', {}, null],
     ['con el interruptor ENCENDIDO', { config: { viajeGratisNuevoPasajero: true } }, null],

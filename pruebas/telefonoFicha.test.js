@@ -55,7 +55,9 @@ const NOMBRA_CELULAR = /(['"]?)celular\1\s*:|\[\s*['"`]celular['"`]\s*\]|[{,(]\s
 const LEEN_CELULAR = {
   'guajirago/src/telefonoUsuario.js': 1, // la regla misma
   'guajirago-admin/src/telefonoUsuario.js': 1, // su copia
-  'guajirago/functions/index.js': 1, // celularDisponible: el número que manda quien se registra
+  // celularDisponible: el número que manda quien se registra; y (P06) descuentoDeBienvenida: el `celular` de la ficha
+  // A PROPÓSITO y no telefonoDe: la bienvenida va por el número del REGISTRO, que Mi perfil no cambia.
+  'guajirago/functions/index.js': 2,
 };
 // Dónde se lee `.telefono` hoy: la regla, y el teléfono de NEGOCIOS, AGENCIAS y PEDIDOS, que no es la ficha.
 const LEEN_TELEFONO = {

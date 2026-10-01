@@ -39,16 +39,19 @@ function baseDeMentira(datos, escrituras = []) {
     update: (r, campos) => { escrituras.push({ que: 'update', ruta: r.col + '/' + r.id, campos }); },
     set: (r, campos, opciones) => { escrituras.push({ que: 'set', ruta: r.col + '/' + r.id, campos, opciones }); },
   });
-  const consulta = (col, filtros) => ({
-    where: (campo, op, valor) => consulta(col, [...filtros, [campo, valor]]),
+  // P06: también `in` (la consulta del celular, `formasGuardadas`), `limit` y `empty`, como la de verdad.
+  const cumple = (s, [c, o, v]) => (o === 'in' ? Array.isArray(v) && v.includes(s.data()[c]) : s.data()[c] === v);
+  const consulta = (col, filtros, tope) => ({
+    where: (campo, op, valor) => consulta(col, [...filtros, [campo, op, valor]], tope),
+    limit: (n) => consulta(col, filtros, n),
     get: async () => {
       const docs = Object.keys(datos[col] || {}).map((id) => snap(col, id))
-        .filter((s) => filtros.every(([c, v]) => s.data()[c] === v));
-      return { size: docs.length, docs, forEach: (fn) => docs.forEach(fn) };
+        .filter((s) => filtros.every((f) => cumple(s, f))).slice(0, tope === undefined ? Infinity : tope);
+      return { size: docs.length, empty: docs.length === 0, docs, forEach: (fn) => docs.forEach(fn) };
     },
   });
   return {
-    collection: (col) => ({ doc: (id) => ref(col, id), where: (c, o, v) => consulta(col, [[c, v]]) }),
+    collection: (col) => ({ doc: (id) => ref(col, id), where: (c, o, v) => consulta(col, [[c, o, v]]) }),
     getAll: async (...refs) => refs.map((r) => snap(r.col, r.id)),
     runTransaction,
   };

@@ -818,7 +818,8 @@ describe('G18 · descuentoDeBienvenida', () => {
   const nuevo = async (campos = {}) => {
     n += 1;
     const uid = 'bienv' + Date.now() + '_' + n;
-    await sembrar('usuarios/' + uid, { tipo: txt(''), nombre: txt('Ana'), ...campos });
+    // P06: como el registro de verdad (Login.js), la ficha nace con su celular en 10 cifras; uno distinto por cuenta.
+    await sembrar('usuarios/' + uid, { tipo: txt(''), nombre: txt('Ana'), celular: txt(celularUnico()), ...campos });
     return uid;
   };
 
@@ -907,6 +908,88 @@ describe('G18 · descuentoDeBienvenida', () => {
     const conPromo = await nuevo({ descuentoPendiente: { mapValue: { fields: { promoId: txt('VIVA'), codigoVerificacion: txt('5555') } } } });
     assert.strictEqual((await llamarA('descuentoDeBienvenida', conPromo, { deviceId: 'dev_' + conPromo })).cuerpo?.result?.motivo, 'ya_tiene_descuento');
     assert.strictEqual((await pendienteDe(conPromo)).codigoVerificacion.stringValue, '5555', 'se le piso la promocion que tenia');
+  });
+});
+
+// ── P06 · LA BIENVENIDA, UNA VEZ POR TELEFONO, DECIDIDO EN EL SERVIDOR ──────────
+// Hasta P06 «una vez por telefono» lo cuidaba solo la pantalla de registro (preguntando a celularDisponible), y el
+// servidor no miraba el numero. Se enciende la funcion de verdad y se reproduce el abuso: Ana cobra con un numero,
+// cambia su `celular` (las reglas se lo dejan) o Beto se salta la pregunta, y Beto se registra con el mismo numero.
+let celularesDados = 0;
+function celularUnico() {
+  celularesDados += 1;
+  return '3' + String(Date.now()).slice(-6) + String(celularesDados % 1000).padStart(3, '0');
+}
+describe('P06 · descuentoDeBienvenida, una vez por telefono', () => {
+  const valorDe = (r) => r.cuerpo?.result?.valor;
+  const motivoDe = (r) => r.cuerpo?.result?.motivo;
+  let n = 0;
+  const cuenta = async (celular, campos = {}) => {
+    n += 1;
+    const uid = 'tel' + Date.now() + '_' + n;
+    await sembrar('usuarios/' + uid, { tipo: txt(''), nombre: txt('P06'), ...(celular === null ? {} : { celular: txt(celular) }), ...campos });
+    return uid;
+  };
+  const pedir = (uid) => llamarA('descuentoDeBienvenida', uid, { deviceId: 'dev_' + uid });
+
+  beforeEach(async () => {
+    await sembrar('config/global', { comisionTaxi: num(COMISION_TAXI), viajeGratisNuevoPasajero: { booleanValue: true } });
+  });
+
+  test('el registro honrado cobra, y queda apuntado su numero a su nombre', async () => {
+    const tel = celularUnico();
+    const ana = await cuenta(tel);
+    assert.strictEqual(valorDe(await pedir(ana)), 8000);
+    assert.strictEqual((await leer('bienvenidaPorTelefono/' + tel))?.uid?.stringValue, ana, 'no quedo el numero apuntado');
+  });
+
+  test('EL ABUSO · Ana cambia su celular despues de cobrar y Beto se registra con el viejo: no cobra', async () => {
+    const tel = celularUnico();
+    const ana = await cuenta(tel);
+    assert.strictEqual(valorDe(await pedir(ana)), 8000);
+    await sembrar('usuarios/' + ana, { tipo: txt(''), celular: txt(celularUnico()) });
+    const beto = await cuenta(tel);
+    const r = await pedir(beto);
+    assert.strictEqual(valorDe(r), 0, 'el mismo numero cobro dos veces: ' + JSON.stringify(r.cuerpo));
+    assert.strictEqual(motivoDe(r), 'telefono_usado');
+  });
+
+  test('EL ABUSO · Beto se salta la pregunta y se registra con el numero de Ana (escrito de otra forma): no cobra', async () => {
+    const tel = celularUnico();
+    const ana = await cuenta(tel);
+    await pedir(ana);
+    const beto = await cuenta(tel.slice(0, 3) + ' ' + tel.slice(3, 6) + ' ' + tel.slice(6));
+    const r = await pedir(beto);
+    assert.strictEqual(valorDe(r), 0);
+    assert.strictEqual(motivoDe(r), 'telefono_usado');
+  });
+
+  test('si otra ficha ya se registro con ese numero (aunque no este apuntado), no cobra', async () => {
+    const tel = celularUnico();
+    await cuenta(tel);
+    const r = await pedir(await cuenta(tel));
+    assert.strictEqual(motivoDe(r), 'telefono_de_otro');
+  });
+
+  test('un numero puesto en Mi perfil por otro NO le quita el regalo al dueño', async () => {
+    const tel = celularUnico();
+    const ana = await cuenta(celularUnico());
+    await pedir(ana);
+    await sembrar('usuarios/' + ana, { tipo: txt(''), celular: (await leer('usuarios/' + ana)).celular, telefono: txt(tel) });
+    assert.strictEqual(valorDe(await pedir(await cuenta(tel))), 8000);
+  });
+
+  test('sin celular en la ficha no se da', async () => {
+    const r = await pedir(await cuenta(null));
+    assert.strictEqual(motivoDe(r), 'sin_telefono');
+  });
+
+  test('dos cuentas con el mismo numero pidiendo A LA VEZ: no salen dos regalos', async () => {
+    const tel = celularUnico();
+    const [a, b] = [await cuenta(tel), await cuenta(tel)];
+    const [r1, r2] = await Promise.all([pedir(a), pedir(b)]);
+    const cobraron = [r1, r2].filter((r) => valorDe(r) === 8000).length;
+    assert.ok(cobraron <= 1, 'el mismo numero cobro dos veces a la vez: ' + JSON.stringify([r1.cuerpo, r2.cuerpo]));
   });
 });
 

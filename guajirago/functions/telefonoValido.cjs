@@ -34,4 +34,20 @@ function formasGuardadas(diez) {
   return [...new Set(formas)];
 }
 
-module.exports = { celularDiezCifras, formasGuardadas };
+/**
+ * P06 (30-sep-2026): la pregunta «¿otra ficha se registró con este celular?» vive UNA vez y la hacen dos funciones:
+ * `celularDisponible` (la pantalla de registro, antes de crear la ficha) y `descuentoDeBienvenida` (el servidor, que ya
+ * no se fía de que la pantalla haya preguntado). Se busca en `celular` (el número del registro), no en `telefono` (el de
+ * Mi perfil): un número puesto en Mi perfil no le quita el regalo a su dueño cuando se registre.
+ * `db` es el Firestore del servidor; la consulta se corre con `.get()` o dentro de una transacción con `t.get()`.
+ */
+function fichasConEsteCelular(db, diez) {
+  return db.collection('usuarios').where('celular', 'in', formasGuardadas(diez)).limit(2);
+}
+
+/** Su propia ficha no cuenta: si vuelve a intentarlo, no se bloquea a sí mismo. */
+function esDeOtraFicha(snap, uid) {
+  return snap.docs.some((d) => d.id !== uid);
+}
+
+module.exports = { celularDiezCifras, formasGuardadas, fichasConEsteCelular, esDeOtraFicha };
