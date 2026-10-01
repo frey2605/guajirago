@@ -59,11 +59,14 @@ const DESCRIPCION = 'Tour de mentira del robot P16';
       await p.getByRole('button', { name: 'Enviar reserva' }).click();
       await p.waitForTimeout(8000);
       await r.captura('enviada');
-      visto = await p.evaluate(() => ({
+      const noSePudo = await p.evaluate(() => document.body.innerText.includes('No se pudo enviar la reserva'));
+      // El «¡Reserva enviada!» solo se pinta en la LISTA de agencias (Turismo.js; hallazgo aparte): se vuelve a ella.
+      if (!noSePudo) { await p.getByText('Volver').first().click(); await p.waitForTimeout(1500); await r.captura('lista'); }
+      visto = await p.evaluate((no) => ({
         enviada: document.body.innerText.includes('¡Reserva enviada!'),
-        noSePudo: document.body.innerText.includes('No se pudo enviar la reserva'),
+        noSePudo: no,
         ids: (() => { try { return JSON.parse(localStorage.getItem('misReservasGuajira')) || []; } catch (e) { return []; } })(),
-      }));
+      }), noSePudo);
     } finally { await r.cerrar(); }
     console.log('LA APP: ' + JSON.stringify({ enviada: visto.enviada, noSePudo: visto.noSePudo }) + ' · capturas', r.carpeta);
     if (!visto.enviada) fallos.push('no salió «¡Reserva enviada!»');
