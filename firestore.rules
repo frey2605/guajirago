@@ -159,8 +159,31 @@ service cloud.firestore {
       //
       // Va en lista APARTE de camposDePoder porque en el CREATE sí hay que dejarlo
       // escribir: si no, nadie puede volver a registrarse.
+      //
+      // ── P07 · EL CELULAR DEL REGISTRO TAMPOCO SE MUEVE (30-sep-2026) ────────
+      // `celular` es el número con que la persona se registró (Login.js lo pone
+      // al crear la ficha). «Mi perfil» cambia `telefono`, que es OTRO campo
+      // (G08). El servidor mira `celular` para dar el regalo de bienvenida una
+      // vez por número (celularDisponible, descuentoDeBienvenida; P06). Hasta
+      // hoy el dueño podía cambiarlo: se ponía el número de otra persona y a esa
+      // persona el registro le decía «ocupado». Medido el 30-sep-2026: en las
+      // tres apps y en el paquete publicado, la ÚNICA escritura de `celular` es
+      // la del registro (un create); lo vigila pruebas/telefonoFicha.test.js.
+      // El panel sigue pudiendo corregirlo (esAdmin, abajo).
+      // Lo mide scripts/medir-celular-congelado.cjs.
       function camposCongelados() {
-        return ['email'];
+        return ['email', 'celular'];
+      }
+
+      // Al CREAR la ficha, el celular (si viene) va en la forma que guarda la
+      // app desde G42: 10 cifras limpias, lo que devuelve celularDiezCifras
+      // (guajirago/src/telefonoValido.js). Esta expresión NO decide si un
+      // número sirve —eso lo hace aquella pieza—: solo comprueba que lo
+      // guardado sea su resultado. La ata pruebas/celularCongelado.test.js.
+      function celularDelRegistro() {
+        return !('celular' in request.resource.data)
+          || (request.resource.data.celular is string
+              && request.resource.data.celular.matches('[0-9]{10}'));
       }
 
       // ── REGLA 7 · LA PLATA NO LA ESCRIBE EL TELÉFONO ────────────────────────
@@ -219,6 +242,7 @@ service cloud.firestore {
       allow create: if request.auth != null
         && request.auth.uid == userId
         && !request.resource.data.keys().hasAny(camposDePoder().concat(camposDePlata()))
+        && celularDelRegistro()
         && descuentoSoloSeQuema();
       allow update: if request.auth != null
         && request.auth.uid == userId
