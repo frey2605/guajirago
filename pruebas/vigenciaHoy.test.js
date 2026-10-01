@@ -145,11 +145,15 @@ function elFiltroDeAnuncios() {
 
 function lasPromosDeRestaurante() {
   const f = sinCR(leer('guajirago/src/Restaurantes.js'));
-  assert.match(f, /import \{ etapaDeVigencia \} from '\.\/reglaPromocion';/, 'Restaurantes.js no pide la regla');
+  // P09: la pantalla pregunta ahora a la pieza del precio del pedido (precioPedido.js), que usa esta misma regla.
+  assert.match(f, /import \{ promoVigenteHoy, [^}]*\} from '\.\/precioPedido';/, 'Restaurantes.js no pide la pieza del precio');
   const d = f.indexOf('const promosActivasHoy');
   assert.ok(d >= 0, 'no está promosActivasHoy');
   // eslint-disable-next-line no-new-func
-  return new Function('restauranteActivo', 'etapaDeVigencia', 'Date', cuerpoDeLaFuncion(f, d).texto);
+  const hacer = new Function('restauranteActivo', 'promoVigenteHoy', 'Date', cuerpoDeLaFuncion(f, d).texto);
+  const { promoVigenteHoy } = cargarDeLaApp('guajirago/src/precioPedido.js');
+  // El segundo argumento (la regla de vigencia) ya no se usa: la pieza la importa de reglaPromocion.js.
+  return (restauranteActivo, _regla, Reloj) => hacer(restauranteActivo, promoVigenteHoy, Reloj);
 }
 
 function lasPestanasDelPanel() {

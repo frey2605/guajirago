@@ -15,7 +15,9 @@ import { guardarRechazo } from './guardarRechazo';
 // «¿Quién sale en la app?» se contesta en UN solo sitio (SEGUNDA LEY): el mismo
 // que usa Turismo.js. Ahí vive también el interruptor `visibleEnEscaparate`.
 import { losDeComida } from './escaparate';
-import { etapaDeVigencia } from './reglaPromocion';
+// P09: qué promoción vale hoy y cuánto cuesta cada línea es la cuenta del SERVIDOR (copia atada de
+// functions/precioPedido.cjs). Aquí solo se ENSEÑA: el precio de verdad lo pone el servidor cuando nace el pedido.
+import { promoVigenteHoy, mejorDescuento, precioDeLaLinea } from './precioPedido';
 // G87: qué número es cada día de la promoción y cómo se dice vive en diasSemana.js (copia atada en aliados).
 import { diasTxt } from './diasSemana';
 // G47: «¿me pueden pedir ahora?» es UNA regla (candado + escaparate + pausa + horario), la misma del dueño y del panel.
@@ -30,7 +32,6 @@ import {
   getDoc,
   setDoc,
   updateDoc,
-  increment,
   arrayUnion,
   serverTimestamp,
   getDocs,
@@ -230,28 +231,12 @@ function Restaurantes({ nombre, onVolver, foto, onCerrarSesion, onIrPerfil, onIr
   // ---------- Promociones (ofertas) ----------
   const promosActivasHoy = () => {
     const proms = (restauranteActivo && restauranteActivo.promociones) || [];
-    const dow = new Date().getDay();
-    return proms.filter((p) => {
-      if (!p.activa) return false;
-      if (p.programacion === 'dias') return (p.dias || []).includes(dow);
-      // G16: el DÍA de hoy en Colombia (antes era el día en UTC: desde las 7 de la noche ya contaba «mañana»).
-      if (p.programacion === 'rango') return etapaDeVigencia(p.fechaInicio, p.fechaFin, new Date()) === 'vigente';
-      return true; // siempre
-    });
+    // P09: la misma pregunta que se hace el servidor (y el día de la semana es el de Colombia, no el del aparato).
+    return proms.filter((p) => promoVigenteHoy(p, new Date()));
   };
-  // Mejor descuento (%, fijo) aplicable a un plato para ESTE cliente (respeta límite por dispositivo)
-  const descuentoDePlato = (plato) => {
-    let mejor = null;
-    for (const p of promosActivasHoy()) {
-      if (p.tipo !== 'porcentaje' && p.tipo !== 'fijo') continue;
-      const lista = p.platosAplica || [];
-      if (lista.length > 0 && !lista.some((x) => x.id === plato.id)) continue;
-      if (p.limiteCliente > 0 && (usosPromo[p.id] || 0) >= p.limiteCliente) continue;
-      const precioFinal = p.tipo === 'porcentaje' ? Math.round(plato.precio * (1 - (p.valor || 0) / 100)) : Math.max(0, plato.precio - (p.valor || 0));
-      if (precioFinal < plato.precio && (!mejor || precioFinal < mejor.precioFinal)) mejor = { promo: p, precioFinal };
-    }
-    return mejor;
-  };
+  // Mejor descuento (%, fijo) aplicable a un plato para ESTE cliente (respeta límite por dispositivo).
+  // P09: la cuenta es la del servidor (precioPedido.js).
+  const descuentoDePlato = (plato) => mejorDescuento(plato, promosActivasHoy(), (id) => usosPromo[id] || 0, new Date());
   const vigenciaTxt = (p) => {
     if (p.programacion === 'dias' && (p.dias || []).length) return diasTxt(p.dias);
     if (p.programacion === 'rango' && p.fechaInicio) return 'hasta ' + (p.fechaFin || p.fechaInicio);
@@ -261,7 +246,7 @@ function Restaurantes({ nombre, onVolver, foto, onCerrarSesion, onIrPerfil, onIr
   const agregarLinea = (plato, adicionesSel, cantidad) => {
     const desc = descuentoDePlato(plato);
     const extra = adicionesSel.reduce((s, a) => s + (a.precio || 0), 0);
-    const unit = (desc ? desc.precioFinal : plato.precio) + extra;
+    const unit = precioDeLaLinea(plato, adicionesSel, desc); // P09: la cuenta del servidor
     const firma = plato.id + '|' + [...adicionesSel.map((a) => a.nombre)].sort().join(',') + (desc ? '|p' + desc.promo.id : '');
     setCarrito((prev) => {
       const idx = prev.findIndex((l) => l.firma === firma);
@@ -338,6 +323,8 @@ function Restaurantes({ nombre, onVolver, foto, onCerrarSesion, onIrPerfil, onIr
         cliente: nombre || 'Cliente GuajiraGo',
         telefono: tel,
         direccion: direccion.trim(),
+        // P09: los precios, el subtotal y el total son lo que el cliente VIO; el servidor los rehace con el menú
+        // del negocio en cuanto nace el pedido (notificarNuevoPedido), y los de él son los que valen.
         items: carrito,
         subtotal: totalCarrito,
         costoDomicilio: restauranteActivo.costoDomicilio || 0,
@@ -350,12 +337,12 @@ function Restaurantes({ nombre, onVolver, foto, onCerrarSesion, onIrPerfil, onIr
       pegarToken(ref);
       setNumeroPedido(numeroDelPedido(ref.id));
       recordar(MIS_PEDIDOS, ref.id);
-      // Registrar el uso de las promociones (por dispositivo y por teléfono)
+      // Registrar el uso de las promociones en ESTE aparato. P09: el contador por teléfono (usosPromo) ya no lo
+      // escribe la app: lo suma el SERVIDOR al poner el precio del pedido, y solo si la promoción de verdad valía.
       if (promosEnCarrito.length > 0) {
         const nuevosUsos = { ...usosPromo };
         for (const pid of promosEnCarrito) {
           nuevosUsos[pid] = (nuevosUsos[pid] || 0) + 1;
-          try { await setDoc(doc(db, 'usosPromo', pid + '__' + tel), { veces: increment(1), telefono: tel, promoId: pid }, { merge: true }); } catch (e) {}
         }
         setUsosPromo(nuevosUsos);
         try { localStorage.setItem('usosPromoGuajira', JSON.stringify(nuevosUsos)); } catch (e) {}

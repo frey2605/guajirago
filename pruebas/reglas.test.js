@@ -1681,6 +1681,40 @@ describe('REGLA 9 · los pedidos dejan de ser públicos entre usuarios', () => {
     }));
   });
 
+  // P09 (30-sep-2026): la plata del pedido la pone el servidor al nacer; el cliente no la cambia después.
+  it('EL QUE MUERDE · P09 · el cliente NO cambia los platos, el subtotal, el domicilio, el total ni la revisión del servidor', async () => {
+    const { doc, setDoc, updateDoc, deleteField } = FS;
+    await entorno.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'pedidos/pplata'), {
+        restauranteId: 'r1', clienteId: 'pasajero1', estado: 'nuevo', tipo: 'domicilio',
+        items: [{ id: 'p1', nombre: 'Sancocho', precio: 18000, cantidad: 1 }],
+        subtotal: 18000, costoDomicilio: 3000, total: 21000,
+        revisionServidor: { evento: 'e1', promos: [], problemas: [] },
+      });
+    });
+    const yo = doc(como('pasajero1'), 'pedidos/pplata');
+    await RUT.assertFails(updateDoc(yo, { items: [{ id: 'p1', nombre: 'Sancocho', precio: 1, cantidad: 1 }] }));
+    await RUT.assertFails(updateDoc(yo, { subtotal: 1 }));
+    await RUT.assertFails(updateDoc(yo, { costoDomicilio: 0 }));
+    await RUT.assertFails(updateDoc(yo, { total: 1 }));
+    await RUT.assertFails(updateDoc(yo, { revisionServidor: { evento: 'falso' } }));
+    await RUT.assertFails(updateDoc(yo, { total: deleteField() }));
+    // Ni de paso, cancelando.
+    await RUT.assertFails(updateDoc(yo, { estado: 'cancelado', canceladoPor: 'cliente', total: 0 }));
+    // Lo que la app SÍ hace sigue entrando: el token de avisos, el motivo y cancelar.
+    await RUT.assertSucceeds(updateDoc(yo, { clienteFcmToken: 'tok' }));
+    await RUT.assertSucceeds(updateDoc(yo, { estado: 'cancelado', canceladoPor: 'cliente' }));
+    await RUT.assertSucceeds(updateDoc(yo, { motivoCancelacion: 'me equivoqué' }));
+    // Y el restaurante sí puede poner su domicilio y su total al confirmar (PedidosDomicilio.js).
+    await entorno.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'pedidos/pplata2'), {
+        restauranteId: 'r1', clienteId: 'pasajero1', estado: 'nuevo', subtotal: 18000, costoDomicilio: 0, total: 18000,
+      });
+    });
+    await RUT.assertSucceeds(updateDoc(doc(como('r1'), 'pedidos/pplata2'),
+      { estado: 'confirmado', costoDomicilio: 4000, subtotal: 18000, total: 22000 }));
+  });
+
   it('y EL RESTAURANTE sigue moviendo el pedido por su flujo (PedidosDomicilio.js:138)', async () => {
     const { doc, setDoc, updateDoc } = FS;
     await entorno.withSecurityRulesDisabled(async (ctx) => {
@@ -4090,9 +4124,11 @@ describe('SE VENDE · un negocio no puede tocar los datos de otro', () => {
     const uso = (veces) => ({ veces, telefono: '3001112233', promoId: 'promoA' });
     const suNombre = 'usosPromo/promoA__3001112233';
 
-    it('el cliente apunta su primer uso', async () => {
+    // P09 (30-sep-2026): el contador ya no lo escribe el cliente; lo suma el SERVIDOR al poner el precio del
+    // pedido (precioPedido.cjs), que no pasa por estas reglas.
+    it('EL QUE MUERDE · P09 · el cliente ya NO apunta ni su primer uso', async () => {
       const { doc, setDoc } = FS;
-      await RUT.assertSucceeds(setDoc(doc(como('pasajero1'), suNombre), uso(1)));
+      await RUT.assertFails(setDoc(doc(como('pasajero1'), suNombre), uso(1)));
     });
 
     it('EL QUE MUERDE · no se puede nacer con el contador ya gastado', async () => {
@@ -4108,8 +4144,8 @@ describe('SE VENDE · un negocio no puede tocar los datos de otro', () => {
       });
       await RUT.assertFails(updateDoc(doc(como('pasajero1'), suNombre), { veces: 0 }));
       await RUT.assertFails(updateDoc(doc(como('pasajero1'), suNombre), { veces: 1 }));
-      // Solo puede subir de uno en uno.
-      await RUT.assertSucceeds(setDoc(doc(como('pasajero1'), suNombre), uso(4)));
+      // P09: tampoco lo sube (antes podía subir de uno en uno).
+      await RUT.assertFails(setDoc(doc(como('pasajero1'), suNombre), uso(4)));
     });
 
     // P08 (30-sep-2026): la prueba de arriba solo comprobaba que SUBIR UNO entra; nadie
@@ -4123,9 +4159,12 @@ describe('SE VENDE · un negocio no puede tocar los datos de otro', () => {
       await RUT.assertFails(updateDoc(doc(como('pasajero1'), suNombre), { veces: increment(2) }));
       await RUT.assertFails(updateDoc(doc(como('pasajero1'), suNombre), { veces: -5 }));
       await RUT.assertFails(setDoc(doc(como('pasajero1'), suNombre), uso(1)));
-      // Y lo que hace la app (Restaurantes.js: increment(1) con merge) SÍ entra.
-      await RUT.assertSucceeds(setDoc(doc(como('pasajero1'), suNombre),
+      // P09: lo que hacía la app vieja (increment(1) con merge) ya NO entra: lo suma el servidor. Las apps viejas
+      // lo intentan dentro de un try vacío, así que negarlo no les rompe nada.
+      await RUT.assertFails(setDoc(doc(como('pasajero1'), suNombre),
         { veces: increment(1), telefono: '3001112233', promoId: 'promoA' }, { merge: true }));
+      await RUT.assertFails(setDoc(doc(como('pasajero1'), 'usosPromo/promoB__3001112233'),
+        { veces: increment(1), telefono: '3001112233', promoId: 'promoB' }, { merge: true }));
     });
 
     it('EL QUE MUERDE · nadie barre la colección y se lleva los teléfonos', async () => {

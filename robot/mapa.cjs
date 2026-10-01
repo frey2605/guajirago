@@ -598,6 +598,14 @@ const RECORRIDOS = [
     // scripts/medir-foto-redonda.cjs (pruebas/fotoRedonda.test.js).
     vigila: ['guajirago/src/FotoRedonda.js', 'guajirago/src/MenuLateral.js', 'guajirago/src/MiPerfil.js'],
   },
+  {
+    nombre: 'total-pedido',
+    que: 'el pasajero pide un domicilio y el servidor le deja su total (con revisionServidor); el mismo pedido creado por la red con los platos a $1 queda con el precio del menú; los dos se cancelan y el cliente ya no puede cambiar el total (P09; crea dos pedidos en PRUEBAS; necesita la función notificarNuevoPedido y las reglas publicadas en pruebas)',
+    archivo: 'total-pedido.cjs',
+    // La cuenta compartida, el careo del carrito con el código de antes, la transacción del servidor y el disparo de
+    // index.js los EJECUTA pruebas/totalPedido.test.js; el disparador de verdad, pruebas/funciones.test.js (P09).
+    vigila: ['guajirago/src/precioPedido.js', 'guajirago/src/Restaurantes.js'],
+  },
 ];
 
 // Los archivos de pantalla: los que, si cambian, el robot debería poder probar. Todo lo que esté en

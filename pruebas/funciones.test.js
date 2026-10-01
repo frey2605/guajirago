@@ -1257,3 +1257,47 @@ describe('P04 · confirmarConductor no confirma si al conductor no le alcanza el
     assert.strictEqual((await leer('viajes/vs2')).estado.stringValue, 'aceptado');
   });
 });
+
+// ── P09 · EL PRECIO DEL PEDIDO LO PONE EL SERVIDOR (30-sep-2026) ──
+// Cuando nace el pedido de un cliente, notificarNuevoPedido le pone los precios del MENÚ del negocio, la promoción
+// solo si vale y si ese teléfono no llenó su tope, y suma él mismo el contador. Aquí con el disparador de verdad.
+describe('P09 · notificarNuevoPedido le pone al pedido el precio del menú al nacer', () => {
+  const { aCampos, val } = require('../scripts/nube.cjs');
+  const comoJs = (f) => f && Object.fromEntries(Object.entries(f).map(([k, v]) => [k, val(v)]));
+  const revisado = async (ruta) => {
+    for (let i = 0; i < 80; i++) {
+      const p = comoJs(await leer(ruta));
+      if (p && p.revisionServidor) return p;
+      await new Promise((r) => setTimeout(r, 250));
+    }
+    return comoJs(await leer(ruta));
+  };
+  const TEL = '3005550009';
+  const pedido = (items) => aCampos({
+    restauranteId: 'negP9', clienteId: 'cliP9', cliente: 'Ana', telefono: TEL, direccion: 'Calle 1', estado: 'nuevo',
+    tipo: 'domicilio', items, subtotal: 1, costoDomicilio: 0, total: 1,
+  });
+
+  test('honrado con promoción: con su descuento y el contador en 1; el segundo, con precios inventados y la promo agotada: el menú', async () => {
+    await sembrar('negocios/negP9', aCampos({
+      nombre: 'Meche', costoDomicilio: 4000,
+      menu: [{ id: 'p1', nombre: 'Sancocho', precio: 18000, disponible: true }],
+      promociones: [{ id: 'pct9', nombre: '20%', tipo: 'porcentaje', valor: 20, activa: true, programacion: 'siempre', platosAplica: [], limiteCliente: 1 }],
+    }));
+    await sembrar('pedidos/pedP9a', pedido([{ id: 'p1', nombre: 'Sancocho', precio: 14400, cantidad: 1, promoId: 'pct9' }]));
+    const a = await revisado('pedidos/pedP9a');
+    assert.ok(a.revisionServidor, 'el servidor no revisó el pedido');
+    assert.strictEqual(a.subtotal, 14400);
+    assert.strictEqual(a.total, 18400);
+    assert.deepStrictEqual(a.revisionServidor.promos, ['pct9']);
+    assert.strictEqual(comoJs(await leer('usosPromo/pct9__' + TEL)).veces, 1);
+
+    await sembrar('pedidos/pedP9b', pedido([{ id: 'p1', nombre: 'Sancocho', precio: 1, cantidad: 2, promoId: 'pct9' }]));
+    const b = await revisado('pedidos/pedP9b');
+    assert.strictEqual(b.subtotal, 36000, 'la promo agotada o el precio inventado entraron');
+    assert.strictEqual(b.total, 40000);
+    assert.strictEqual(b.items[0].precio, 18000);
+    assert.deepStrictEqual(b.revisionServidor.problemas.map((p) => p.codigo), ['promocion-no-vale']);
+    assert.strictEqual(comoJs(await leer('usosPromo/pct9__' + TEL)).veces, 1, 'se contó un uso que no hubo');
+  });
+});

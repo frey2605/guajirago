@@ -1882,6 +1882,16 @@ service cloud.firestore {
             || request.resource.data.get('estado', '') == 'cancelado';
       }
 
+      // P09 (30-sep-2026): la PLATA del pedido la pone el servidor al nacer
+      // (precioPedido.cjs, con el menú del negocio). El cliente no la toca
+      // después: si pudiera, cambiaría los platos o el total encima de lo que
+      // puso el servidor. Lo que la app sí le cambia (cancelar, el motivo, el
+      // chat, las estrellas, el token de avisos) no es nada de esto.
+      function elClienteNoTocaLaPlata() {
+        return !request.resource.data.diff(resource.data).affectedKeys()
+          .hasAny(['items', 'subtotal', 'costoDomicilio', 'total', 'revisionServidor']);
+      }
+
       // Al cambiarlo: su cliente, su restaurante o el panel. Y el pedido NO
       // puede cambiar de dueño ni de restaurante por el camino: si pudiera, la
       // firma de arriba no valdría nada — bastaría crear uno propio y después
@@ -1894,7 +1904,8 @@ service cloud.firestore {
            negocioPuedeOperar(resource.data.restauranteId)) ||
           (request.auth != null &&
            resource.data.get('clienteId', '') == request.auth.uid &&
-           elClienteNoMueveElPedido())) &&
+           elClienteNoMueveElPedido() &&
+           elClienteNoTocaLaPlata())) &&
         request.resource.data.restauranteId == resource.data.restauranteId &&
         request.resource.data.get('clienteId', '') == resource.data.get('clienteId', '');
 
@@ -2320,9 +2331,15 @@ service cloud.firestore {
       allow get: if request.auth != null;
       allow list: if esAdmin();
 
-      // EL CLIENTE solo puede empezar en uno y subir de uno en uno. Eso es lo que
-      // impide la trampa de ponerse el contador a cero para volver a gastar la
-      // promoción.
+      // EL CLIENTE YA NO LO ESCRIBE (P09, 30-sep-2026). Hasta hoy lo subía la app
+      // de uno en uno después de crear el pedido; ahora lo suma el SERVIDOR al
+      // ponerle el precio al pedido (precioPedido.cjs), y solo si la promoción de
+      // verdad valía. El servidor no pasa por estas reglas. Si el cliente pudiera
+      // seguir sumando, una app vieja contaría dos veces el mismo pedido —y si su
+      // suma llegara antes que la del servidor, le quitaría el descuento a un
+      // cliente honrado—, y cualquiera podría gastarle la promoción a otro
+      // teléfono. Las apps viejas lo intentan dentro de un try vacío: que se
+      // niegue no le rompe nada a nadie.
       //
       // LA ADMINISTRADORA SÍ PUEDE BAJARLO, y esto lo decidió el dueño el
       // 6-sep-2026 después de que se le enseñaran las dos opciones. El caso real
@@ -2332,17 +2349,11 @@ service cloud.firestore {
       //
       // Al admin se le pide igual que el documento tenga la forma correcta: poder
       // corregir no es poder escribir cualquier cosa.
-      allow create: if contadorBueno() && (
-        esAdmin() || (request.auth != null && request.resource.data.veces == 1)
-      );
+      allow create: if contadorBueno() && esAdmin();
       allow update: if contadorBueno()
         && request.resource.data.telefono == resource.data.telefono
         && request.resource.data.promoId == resource.data.promoId
-        && (
-          esAdmin()
-          || (request.auth != null
-              && request.resource.data.veces == resource.data.veces + 1)
-        );
+        && esAdmin();
       allow delete: if false;
     }
   }

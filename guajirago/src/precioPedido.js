@@ -1,0 +1,65 @@
+/**
+ * 🍽️ EL PRECIO DEL PEDIDO — COPIA de guajirago/functions/precioPedido.cjs · P09 (30-sep-2026)
+ *
+ * El precio del pedido lo pone el SERVIDOR cuando el pedido nace (los precios del menú, la promoción solo si vale
+ * hoy y si el teléfono no llenó su tope). La app usa ESTE trozo para ENSEÑAR el carrito mientras se arma, con la
+ * misma cuenta: así lo que el cliente ve es lo que el servidor va a cobrar. Es una COPIA porque desde aquí no se puede
+ * importar aquel archivo: pruebas/totalPedido.test.js exige que el trozo entre las marcas sea IGUAL y lo ejecuta con
+ * los mismos casos. Se cambia allá y se copia aquí, o la tanda se pone roja.
+ */
+import { etapaDeVigencia, hoyEnColombia } from './reglaPromocion';
+
+// ── EL PRECIO DEL PEDIDO (se copia igual en la app) ──
+
+/** El día de la semana HOY en Colombia, con el número de `Date.getDay()` (0 = domingo … 6 = sábado). */
+export function diaDeLaSemanaEnColombia(ahora) {
+  return new Date(hoyEnColombia(ahora) + 'T12:00:00Z').getUTCDay();
+}
+
+/** ¿Esta promoción del negocio vale HOY (en Colombia)? Encendida, y en su programación: siempre, ciertos días o un rango. */
+export function promoVigenteHoy(promo, ahora) {
+  if (!promo || !promo.activa) return false;
+  if (promo.programacion === 'dias') return (promo.dias || []).includes(diaDeLaSemanaEnColombia(ahora));
+  // G16: el DÍA de hoy en Colombia (antes era el día en UTC: desde las 7 de la noche ya contaba «mañana»).
+  if (promo.programacion === 'rango') return etapaDeVigencia(promo.fechaInicio, promo.fechaFin, ahora) === 'vigente';
+  return true; // siempre
+}
+
+/** El precio del plato con esta promoción, o null si la promoción no le baja el precio a ESTE plato. */
+export function precioConPromo(plato, promo) {
+  if (!plato || !promo) return null;
+  if (promo.tipo !== 'porcentaje' && promo.tipo !== 'fijo') return null;
+  const lista = promo.platosAplica || [];
+  if (lista.length > 0 && !lista.some((x) => x.id === plato.id)) return null;
+  const precioFinal = promo.tipo === 'porcentaje'
+    ? Math.round(plato.precio * (1 - (promo.valor || 0) / 100))
+    : Math.max(0, plato.precio - (promo.valor || 0));
+  return precioFinal < plato.precio ? precioFinal : null;
+}
+
+/** ¿Este teléfono ya llenó el tope de la promoción? `usados` = cuántas veces la usó. Sin tope, nunca. */
+export function topeLleno(promo, usados) {
+  return promo.limiteCliente > 0 && (usados || 0) >= promo.limiteCliente;
+}
+
+/**
+ * La mejor promoción para este plato: { promo, precioFinal }, o null. `usos(id)` dice cuántas veces la usó ya quien
+ * pide; con su tope lleno no cuenta.
+ */
+export function mejorDescuento(plato, promos, usos, ahora) {
+  let mejor = null;
+  for (const p of (promos || []).filter((x) => promoVigenteHoy(x, ahora))) {
+    if (topeLleno(p, usos(p.id))) continue;
+    const precioFinal = precioConPromo(plato, p);
+    if (precioFinal !== null && (!mejor || precioFinal < mejor.precioFinal)) mejor = { promo: p, precioFinal };
+  }
+  return mejor;
+}
+
+/** El precio de UNA unidad de la línea: el del plato (con su promoción, si la hay) más el de sus adiciones. */
+export function precioDeLaLinea(plato, adiciones, desc) {
+  const extra = (adiciones || []).reduce((s, a) => s + (a.precio || 0), 0);
+  return (desc ? desc.precioFinal : plato.precio) + extra;
+}
+
+// ── FIN DEL PRECIO DEL PEDIDO ──

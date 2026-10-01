@@ -61,6 +61,8 @@ const { regaloDelConductorNuevo } = require('./regaloConductorNuevo.cjs');
 const { ESTADOS_MERCADO, ESTADO_ACEPTADO, ESTADOS_EN_CURSO } = require('./estadosViaje.cjs');
 // G64: a qué EMPLEADOS del negocio les llega cada aviso (pedido, reserva, cobro) sale de UNA tabla.
 const { tokensDeLosEmpleados } = require('./quienRecibeElAviso.cjs');
+// P09: el precio del pedido de un cliente lo pone el servidor con el menú del negocio (precioPedido.cjs).
+const { loRevisaElServidor, ponerElPrecioDelServidor } = require('./precioPedido.cjs');
 // P03: la tarjeta del conductor que lleva el viaje sale de su ficha (copias atadas de la app, pruebas/tarjetaDelConductor.test.js).
 const { tarjetaDelConductor } = require('./conductorDeLaFicha.cjs');
 
@@ -211,8 +213,23 @@ async function avisarDelPedidoNuevo(p) {
 
 // Una sola puerta desde el 9-sep-2026. El cuerpo se queda suelto a propósito: es
 // lo que permitió tener dos puertas sin dos copias, y lo permitirá otra vez.
+//
+// P09 (30-sep-2026): ANTES de avisar, el servidor le pone al pedido de un cliente los precios del MENÚ (y la
+// promoción solo si vale); así el aviso al negocio dice el total bueno. Si eso falla, se avisa igual con lo que
+// mandó el teléfono y queda en el registro: un pedido sin aviso es peor que un aviso con el total del teléfono.
+async function pedidoConElPrecioDelServidor(event) {
+  const p = event.data.data();
+  if (!loRevisaElServidor(p)) return p;
+  try {
+    return (await ponerElPrecioDelServidor(admin.firestore(), event.data.id, event.id)) || p;
+  } catch (e) {
+    console.error("P09 · no se pudo poner el precio del servidor al pedido", event.data.id, e.message);
+    return p;
+  }
+}
+
 exports.notificarNuevoPedido = onDocumentCreated("pedidos/{id}",
-  async (event) => avisarDelPedidoNuevo(event.data.data()));
+  async (event) => avisarDelPedidoNuevo(await pedidoConElPrecioDelServidor(event)));
 
 // Avisar al CLIENTE cuando su pedido a domicilio cambia de estado
 // EL MISMO TRATO que el de arriba: el cuerpo suelto, y ya una sola puerta.
