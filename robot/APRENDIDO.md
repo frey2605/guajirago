@@ -938,3 +938,11 @@ la placa de `conductores/{uid}` (la escribe su GPS con la misma placa que va en 
   En la tanda de `probar-cambio` de P19, `sin-saldo-confirmar` dijo una vez «la oferta del taxista no apareció en la
   pantalla del pasajero»; corrido solo justo después, ✓ (esa oferta sale de `contraofertas`, que P19 no tocó): tropiezo
   de tiempo del recorrido.
+- **mercado-viajes, P20 (1-oct-2026):** el taxista ve el viaje en su lista por la consulta de verdad de la app
+  (`where('estado', 'in', ESTADOS_MERCADO)`), así que si las reglas le cerraran el mercado la lista saldría vacía SIN
+  error: por eso el robot espera el texto del origen en su pantalla, no solo lee por la red. Quién lee el viaje se
+  comprueba por la red con cinco cuentas: moto@gg.test, el propio pasajero y admin@gg.test lo leen; pasajera@gg.test y
+  restaurante@gg.test reciben «Missing or insufficient permissions». Las cuentas de conductor de pruebas ya traen
+  `tipo: 'conductor'` en su ficha (scripts/sembrar-pruebas.cjs); una cuenta nueva solo lo tiene tras guardar los datos
+  del vehículo. Corrido en pruebas con las reglas de 7733a4f: ✓, y la tanda de `probar-cambio` entera ✓. Los 403 de la
+  consola salen igual que en los demás. No cuesta comisión (nadie oferta).
