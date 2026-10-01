@@ -606,6 +606,14 @@ const RECORRIDOS = [
     // index.js los EJECUTA pruebas/totalPedido.test.js; el disparador de verdad, pruebas/funciones.test.js (P09).
     vigila: ['guajirago/src/precioPedido.js', 'guajirago/src/Restaurantes.js'],
   },
+  {
+    nombre: 'revision-precio',
+    que: 'un pedido normal sale «revisado» y sin aviso; otro cuya revisión del precio revienta en el servidor queda «sin_revisar» con la plata del teléfono, y aliados dice «⚠️ Precio sin revisar» en su tarjeta y al confirmar (P11; crea dos pedidos en PRUEBAS y los cancela; necesita notificarNuevoPedido, las reglas y aliados publicados en pruebas)',
+    archivo: 'revision-precio.cjs',
+    // La pieza (y su copia atada), la marca del servidor, los 7 caminos de index.js y el confirmar de aliados con el
+    // careo los EJECUTA pruebas/revisionPrecio.test.js.
+    vigila: ['guajirago-aliados/src/revisionPrecio.js', 'guajirago-aliados/src/PedidosDomicilio.js'],
+  },
 ];
 
 // Los archivos de pantalla: los que, si cambian, el robot debería poder probar. Todo lo que esté en

@@ -1715,6 +1715,18 @@ describe('REGLA 9 · los pedidos dejan de ser públicos entre usuarios', () => {
       { estado: 'confirmado', costoDomicilio: 4000, subtotal: 18000, total: 22000 }));
   });
 
+  // P11 (30-sep-2026): la marca de «precio revisado» la pone solo el servidor. Si el teléfono pudiera nacer el pedido
+  // con ella, aliados lo enseñaría como revisado aunque la revisión nunca hubiera corrido.
+  it('EL QUE MUERDE · P11 · el cliente NO crea el pedido con la revisión del servidor ya puesta', async () => {
+    const { doc, setDoc } = FS;
+    const base = { restauranteId: 'r1', clienteId: 'pasajero1', estado: 'nuevo', tipo: 'domicilio', subtotal: 2, total: 2 };
+    await RUT.assertFails(setDoc(doc(como('pasajero1'), 'pedidos/prev1'),
+      { ...base, revisionServidor: { evento: 'x', estado: 'revisado', promos: [], problemas: [] } }));
+    await RUT.assertFails(setDoc(doc(como('pasajero1'), 'pedidos/prev2'), { ...base, revisionServidor: null }));
+    // Lo que manda la app (Restaurantes.js), sin la marca, sigue entrando.
+    await RUT.assertSucceeds(setDoc(doc(como('pasajero1'), 'pedidos/prev3'), base));
+  });
+
   it('y EL RESTAURANTE sigue moviendo el pedido por su flujo (PedidosDomicilio.js:138)', async () => {
     const { doc, setDoc, updateDoc } = FS;
     await entorno.withSecurityRulesDisabled(async (ctx) => {

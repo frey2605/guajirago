@@ -62,7 +62,7 @@ const { ESTADOS_MERCADO, ESTADO_ACEPTADO, ESTADOS_EN_CURSO } = require('./estado
 // G64: a qué EMPLEADOS del negocio les llega cada aviso (pedido, reserva, cobro) sale de UNA tabla.
 const { tokensDeLosEmpleados } = require('./quienRecibeElAviso.cjs');
 // P09: el precio del pedido de un cliente lo pone el servidor con el menú del negocio (precioPedido.cjs).
-const { loRevisaElServidor, ponerElPrecioDelServidor } = require('./precioPedido.cjs');
+const { loRevisaElServidor, ponerElPrecioDelServidor, marcarSinRevisar, comoVaLaRevision } = require('./precioPedido.cjs');
 // P03: la tarjeta del conductor que lleva el viaje sale de su ficha (copias atadas de la app, pruebas/tarjetaDelConductor.test.js).
 const { tarjetaDelConductor } = require('./conductorDeLaFicha.cjs');
 
@@ -198,8 +198,10 @@ async function avisarDelPedidoNuevo(p) {
     }
 
     const totalTxt = p.total ? cop(Number(p.total)) : "";
+    // P11: si el servidor no pudo revisar el precio, el aviso lo dice (el total es el que mandó el teléfono).
+    const sinRevisar = comoVaLaRevision(p, null) === "sin-revisar" ? " · ⚠️ precio sin revisar" : "";
     await mandarAviso(admin.messaging(), tokens,
-      sobreDelAviso("🍽️ Nuevo pedido a domicilio", (p.cliente || "Cliente") + (totalTxt ? " — " + totalTxt : ""),
+      sobreDelAviso("🍽️ Nuevo pedido a domicilio", (p.cliente || "Cliente") + (totalTxt ? " — " + totalTxt : "") + sinRevisar,
         { canal: "pedidos", despertar: true }),
       "notificarNuevoPedido");
 
@@ -224,7 +226,14 @@ async function pedidoConElPrecioDelServidor(event) {
     return (await ponerElPrecioDelServidor(admin.firestore(), event.data.id, event.id)) || p;
   } catch (e) {
     console.error("P09 · no se pudo poner el precio del servidor al pedido", event.data.id, e.message);
-    return p;
+    // P11: y se deja dicho EN EL PEDIDO (revisionServidor.estado = 'sin_revisar'), para que aliados no lo enseñe
+    // como revisado. Si ni eso se puede, aliados lo da por «sin revisar» cuando pasa la espera (comoVaLaRevision).
+    try {
+      return (await marcarSinRevisar(admin.firestore(), event.data.id, event.id, e.message)) || p;
+    } catch (e2) {
+      console.error("P11 · tampoco se pudo marcar el pedido sin revisar", event.data.id, e2.message);
+      return p;
+    }
   }
 }
 

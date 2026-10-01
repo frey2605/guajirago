@@ -283,7 +283,7 @@ describe('P09 · la transacción del servidor (ponerElPrecioDelServidor)', () =>
     assert.strictEqual(up.campos.subtotal, 14400 * 2 + 6000);
     assert.strictEqual(up.campos.costoDomicilio, 4000);
     assert.strictEqual(up.campos.total, 14400 * 2 + 6000 + 4000);
-    assert.deepStrictEqual(up.campos.revisionServidor, { evento: 'ev1', subtotalDelTelefono: 3, totalDelTelefono: 3, promos: ['pct'], problemas: [] });
+    assert.deepStrictEqual(up.campos.revisionServidor, { evento: 'ev1', estado: 'revisado', subtotalDelTelefono: 3, totalDelTelefono: 3, promos: ['pct'], problemas: [] });
     const uso = escrituras.find((e) => e.ruta === 'usosPromo/pct__' + TEL);
     assert.deepStrictEqual(uso.campos, { veces: 1, telefono: TEL, promoId: 'pct' });
     assert.strictEqual(escrituras.length, 2);
@@ -299,7 +299,7 @@ describe('P09 · la transacción del servidor (ponerElPrecioDelServidor)', () =>
   });
 
   it('un reintento del MISMO disparo no escribe nada (no cuenta dos veces)', async () => {
-    const { escrituras } = await correr(datosCon(PEDIDO({ revisionServidor: { evento: 'ev1' } })));
+    const { escrituras } = await correr(datosCon(PEDIDO({ revisionServidor: { evento: 'ev1', estado: 'revisado' } })));
     assert.strictEqual(escrituras.length, 0);
   });
 
@@ -382,13 +382,13 @@ describe('P09 · las apps', () => {
     const d = f.indexOf('const confirmarConTiempo = ');
     assert.ok(d >= 0, 'no está confirmarConTiempo en aliados');
     // eslint-disable-next-line no-new-func
-    const confirmar = new Function('confirmando', 'costoDomSel', 'tiempoSel', 'cambiarEstado', 'setConfirmando', 'setErrorConfirmar',
+    const confirmar = new Function('confirmando', 'costoDomSel', 'tiempoSel', 'cambiarEstado', 'setConfirmando', 'setErrorConfirmar', 'pedidoVivo', 'revisionDe',
       'return (async () => {' + cuerpoDeLaFuncion(f, d).texto + '})();');
     let escrito = null;
     // Un pedido que el servidor ya revisó: los platos dicen $1 (lo que mandó un teléfono tramposo antes de la
     // revisión no importa: el servidor reescribe los items), el subtotal es el del servidor.
     const p = { id: 'x', items: [{ precio: 1, cantidad: 2 }], subtotal: 36000, total: 40000, costoDomicilio: 4000 };
-    await confirmar({ pedido: p, destino: 'confirmado' }, '5000', 20, async (_p, _d, extra) => { escrito = extra; }, () => {}, () => {});
+    await confirmar({ pedido: p, destino: 'confirmado' }, '5000', 20, async (_p, _d, extra) => { escrito = extra; }, () => {}, () => {}, (x) => x, () => 'revisado');
     assert.deepStrictEqual(escrito, { tiempoEstimado: 20, costoDomicilio: 5000, subtotal: 36000, total: 41000 });
   });
 });

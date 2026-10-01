@@ -153,10 +153,37 @@ function pedidoConPreciosDelMenu(negocio, items, usos, ahora) {
   return { items: lineas, subtotal, promos: usadas, problemas };
 }
 
+// ── LA REVISIÓN DEL PRECIO (se copia igual en aliados) ──
+
 /** ¿A este pedido le pone el precio el servidor? Los de un CLIENTE (llevan su firma); los del negocio (la mesa), no. */
 function loRevisaElServidor(p) {
   return !!(p && p.clienteId);
 }
+
+/**
+ * P11: lo que el servidor deja en `revisionServidor.estado`: REVISION_HECHA si le puso al pedido el precio del menú,
+ * o REVISION_FALLIDA (con su `motivo`) si no pudo y el pedido se quedó con lo que mandó el teléfono.
+ */
+const REVISION_HECHA = 'revisado';
+const REVISION_FALLIDA = 'sin_revisar';
+/** Lo que se espera la revisión antes de darla por perdida (la función se cayó o no corrió): 2 minutos. */
+const ESPERA_DE_LA_REVISION_MS = 2 * 60 * 1000;
+
+/**
+ * Qué se puede decir del precio de este pedido: 'no-aplica' (lo hizo el negocio: la mesa), 'revisando' (acaba de
+ * nacer y el servidor aún no contesta), 'revisado' (lleva el precio del menú) o 'sin-revisar' (el total es el que
+ * mandó el teléfono y nadie lo comprobó). `msDeVida` = cuánto hace que nació el pedido (null si no se sabe).
+ * Una revisión sin estado, o con otro, no se cree: no la escribió este servidor.
+ */
+function comoVaLaRevision(p, msDeVida) {
+  if (!loRevisaElServidor(p)) return 'no-aplica';
+  const r = p.revisionServidor;
+  if (r) return r.estado === REVISION_HECHA ? 'revisado' : 'sin-revisar';
+  // Con el reloj del aparato atrasado la vida sale negativa: tampoco se espera más de la cuenta.
+  return typeof msDeVida === 'number' && Math.abs(msDeVida) < ESPERA_DE_LA_REVISION_MS ? 'revisando' : 'sin-revisar';
+}
+
+// ── FIN DE LA REVISIÓN DEL PRECIO ──
 
 /**
  * Le pone al pedido recién nacido los precios del menú, en UNA transacción: lee el pedido, el negocio y los contadores
@@ -174,11 +201,13 @@ async function ponerElPrecioDelServidor(db, pedidoId, eventoId, ahora) {
     if (!sp.exists) return null;
     const p = sp.data();
     if (!loRevisaElServidor(p)) return p;
-    if (p.revisionServidor && p.revisionServidor.evento === eventoId) return p;
+    // P11: un reintento del mismo disparo no vuelve a revisar (ni a contar) lo que ya quedó revisado; si la vez
+    // anterior falló, sí lo intenta otra vez (el contador solo se suma cuando la revisión sale bien).
+    if (yaLoRevisoEsteDisparo(p, eventoId)) return p;
     const sn = p.restauranteId ? await tx.get(db.collection('negocios').doc(String(p.restauranteId))) : null;
     const delTelefono = { subtotalDelTelefono: numero(p.subtotal), totalDelTelefono: numero(p.total) };
     if (!sn || !sn.exists) {
-      const revisionServidor = { evento: eventoId, ...delTelefono, promos: [], problemas: [{ codigo: 'sin-negocio' }] };
+      const revisionServidor = { evento: eventoId, estado: REVISION_FALLIDA, motivo: 'sin-negocio', ...delTelefono, promos: [], problemas: [{ codigo: 'sin-negocio' }] };
       tx.update(refPedido, { revisionServidor });
       return { ...p, revisionServidor };
     }
@@ -195,7 +224,7 @@ async function ponerElPrecioDelServidor(db, pedidoId, eventoId, ahora) {
     const costoDomicilio = p.estado === 'nuevo' ? costoDomicilioDelNegocio(negocio) : Number(p.costoDomicilio) || 0;
     const campos = {
       items: r.items, subtotal: r.subtotal, costoDomicilio, total: r.subtotal + costoDomicilio,
-      revisionServidor: { evento: eventoId, ...delTelefono, promos: r.promos, problemas: r.problemas },
+      revisionServidor: { evento: eventoId, estado: REVISION_HECHA, ...delTelefono, promos: r.promos, problemas: r.problemas },
     };
     tx.update(refPedido, campos);
     for (const pid of r.promos) {
@@ -205,7 +234,35 @@ async function ponerElPrecioDelServidor(db, pedidoId, eventoId, ahora) {
   });
 }
 
+/** P11: ¿este mismo disparo ya le dejó al pedido una revisión HECHA? (entonces no se repite ni se pisa) */
+function yaLoRevisoEsteDisparo(p, eventoId) {
+  const r = p && p.revisionServidor;
+  return !!(r && r.evento === eventoId && r.estado === REVISION_HECHA);
+}
+
+/**
+ * P11: si poner el precio FALLÓ, se deja dicho en el pedido —`revisionServidor.estado` = REVISION_FALLIDA, con el
+ * motivo y lo que mandó el teléfono— para que aliados no lo enseñe como uno revisado. En una transacción, y sin pisar
+ * una revisión hecha por este mismo disparo. No toca la plata ni el contador de las promociones.
+ */
+async function marcarSinRevisar(db, pedidoId, eventoId, motivo) {
+  const refPedido = db.collection('pedidos').doc(pedidoId);
+  return db.runTransaction(async (tx) => {
+    const sp = await tx.get(refPedido);
+    if (!sp.exists) return null;
+    const p = sp.data();
+    if (!loRevisaElServidor(p) || yaLoRevisoEsteDisparo(p, eventoId)) return p;
+    const revisionServidor = {
+      evento: eventoId, estado: REVISION_FALLIDA, motivo: String(motivo || 'error').slice(0, 200),
+      subtotalDelTelefono: numero(p.subtotal), totalDelTelefono: numero(p.total), promos: [], problemas: [],
+    };
+    tx.update(refPedido, { revisionServidor });
+    return { ...p, revisionServidor };
+  });
+}
+
 module.exports = {
   diaDeLaSemanaEnColombia, promoVigenteHoy, precioConPromo, topeLleno, mejorDescuento, precioDeLaLinea,
   costoDomicilioDelNegocio, pedidoConPreciosDelMenu, loRevisaElServidor, ponerElPrecioDelServidor,
+  REVISION_HECHA, REVISION_FALLIDA, ESPERA_DE_LA_REVISION_MS, comoVaLaRevision, marcarSinRevisar,
 };
