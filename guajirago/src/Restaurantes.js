@@ -17,7 +17,7 @@ import { guardarRechazo } from './guardarRechazo';
 import { losDeComida } from './escaparate';
 // P09: qué promoción vale hoy y cuánto cuesta cada línea es la cuenta del SERVIDOR (copia atada de
 // functions/precioPedido.cjs). Aquí solo se ENSEÑA: el precio de verdad lo pone el servidor cuando nace el pedido.
-import { promoVigenteHoy, mejorDescuento, precioDeLaLinea, costoDomicilioDelNegocio, sinPromo } from './precioPedido';
+import { promoVigenteHoy, mejorDescuento, precioDeLaLinea, costoDomicilioDelNegocio, sinPromo, nombreOPorDefecto, PLATO_SIN_NOMBRE, PROMO_SIN_NOMBRE } from './precioPedido';
 // G87: qué número es cada día de la promoción y cómo se dice vive en diasSemana.js (copia atada en aliados).
 import { diasTxt } from './diasSemana';
 // G47: «¿me pueden pedir ahora?» es UNA regla (candado + escaparate + pausa + horario), la misma del dueño y del panel.
@@ -232,7 +232,8 @@ function Restaurantes({ nombre, onVolver, foto, onCerrarSesion, onIrPerfil, onIr
   const promosActivasHoy = () => {
     const proms = (restauranteActivo && restauranteActivo.promociones) || [];
     // P09: la misma pregunta que se hace el servidor (y el día de la semana es el de Colombia, no el del aparato).
-    return proms.filter((p) => promoVigenteHoy(p, new Date()));
+    // P15: una promoción sin id no la puede reconocer el servidor (cobra sin ella): tampoco se ofrece aquí.
+    return proms.filter((p) => p && p.id != null && promoVigenteHoy(p, new Date()));
   };
   // Mejor descuento (%, fijo) aplicable a un plato para ESTE cliente (respeta límite por dispositivo).
   // P09: la cuenta es la del servidor (precioPedido.js).
@@ -251,7 +252,7 @@ function Restaurantes({ nombre, onVolver, foto, onCerrarSesion, onIrPerfil, onIr
     setCarrito((prev) => {
       const idx = prev.findIndex((l) => l.firma === firma);
       if (idx >= 0) return prev.map((l, i) => (i === idx ? { ...l, cantidad: l.cantidad + cantidad } : l));
-      return [...prev, { lineaId: nuevaLineaId(), firma, id: plato.id, nombre: plato.nombre, precio: unit, cantidad, adiciones: adicionesSel, ...(desc ? { promoId: desc.promo.id, promoNombre: desc.promo.nombre, precioOriginal: plato.precio + extra } : {}) }];
+      return [...prev, { lineaId: nuevaLineaId(), firma, ...(plato.id != null ? { id: plato.id } : {}), nombre: nombreOPorDefecto(plato.nombre, PLATO_SIN_NOMBRE), precio: unit, cantidad, adiciones: adicionesSel, ...(desc ? { promoId: desc.promo.id, promoNombre: nombreOPorDefecto(desc.promo.nombre, PROMO_SIN_NOMBRE), precioOriginal: plato.precio + extra } : {}) }];
     });
   };
 
@@ -321,7 +322,8 @@ function Restaurantes({ nombre, onVolver, foto, onCerrarSesion, onIrPerfil, onIr
         // servidor no tiene forma de saber de quien es, y hasta el 24-ago-2026
         // por eso los dejaba mirar a CUALQUIERA que tuviera una cuenta.
         clienteId: auth.currentUser ? auth.currentUser.uid : null,
-        restauranteNombre: restauranteActivo.nombre,
+        // P15: con un dato que falta, un nombre que se entienda (antes: undefined, y el pedido no salía del teléfono).
+        restauranteNombre: nombreOPorDefecto(restauranteActivo.nombre, 'Restaurante'),
         cliente: nombre || 'Cliente GuajiraGo',
         telefono: tel,
         direccion: direccion.trim(),

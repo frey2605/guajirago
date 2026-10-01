@@ -85,6 +85,17 @@ function sinPromo(linea) {
   return resto;
 }
 
+/**
+ * P15: el nombre que se guarda en el pedido (del negocio, de un plato o de una promoción): el suyo si es un texto con
+ * algo, o `porDefecto` si falta o no es texto. Firestore no guarda `undefined` y las reglas piden texto: con un nombre
+ * que faltaba, el pedido no salía del teléfono. El servidor usa los mismos nombres por defecto al revisar la línea.
+ */
+function nombreOPorDefecto(nombre, porDefecto) {
+  return typeof nombre === 'string' && nombre.trim() ? nombre : porDefecto;
+}
+const PLATO_SIN_NOMBRE = 'Plato';
+const PROMO_SIN_NOMBRE = 'Promoción';
+
 // ── EL DOMICILIO DEL NEGOCIO (se copia igual en la app y en aliados) ──
 
 /**
@@ -207,8 +218,9 @@ function pedidoConPreciosDelMenu(negocio, items, usos, ahora) {
     if (cantidadBuena) subtotal += precio * l.cantidad;
     const extra = adiciones.reduce((s, a) => s + (a.precio || 0), 0);
     return {
-      ...base, id: plato.id, nombre: plato.nombre || '', precio, adiciones,
-      ...(desc ? { promoId: desc.promo.id, promoNombre: desc.promo.nombre || '', precioOriginal: plato.precio + extra } : {}),
+      // P15: un plato del menú sin id va sin id (antes `id: undefined`, y la revisión no se podía guardar).
+      ...base, ...(plato.id != null ? { id: plato.id } : {}), nombre: nombreOPorDefecto(plato.nombre, PLATO_SIN_NOMBRE), precio, adiciones,
+      ...(desc ? { promoId: desc.promo.id, promoNombre: nombreOPorDefecto(desc.promo.nombre, PROMO_SIN_NOMBRE), precioOriginal: plato.precio + extra } : {}),
     };
   });
   const deMas = problemas.length - MAX_PROBLEMAS;
@@ -340,5 +352,6 @@ module.exports = {
   diaDeLaSemanaEnColombia, promoVigenteHoy, precioConPromo, topeLleno, mejorDescuento, precioDeLaLinea,
   costoDomicilioDelNegocio, pedidoConPreciosDelMenu, loRevisaElServidor, ponerElPrecioDelServidor,
   REVISION_HECHA, REVISION_FALLIDA, ESPERA_DE_LA_REVISION_MS, comoVaLaRevision, marcarSinRevisar,
+  nombreOPorDefecto, PLATO_SIN_NOMBRE, PROMO_SIN_NOMBRE,
   nombreDeDocumento, idDelContador, MAX_LINEAS, MAX_ADICIONES, CANTIDAD_MAXIMA, MAX_PROBLEMAS,
 };

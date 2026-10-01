@@ -99,6 +99,23 @@ const CASOS = [
   },
 ];
 
+/**
+ * P15 (1-oct-2026): LOS DATOS QUE LE FALTAN AL NEGOCIO. La app arma el pedido con el nombre del negocio, el id y el
+ * nombre de cada plato, y el id y el nombre de la promoción; si al negocio le falta uno (o no es texto), la línea se
+ * armaba con `undefined` y Firestore rechazaba el pedido en el teléfono. Cada caso es el negocio de mentira con UN dato
+ * de menos; en `lineas` el plato se nombra por su id o, si no tiene, por su nombre.
+ */
+const sinCampo = (o, k) => { const r = { ...o }; delete r[k]; return r; };
+const negocioCon = (cambio) => cambio(JSON.parse(JSON.stringify(NEGOCIO)));
+const CASOS_FALTANTES = [
+  { caso: 'FALTA · el negocio no tiene nombre', negocio: negocioCon((n) => sinCampo(n, 'nombre')), lineas: [['p3', [], 1]], envios: 1 },
+  { caso: 'FALTA · el nombre del negocio no es texto (un número)', negocio: negocioCon((n) => ({ ...n, nombre: 123 })), lineas: [['p3', [], 1]], envios: 1 },
+  { caso: 'FALTA · un plato sin nombre', negocio: negocioCon((n) => ({ ...n, menu: n.menu.map((p) => (p.id === 'p3' ? sinCampo(p, 'nombre') : p)) })), lineas: [['p3', [], 2]], envios: 1 },
+  { caso: 'FALTA · una promoción sin nombre', negocio: negocioCon((n) => ({ ...n, promociones: n.promociones.map((p) => (p.id === 'libre' ? sinCampo(p, 'nombre') : p)) })), lineas: [['p2', [], 1]], envios: 1 },
+  { caso: 'FALTA · una promoción sin id', negocio: negocioCon((n) => ({ ...n, promociones: n.promociones.map((p) => (p.id === 'libre' ? sinCampo(p, 'id') : p)) })), lineas: [['p2', [], 1]], envios: 1 },
+  { caso: 'FALTA · un plato sin id', negocio: negocioCon((n) => ({ ...n, menu: n.menu.map((p) => (p.id === 'p3' ? sinCampo(p, 'id') : p)) })), lineas: [['Agua', [], 1]], envios: 1 },
+];
+
 /** La pantalla sacada de Restaurantes.js y ejecutada: devuelve un «aparato» con su estado y sus dos acciones. */
 function pantallaDe(fuente, pieza) {
   const f = sinCR(fuente);
@@ -111,7 +128,7 @@ function pantallaDe(fuente, pieza) {
   const { crearCandado } = cargarDeLaApp('guajirago/src/candado.js');
   const { celularDiezCifras } = cargarDeLaApp('guajirago/src/telefonoValido.js');
 
-  return function aparato({ usosTelefono = {}, usosAparato = {} } = {}) {
+  return function aparato({ usosTelefono = {}, usosAparato = {}, negocio = NEGOCIO } = {}) {
     const estado = {
       carrito: [], usosPromo: { ...usosAparato }, telefono: TELEFONO, direccion: 'Calle 1 #2-3', metodoPago: 'Efectivo',
       avisoPromo: '', avisoPago: '', pantalla: 'menu', pedidoId: null,
@@ -122,7 +139,7 @@ function pantallaDe(fuente, pieza) {
     const poner = (k) => (v) => { estado[k] = typeof v === 'function' ? v(estado[k]) : v; };
     const ambito = {
       ...pieza, celularDiezCifras,
-      restauranteActivo: NEGOCIO, nombre: 'Ana',
+      restauranteActivo: negocio, nombre: 'Ana',
       platoConfig: null, adicionesSel: [], setPlatoConfig: () => {}, setAdicionesSel: () => {}, setCantidadConfig: () => {},
       setCarrito: poner('carrito'), setUsosPromo: poner('usosPromo'), setAvisoPromo: poner('avisoPromo'), setAvisoPago: poner('avisoPago'),
       setDireccion: poner('direccion'), setTelefono: poner('telefono'), setMetodoPago: poner('metodoPago'),
@@ -149,7 +166,7 @@ function pantallaDe(fuente, pieza) {
     const render = () => hacer({ ...ambito, ...estado });
     return {
       estado, mandados, avisos,
-      agregar: (id, ad, n) => render().agregarLinea(plato(id), ad, n),
+      agregar: (id, ad, n) => render().agregarLinea(negocio === NEGOCIO ? plato(id) : negocio.menu.find((p) => p.id === id || (p.id == null && p.nombre === id)), ad, n),
       pedir: () => render().enviarPedido(),
     };
   };
@@ -159,7 +176,7 @@ function pantallaDe(fuente, pieza) {
 const CAMPOS_LINEA = ['lineaId', 'firma', 'id', 'nombre', 'precio', 'cantidad', 'adiciones', 'promoId', 'promoNombre', 'precioOriginal'];
 
 async function correrCaso(aparatoDe, c, crear) {
-  const ap = aparatoDe({ usosTelefono: c.usosTelefono, usosAparato: c.usosAparato });
+  const ap = aparatoDe({ usosTelefono: c.usosTelefono, usosAparato: c.usosAparato, negocio: c.negocio || NEGOCIO });
   for (const [id, ad, n] of c.lineas) ap.agregar(id, ad, n);
   const pasos = [];
   for (let i = 0; i < c.envios; i++) {
@@ -177,27 +194,46 @@ async function correrCaso(aparatoDe, c, crear) {
   const enLaLinea = ultimo ? ultimo.items.flatMap((l) => Object.keys(l).filter((k) => !CAMPOS_LINEA.includes(k))) : [];
   const fueraDeP13 = ultimo ? Object.keys(ultimo).filter((k) => !crear.includes(k)) : [];
   const usos = (id) => (c.usosTelefono || {})[id] || 0;
-  const servidor = entro ? SERVIDOR.pedidoConPreciosDelMenu(NEGOCIO, ultimo.items, usos, new Date()) : null;
+  const servidor = entro ? servidorDe(c.negocio || NEGOCIO, ultimo.items, usos, new Date()) : null;
   return {
-    caso: c.caso, agotada: !!c.agotada, entro, pasos, pedido: entro ? ultimo : null,
+    caso: c.caso, agotada: !!c.agotada, entro, pasos, pedido: entro ? ultimo : null, intentado: ultimo,
     indefinidosMandados: ultimo ? dondeHayIndefinidos(ultimo) : [],
     fueraDeP13, enLaLinea,
     subtotalApp: entro ? ultimo.subtotal : null,
     subtotalServidor: servidor ? servidor.subtotal : null,
     promosServidor: servidor ? servidor.promos : null,
     problemasServidor: servidor ? servidor.problemas.map((p) => p.codigo) : null,
+    // P15: la línea que guardaría el servidor también tiene que poder guardarse (sin `undefined`).
+    itemsServidor: servidor ? servidor.items : null,
+    indefinidosServidor: servidor ? dondeHayIndefinidos(servidor.items) : [],
   };
 }
 
-/** Corre todos los casos con el código de hoy (commit null) o el de un commit. */
-async function medirApp(commit) {
+/** Corre los casos (los de P14 si no se dicen otros) con el código de hoy (commit null) o el de un commit. */
+async function medirApp(commit, casos = CASOS) {
   const pieza = cargarDeLaApp(PIEZA, leerRaiz(commit, PIEZA));
   const aparatoDe = pantallaDe(leerRaiz(commit, PANTALLA), pieza);
   const { crear } = listasDeLasReglas(leerRaiz(null, 'firestore.rules'));
+  servidorDe = servidorDelCommit(commit);
   const filas = [];
   // eslint-disable-next-line no-await-in-loop
-  for (const c of CASOS) filas.push(await correrCaso(aparatoDe, c, crear));
+  for (const c of casos) filas.push(await correrCaso(aparatoDe, c, crear));
   return filas;
+}
+
+/**
+ * P15: la revisión del servidor del mismo código que la app (la de hoy, o la de un commit sacada a una carpeta
+ * temporal con sus vecinos), para carear también lo que guarda el servidor.
+ */
+let servidorDe = SERVIDOR.pedidoConPreciosDelMenu;
+function servidorDelCommit(commit) {
+  if (!commit) return SERVIDOR.pedidoConPreciosDelMenu;
+  const os = require('os');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'p15-servidor-'));
+  for (const f of ['precioPedido.cjs', 'promociones.cjs', 'cobros.cjs', 'telefonoValido.cjs', 'moneda.cjs', 'suscripcion.js']) {
+    fs.writeFileSync(path.join(dir, f), leerRaiz(commit, 'guajirago/functions/' + f));
+  }
+  return require(path.join(dir, 'precioPedido.cjs')).pedidoConPreciosDelMenu;
 }
 
 /** Producción (solo lectura): ¿hay datos que harían que la app mandara un undefined o que activan el caso? */
@@ -205,9 +241,13 @@ function contarNube(negocios, usosPromo, pedidos) {
   const r = { negocios: negocios.length, sinNombre: [], platosSinNombre: [], promosSinNombre: [], promosConTope: [], usosPromo: usosPromo.length, pedidosConPromo: 0, lineasConPromoVacia: 0 };
   for (const n of negocios) {
     if (typeof n.nombre !== 'string') r.sinNombre.push(n.id);
-    for (const p of n.menu || []) if (p && typeof p.nombre !== 'string') r.platosSinNombre.push(n.id + '/' + p.id);
+    for (const p of n.menu || []) {
+      if (p && typeof p.nombre !== 'string') r.platosSinNombre.push(n.id + '/' + p.id);
+      if (p && p.id == null) (r.platosSinId = r.platosSinId || []).push(n.id + '/' + p.nombre);
+    }
     for (const p of n.promociones || []) {
       if (p && typeof p.nombre !== 'string') r.promosSinNombre.push(n.id + '/' + p.id);
+      if (p && p.id == null) (r.promosSinId = r.promosSinId || []).push(n.id + '/' + p.nombre);
       if (p && p.limiteCliente > 0) r.promosConTope.push(n.id + '/' + p.id + ' (tope ' + p.limiteCliente + (p.activa ? ', encendida' : ', apagada') + ')');
     }
   }
@@ -237,6 +277,9 @@ function imprimir(titulo, filas) {
       console.log('      la app enseñó subtotal ' + f.subtotalApp + ' · el servidor cobra ' + f.subtotalServidor
         + ' · promociones aplicadas por el servidor: ' + (f.promosServidor.join(', ') || 'ninguna')
         + (f.problemasServidor.length ? ' · problemas: ' + f.problemasServidor.join(', ') : ''));
+      console.log('      nombre del negocio: ' + JSON.stringify(f.pedido.restauranteNombre) + ' · líneas: '
+        + f.pedido.items.map((l) => JSON.stringify(l.nombre) + (l.promoNombre !== undefined ? ' (' + JSON.stringify(l.promoNombre) + ')' : '')).join(', ')
+        + (f.indefinidosServidor.length ? ' · 🔴 el servidor guardaría undefined en ' + f.indefinidosServidor.join(', ') : ''));
     }
   }
   const atascados = filas.filter((f) => f.agotada && !f.entro).length;
@@ -253,12 +296,16 @@ async function main() {
   const commit = i >= 0 ? process.argv[i + 1] : null;
   const filas = await medirApp(commit);
   imprimir('LA APP ' + (commit ? 'DEL COMMIT ' + commit : 'DE HOY'), filas);
+  const faltantes = await medirApp(commit, CASOS_FALTANTES);
+  imprimir('P15 · DATOS QUE LE FALTAN AL NEGOCIO, ' + (commit ? 'COMMIT ' + commit : 'HOY'), faltantes);
+  console.log('  P15 · casos con un dato faltante que NO dejan pedir: ' + faltantes.filter((f) => !f.entro).length + ' de ' + faltantes.length);
   if (process.argv.includes('--nube')) {
     const { traer, doc } = require('./nube.cjs');
     const r = contarNube((await traer('negocios')).map(doc), (await traer('usosPromo')).map(doc), (await traer('pedidos')).map(doc));
     console.log('\n── PRODUCCIÓN (solo lectura) ──');
     console.log('  negocios: ' + r.negocios + ' · sin nombre: ' + r.sinNombre.length + ' · platos sin nombre: ' + r.platosSinNombre.length
-      + ' · promociones sin nombre: ' + r.promosSinNombre.length);
+      + ' · promociones sin nombre: ' + r.promosSinNombre.length
+      + ' · platos sin id: ' + (r.platosSinId || []).length + ' · promociones sin id: ' + (r.promosSinId || []).length);
     console.log('  promociones con tope por cliente: ' + r.promosConTope.length + (r.promosConTope.length ? ' → ' + r.promosConTope.join(' · ') : ''));
     console.log('  contadores usosPromo: ' + r.usosPromo + ' · pedidos con promoción: ' + r.pedidosConPromo + ' · líneas con promoId vacío: ' + r.lineasConPromoVacia);
   }
@@ -269,4 +316,4 @@ if (require.main === module) {
   main().catch((e) => { console.error('✋ ' + e.message); process.exit(1); });
 }
 
-module.exports = { medirApp, pantallaDe, correrCaso, dondeHayIndefinidos, loQueDiceFirestore, contarNube, CASOS, NEGOCIO, CAMPOS_LINEA };
+module.exports = { medirApp, pantallaDe, correrCaso, dondeHayIndefinidos, loQueDiceFirestore, contarNube, CASOS, CASOS_FALTANTES, NEGOCIO, CAMPOS_LINEA };

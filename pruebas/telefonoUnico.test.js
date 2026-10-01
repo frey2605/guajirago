@@ -178,7 +178,8 @@ describe('G42 · cada formulario guarda las 10 cifras limpias, y no guarda lo qu
         nombre: 'Ana', totalCarrito: 1000, serverTimestamp: () => 'ahora', prepararTokenDeAvisos: () => () => {},
         recordar: () => {}, MIS_PEDIDOS: {}, usosPromo: {}, // G88: el id se recuerda con la pieza del teléfono
         numeroDelPedido: cargarDeLaApp('guajirago/src/estadosPedido.js').numeroDelPedido, // G94: el «Pedido #» sale de la pieza
-        costoDomicilioDelNegocio: cargarDeLaApp('guajirago/src/precioPedido.js').costoDomicilioDelNegocio }); // P10: el domicilio sale de la pieza
+        costoDomicilioDelNegocio: cargarDeLaApp('guajirago/src/precioPedido.js').costoDomicilioDelNegocio, // P10: el domicilio sale de la pieza
+        nombreOPorDefecto: cargarDeLaApp('guajirago/src/precioPedido.js').nombreOPorDefecto }); // P15: el nombre del negocio, de la pieza
       return r;
     };
     assert.strictEqual((await correr('300 123 4567')).b.escritos.find((e) => e.ref === 'pedidos').datos.telefono, '3001234567');

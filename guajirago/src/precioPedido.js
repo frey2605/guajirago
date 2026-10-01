@@ -72,6 +72,17 @@ export function sinPromo(linea) {
   return resto;
 }
 
+/**
+ * P15: el nombre que se guarda en el pedido (del negocio, de un plato o de una promoción): el suyo si es un texto con
+ * algo, o `porDefecto` si falta o no es texto. Firestore no guarda `undefined` y las reglas piden texto: con un nombre
+ * que faltaba, el pedido no salía del teléfono. El servidor usa los mismos nombres por defecto al revisar la línea.
+ */
+export function nombreOPorDefecto(nombre, porDefecto) {
+  return typeof nombre === 'string' && nombre.trim() ? nombre : porDefecto;
+}
+export const PLATO_SIN_NOMBRE = 'Plato';
+export const PROMO_SIN_NOMBRE = 'Promoción';
+
 // ── EL DOMICILIO DEL NEGOCIO (se copia igual en la app y en aliados) ──
 
 /**
